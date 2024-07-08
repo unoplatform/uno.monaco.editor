@@ -262,7 +262,7 @@ namespace Monaco
 
 				var opt = {{}};
 				try{{
-					opt = getOptions();
+					opt = getOptionsJson();
 				}}
 				catch(err){{
 					Debug.log(""Unable to read options - "" + err);
