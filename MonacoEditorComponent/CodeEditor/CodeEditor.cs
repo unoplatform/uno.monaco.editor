@@ -101,9 +101,6 @@ namespace Monaco
                 Decorations.VectorChanged += Decorations_VectorChanged;
                 Markers.VectorChanged += Markers_VectorChanged;
 
-                _view.NewWindowRequested += WebView_NewWindowRequested;
-                _view.Loaded += WebView_DOMContentLoaded;
-
                 Debug.WriteLine("Setting initialized - true");
                 _initialized = true;
 
