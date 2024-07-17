@@ -318,12 +318,6 @@ namespace Monaco
 				Debug.log(""Changing theme"");
 	            changeTheme(theme, getThemeIsHighContrast());
 
-	            // Update Monaco Size when we receive a window resize event
-				Debug.log(""Listen for resize events on the window and resize the editor"");
-	            window.addEventListener(""resize"", () => {{
-	                            editor.layout();
-	                        }});
-
 	            // Disable WebView Scrollbar so Monaco Scrollbar can do heavy lifting
 	            document.body.style.overflow = 'hidden';
 

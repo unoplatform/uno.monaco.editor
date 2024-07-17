@@ -46,7 +46,10 @@ namespace Monaco
         {
             DefaultStyleKey = typeof(CodeEditor);
 
-            Options = new StandaloneEditorConstructionOptions();
+            Options = new StandaloneEditorConstructionOptions
+            {
+                AutomaticLayout = true
+            };
             //if (Options != null)
             //{
                 // Set Pass-Thru Properties

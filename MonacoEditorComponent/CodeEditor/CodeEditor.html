@@ -76,11 +76,6 @@
             }
             changeTheme(theme, Theme.isHighContrast.toString());
 
-            // Update Monaco Size when we receive a window resize event
-            window.addEventListener("resize", () => {
-                editor.layout();
-            });
-
             // Disable WebView Scrollbar so Monaco Scrollbar can do heavy lifting
             document.body.style.overflow = 'hidden';
 
