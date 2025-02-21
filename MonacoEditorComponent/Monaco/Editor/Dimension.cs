@@ -2,7 +2,7 @@
 using Monaco.Helpers;
 using Newtonsoft.Json;
 
-namespace Monaco.Monaco.Editor
+namespace Monaco.Editor
 {
     /// <summary>
     /// The initial editor dimension (to avoid measuring the container).

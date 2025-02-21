@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using Windows.ApplicationModel.Activation;
 using Windows.Foundation;
+using Windows.System;
 using Windows.UI.Core;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -56,7 +57,7 @@ namespace Monaco
 #if __WASM__
             InitialiseWebObjects();
 
-            _view.Launch();
+            _ = _view.Launch();
 
             Options.Language = CodeLanguage;
             Options.ReadOnly = ReadOnly;
@@ -71,7 +72,7 @@ namespace Monaco
             IsEditorLoaded = true;
 
             // Make sure inner editor is focused
-            await SendScriptAsync("editor.focus();");
+            await SendScriptAsync("EditorContext.getEditorForElement(element).editor.focus();");
 
             // If we're supposed to have focus, make sure we try and refocus on our now loaded webview.
             if (FocusManager.GetFocusedElement() == this)
@@ -84,6 +85,7 @@ namespace Monaco
 
         internal ParentAccessor _parentAccessor;
         private KeyboardListener _keyboardListener;
+        private DebugLogger _debugLogger;
         private long _themeToken;
 
         private void WebView_NavigationStarting(ICodeEditorPresenter sender, WebViewNavigationStartingEventArgs args)
@@ -98,20 +100,17 @@ namespace Monaco
             Debug.WriteLine($"InitialiseWebObjects");
             try
             {
-                _parentAccessor = new ParentAccessor(this);
+                _parentAccessor = new ParentAccessor(this, _queue);
                 _parentAccessor.AddAssemblyForTypeLookup(typeof(Range).GetTypeInfo().Assembly);
                 _parentAccessor.RegisterAction("Loaded", CodeEditorLoaded);
 
-                _themeListener = new ThemeListener();
+                _themeListener = new ThemeListener(this);
                 _themeListener.ThemeChanged += ThemeListener_ThemeChanged;
                 _themeToken = RegisterPropertyChangedCallback(RequestedThemeProperty, RequestedTheme_PropertyChanged);
 
-                _keyboardListener = new KeyboardListener(this);
+                _keyboardListener = new KeyboardListener(this, _queue);
+                _debugLogger = new DebugLogger(this);
 
-                _view.AddWebAllowedObject("Debug", new DebugLogger());
-                _view.AddWebAllowedObject("Parent", _parentAccessor);
-                _view.AddWebAllowedObject("Theme", _themeListener);
-                _view.AddWebAllowedObject("Keyboard", _keyboardListener);
                 Debug.WriteLine($"InitialiseWebObjects - Completed");
             }
             catch(Exception ex)
@@ -122,6 +121,8 @@ namespace Monaco
 
         private async void CodeEditorLoaded()
         {
+            _initialized = true;
+
             if (Decorations != null && Decorations.Count > 0)
             {
                 // Need to retrigger highlights after load if they were set before load.
@@ -130,6 +131,24 @@ namespace Monaco
 
             // Now we're done loading
             Loading?.Invoke(this, new RoutedEventArgs());
+
+            // Make sure inner editor is focused
+            await SendScriptAsync("EditorContext.getEditorForElement(element).editor.focus();");
+
+            await SendScriptAsync("EditorContext.getEditorForElement(element).editor.layout();");
+
+            await InvokeScriptAsync("updateLanguage", Options.Language);
+            await InvokeScriptAsync("updateOptions", Options);
+
+            // If we're supposed to have focus, make sure we try and refocus on our now loaded webview.
+            if (FocusManager.GetFocusedElement() == this)
+            {
+                _view.Focus(FocusState.Programmatic);
+            }
+
+            IsEditorLoaded = true;
+
+            Loaded?.Invoke(this, new RoutedEventArgs());
 
 #if __WASM__
             Dispatcher.RunAsync(CoreDispatcherPriority.Low, () => WebView_NavigationCompleted(_view, null));

@@ -1,15 +1,21 @@
-v0.9 - 04/??/2020
+v0.9 - 10/27/2021
 -----------------
-- Updated Monaco Reference to v0.20.0
+- Updated Monaco Reference to v0.21.3
+- Add *[CodeAction](https://microsoft.github.io/monaco-editor/api/modules/monaco.languages.html#registercodeactionprovider)* Language Service Support
+- Add *[CodeLens](https://microsoft.github.io/monaco-editor/api/modules/monaco.languages.html#registercodelensprovider)* Language Sergvice Support (onDidChange not supported)
 - Add *[ColorProvider](https://microsoft.github.io/monaco-editor/api/modules/monaco.languages.html#registercolorprovider)* Language Service Support
 - Add *[FindMatches](https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.itextmodel.html#findmatches)* Model Methods
+- Moved WebView out-of-process
 - Expose `ReadOnly` property
 - Fix broken Snippet function
 - Optimized Decoration Style generation
 - Sync `CodeLanguage` and `Options.Language`, `HasGlyphMargin` and `Options.GlyphMargin`
 - **Note:** Marked `LanguagesHelper` Obsolete, use <Editor Instance>.Languages.* instead.
+- Fixes for #41, #49, #58, #60, #62
+- Added Converter Script to Repo to Generate Typings from Monaco, thanks to @hez2010 for the tool!
 
 **Breaking Changes**: 
+- The CssStyle classes for `IModelDecorationOptions` have been changed from `SolidColorBrush` to `Nullable<Color>` and support alpha
 - The `CommandHandler` delegate has changed to accept arguments to Commands.
 - Use `StandaloneEditorConstructionOptions` for Options instead of `IEditorConstructionOptions`
 - `CompletionItem` constructor has changed
@@ -17,7 +23,7 @@ v0.9 - 04/??/2020
 - Use `HoverProvider` interface instead of original delegate
 - `IUri` has been renamed to `Uri` (see another Future Break #33)
 - Rename `IsLoaded` to `IsEditorLoaded`
-- `CssStyleBroker` made internal
+- `CssStyleBroker` made internal #42
 
 v0.8.1 - 01/15/2019
 -------------------

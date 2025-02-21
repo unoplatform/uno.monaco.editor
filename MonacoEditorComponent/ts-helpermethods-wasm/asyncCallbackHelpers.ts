@@ -1,7 +1,4 @@
-﻿declare var Parent: ParentAccessor;
-declare var Theme: ThemeAccessor;
-
-type MethodWithReturnId = (parameter: string) => void;
+﻿type MethodWithReturnId = (parameter: string) => void;
 type NumberCallback = (parameter: any) => void;
 declare var asyncCallbackMap: { [promiseId: string]: NumberCallback };
 declare var nextAsync: number;
@@ -14,6 +11,142 @@ declare var nextReturn: number;
 
 nextReturn = 1;
 returnValueCallbackMap = {};
+
+const initializeMonacoEditor = (handle: string, element: any) => {
+    {
+        console.debug("Grabbing Monaco Options");
+
+        var opt = {}
+    };
+    try {
+        {
+            opt = getOptions(element);
+        }
+    }
+    catch (err) {
+        {
+            console.debug("Unable to read options - " + err);
+        }
+    }
+
+    console.debug("Getting Parent Text value");
+    opt["value"] = getParentValue(element, "Text");
+
+    console.debug("Getting Host container");
+    console.debug("Creating Editor");
+    const editor = monaco.editor.create(element, opt);
+    var editorContext = EditorContext.registerEditorForElement(element, editor);
+
+    console.debug("Getting Editor model");
+    editorContext.model = editor.getModel();
+
+    // Listen for Content Changes
+    console.debug("Listening for changes in the editor model - " + (!editorContext.model));
+
+    editorContext.model.onDidChangeContent((event) => {
+        {
+            editorContext.Accessor.setValue("Text", stringifyForMarshalling(editorContext.model.getValue()));
+            //console.log("buffers: " + JSON.stringify(model._buffer._pieceTree._buffers));
+            //console.log("commandMgr: " + JSON.stringify(model._commandManager));
+            //console.log("viewState:" + JSON.stringify(editor.saveViewState()));
+        }
+    });
+
+    // Listen for Selection Changes
+    console.debug("Listening for changes in the editor selection");
+    editor.onDidChangeCursorSelection((event) => {
+        {
+            if (!editorContext.modifingSelection) {
+                {
+                    console.log(event.source);
+                    editorContext.Accessor.setValue("SelectedText", stringifyForMarshalling(editorContext.model.getValueInRange(event.selection)));
+                    editorContext.Accessor.setValueWithType("SelectedRange", stringifyForMarshalling(JSON.stringify(event.selection)), "Selection");
+                }
+            }
+        }
+    });
+
+    // Set theme
+    console.debug("Getting parent theme value");
+    let theme = getParentJsonValue(element, "RequestedTheme");
+    theme = {
+        "0": "Default",
+        "1": "Light",
+        "2": "Dark"
+    }
+    [theme];
+    console.debug("Current theme value - " + theme);
+    if (theme == "Default") {
+        {
+            console.debug("Loading default theme");
+
+            theme = getThemeCurrentThemeName(element);
+        }
+    }
+    console.debug("Changing theme");
+    changeTheme(element, theme, getThemeIsHighContrast(element));
+
+    // Update Monaco Size when we receive a window resize event
+    console.debug("Listen for resize events on the window and resize the editor");
+    window.addEventListener("resize", () => {
+        {
+            editor.layout();
+        }
+    });
+
+    // Disable WebView Scrollbar so Monaco Scrollbar can do heavy lifting
+    document.body.style.overflow = 'hidden';
+
+    // Callback to Parent that we're loaded
+    console.debug("Loaded Monaco");
+    editorContext.Accessor.callAction("Loaded");
+
+    console.debug("Ending Monaco Load");
+};
+
+class DebugLogger {
+
+    public static async setup() {
+    }
+}
+
+class KeyboardListener {
+
+    public static async setup() {
+    }
+}
+
+class ParentAccessor {
+
+    public static async setup() {
+    }
+}
+
+class ThemeListener {
+
+    public static async setup() {
+    }
+}
+
+const createMonacoEditor = async (managedOwner: any, elementId: string, basePath: string) => {
+    console.debug("Create dynamic style element");
+    var head = document.head || document.getElementsByTagName('head')[0];
+    var style = document.createElement('style');
+    style.id = 'dynamic';
+    head.appendChild(style);
+
+    await DebugLogger.setup();
+    await KeyboardListener.setup();
+    await ParentAccessor.setup();
+    await ThemeListener.setup();
+
+    console.debug("Starting Monaco Load");
+
+    (<any>window).require.config({ paths: { 'vs': `${basePath}/monaco-editor/min/vs` } });
+    (<any>window).require(['vs/editor/editor.main'], function () {
+        initializeMonacoEditor(managedOwner, (<any>globalThis).window.getElementById(elementId));
+    });
+}
 
 const asyncCallback = (promiseId: string, parameter: string) => {
     const promise = asyncCallbackMap[promiseId];
@@ -91,40 +224,40 @@ const invokeWithReturnValue = (methodToInvoke: MethodWithReturnId): string => {
     return json;
 }
 
-const getParentValue = (name: string): any => {
-    const jsonString = invokeWithReturnValue((returnId) => Parent.getJsonValue(name, returnId));
+const getParentValue = (element:any, name: string): any => {
+    const jsonString = invokeWithReturnValue((returnId) => EditorContext.getEditorForElement(element).Accessor.getJsonValue(name, returnId));
     const obj = JSON.parse(jsonString);
     return obj;
 }
 
-const getParentJsonValue = (name: string): string =>
-    invokeWithReturnValue((returnId) => Parent.getJsonValue(name, returnId))
+const getParentJsonValue = (element: any, name: string): string =>
+    invokeWithReturnValue((returnId) => EditorContext.getEditorForElement(element).Accessor.getJsonValue(name, returnId))
 
-const getThemeIsHighContrast = (): boolean =>
-    invokeWithReturnValue((returnId) => Theme.getIsHighContrast(returnId)) == "true";
+const getThemeIsHighContrast = (element: any): boolean =>
+    invokeWithReturnValue((returnId) => EditorContext.getEditorForElement(element).Theme.getIsHighContrast(returnId)) == "true";
 
-const getThemeCurrentThemeName = (): string =>
-    invokeWithReturnValue((returnId) => Theme.getCurrentThemeName(returnId));
+const getThemeCurrentThemeName = (element: any): string =>
+    invokeWithReturnValue((returnId) => EditorContext.getEditorForElement(element).Theme.getCurrentThemeName(returnId));
 
 
-const callParentEventAsync = (name: string, parameters: string[]): Promise<string> =>
+const callParentEventAsync = (element: any, name: string, parameters: string[]): Promise<string> =>
     invokeAsyncMethod<string>(async (promiseId) => {
-        let result = await Parent.callEvent(name,
+        let result = await EditorContext.getEditorForElement(element).Accessor.callEvent(name,
             promiseId,
             parameters != null && parameters.length > 0 ? stringifyForMarshalling(parameters[0]) : null,
             parameters != null && parameters.length > 1 ? stringifyForMarshalling(parameters[1]) : null);
         if (result) {
-            //console.log('Parent event result: ' + name + ' -  ' +  result);
+            console.log('Parent event result: ' + name + ' -  ' +  result);
             result = desantize(result);
-            //console.log('Desanitized: ' + name + ' -  ' + result);
+            console.log('Desanitized: ' + name + ' -  ' + result);
         } else {
-            //console.log('No Parent event result for ' + name);
+            console.log('No Parent event result for ' + name);
         }
 
         return result;
     });
 
-const callParentActionWithParameters = (name: string, parameters: string[]): boolean =>
-    Parent.callActionWithParameters(name,
+const callParentActionWithParameters = (element: any, name: string, parameters: string[]): boolean =>
+    EditorContext.getEditorForElement(element).Accessor.callActionWithParameters(name,
         parameters != null && parameters.length > 0 ? stringifyForMarshalling(parameters[0]) : null,
         parameters != null && parameters.length > 1 ? stringifyForMarshalling(parameters[1]) : null);

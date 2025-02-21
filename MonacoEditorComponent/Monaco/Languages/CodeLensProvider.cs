@@ -1,15 +1,16 @@
 using Monaco.Editor;
 using System;
 using System.ComponentModel;
+using System.Threading.Tasks;
 using Windows.Foundation;
 
 namespace Monaco.Languages
 {
     public interface CodeLensProvider
     {
-        IAsyncOperation<CodeLensList> ProvideCodeLensesAsync(IModel model);
+        Task<CodeLensList> ProvideCodeLensesAsync(IModel model);
 
-        IAsyncOperation<CodeLens> ResolveCodeLensAsync(IModel model, CodeLens codeLens);
+        Task<CodeLens> ResolveCodeLensAsync(IModel model, CodeLens codeLens);
     }
 }
 

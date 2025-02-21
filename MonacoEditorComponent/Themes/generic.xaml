@@ -8,6 +8,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="monaco:CodeEditor">
                     <Border
+                        x:Name="RootBorder"
                         Background="{TemplateBinding Background}"
                         BorderBrush="{TemplateBinding BorderBrush}"
                         BorderThickness="{TemplateBinding BorderThickness}"

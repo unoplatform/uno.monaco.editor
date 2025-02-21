@@ -9,14 +9,16 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
 		changelog.md = changelog.md
+		Directory.Build.props = Directory.Build.props
+		Directory.Build.targets = Directory.Build.targets
+		Directory.Packages.props = Directory.Packages.props
 		install-dependencies.ps1 = install-dependencies.ps1
 		MonacoEditorComponent\MonacoEditorComponent.nuspec = MonacoEditorComponent\MonacoEditorComponent.nuspec
 		README.md = README.md
+		ThirdPartyNotices.txt = ThirdPartyNotices.txt
 	EndProjectSection
 EndProject
-Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "MonacoEditorTestApp.Shared", "MonacoEditorTestApp.Shared\MonacoEditorTestApp.Shared.shproj", "{6279C845-92F8-4333-AB99-3D213163593C}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MonacoEditorTestApp.Wasm", "MonacoEditorTestApp.Wasm\MonacoEditorTestApp.Wasm.csproj", "{8F8B7A5A-3B20-42C9-9307-E1B3C0C55FE7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MonacoEditorTestApp", "MonacoEditorTestApp.Wasm\MonacoEditorTestApp.csproj", "{8F8B7A5A-3B20-42C9-9307-E1B3C0C55FE7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -80,7 +82,6 @@ Global
 		SolutionGuid = {90987E94-2049-4E20-B338-022AD41FAC9C}
 	EndGlobalSection
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
-		MonacoEditorTestApp.Shared\MonacoEditorTestApp.Shared.projitems*{6279c845-92f8-4333-ab99-3d213163593c}*SharedItemsImports = 13
 		MonacoEditorTestApp.Shared\MonacoEditorTestApp.Shared.projitems*{8f8b7a5a-3b20-42c9-9307-e1b3c0c55fe7}*SharedItemsImports = 5
 	EndGlobalSection
 EndGlobal

@@ -1,22 +1,33 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices.JavaScript;
 using System.Text;
-using Uno.Foundation.Interop;
 
 namespace Monaco.Helpers
 {
-	partial class DebugLogger : IJSObject
+	partial class DebugLogger
 	{
-		public DebugLogger()
-		{
-			Handle = JSObjectHandle.Create(this);
+        private static ConditionalWeakTable<object, DebugLogger> _instances = new();
 
-			log("created");
+        public DebugLogger(CodeEditor codeEditor)
+		{
+            _instances.Add(codeEditor, this);
+
+            Log("created");
 		}
 
-		/// <inheritdoc />
-		public JSObjectHandle Handle { get; }
-
-		public void log(string message) => Log(message);
-	}
+        [JSExport]
+        public static void NativeLog([JSMarshalAs<JSType.Any>] object managedOwner, string message)
+        {
+            if(_instances.TryGetValue(managedOwner, out var logger))
+            {
+                logger.Log(message);
+            }
+            else
+            {
+                throw new InvalidOperationException($"DebugLogger not found for owner {managedOwner}");
+            }
+        }
+    }
 }

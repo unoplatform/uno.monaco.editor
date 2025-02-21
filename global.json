@@ -1,5 +1,5 @@
 {
   "msbuild-sdks": {
-    "MSBuild.Sdk.Extras": "2.1.2"
+    "Uno.Sdk.Private": "6.0.0-feature.skia-everywhere.18"
   }
 }

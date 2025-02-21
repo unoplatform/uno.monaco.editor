@@ -4,6 +4,8 @@ using Windows.ApplicationModel.Core;
 using Windows.Foundation.Metadata;
 using Windows.UI.ViewManagement;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Dispatching;
+using CommunityToolkit.WinUI;
 
 namespace Monaco.Helpers
 {
@@ -14,8 +16,11 @@ namespace Monaco.Helpers
     /// and Signals an Event when they occur.
     /// </summary>
     [AllowForWeb]
-    public sealed partial class ThemeListener
+    public sealed partial class ThemeListener // This is a copy of the Toolkit ThemeListener, for some reason if we try and use it directly it's not read by the WebView
     {
+        private readonly DispatcherQueue _queue;
+        private readonly CodeEditor _owner;
+
         public string CurrentThemeName { get { return CurrentTheme.ToString(); } } // For Web Retrieval
 
         public ApplicationTheme CurrentTheme { get; set; }
@@ -26,8 +31,13 @@ namespace Monaco.Helpers
         private readonly AccessibilitySettings _accessible = new AccessibilitySettings();
         private readonly UISettings _settings = new UISettings();
 
-        public ThemeListener()
+        public ThemeListener(CodeEditor codeEditor) : this(codeEditor, null) { }
+
+        public ThemeListener(CodeEditor codeEditor, DispatcherQueue queue)
         {
+            _queue = queue ?? DispatcherQueue.GetForCurrentThread();
+            _owner = codeEditor;
+
             CurrentTheme = Application.Current.RequestedTheme;
 #if !__WASM__
             IsHighContrast = _accessible.HighContrast;
@@ -65,15 +75,15 @@ namespace Monaco.Helpers
         private async void _settings_ColorValuesChanged(UISettings sender, object args)
         {
             // Getting called off thread, so we need to dispatch to request value.
-            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
-			{
-				// TODO: This doesn't stop the multiple calls if we're in our faked 'White' HighContrast Mode below.
-				if (CurrentTheme != Application.Current.RequestedTheme ||
-					IsHighContrast != IsSystemHighContrast())
-				{
-#if DEBUG
-					Debug.WriteLine("Color Values Changed");
-#endif
+            await _queue.EnqueueAsync(() =>
+            {
+                // TODO: This doesn't stop the multiple calls if we're in our faked 'White' HighContrast Mode below.
+                if (CurrentTheme != Application.Current.RequestedTheme ||
+                    IsHighContrast != _accessible.HighContrast)
+                {
+                    #if DEBUG
+                    Debug.WriteLine("Color Values Changed");
+                    #endif
 
 					UpdateProperties();
 				}

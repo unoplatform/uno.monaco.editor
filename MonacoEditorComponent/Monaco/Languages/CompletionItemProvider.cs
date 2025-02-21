@@ -1,5 +1,6 @@
 ﻿using Monaco.Editor;
 using Newtonsoft.Json;
+using System.Threading.Tasks;
 using Windows.Foundation;
 
 namespace Monaco.Languages
@@ -21,12 +22,12 @@ namespace Monaco.Languages
         /// <summary>
         /// Provide completion items for the given position and document.
         /// </summary>
-        IAsyncOperation<CompletionList> ProvideCompletionItemsAsync(IModel model, Position position, CompletionContext context);
+        Task<CompletionList> ProvideCompletionItemsAsync(IModel model, Position position, CompletionContext context);
         /// <summary>
         /// Given a completion item fill in more data, like [doc-comment](#CompletionItem.documentation)
         /// or [details](#CompletionItem.detail)./// The editor will only resolve a completion item once.
         /// 
         /// </summary>
-        IAsyncOperation<CompletionItem> ResolveCompletionItemAsync(IModel model, Position position, CompletionItem item);
+        Task<CompletionItem> ResolveCompletionItemAsync(IModel model, CompletionItem item);
     }
 }

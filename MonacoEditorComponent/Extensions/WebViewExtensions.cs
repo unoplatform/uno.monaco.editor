@@ -71,7 +71,7 @@ namespace Monaco.Extensions
 
         private static async Task<T> RunScriptHelperAsync<T>(ICodeEditorPresenter _view, string script)
         {            
-            var returnstring = await _view.InvokeScriptAsync("eval", new string[] { script });
+            var returnstring = await _view.InvokeScriptAsync("eval", new string[] { script }) as string ?? "";
 
             //if (JsonObject.TryParse(returnstring, out JsonObject result))
             //{
@@ -113,7 +113,7 @@ namespace Monaco.Extensions
             await _view.InvokeScriptAsync<object>(method, arg, serialize, member, file, line);
         }
 
-        public static async Task InvokeScriptAsync(
+        public static async Task<object> InvokeScriptAsync(
             this ICodeEditorPresenter _view,
             string method,
             object[] args,
@@ -122,7 +122,7 @@ namespace Monaco.Extensions
             [CallerFilePath] string file = null,
             [CallerLineNumber] int line = 0)
         {
-            await _view.InvokeScriptAsync<object>(method, args, serialize, member, file, line);
+            return await _view.InvokeScriptAsync<object>(method, args, serialize, member, file, line);
         }
 
         public static async Task<T> InvokeScriptAsync<T>(
@@ -175,7 +175,7 @@ namespace Monaco.Extensions
                     sanitizedargs = args.Select(item => item.ToString()).ToArray();
                 }
 
-                var script = method + "(" + string.Join(",", sanitizedargs) + ");";
+                var script = method + "(element," + string.Join(",", sanitizedargs) + ");";
 
                 System.Diagnostics.Debug.WriteLine($"Script {script})");
 

@@ -2,6 +2,7 @@
 using Monaco.Helpers;
 using Nito.AsyncEx;
 using System;
+using System.Diagnostics;
 using System.Linq;
 using Windows.Foundation.Collections;
 using Microsoft.UI.Xaml;
@@ -28,14 +29,16 @@ namespace Monaco
 
         public static DependencyProperty TextProperty { get; } = DependencyProperty.Register(nameof(Text), typeof(string), typeof(CodeEditor), new PropertyMetadata(string.Empty, async (d, e) =>
         {
-            if (d is CodeEditor editor)
+            if (d is CodeEditor codeEditor)
             {
-                if (!editor.IsSettingValue)
+                if (codeEditor.IsEditorLoaded && !codeEditor.IsSettingValue)
                 {
-                    await editor.InvokeScriptAsync("updateContent", e.NewValue.ToString());
-                }
-                editor.NotifyPropertyChanged(nameof(Text));
-            }
+                    // link:otherScriptsToBeOrganized.ts:updateContent
+                    await codeEditor.InvokeScriptAsync("updateContent", e.NewValue.ToString());
+				}
+
+				codeEditor.NotifyPropertyChanged(nameof(Text));
+			}
         }));
 
         /// <summary>
@@ -47,17 +50,19 @@ namespace Monaco
             set => SetValue(SelectedTextProperty, value);
         }
 
-        public static DependencyProperty SelectedTextProperty { get; } = DependencyProperty.Register(nameof(SelectedText), typeof(string), typeof(CodeEditor), new PropertyMetadata(string.Empty, async (d, e) =>
+        public static DependencyProperty SelectedTextProperty { get; } = DependencyProperty.Register(nameof(SelectedText), typeof(string), typeof(CodeEditor), new PropertyMetadata(string.Empty, (d, e) =>
         {
-            if (d is CodeEditor editor)
-            {
-                if (!editor.IsSettingValue)
+            if (d is CodeEditor codeEditor)
+			{
+                if (codeEditor.IsEditorLoaded && !codeEditor.IsSettingValue)
                 {
-                    await editor.InvokeScriptAsync("updateSelectedContent", e.NewValue.ToString());
+                    // link:updateSelectedContent.ts:updateSelectedContent
+                    codeEditor.InvokeScriptAsync("updateSelectedContent", e.NewValue.ToString());
                 }
-                editor.NotifyPropertyChanged(nameof(SelectedText));
-            }
-        }));
+
+				codeEditor.NotifyPropertyChanged(nameof(SelectedText));
+			}
+		}));
 
         public Selection SelectedRange
         {
@@ -108,16 +113,25 @@ namespace Monaco
             set => SetValue(OptionsProperty, value);
         }
 
-        public static DependencyProperty OptionsProperty { get; } = DependencyProperty.Register(nameof(Options), typeof(StandaloneEditorConstructionOptions), typeof(CodeEditor), new PropertyMetadata(null, (d, e) =>
-        {
-            if (d is CodeEditor editor)
-            {
-                if (e.OldValue is StandaloneEditorConstructionOptions oldValue)
-                    oldValue.PropertyChanged -= editor.Options_PropertyChanged;
-                if (e.NewValue is StandaloneEditorConstructionOptions value)
-                    value.PropertyChanged += editor.Options_PropertyChanged;
-            }
-        }));
+        public static DependencyProperty OptionsProperty { get; } = DependencyProperty.Register(
+            nameof(Options),
+            typeof(StandaloneEditorConstructionOptions),
+            typeof(CodeEditor),
+            new PropertyMetadata(
+                null,
+                (d, e) =>
+                {
+                    if (d is CodeEditor editor)
+                    {
+                        if (e.OldValue is StandaloneEditorConstructionOptions oldValue)
+                            oldValue.PropertyChanged -= editor.Options_PropertyChanged;
+                        if (e.NewValue is StandaloneEditorConstructionOptions value)
+                        {
+                            value.PropertyChanged -= editor.Options_PropertyChanged;
+                            value.PropertyChanged += editor.Options_PropertyChanged;
+                        }
+                    }
+                }));
 
         /// <summary>
         /// Get or Set the CodeEditor Text.
@@ -130,7 +144,8 @@ namespace Monaco
 
         public static DependencyProperty HasGlyphMarginProperty { get; } = DependencyProperty.Register(nameof(HasGlyphMargin), typeof(bool), typeof(CodeEditor), new PropertyMetadata(false, (d, e) =>
         {
-            (d as CodeEditor).Options.GlyphMargin = e.NewValue as bool?;
+            if (!(d is CodeEditor editor)) return;
+            if (editor.Options != null) editor.Options.GlyphMargin = e.NewValue as bool?;
         }));
 
         /// <summary>

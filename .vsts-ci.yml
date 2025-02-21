@@ -18,8 +18,8 @@ jobs:
 
   - task: MSBuild@1
     inputs:
-      solution: MonacoEditorComponent.sln
-      msbuildArguments: /r /p:Configuration=Release "/p:PackageOutputPath=$(build.artifactstagingdirectory)\nuget" "/p:PackageVersion=$(GITVERSION.FullSemVer)" "/p:InformationalVersion=$(GITVERSION.InformationalVersion)"  /detailedsummary
+      solution: MonacoEditorComponent.slnf
+      msbuildArguments: /r /p:Configuration=Release "/p:PackageOutputPath=$(build.artifactstagingdirectory)\nuget" "/p:PackageVersion=$(GITVERSION.FullSemVer)" "/p:InformationalVersion=$(GITVERSION.InformationalVersion)"  /detailedsummary /bl:$(build.artifactstagingdirectory)/build.binlog
 
   - task: PowerShell@2
     displayName: Authenticode Sign Packages
@@ -34,6 +34,7 @@ jobs:
     condition: and(succeeded(), not(eq(variables['build.reason'], 'PullRequest')), not(eq(variables['SignClientSecret'], '')), not(eq(variables['SignClientUser'], '')))
 
   - task: PublishBuildArtifacts@1
+    condition: always()
     inputs:
       PathtoPublish: $(build.artifactstagingdirectory)
       ArtifactName: uno-monaco-editor-uwp-drop

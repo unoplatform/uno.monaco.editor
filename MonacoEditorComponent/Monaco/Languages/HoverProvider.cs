@@ -1,4 +1,5 @@
 ﻿using Monaco.Editor;
+using System.Threading.Tasks;
 using Windows.Foundation;
 
 namespace Monaco.Languages
@@ -14,6 +15,6 @@ namespace Monaco.Languages
         /// position will be merged by the editor. A hover can have a range which defaults
         /// to the word range at the position when omitted.
         /// </summary>
-        IAsyncOperation<Hover> ProvideHover(IModel model, Position position);
+        Task<Hover> ProvideHover(IModel model, Position position);
     }
 }

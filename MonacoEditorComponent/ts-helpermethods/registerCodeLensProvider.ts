@@ -1,19 +1,25 @@
 ﻿///<reference path="../monaco-editor/monaco.d.ts" />
-declare var Parent: ParentAccessor;
 
-var registerCodeLensProvider = function (languageId) {
+const registerCodeLensProvider = function (element: any, languageId) {
+    var editorContext = EditorContext.getEditorForElement(element);
+
     return monaco.languages.registerCodeLensProvider(languageId, {
         provideCodeLenses: function (model, token) {
-            return callParentEventAsync("ProvideCodeLenses" + languageId, null).then(result => {
+            return callParentEventAsync(element, "ProvideCodeLenses" + languageId, []).then(result => {
                 if (result) {
-                    return JSON.parse(result);
+                    const list: monaco.languages.CodeLensList = JSON.parse(result);
+
+                    // Add dispose method for IDisposable that Monaco is looking for.
+                    list.dispose = () => {};
+
+                    return list;
                 }
                 return null;
 
             });
         },
         resolveCodeLens: function (model, codeLens, token) {
-            return callParentEventAsync("ResolveCodeLens" + languageId, [JSON.stringify(codeLens)]).then(result => {
+            return callParentEventAsync(element, "ResolveCodeLens" + languageId, [JSON.stringify(codeLens)]).then(result => {
                 if (result) {
                     return JSON.parse(result);
                 }

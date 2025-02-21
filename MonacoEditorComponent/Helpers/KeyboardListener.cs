@@ -1,4 +1,11 @@
-﻿using System;
+﻿using Microsoft.UI.Dispatching;
+using System;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices.JavaScript;
+using System.Runtime.InteropServices.WindowsRuntime;
+using System.Threading;
+using System.Threading.Tasks;
+using Windows.Foundation;
 using Windows.Foundation.Metadata;
 
 namespace Monaco.Helpers
@@ -21,11 +28,16 @@ namespace Monaco.Helpers
     [AllowForWeb]
     public sealed partial class KeyboardListener
     {
+        private static ConditionalWeakTable<object, KeyboardListener> _instances = new();
         private readonly WeakReference<CodeEditor> parent;
+        private readonly DispatcherQueue _queue;
 
-        public KeyboardListener(CodeEditor parent) // TODO: Make Interface for event usage
+        public KeyboardListener(CodeEditor parent, DispatcherQueue queue)
         {
             this.parent = new WeakReference<CodeEditor>(parent);
+            _queue = queue;
+
+            _instances.Add(parent, this);
 
             PartialCtor();
         }
@@ -56,6 +68,19 @@ namespace Monaco.Helpers
             }
 
             return false;
+        }
+
+        [JSExport]
+        internal static bool NativeKeyDown([JSMarshalAs<JSType.Any>] object managedOwner, int keycode, bool ctrl, bool shift, bool alt, bool meta)
+        {
+            if (_instances.TryGetValue(managedOwner, out var listener))
+            {
+                return listener.KeyDown(keycode, ctrl, shift, alt, meta);
+            }
+            else
+            {
+                throw new InvalidOperationException($"KeyboardListener not found for owner {managedOwner}");
+            }
         }
     }
 }

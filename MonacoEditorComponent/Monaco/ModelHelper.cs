@@ -27,7 +27,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.InvokeScriptAsync("model.detectIndentationAsync", new object[] { defaultInsertSpaces, defaultTabSize }).AsAsyncAction();
+                return editor.InvokeScriptAsync("EditorContext.getEditorForElement(element).model.detectIndentationAsync", new object[] { defaultInsertSpaces, defaultTabSize }).AsAsyncAction();
             }
 
             return null;
@@ -49,7 +49,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.InvokeScriptAsync<IEnumerable<FindMatch>>("model.findMatches", new object[] { searchString, searchOnlyEditableRange, isRegex, matchCase, wordSeparators, captureMatches, limitResultCount }).AsAsyncOperation();
+                return editor.InvokeScriptAsync<IEnumerable<FindMatch>>("EditorContext.getEditorForElement(element).model.findMatches", new object[] { searchString, searchOnlyEditableRange, isRegex, matchCase, wordSeparators, captureMatches, limitResultCount }).AsAsyncOperation();
             }
 
             return null;
@@ -59,7 +59,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.InvokeScriptAsync<IEnumerable<FindMatch>>("model.findMatches", new object[] { searchString, searchScope, isRegex, matchCase, wordSeparators, captureMatches, limitResultCount }).AsAsyncOperation();
+                return editor.InvokeScriptAsync<IEnumerable<FindMatch>>("EditorContext.getEditorForElement(element).model.findMatches", new object[] { searchString, searchScope, isRegex, matchCase, wordSeparators, captureMatches, limitResultCount }).AsAsyncOperation();
             }
 
             return null;
@@ -69,7 +69,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.InvokeScriptAsync<FindMatch>("model.findNextMatch", new object[] { searchString, searchString, isRegex, matchCase, wordSeparators, captureMatches }).AsAsyncOperation();
+                return editor.InvokeScriptAsync<FindMatch>("EditorContext.getEditorForElement(element).model.findNextMatch", new object[] { searchString, searchString, isRegex, matchCase, wordSeparators, captureMatches }).AsAsyncOperation();
             }
 
             return null;
@@ -79,7 +79,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.InvokeScriptAsync<FindMatch>("model.findPreviousMatch", new object[] { searchString, searchString, isRegex, matchCase, wordSeparators, captureMatches }).AsAsyncOperation();
+                return editor.InvokeScriptAsync<FindMatch>("EditorContext.getEditorForElement(element).model.findPreviousMatch", new object[] { searchString, searchString, isRegex, matchCase, wordSeparators, captureMatches }).AsAsyncOperation();
             }
 
             return null;
@@ -89,7 +89,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<uint>("model.getAlternativeVersionId();").AsAsyncOperation();
+                return editor.SendScriptAsync<uint>("EditorContext.getEditorForElement(element).model.getAlternativeVersionId();").AsAsyncOperation();
             }
 
             return null;
@@ -99,7 +99,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<string>("model.getEOL();").AsAsyncOperation();
+                return editor.SendScriptAsync<string>("EditorContext.getEditorForElement(element).model.getEOL();").AsAsyncOperation();
             }
 
             return null;
@@ -109,7 +109,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<Range>("model.getFullModelRange();").AsAsyncOperation();
+                return editor.SendScriptAsync<Range>("EditorContext.getEditorForElement(element).model.getFullModelRange();").AsAsyncOperation();
             }
 
             return null;
@@ -119,7 +119,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<string>("model.getLineContent(" + lineNumber + ");").AsAsyncOperation();
+                return editor.SendScriptAsync<string>("EditorContext.getEditorForElement(element).model.getLineContent(" + lineNumber + ");").AsAsyncOperation();
             }
 
             return null;
@@ -129,7 +129,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<uint>("model.getLineCount();").AsAsyncOperation();
+                return editor.SendScriptAsync<uint>("EditorContext.getEditorForElement(element).model.getLineCount();").AsAsyncOperation();
             }
 
             return null;
@@ -139,7 +139,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<uint>("model.getLineFirstNonWhitespaceColumn(" + lineNumber + ");").AsAsyncOperation();
+                return editor.SendScriptAsync<uint>("EditorContext.getEditorForElement(element).model.getLineFirstNonWhitespaceColumn(" + lineNumber + ");").AsAsyncOperation();
             }
 
             return null;
@@ -149,7 +149,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<uint>("model.getLineLastNonWhitespaceColumn(" + lineNumber + ");").AsAsyncOperation();
+                return editor.SendScriptAsync<uint>("EditorContext.getEditorForElement(element).model.getLineLastNonWhitespaceColumn(" + lineNumber + ");").AsAsyncOperation();
             }
 
             return null;
@@ -159,7 +159,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<uint>("model.getLineLength(" + lineNumber + ");").AsAsyncOperation();
+                return editor.SendScriptAsync<uint>("EditorContext.getEditorForElement(element).model.getLineLength(" + lineNumber + ");").AsAsyncOperation();
             }
 
             return null;
@@ -169,7 +169,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<uint>("model.getLineMaxColumn(" + lineNumber + ");").AsAsyncOperation();
+                return editor.SendScriptAsync<uint>("EditorContext.getEditorForElement(element).model.getLineMaxColumn(" + lineNumber + ");").AsAsyncOperation();
             }
 
             return null;
@@ -179,7 +179,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<uint>("model.getLineMinColumn(" + lineNumber + ");").AsAsyncOperation();
+                return editor.SendScriptAsync<uint>("EditorContext.getEditorForElement(element).model.getLineMinColumn(" + lineNumber + ");").AsAsyncOperation();
             }
 
             return null;
@@ -189,7 +189,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<IEnumerable<string>>("model.getLinesContent();").AsAsyncOperation();
+                return editor.SendScriptAsync<IEnumerable<string>>("EditorContext.getEditorForElement(element).model.getLinesContent();").AsAsyncOperation();
             }
 
             return null;
@@ -199,7 +199,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<string>("model.getModelId();").AsAsyncOperation();
+                return editor.SendScriptAsync<string>("EditorContext.getEditorForElement(element).model.getModelId();").AsAsyncOperation();
             }
 
             return null;
@@ -209,7 +209,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<uint>("model.getOffsetAt(" + JsonConvert.SerializeObject(position) + ");").AsAsyncOperation();
+                return editor.SendScriptAsync<uint>("EditorContext.getEditorForElement(element).model.getOffsetAt(" + JsonConvert.SerializeObject(position) + ");").AsAsyncOperation();
             }
 
             return null;
@@ -219,7 +219,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<string>("model.getOneIndent();").AsAsyncOperation();
+                return editor.SendScriptAsync<string>("EditorContext.getEditorForElement(element).model.getOneIndent();").AsAsyncOperation();
             }
 
             return null;
@@ -229,7 +229,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<Position>("model.getPositionAt(" + offset + ");").AsAsyncOperation();
+                return editor.SendScriptAsync<Position>("EditorContext.getEditorForElement(element).model.getPositionAt(" + offset + ");").AsAsyncOperation();
             }
 
             return null;
@@ -239,7 +239,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<string>("model.getValue();").AsAsyncOperation();
+                return editor.SendScriptAsync<string>("EditorContext.getEditorForElement(element).model.getValue();").AsAsyncOperation();
             }
 
             return null;
@@ -259,7 +259,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<string>("model.getValueInRange(" + JsonConvert.SerializeObject(range) + ");").AsAsyncOperation();
+                return editor.SendScriptAsync<string>("EditorContext.getEditorForElement(element).model.getValueInRange(" + JsonConvert.SerializeObject(range) + ");").AsAsyncOperation();
             }
 
             return null;
@@ -274,7 +274,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<uint>("model.getValueLength();").AsAsyncOperation();
+                return editor.SendScriptAsync<uint>("EditorContext.getEditorForElement(element).model.getValueLength();").AsAsyncOperation();
             }
 
             return null;
@@ -294,7 +294,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<uint>("model.getValueLengthInRange(" + JsonConvert.SerializeObject(range) + ");").AsAsyncOperation();
+                return editor.SendScriptAsync<uint>("EditorContext.getEditorForElement(element).model.getValueLengthInRange(" + JsonConvert.SerializeObject(range) + ");").AsAsyncOperation();
             }
 
             return null;
@@ -304,7 +304,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<uint>("model.getVersionId();").AsAsyncOperation();
+                return editor.SendScriptAsync<uint>("EditorContext.getEditorForElement(element).model.getVersionId();").AsAsyncOperation();
             }
 
             return null;
@@ -315,7 +315,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<WordAtPosition>("model.getWordAtPosition(" + JsonConvert.SerializeObject(position) + ");").AsAsyncOperation();
+                return editor.SendScriptAsync<WordAtPosition>("EditorContext.getEditorForElement(element).model.getWordAtPosition(" + JsonConvert.SerializeObject(position) + ");").AsAsyncOperation();
             }
 
             return null;
@@ -325,7 +325,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<WordAtPosition>("model.getWordUntilPosition(" + JsonConvert.SerializeObject(position) + ");").AsAsyncOperation();
+                return editor.SendScriptAsync<WordAtPosition>("EditorContext.getEditorForElement(element).model.getWordUntilPosition(" + JsonConvert.SerializeObject(position) + ");").AsAsyncOperation();
             }
 
             return null;
@@ -335,7 +335,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<Position>("model.modifyPosition(" + JsonConvert.SerializeObject(position) + ", " + number + ");").AsAsyncOperation();
+                return editor.SendScriptAsync<Position>("EditorContext.getEditorForElement(element).model.modifyPosition(" + JsonConvert.SerializeObject(position) + ", " + number + ");").AsAsyncOperation();
             }
 
             return null;
@@ -345,7 +345,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<string>("model.normalizeIndentations(JSON.parse(" + JsonConvert.ToString(str) + "));").AsAsyncOperation();
+                return editor.SendScriptAsync<string>("EditorContext.getEditorForElement(element).model.normalizeIndentations(JSON.parse(" + JsonConvert.ToString(str) + "));").AsAsyncOperation();
             }
 
             return null;
@@ -355,7 +355,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync("model.pushStackElement();").AsAsyncAction();
+                return editor.SendScriptAsync("EditorContext.getEditorForElement(element).model.pushStackElement();").AsAsyncAction();
             }
 
             return null;
@@ -370,7 +370,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync("model.setValue(JSON.parse(" + JsonConvert.ToString(newValue) + "));").AsAsyncAction();
+                return editor.SendScriptAsync("EditorContext.getEditorForElement(element).model.setValue(JSON.parse(" + JsonConvert.ToString(newValue) + "));").AsAsyncAction();
             }
 
             return null;
@@ -380,7 +380,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<Position>("model.validatePosition(" + JsonConvert.SerializeObject(position) + ");").AsAsyncOperation();
+                return editor.SendScriptAsync<Position>("EditorContext.getEditorForElement(element).model.validatePosition(" + JsonConvert.SerializeObject(position) + ");").AsAsyncOperation();
             }
 
             return null;
@@ -390,7 +390,7 @@ namespace Monaco.Editor
         {
             if (_editor.TryGetTarget(out CodeEditor editor))
             {
-                return editor.SendScriptAsync<Range>("model.validateRange(" + JsonConvert.SerializeObject(range) + ");").AsAsyncOperation();
+                return editor.SendScriptAsync<Range>("EditorContext.getEditorForElement(element).model.validateRange(" + JsonConvert.SerializeObject(range) + ");").AsAsyncOperation();
             }
 
             return null;

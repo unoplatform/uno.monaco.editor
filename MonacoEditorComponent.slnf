@@ -1,0 +1,10 @@
+{
+  "solution": {
+    "path": "MonacoEditorComponent.sln",
+    "projects": [
+      "MonacoEditorComponent\\MonacoEditorComponent.csproj",
+      "MonacoEditorTestApp.Shared\\MonacoEditorTestApp.Shared.shproj",
+      "MonacoEditorTestApp.Wasm\\MonacoEditorTestApp.Wasm.csproj"
+    ]
+  }
+}

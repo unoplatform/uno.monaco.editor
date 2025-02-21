@@ -37,20 +37,22 @@ namespace MonacoEditorTestApp
 
         private ContextKey _myCondition;
 
+        private EditorCodeActionProvider _actionProvider;
+
         #region CSS Style Objects
-        private readonly CssLineStyle CssLineDarkRed = new CssLineStyle()
+        private readonly CssLineStyle CssLineDarkTransparentRed = new CssLineStyle()
         {
-            BackgroundColor = new SolidColorBrush(Colors.DarkRed),
+            BackgroundColor = Color.FromArgb(128, 128, 0, 0),
         };
 
-        private readonly CssLineStyle CssLineAliceBlue = new CssLineStyle()
+        private readonly CssLineStyle CssLineLightBlue = new CssLineStyle()
         {
-            BackgroundColor = new SolidColorBrush(Colors.AliceBlue)
+            BackgroundColor = Colors.LightBlue
         };
 
         private readonly CssInlineStyle CssInlineWhiteBold = new CssInlineStyle()
         {
-            ForegroundColor = new SolidColorBrush(Colors.White),
+            ForegroundColor = Colors.White,
             FontWeight = FontWeights.Bold,
             FontStyle = FontStyle.Italic
         };
@@ -94,6 +96,9 @@ namespace MonacoEditorTestApp
             {
                 CodeContent = await FileIO.ReadTextAsync(await StorageFile.GetFileFromApplicationUriAsync(new System.Uri("ms-appx:///Content.txt")));
 
+                // Set the copy of our initial text.
+                TextEditor.Text = CodeContent;
+
                 ButtonHighlightRange_Click(null, null);
             }
 
@@ -102,14 +107,25 @@ namespace MonacoEditorTestApp
             var available_languages = Editor.Languages.GetLanguagesAsync();
             //Debugger.Break();
 
-            // Code Lens Action
-            string cmdId = await Editor.AddCommandAsync(0, async (args) =>
+            // Code Action Command - TODO: Should we just encapsulate these in the Provider class anyway as they're only being used there?
+            string cmdId = await Editor.AddCommandAsync(async (args) =>
             {
-                var md = new MessageDialog("You hit the CodeLens command " + args[0].ToString());
+                var md = new MessageDialog($"You hit the CodeAction command, Arg[0] = {args[0]}");
                 await md.ShowAsync();
             });
 
-            await Editor.Languages.RegisterCodeLensProviderAsync("csharp", new EditorCodeLensProvider(cmdId));
+            // Code Lens Command
+            string cmdId2 = await Editor.AddCommandAsync(async (args) =>
+            {
+                var md = new MessageDialog($"You hit the CodeLens command, Arg[0] = {args[0]}, Arg[1] = {args[1]}, Args[2] = {args[2]}");
+                await md.ShowAsync();
+            });
+
+            _actionProvider = new EditorCodeActionProvider(cmdId);
+
+            await Editor.Languages.RegisterCodeActionProviderAsync("csharp", _actionProvider);
+
+            await Editor.Languages.RegisterCodeLensProviderAsync("csharp", new EditorCodeLensProvider(cmdId2));
 
             await Editor.Languages.RegisterColorProviderAsync("csharp", new ColorProvider());
 
@@ -183,11 +199,15 @@ namespace MonacoEditorTestApp
             });
 
             await Editor.AddActionAsync(new TestAction());
+
+            // we only need to fire loading once to initialize all our model/helpers
+            Editor.Loading -= Editor_Loading;
         }
 
         private void Editor_Loaded(object sender, RoutedEventArgs e)
         {
             // Ready for Display
+            Editor.Loaded -= Editor_Loaded;
         }
 
         private void Editor_OpenLinkRequest(ICodeEditorPresenter sender, WebViewNewWindowRequestedEventArgs args)
@@ -213,7 +233,7 @@ namespace MonacoEditorTestApp
             Editor.Decorations.Add(
                 new IModelDeltaDecoration(new Range(3, 1, 3, 10), new IModelDecorationOptions()
                 {
-                    ClassName = CssLineDarkRed,
+                    ClassName = CssLineDarkTransparentRed,
                     InlineClassName = CssInlineWhiteBold,
                     HoverMessage = new string[]
                     {
@@ -229,7 +249,7 @@ namespace MonacoEditorTestApp
             Editor.Decorations.Add(
                 new IModelDeltaDecoration(new Range(4, 1, 4, 1), new IModelDecorationOptions() {
                     IsWholeLine = true,
-                    ClassName = CssLineAliceBlue,
+                    ClassName = CssLineLightBlue,
                     InlineClassName = CssInlineWhiteBold,
                     GlyphMarginClassName = CssGlyphError,
                     HoverMessage = (new string[]
@@ -310,6 +330,18 @@ namespace MonacoEditorTestApp
             Editor.CodeLanguage = (Editor.CodeLanguage == "csharp") ? "xml" : "csharp";
         }
 
+        private void ButtonLineNumbers_Click(object sender, RoutedEventArgs e)
+        {
+            options.LineNumbers = options.LineNumbers switch
+            {
+                LineNumbersType.Interval => LineNumbersType.Off,
+                LineNumbersType.Off => LineNumbersType.On,
+                LineNumbersType.On or null => LineNumbersType.Relative,
+                LineNumbersType.Relative => LineNumbersType.Interval,
+                _ => throw new NotImplementedException(),
+            };
+        }
+
         private async void ButtonSetMarker_Click(object sender, RoutedEventArgs e)
         {
             if ((await Editor.GetModelMarkersAsync()).Count() == 0)
@@ -322,9 +354,9 @@ namespace MonacoEditorTestApp
                         Severity = MarkerSeverity.Warning,
                         Source = "Origin",
                         StartLineNumber = 2,
-                        StartColumn = 2,
+                        StartColumn = 5,
                         EndLineNumber = 2,
-                        EndColumn = 8
+                        EndColumn = 10
                     });
 
                 Editor.Markers.Add(
@@ -334,16 +366,19 @@ namespace MonacoEditorTestApp
                         Message = "This is an \"Error\" about 'that thing'.",
                         Severity = MarkerSeverity.Error,
                         Source = "Origin",
-                        StartLineNumber = 3,
-                        StartColumn = 5,
-                        EndLineNumber = 3,
-                        EndColumn = 15
+                        StartLineNumber = 5,
+                        StartColumn = 3,
+                        EndLineNumber = 5,
+                        EndColumn = 10
                     });
+
+                _actionProvider.IsOn = true;
             }
             else
             {
-                //Editor.Markers.Clear();
-                await Editor.SetModelMarkersAsync("CodeEditor", Array.Empty<IMarkerData>());
+                Editor.Markers.Clear();
+
+                _actionProvider.IsOn = false;
             }            
         }
 
@@ -399,8 +434,6 @@ namespace MonacoEditorTestApp
                 _myCondition = null;
                 Editor.KeyDown -= Editor_KeyDown;
 
-                Editor.Loaded -= Editor_Loaded;
-                Editor.Loading -= Editor_Loading;
                 Editor.OpenLinkRequested -= Editor_OpenLinkRequest;
                 Editor.InternalException -= Editor_InternalException;
 
@@ -424,6 +457,7 @@ namespace MonacoEditorTestApp
 
                 Editor.KeyDown += Editor_KeyDown;
 
+                // Re-setup loading events for new instance
                 Editor.Loading += Editor_Loading;
                 Editor.Loaded += Editor_Loaded;
                 Editor.OpenLinkRequested += Editor_OpenLinkRequest;
@@ -432,8 +466,6 @@ namespace MonacoEditorTestApp
                 Grid.SetColumn(Editor, 1);
 
                 RootGrid.Children.Add(Editor);
-
-                // TODO: My Condition?
 
                 btn.Content = "Remove";
             }           
@@ -483,7 +515,9 @@ namespace MonacoEditorTestApp
         private async void ButtonRunScript_Click(object sender, RoutedEventArgs e)
         {
             var result = await Editor.InvokeScriptAsync(@"function test(a, b) { return a + b; }; test(3, 4).toString()");
-            Debug.WriteLine(result);
+
+            var md = new MessageDialog($"Result (should be 7): {result}");
+            await md.ShowAsync();
         }
 
         private void Editor_GotFocus(object sender, RoutedEventArgs e)
@@ -494,6 +528,18 @@ namespace MonacoEditorTestApp
         private void Editor_LostFocus(object sender, RoutedEventArgs e)
         {
             Debug.WriteLine("Editor Lost Focus");
+        }
+
+        private async void ButtonFindCtrl_Click(object sender, RoutedEventArgs e)
+        {
+            var matches = await Editor.GetModel().FindMatchesAsync("Ctrl", true, false, true, null, true);
+
+            var toString = matches.Select((match) => $"Range: {match.Range.ToString()} contains {match.Matches.Length} Matches - First is: {match.Matches[0]}");
+
+            var output = string.Join("\n", toString);
+
+            var md = new MessageDialog("Results:\n" + output);
+            await md.ShowAsync();
         }
     }
 }

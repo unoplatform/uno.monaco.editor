@@ -1,7 +1,11 @@
-﻿namespace Monaco.Helpers
+﻿using Newtonsoft.Json;
+
+namespace Monaco.Helpers
 {
+    [JsonConverter(typeof(CssStyleConverter))]
     public sealed class CssGlyphStyle : ICssStyle
     {
+        [JsonIgnore]
         public System.Uri GlyphImage { get; set; }
 
         public uint Id { get; }

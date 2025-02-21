@@ -13,11 +13,6 @@ namespace Monaco
 {
     public interface ICodeEditorPresenter
 	{
-		/// <summary>Adds a native Windows Runtime object as a global parameter to the top level document inside of a WebView.</summary>
-		/// <param name="name">The name of the object to expose to the document in the WebView.</param>
-		/// <param name="pObject">The object to expose to the document in the WebView.</param>
-		void AddWebAllowedObject(string name, object pObject);
-
 		// <summary>Occurs when a user performs an action in a WebView that causes content to be opened in a new window.</summary>
 		event TypedEventHandler<ICodeEditorPresenter, WebViewNewWindowRequestedEventArgs> NewWindowRequested;
 
@@ -37,10 +32,8 @@ namespace Monaco
 
         event RoutedEventHandler Loaded;
 
-        IAsyncOperation<string> InvokeScriptAsync(string scriptName, IEnumerable<string> arguments);
-
 		bool Focus(FocusState state);
 
-		void Launch();
+		Task Launch();
 	}
 }
