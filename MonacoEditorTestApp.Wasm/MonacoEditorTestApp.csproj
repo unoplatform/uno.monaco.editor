@@ -27,11 +27,13 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<Content Include="..\MonacoEditorComponent\monaco-editor\**\*">
-			<Link>monaco-editor\%(RecursiveDir)%(Filename)%(Extension)</Link>
-		</Content>
+	  <None Remove="Content.txt" />
 	</ItemGroup>
-	
+
+	<ItemGroup>
+	  <Content Include="Content.txt" />
+	</ItemGroup>
+
 	<ItemGroup>
 		<ProjectReference Include="..\MonacoEditorComponent\MonacoEditorComponent.csproj" />
 	</ItemGroup>

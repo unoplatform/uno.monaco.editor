@@ -49,9 +49,9 @@ namespace Monaco
 
         private void WebView_DOMContentLoaded()
         {
-            #if DEBUG
-            Debug.WriteLine("DOM Content Loaded");
-            #endif
+#if DEBUG
+            Console.WriteLine("WebView_DOMContentLoaded()");
+#endif
             _initialized = true;
 
 #if __WASM__

@@ -23,6 +23,7 @@ namespace Monaco
 
         public CodeEditorPresenter()
         {
+            Console.WriteLine("CodeEditorPresenter()");
             Content = _element = BrowserHtmlElement.CreateHtmlElement("monaco-" + this.GetHashCode(), "div");
         }
 
@@ -50,17 +51,16 @@ namespace Monaco
                 string target;
 				if (value.IsAbsoluteUri)
 				{
-					if(value.Scheme=="file")
+					if (value.Scheme == "file")
 					{
 						// Local files are assumed as coming from the remoter server
 						target = UNO_BOOTSTRAP_APP_BASE == null ? value.PathAndQuery : UNO_BOOTSTRAP_WEBAPP_BASE_PATH + UNO_BOOTSTRAP_APP_BASE + value.PathAndQuery;
 					}
-                    else
-                    {
+					else
+					{
 						target = value.AbsoluteUri;
 
 					}
-
 				}
 				else
 				{
@@ -83,7 +83,15 @@ namespace Monaco
 
         public async Task Launch()
         {
-            await NativeMethods.InitializeMonaco(this, _element.ElementId, $"{UNO_BOOTSTRAP_WEBAPP_BASE_PATH}{UNO_BOOTSTRAP_APP_BASE}");
+			try
+			{
+                // await NativeMethods.InitializeMonaco(this, _element.ElementId, $"{UNO_BOOTSTRAP_WEBAPP_BASE_PATH}{UNO_BOOTSTRAP_APP_BASE}");
+                await NativeMethods.InitializeMonaco(this, _element.ElementId, $"");
+            }
+            catch (Exception e)
+			{
+                Console.WriteLine(e);
+			}
         }
 
         static partial class NativeMethods
@@ -94,7 +102,7 @@ namespace Monaco
             [JSImport("globalThis.setSrc")]
             public static partial void SetSrc(string elementId, string src);
 
-            [JSImport("globalThis.initializeMonacoEditor")]
+            [JSImport("globalThis.createMonacoEditor")]
             public static partial Task InitializeMonaco([JSMarshalAs<JSType.Any>] object managedOwner, string elementId, string baseUri);
         }
     }

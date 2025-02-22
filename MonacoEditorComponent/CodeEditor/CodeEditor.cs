@@ -222,6 +222,8 @@ namespace Monaco
 
         protected override void OnApplyTemplate()
         {
+            Console.WriteLine("OnApplyTemplate()");
+
             if (_view != null)
             {
                 _view.NavigationStarting -= WebView_NavigationStarting;

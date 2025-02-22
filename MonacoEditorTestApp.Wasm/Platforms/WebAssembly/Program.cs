@@ -4,11 +4,12 @@ public class Program
 {
     private static App? _app;
 
-    public static int Main(string[] args)
+    public static async Task<int> Main(string[] args)
     {
         App.InitializeLogging();
 
-        Microsoft.UI.Xaml.Application.Start(_ => _app = new App());
+        var host = new global::Uno.UI.Runtime.Skia.WebAssembly.Browser.PlatformHost(() => _app = new App());
+        await host.Run();
 
         return 0;
     }

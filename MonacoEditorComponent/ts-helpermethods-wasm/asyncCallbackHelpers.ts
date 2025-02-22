@@ -128,7 +128,7 @@ class ThemeListener {
     }
 }
 
-const createMonacoEditor = async (managedOwner: any, elementId: string, basePath: string) => {
+globalThis.createMonacoEditor = async (managedOwner: any, elementId: string, basePath: string) => {
     console.debug("Create dynamic style element");
     var head = document.head || document.getElementsByTagName('head')[0];
     var style = document.createElement('style');
@@ -142,9 +142,9 @@ const createMonacoEditor = async (managedOwner: any, elementId: string, basePath
 
     console.debug("Starting Monaco Load");
 
-    (<any>window).require.config({ paths: { 'vs': `${basePath}/monaco-editor/min/vs` } });
+    (<any>window).require.config({ paths: { 'vs': `${basePath}/MonacoEditorComponent/monaco-editor/min/vs` } });
     (<any>window).require(['vs/editor/editor.main'], function () {
-        initializeMonacoEditor(managedOwner, (<any>globalThis).window.getElementById(elementId));
+        initializeMonacoEditor(managedOwner, document.getElementById(elementId));
     });
 }
 
