@@ -27,7 +27,7 @@ partial class ParentAccessor
     {
         if (_instances.TryGetValue(managedOwner, out var logger))
         {
-            var json = Desanitize(value);
+            var json = Desanitize(value) ?? "";
             json = json.Replace(@"\\",@"\");
             json = json.Trim('"');
             json = json.Replace(@"\r\n", Environment.NewLine);
@@ -46,7 +46,7 @@ partial class ParentAccessor
     {
         if (_instances.TryGetValue(managedOwner, out var logger))
         {
-            var json = Desanitize(value);
+            var json = Desanitize(value) ?? "";
             json = json.Replace(@"\\", @"\");
             json = json.Trim('"', ' ');
             json = json.Replace(@"\r\n", Environment.NewLine);
@@ -60,7 +60,7 @@ partial class ParentAccessor
         }
     }
 
-    public static string Santize(string jsonString)
+    public static string? Santize(string? jsonString)
     {
         if (jsonString == null) return null;
 
@@ -78,7 +78,7 @@ partial class ParentAccessor
         if (_instances.TryGetValue(managedOwner, out var logger))
         {
             var json = logger.GetJsonValue(name);
-            return Santize(json);
+            return Santize(json) ?? "";
         }
         else
         {
@@ -108,7 +108,7 @@ partial class ParentAccessor
         {
             //System.Diagnostics.Debug.WriteLine($"Calling action {name}");
 
-            var parameters = new[] { Desanitize(parameter1), Desanitize(parameter2) }.Where(x => x != null).ToArray();
+            var parameters = new[] { Desanitize(parameter1) ?? "", Desanitize(parameter2) ?? "" }.ToArray();
             var result = logger.CallActionWithParameters(name, parameters);
 
             return result;
@@ -119,7 +119,7 @@ partial class ParentAccessor
         }
     }
 
-    private static string Desanitize(string parameter)
+    private static string? Desanitize(string? parameter)
     {
        // System.Diagnostics.Debug.WriteLine($"Encoded String: {parameter}");
         if (parameter == null) return parameter;
@@ -138,16 +138,13 @@ partial class ParentAccessor
     }
 
     [JSExport]
-    public static async Task<string> ManagedCallEvent([JSMarshalAs<JSType.Any>] object managedOwner, string name, string parameter1, string parameter2)
+    public static async Task<string?> ManagedCallEvent([JSMarshalAs<JSType.Any>] object managedOwner, string name, string[] parameters)
     {
         if (_instances.TryGetValue(managedOwner, out var logger))
         {
-            //System.Diagnostics.Debug.WriteLine($"Calling event {name}");
-
-            var parameters = new[] { Desanitize(parameter1), Desanitize(parameter2) }.Where(x => x != null).ToArray();
-            var resultString = await logger.CallEvent(name, parameters);
-
-            return resultString;
+            Console.WriteLine($"ManagedCallEvent({managedOwner}/{managedOwner.GetHashCode():x8}, {name}, {string.Join(", ", parameters)}");
+            var resultString = await logger.CallEvent(name, parameters.Where(p => p is not null).ToArray());
+            return Desanitize(resultString);
         }
         else
         {

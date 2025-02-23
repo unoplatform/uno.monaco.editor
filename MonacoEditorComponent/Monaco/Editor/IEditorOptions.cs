@@ -38,7 +38,7 @@ namespace Monaco.Editor
         /// The aria label for the editor's textarea (when it is focused).
         /// </summary>
         [JsonProperty("ariaLabel", NullValueHandling = NullValueHandling.Ignore)]
-        string AriaLabel { get; set; }
+        string? AriaLabel { get; set; }
 
         /// <summary>
         /// Options for auto closing brackets.
@@ -106,7 +106,7 @@ namespace Monaco.Editor
         /// Control the behaviour of comments in the editor.
         /// </summary>
         [JsonProperty("comments", NullValueHandling = NullValueHandling.Ignore)]
-        IEditorCommentsOptions Comments { get; set; }
+        IEditorCommentsOptions? Comments { get; set; }
         /// <summary>
         /// Enable custom contextmenu.
         /// Defaults to true.
@@ -198,7 +198,7 @@ namespace Monaco.Editor
         /// Class name to be added to the editor.
         /// </summary>
         [JsonProperty("extraEditorClassName", NullValueHandling = NullValueHandling.Ignore)]
-        string ExtraEditorClassName { get; set; }
+        string? ExtraEditorClassName { get; set; }
 
         /// <summary>
         /// FastScrolling mulitplier speed when pressing `Alt`
@@ -211,7 +211,7 @@ namespace Monaco.Editor
         /// Control the behavior of the find widget.
         /// </summary>
         [JsonProperty("find", NullValueHandling = NullValueHandling.Ignore)]
-        EditorFindOptions Find { get; set; }
+        EditorFindOptions? Find { get; set; }
 
         /// <summary>
         /// Display overflow widgets as `fixed`.
@@ -246,7 +246,7 @@ namespace Monaco.Editor
         /// The font family
         /// </summary>
         [JsonProperty("fontFamily", NullValueHandling = NullValueHandling.Ignore)]
-        string FontFamily { get; set; }
+        string? FontFamily { get; set; }
 
         /// <summary>
         /// Enable font ligatures.
@@ -265,7 +265,7 @@ namespace Monaco.Editor
         /// The font weight
         /// </summary>
         [JsonProperty("fontWeight", NullValueHandling = NullValueHandling.Ignore)]
-        string FontWeight { get; set; }
+        string? FontWeight { get; set; }
 
         /// <summary>
         /// Enable format on paste.
@@ -292,7 +292,7 @@ namespace Monaco.Editor
         /// Configuration options for go to location
         /// </summary>
         [JsonProperty("gotoLocation", NullValueHandling = NullValueHandling.Ignore)]
-        GoToLocationOptions GotoLocation { get; set; }
+        GoToLocationOptions? GotoLocation { get; set; }
 
         /// <summary>
         /// Should the cursor be hidden in the overview ruler.
@@ -312,7 +312,7 @@ namespace Monaco.Editor
         /// Configure the editor's hover.
         /// </summary>
         [JsonProperty("hover", NullValueHandling = NullValueHandling.Ignore)]
-        EditorHoverOptions Hover { get; set; }
+        EditorHoverOptions? Hover { get; set; }
 
         /// <summary>
         /// This editor is used inside a diff editor.
@@ -330,7 +330,7 @@ namespace Monaco.Editor
         /// Control the behavior and rendering of the code action lightbulb.
         /// </summary>
         [JsonProperty("lightbulb", NullValueHandling = NullValueHandling.Ignore)]
-        EditorLightbulbOptions Lightbulb { get; set; }
+        EditorLightbulbOptions? Lightbulb { get; set; }
 
         /// <summary>
         /// The width reserved for line decorations (in px).
@@ -385,7 +385,7 @@ namespace Monaco.Editor
         /// Control the behavior and rendering of the minimap.
         /// </summary>
         [JsonProperty("minimap", NullValueHandling = NullValueHandling.Ignore)]
-        EditorMinimapOptions Minimap { get; set; }
+        EditorMinimapOptions? Minimap { get; set; }
 
         /// <summary>
         /// Control the mouse pointer style, either 'text' or 'default' or 'copy'
@@ -455,7 +455,7 @@ namespace Monaco.Editor
         /// Parameter hint options.
         /// </summary>
         [JsonProperty("parameterHints", NullValueHandling = NullValueHandling.Ignore)]
-        IEditorParameterHintOptions ParameterHints { get; set; }
+        IEditorParameterHintOptions? ParameterHints { get; set; }
 
         /// <summary>
         /// Controls whether to focus the inline editor in the peek widget by default.
@@ -518,7 +518,7 @@ namespace Monaco.Editor
         /// Defaults to editable.
         /// </summary>
         [JsonProperty("renderValidationDecorations", NullValueHandling = NullValueHandling.Ignore)]
-        string RenderValidationDecorations { get; set; }
+        string? RenderValidationDecorations { get; set; }
 
         /// <summary>
         /// Enable rendering of whitespace.
@@ -555,7 +555,7 @@ namespace Monaco.Editor
         /// Control the behavior and rendering of the scrollbars.
         /// </summary>
         [JsonProperty("scrollbar", NullValueHandling = NullValueHandling.Ignore)]
-        IEditorScrollbarOptions Scrollbar { get; set; }
+        IEditorScrollbarOptions? Scrollbar { get; set; }
 
         /// <summary>
         /// Enable that scrolling can go beyond the last column by a number of columns.
@@ -631,7 +631,7 @@ namespace Monaco.Editor
         /// Suggest options.
         /// </summary>
         [JsonProperty("suggest", NullValueHandling = NullValueHandling.Ignore)]
-        ISuggestOptions Suggest { get; set; }
+        ISuggestOptions? Suggest { get; set; }
 
         /// <summary>
         /// The font size for the suggest widget.
@@ -678,7 +678,7 @@ namespace Monaco.Editor
         /// *
         /// </summary>
         [JsonProperty("wordSeparators", NullValueHandling = NullValueHandling.Ignore)]
-        string WordSeparators { get; set; }
+        string? WordSeparators { get; set; }
 
         /// <summary>
         /// Control the wrapping of the editor.
@@ -696,14 +696,14 @@ namespace Monaco.Editor
         /// Defaults to ' \t})]?|/&amp;.,;¢°′″‰℃、。｡､￠，．：；？！％・･ゝゞヽヾーァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎゕゖㇰㇱㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ々〻ｧｨｩｪｫｬｭｮｯｰ”〉》」』】〕）］｝｣'.
         /// </summary>
         [JsonProperty("wordWrapBreakAfterCharacters", NullValueHandling = NullValueHandling.Ignore)]
-        string WordWrapBreakAfterCharacters { get; set; }
+        string? WordWrapBreakAfterCharacters { get; set; }
 
         /// <summary>
         /// Configure word wrapping characters. A break will be introduced before these characters.
         /// Defaults to '([{‘“〈《「『【〔（［｛｢£¥＄￡￥+＋'.
         /// </summary>
         [JsonProperty("wordWrapBreakBeforeCharacters", NullValueHandling = NullValueHandling.Ignore)]
-        string WordWrapBreakBeforeCharacters { get; set; }
+        string? WordWrapBreakBeforeCharacters { get; set; }
 
         /// <summary>
         /// Control the wrapping of the editor.
@@ -735,7 +735,7 @@ namespace Monaco.Editor
         /// Defaults to 'simple'.
         /// </summary>
         [JsonProperty("wrappingStrategy", NullValueHandling = NullValueHandling.Ignore)]
-        string WrappingStrategy { get; set; }
+        string? WrappingStrategy { get; set; }
     }
 
 }

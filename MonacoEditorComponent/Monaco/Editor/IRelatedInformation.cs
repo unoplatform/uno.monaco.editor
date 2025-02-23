@@ -11,10 +11,10 @@ namespace Monaco.Editor
         public uint EndLineNumber { get; set; }
 
         [JsonProperty("message")]
-        public string Message { get; set; }
+        public string? Message { get; set; }
 
         [JsonProperty("resource")]
-        public Uri Resource { get; set; }
+        public Uri? Resource { get; set; }
 
         [JsonProperty("startColumn")]
         public uint StartColumn { get; set; }

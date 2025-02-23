@@ -3,7 +3,7 @@
 	<PropertyGroup>
 		<TargetFrameworks>net9.0</TargetFrameworks>
 		<Title>MonacoEditorComponent</Title>
-		<NoWarn>$(NoWarn);Uno0001;CA1416</NoWarn>
+		<NoWarn>$(NoWarn);Uno0001;CA1416;CS1998;CS0067</NoWarn>
 		<PackageId>Uno.Monaco.Editor</PackageId>
 		<!-- Ensures the .xr.xml files are generated in a proper layout folder --> 
 		<GenerateLibraryLayout>true</GenerateLibraryLayout>

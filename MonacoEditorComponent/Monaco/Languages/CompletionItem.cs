@@ -15,13 +15,13 @@ namespace Monaco.Languages
         /// nor with themselves.
         /// </summary>
         [JsonProperty("additionalTextEdits", NullValueHandling = NullValueHandling.Ignore)]
-        public ISingleEditOperation[] AdditionalTextEdits { get; set; }
+        public ISingleEditOperation[]? AdditionalTextEdits { get; set; }
 
         /// <summary>
         /// A command that should be run upon acceptance of this item.
         /// </summary>
         [JsonProperty("command", NullValueHandling = NullValueHandling.Ignore)]
-        public Command Command { get; set; }
+        public Command? Command { get; set; }
 
         /// <summary>
         /// An optional set of characters that when pressed while this completion is active will
@@ -31,20 +31,20 @@ namespace Monaco.Languages
         /// characters will be ignored.
         /// </summary>
         [JsonProperty("commitCharacters", NullValueHandling = NullValueHandling.Ignore)]
-        public string[] CommitCharacters { get; set; }
+        public string[]? CommitCharacters { get; set; }
 
         /// <summary>
         /// A human-readable string with additional information
         /// about this item, like type or symbol information.
         /// </summary>
         [JsonProperty("detail", NullValueHandling = NullValueHandling.Ignore)]
-        public string Detail { get; set; }
+        public string? Detail { get; set; }
 
         /// <summary>
         /// A human-readable string that represents a doc-comment.
         /// </summary>
         [JsonProperty("documentation", NullValueHandling = NullValueHandling.Ignore)]
-        public IMarkdownString Documentation { get; set; }
+        public IMarkdownString? Documentation { get; set; }
 
         /// <summary>
         /// A string that should be used when filtering a set of
@@ -52,7 +52,7 @@ namespace Monaco.Languages
         /// is used.
         /// </summary>
         [JsonProperty("filterText", NullValueHandling = NullValueHandling.Ignore)]
-        public string FilterText { get; set; }
+        public string? FilterText { get; set; }
 
         /// <summary>
         /// A string or snippet that should be inserted in a document when selecting
@@ -60,7 +60,7 @@ namespace Monaco.Languages
         /// is used.
         /// </summary>
         [JsonProperty("insertText")]
-        public string InsertText { get; set; }
+        public string? InsertText { get; set; }
 
         /// <summary>
         /// Addition rules (as bitmask) that should be applied when inserting
@@ -82,7 +82,7 @@ namespace Monaco.Languages
         /// this completion.
         /// </summary>
         [JsonProperty("label")]
-        public string Label { get; set; }
+        public string? Label { get; set; }
 
         /// <summary>
         /// Select this item when showing. *Note* that only one completion item can be selected and
@@ -104,7 +104,7 @@ namespace Monaco.Languages
         /// [requested](#CompletionItemProvider.provideCompletionItems).
         /// </summary>
         [JsonProperty("range")]
-        public Range Range { get; set; }
+        public Range? Range { get; set; }
 
         /// <summary>
         /// A string that should be used when comparing this item
@@ -112,14 +112,14 @@ namespace Monaco.Languages
         /// is used.
         /// </summary>
         [JsonProperty("sortText", NullValueHandling = NullValueHandling.Ignore)]
-        public string SortText { get; set; }
+        public string? SortText { get; set; }
 
         /// <summary>
         /// A modifier to the `kind` which affect how the item
         /// is rendered, e.g. Deprecated is rendered with a strikeout
         /// </summary>
         [JsonProperty("tags", NullValueHandling = NullValueHandling.Ignore)]
-        public MarkerTag[] Tags { get; set; }
+        public MarkerTag[]? Tags { get; set; }
 
         public CompletionItem(string label, string insertText, CompletionItemKind kind)
         {

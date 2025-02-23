@@ -55,7 +55,7 @@ namespace Monaco.Helpers
         /// <returns></returns>
         public bool KeyDown(int keycode, bool ctrl, bool shift, bool alt, bool meta)
         {
-            if (parent.TryGetTarget(out CodeEditor editor))
+            if (parent.TryGetTarget(out var editor))
             {
                 return editor.TriggerKeyDown(new WebKeyEventArgs()
                 {

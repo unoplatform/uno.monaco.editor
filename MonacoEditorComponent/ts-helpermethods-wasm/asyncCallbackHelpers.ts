@@ -1,16 +1,5 @@
 ﻿type MethodWithReturnId = (parameter: string) => void;
 type NumberCallback = (parameter: any) => void;
-declare var asyncCallbackMap: { [promiseId: string]: NumberCallback };
-declare var nextAsync: number;
-
-nextAsync = 1;
-asyncCallbackMap = {};
-
-declare var returnValueCallbackMap: { [returnId: string]: string };
-declare var nextReturn: number;
-
-nextReturn = 1;
-returnValueCallbackMap = {};
 
 const initializeMonacoEditor = (managedOwner: any, element: any) => {
     {
@@ -178,34 +167,6 @@ globalThis.createMonacoEditor = async (managedOwner: any, elementId: string, bas
     });
 }
 
-const asyncCallback = (promiseId: string, parameter: string) => {
-    const promise = asyncCallbackMap[promiseId];
-    if (promise) {
-        //console.log('Async response: ' + parameter);
-        promise(parameter);
-    }
-}
-
-const returnValueCallback = (returnId: string, returnValue: string) => {
-    //console.log('Return value for id ' + returnId + ' is ' + returnValue);
-    returnValueCallbackMap[returnId] = returnValue;
-}
-
-const invokeAsyncMethod = <T>(syncMethod: NumberCallback): Promise<T> => {
-    if (nextAsync==null) {
-        nextAsync = 0;
-    }
-    if (asyncCallbackMap==null) {
-        asyncCallbackMap = {};
-    }
-    const promise = new Promise<T>((resolve, reject) => {
-        var nextId = nextAsync++;
-        asyncCallbackMap[nextId] = resolve;
-        syncMethod(`${nextId}`);
-    });
-    return promise;
-}
-
 const replaceAll = (str: string, find: string, rep: string): string => {
     if (find == "\\")
     {
@@ -258,29 +219,34 @@ const getThemeIsHighContrast = (element: any): boolean =>
 const getThemeCurrentThemeName = (element: any): string =>
     EditorContext.getEditorForElement(element).Theme.getCurrentThemeName();
 
-const callParentEventAsync = (element: any, name: string, parameters: string[]): Promise<string> =>
-    invokeAsyncMethod<string>(async (promiseId) => {
-        let result = await EditorContext.getEditorForElement(element).Accessor.callEvent(name,
-            parameters != null && parameters.length > 0 ? stringifyForMarshalling(parameters[0]) : null,
-            parameters != null && parameters.length > 1 ? stringifyForMarshalling(parameters[1]) : null);
-        if (result) {
-            console.log('Parent event result: ' + name + ' -  ' +  result);
-            result = desantize(result);
-            console.log('Desanitized: ' + name + ' -  ' + result);
-        } else {
-            console.log('No Parent event result for ' + name);
-        }
+const callParentEventAsync = async (element: any, name: string, parameters: string[]): Promise<string> =>
+{
+    let result = await EditorContext.getEditorForElement(element).Accessor.callEvent(name,
+        parameters != null && parameters.length > 0 ? stringifyForMarshalling(parameters[0]) : null,
+        parameters != null && parameters.length > 1 ? stringifyForMarshalling(parameters[1]) : null);
 
-        return result;
-    });
+    if (result) {
+        console.log('Parent event result: ' + name + ' -  ' +  result);
+        result = desantize(result);
+        console.log('Desanitized: ' + name + ' -  ' + result);
+    } else {
+        console.log('No Parent event result for ' + name);
+    }
+
+    return result;
+}
 
 const callParentActionWithParameters = (element: any, name: string, parameters: string[]): boolean =>
     EditorContext.getEditorForElement(element).Accessor.callActionWithParameters(name,
         parameters != null && parameters.length > 0 ? stringifyForMarshalling(parameters[0]) : null,
         parameters != null && parameters.length > 1 ? stringifyForMarshalling(parameters[1]) : null);
 
-const InvokeJS = (command: string): string => {
+globalThis.InvokeJS = (elementId: string, command: string): string => {
     // Preseve the original emscripten marshalling semantics
     // to always return a valid string.
-    return String(eval(command) || "");
+    var r = eval(`var element = globalThis.document.getElementById(\"${elementId}\"); ${command}`) || "";
+
+    var r2 = JSON.stringify(r);
+
+    return r2;
 }

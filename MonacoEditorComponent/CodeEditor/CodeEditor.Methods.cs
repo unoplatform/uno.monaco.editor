@@ -4,6 +4,7 @@ using Monaco.Helpers;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,7 +15,7 @@ namespace Monaco
     /// <summary>
     /// Action delegate for <see cref="CodeEditor.AddCommandAsync(int, CommandHandler)"/> and <see cref="CodeEditor.AddCommandAsync(int, CommandHandler, string)"/>.
     /// </summary>
-    public delegate void CommandHandler(object[] parameters);
+    public delegate void CommandHandler(object?[] parameters);
 
     /// <summary>
     /// This file contains Monaco IEditor method implementations we can call on our control.
@@ -102,8 +103,10 @@ namespace Monaco
 
         public IAsyncAction AddActionAsync(IActionDescriptor action)
         {
+            _parentAccessor = _parentAccessor ?? throw new InvalidOperationException($"_parentAccessor is not available");
+
             var wref = new WeakReference<CodeEditor>(this);
-            _parentAccessor.RegisterAction("Action" + action.Id, new Action(() => { if (wref.TryGetTarget(out CodeEditor editor)) { action?.Run(editor, null); } }));
+            _parentAccessor.RegisterAction("Action" + action.Id, new Action(() => { if (wref.TryGetTarget(out var editor)) { action?.Run(editor, null); } }));
             return InvokeScriptAsync("addAction", action).AsAsyncAction();
         }
 
@@ -112,7 +115,7 @@ namespace Monaco
         /// </summary>
         /// <param name="script">Script to invoke</param>
         /// <returns>An async operation result to string</returns>
-        public IAsyncOperation<string> InvokeScriptAsync(string script)
+        public async Task<string> InvokeScriptAsync(string script)
         {
             throw new InvalidOperationException("InvokeScriptAsync failed");
             // return _view.InvokeScriptAsync("eval", new[] { script });
@@ -120,17 +123,17 @@ namespace Monaco
 
         private int _commandIndex = 0;
 
-        public IAsyncOperation<string> AddCommandAsync(CommandHandler handler)
+        public async Task<string?> AddCommandAsync(CommandHandler handler)
         {
-            return AddCommandAsync(0, handler, string.Empty);
+            return await AddCommandAsync(0, handler, string.Empty);
         }
 
-        public IAsyncOperation<string> AddCommandAsync(int keybinding, CommandHandler handler)
+        public async Task<string?> AddCommandAsync(int keybinding, CommandHandler handler)
         {
-            return AddCommandAsync(keybinding, handler, string.Empty);
+            return await AddCommandAsync(keybinding, handler, string.Empty);
         }
 
-        public IAsyncOperation<string> AddCommandAsync(int keybinding, CommandHandler handler, string context)
+        public async Task<string?> AddCommandAsync(int keybinding, CommandHandler handler, string context)
         {
             if(_parentAccessor == null)
             {
@@ -142,7 +145,7 @@ namespace Monaco
             {
                 if (parameters != null && parameters.Length > 0)
                 {
-                    object[] args = new object[parameters.Length];
+                    object?[] args = new object[parameters.Length];
                     for (int i = 0; i < parameters.Length; i++)
                     {
                         args[i] = JsonConvert.DeserializeObject<object>(parameters[i]);
@@ -155,7 +158,7 @@ namespace Monaco
                     handler?.Invoke(new object[] {});
                 }
             });
-            return InvokeScriptAsync<string>("addCommand", new object[] { keybinding, name, context }).AsAsyncOperation();
+            return await InvokeScriptAsync<string>("addCommand", new object[] { keybinding, name, context });
         }
 
         public async Task<ContextKey> CreateContextKeyAsync(string key, bool defaultValue)
@@ -167,24 +170,24 @@ namespace Monaco
             return ck;
         }
 
-        public IModel GetModel()
+        public IModel? GetModel()
         {
-            return _model ?? throw new NotSupportedException($"Model is not available");
+            return _model;
         }
 
-        public IAsyncOperation<IEnumerable<Marker>> GetModelMarkersAsync() // TODO: Filter (string? owner, Uri? resource, int? take)
+        public async Task<IEnumerable<Marker?>> GetModelMarkersAsync() // TODO: Filter (string? owner, Uri? resource, int? take)
         {
-            return SendScriptAsync<IEnumerable<Marker>>("monaco.editor.getModelMarkers();").AsAsyncOperation();
+            return await SendScriptAsync<IEnumerable<Marker>>("monaco.editor.getModelMarkers();").AsAsyncOperation();
         }
 
-        public IAsyncAction SetModelMarkersAsync(string owner, IMarkerData[] markers)
+        public async Task SetModelMarkersAsync(string owner, IMarkerData[] markers)
         {
-            return SendScriptAsync("monaco.editor.setModelMarkers(EditorContext.getEditorForElement(element).model, " + JsonConvert.ToString(owner) + ", " + JsonConvert.SerializeObject(markers) + ");").AsAsyncAction();
+            await SendScriptAsync("monaco.editor.setModelMarkers(EditorContext.getEditorForElement(element).model, " + JsonConvert.ToString(owner) + ", " + JsonConvert.SerializeObject(markers) + ");").AsAsyncAction();
         }
 
-        public IAsyncOperation<Position> GetPositionAsync()
+        public async Task<Position?> GetPositionAsync()
         {
-            return SendScriptAsync<Position>("EditorContext.getEditorForElement(element).editor.getPosition();").AsAsyncOperation();
+            return await SendScriptAsync<Position>("EditorContext.getEditorForElement(element).editor.getPosition();").AsAsyncOperation();
         }
 
         public IAsyncAction SetPositionAsync(IPosition position)
@@ -201,11 +204,14 @@ namespace Monaco
         /// <returns></returns>
         private async Task DeltaDecorationsHelperAsync(IModelDeltaDecoration[] newDecorations)
         {
+            _queue = _queue ?? throw new InvalidOperationException($"_queue is not available");
+
             await _queue.EnqueueAsync(async () =>
             {
                 var newDecorationsAdjust = newDecorations ?? Array.Empty<IModelDeltaDecoration>();
 
-                if (_cssBroker.AssociateStyles(newDecorations))
+                if (_cssBroker is not null
+                    && _cssBroker.AssociateStyles(newDecorationsAdjust))
                 {
                         // Update Styles First
                         await InvokeScriptAsync("updateStyle", _cssBroker.GetStyles());

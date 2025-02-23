@@ -53,6 +53,6 @@ namespace Monaco.Editor
         [JsonProperty("precondition", NullValueHandling = NullValueHandling.Ignore)]
         string Precondition { get; }
 
-        void Run(CodeEditor editor, object[] args);
+        void Run(CodeEditor editor, object[]? args);
     }
 }

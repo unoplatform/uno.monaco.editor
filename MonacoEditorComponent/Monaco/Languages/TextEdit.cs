@@ -7,10 +7,10 @@ namespace Monaco.Languages
     public sealed class TextEdit
     {
         [JsonProperty("range", NullValueHandling = NullValueHandling.Ignore)]
-        public IRange Range { get; set; }
+        public IRange? Range { get; set; }
 
         [JsonProperty("text", NullValueHandling = NullValueHandling.Ignore)]
-        public string Text { get; set; }
+        public string? Text { get; set; }
 
         [JsonProperty("eol", NullValueHandling = NullValueHandling.Ignore)]
         public EndOfLineSequence Eol { get; set; }

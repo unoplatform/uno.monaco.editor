@@ -8,7 +8,7 @@ namespace Monaco.Helpers
     {
         uint Id { get; }
 
-        string Name { get; }
+        string? Name { get; }
 
         string ToCss();
     }
@@ -25,9 +25,9 @@ namespace Monaco.Helpers
     {
         public override bool CanConvert(Type objectType) => typeof(ICssStyle).IsAssignableFrom(objectType);
 
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer) => new NotSupportedException();
+        public override object? ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer) => new NotSupportedException();
 
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
         {
             if (value is ICssStyle style)
             {

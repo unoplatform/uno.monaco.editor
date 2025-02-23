@@ -14,13 +14,13 @@ namespace Monaco.Languages
         /// An array of diagnostics.
         /// </summary>
         [JsonProperty("markers", NullValueHandling = NullValueHandling.Ignore)]
-        public MarkerData[] Markers { get; set; } // TODO: Should setup the serialization mappings between interfaces to leave interfaces here...
+        public MarkerData[]? Markers { get; set; } // TODO: Should setup the serialization mappings between interfaces to leave interfaces here...
 
         /// <summary>
         /// Requested kind of actions to return.
         /// </summary>
         [JsonProperty("only", NullValueHandling = NullValueHandling.Ignore)]
-        public string Only { get; set; }
+        public string? Only { get; set; }
     }
 }
 

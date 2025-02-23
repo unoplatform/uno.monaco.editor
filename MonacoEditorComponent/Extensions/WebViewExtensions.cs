@@ -16,32 +16,34 @@ namespace Monaco.Extensions
         public static async Task RunScriptAsync(
             this ICodeEditorPresenter _view,
             string script,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
             await _view.RunScriptAsync<object>(script, member, file, line);
         }
 
-        public static async Task<T> RunScriptAsync<T>(
+        public static async Task<T?> RunScriptAsync<T>(
             this ICodeEditorPresenter _view, 
             string script, 
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
-            var start = "try {\n";
-            if (typeof(T) != typeof(object))
-            {
-                script = script.Trim(';');
-                 start += "return JSON.stringify(" + script + ");";
-            }
-            else
-            {
-                start += script;
-            }
-            var fullscript = start + 
-                "\n} catch (err) { return JSON.stringify({ wv_internal_error: true, message: err.message, description: err.description, number: err.number, stack: err.stack }); }";
+            //var start = "try {\n";
+            //if (typeof(T) != typeof(object))
+            //{
+            //    script = script.Trim(';');
+            //     start += "return JSON.stringify(" + script + ");";
+            //}
+            //else
+            //{
+            //    start += script;
+            //}
+            //var fullscript = start + 
+            //    "\n} catch (err) { return JSON.stringify({ wv_internal_error: true, message: err.message, description: err.description, number: err.number, stack: err.stack }); }";
+
+            var fullscript = script;
 
             //if (_view.Dispatcher.HasThreadAccess)
             //{
@@ -70,9 +72,9 @@ namespace Monaco.Extensions
             //}
         }
 
-        private static async Task<T> RunScriptHelperAsync<T>(ICodeEditorPresenter _view, string script)
+        private static async Task<T?> RunScriptHelperAsync<T>(ICodeEditorPresenter _view, string script)
         {
-            var returnstring = NativeMethods.InvokeJS(script);
+            var returnstring = NativeMethods.InvokeJS(_view.ElementId, script);
 
             // TODO: Need to decode the error correctly
             if (returnstring.Contains("wv_internal_error"))
@@ -99,47 +101,47 @@ namespace Monaco.Extensions
             string method,
             object arg,
             bool serialize = true,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
             await _view.InvokeScriptAsync<object>(method, arg, serialize, member, file, line);
         }
 
-        public static async Task<object> InvokeScriptAsync(
+        public static async Task<object?> InvokeScriptAsync(
             this ICodeEditorPresenter _view,
             string method,
             object[] args,
             bool serialize = true,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
             return await _view.InvokeScriptAsync<object>(method, args, serialize, member, file, line);
         }
 
-        public static async Task<T> InvokeScriptAsync<T>(
+        public static async Task<T?> InvokeScriptAsync<T>(
             this ICodeEditorPresenter _view,
             string method,
             object arg,
             bool serialize = true,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
             return await _view.InvokeScriptAsync<T>(method, new object[] { arg }, serialize, member, file, line);
         }
 
-        public static async Task<T> InvokeScriptAsync<T>(
+        public static async Task<T?> InvokeScriptAsync<T>(
             this ICodeEditorPresenter _view,
             string method,
-            object[] args,
+            object?[] args,
             bool serialize = true,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
-            string[] sanitizedargs;
+            string?[] sanitizedargs;
 
             try
             {
@@ -158,14 +160,14 @@ namespace Monaco.Extensions
                         }
                         else
                         {
-                        // TODO: Need JSON.parse?
-                        return JsonConvert.SerializeObject(item, _settings);
+                            // TODO: Need JSON.parse?
+                            return JsonConvert.SerializeObject(item, _settings);
                         }
                     }).ToArray();
                 }
                 else
                 {
-                    sanitizedargs = args.Select(item => item.ToString()).ToArray();
+                    sanitizedargs = args.Select(item => item?.ToString()).ToArray();
                 }
 
                 var script = method + "(element," + string.Join(",", sanitizedargs) + ");";
@@ -185,15 +187,15 @@ namespace Monaco.Extensions
 
     internal sealed class JavaScriptExecutionException : Exception
     {
-        public string Script { get; private set; }
+        public string? Script { get; private set; }
 
-        public string Member { get; private set; }
+        public string? Member { get; private set; }
 
-        public string FileName { get; private set; }
+        public string? FileName { get; private set; }
 
         public int LineNumber { get; private set; }
 
-        public JavaScriptExecutionException(string member, string filename, int line, string script, Exception inner)
+        public JavaScriptExecutionException(string? member, string? filename, int line, string? script, Exception inner)
             : base("Error Executing JavaScript Code for " + member + "\nLine " + line + " of " + filename + "\n" + script + "\n", inner)
         {
             Member = member;
@@ -217,6 +219,6 @@ namespace Monaco.Extensions
     internal partial class NativeMethods
     {
         [JSImport("globalThis.InvokeJS")]
-        public static partial string InvokeJS(string script);
+        public static partial string InvokeJS(string elementId, string script);
     }
 }

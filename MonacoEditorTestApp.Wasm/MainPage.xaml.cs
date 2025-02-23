@@ -55,7 +55,7 @@ namespace MonacoEditorTestApp
 
         private void TabView_TabCloseRequested(TabView sender, TabViewTabCloseRequestedEventArgs args)
         {
-            
+            editors.TabItems.Remove(args.Item);
         }
     }
 }

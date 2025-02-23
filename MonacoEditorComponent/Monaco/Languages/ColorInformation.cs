@@ -32,7 +32,7 @@ namespace Monaco.Languages
     {
         public override bool CanConvert(Type t) => t == typeof(Color) || t == typeof(Color?);
 
-        public override object ReadJson(JsonReader reader, Type t, object existingValue, JsonSerializer serializer)
+        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
         {
             Color color = new Color();
 
@@ -43,16 +43,16 @@ namespace Monaco.Languages
                     switch (reader.Value)
                     {
                         case "alpha":
-                            color.A = (byte)(reader.ReadAsDouble() * 255);
+                            color.A = (byte)((reader.ReadAsDouble() ?? 0) * 255);
                             break;
                         case "red":
-                            color.R = (byte)(reader.ReadAsDouble() * 255);
+                            color.R = (byte)((reader.ReadAsDouble() ?? 0) * 255);
                             break;
                         case "green":
-                            color.G = (byte)(reader.ReadAsDouble() * 255);
+                            color.G = (byte)((reader.ReadAsDouble() ?? 0) * 255);
                             break;
                         case "blue":
-                            color.B = (byte)(reader.ReadAsDouble() * 255);
+                            color.B = (byte)((reader.ReadAsDouble() ?? 0) * 255);
                             break;
                     }
 
@@ -63,7 +63,7 @@ namespace Monaco.Languages
             return color;
         }
 
-        public override void WriteJson(JsonWriter writer, object untypedValue, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
         {
             if (untypedValue == null)
             {

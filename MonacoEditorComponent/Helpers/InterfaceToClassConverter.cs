@@ -16,7 +16,7 @@ namespace Monaco.Helpers
             return objectType == typeof(TInterface);
         }
 
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        public override object? ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
         {
             // Use the implementation type for the deserialization of the interface.
             var pop = new TClass();
@@ -26,7 +26,7 @@ namespace Monaco.Helpers
             return pop;
         }
 
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
         {
             serializer.Serialize(writer, value);
         }        

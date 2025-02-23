@@ -22,9 +22,9 @@ namespace Monaco.Helpers
         private readonly WeakReference<IParentAccessorAcceptor> parent;
         private readonly Type typeinfo;
         private readonly DispatcherQueue _queue;
-        private Dictionary<string, Action> actions;
+        private Dictionary<string, Action>? actions;
         private Dictionary<string, Action<string[]>> action_parameters;
-        private Dictionary<string, Func<string[], Task<string>>> events;
+        private Dictionary<string, Func<string[], Task<string>?>>? events;
 
         private List<Assembly> Assemblies { get; set; } = new List<Assembly>();
 
@@ -38,9 +38,9 @@ namespace Monaco.Helpers
 
             this.parent = new WeakReference<IParentAccessorAcceptor>(parent);
             typeinfo = parent.GetType();
-            actions = new Dictionary<string, Action>();
-            action_parameters = new Dictionary<string, Action<string[]>>();
-            events = new Dictionary<string, Func<string[], Task<string>>>();
+            actions = [];
+            action_parameters = [];
+            events = [];
 
             PartialCtor();
         }
@@ -54,7 +54,10 @@ namespace Monaco.Helpers
         /// <param name="action">Action to perform.</param>
         internal void RegisterAction(string name, Action action)
         {
-            actions[name] = action;
+            if (actions is not null)
+            {
+                actions[name] = action;
+            }
         }
 
         internal void RegisterActionWithParameters(string name, Action<string[]> action)
@@ -67,9 +70,12 @@ namespace Monaco.Helpers
         /// </summary>
         /// <param name="name">String Key.</param>
         /// <param name="function">Event to call.</param>
-        internal void RegisterEvent(string name, Func<string[], Task<string>> function)
+        internal void RegisterEvent(string name, Func<string[], Task<string>?> function)
         {
-            events[name] = function;
+            if (events is not null)
+            {
+                events[name] = function;
+            }
         }
 
         /// <summary>
@@ -78,15 +84,20 @@ namespace Monaco.Helpers
         /// <param name="name">Name of event to call.</param>
         /// <param name="parameters">JSON string Parameters.</param>
         /// <returns></returns>
-        public async Task<string> CallEvent(string name, string[] parameters)
+        public async Task<string?> CallEvent(string name, string[] parameters)
         {
-            string result = null;
+            string? result = null;
 
             await _queue.EnqueueAsync(async () =>
             {
-                if (events.ContainsKey(name))
+                if (events is not null 
+                    && events.TryGetValue(name, out Func<string[], Task<string>?>? value))
                 {
-                    result = await events[name]?.Invoke(parameters);
+                    var task = value?.Invoke(parameters);
+                    if (task != null)
+                    {
+                        result = await task;
+                    }
                 }
             });
 
@@ -109,7 +120,8 @@ namespace Monaco.Helpers
         /// <returns>True if method was found in registration.</returns>
         public bool CallAction(string name)
         {
-            if (actions.ContainsKey(name))
+            if (actions is not null &&
+                actions.ContainsKey(name))
             {
                 // TODO: Not sure if this a problem too?
                 _queue.EnqueueAsync(() =>
@@ -147,13 +159,13 @@ namespace Monaco.Helpers
         /// </summary>
         /// <param name="name">Property name on Parent Object.</param>
         /// <returns>Property Value or null.</returns>
-        public async Task<object> GetValue(string name)
+        public async Task<object?> GetValue(string name)
         {
-            object result = null;
+            object? result = null;
 
             await _queue.EnqueueAsync(() =>
             {
-                if (parent.TryGetTarget(out IParentAccessorAcceptor tobj))
+                if (parent.TryGetTarget(out var tobj))
                 {
                     var propinfo = typeinfo.GetProperty(name);
                     result = propinfo?.GetValue(tobj);
@@ -165,7 +177,7 @@ namespace Monaco.Helpers
 
         public string GetJsonValue(string name)
         {
-            if (parent.TryGetTarget(out IParentAccessorAcceptor tobj))
+            if (parent.TryGetTarget(out var tobj))
             {
                 var propinfo = typeinfo.GetProperty(name);
                 var obj = propinfo?.GetValue(tobj);
@@ -186,13 +198,13 @@ namespace Monaco.Helpers
         /// <param name="name">Parent Property name.</param>
         /// <param name="child">Property's Property name to retrieve.</param>
         /// <returns>Value of Child Property or null.</returns>
-        public async Task<object> GetChildValue(string name, string child)
+        public async Task<object?> GetChildValue(string name, string child)
         {
-            object result = null;
+            object? result = null;
 
             await _queue.EnqueueAsync(() =>
             {
-                if (parent.TryGetTarget(out IParentAccessorAcceptor tobj))
+                if (parent.TryGetTarget(out var tobj))
                 {
                     // TODO: Support params for multi-level digging?
                     var propinfo = typeinfo.GetProperty(name);
@@ -217,16 +229,18 @@ namespace Monaco.Helpers
         {
             await _queue.EnqueueAsync(() =>
             {
-                if (parent.TryGetTarget(out IParentAccessorAcceptor tobj))
+                if (parent.TryGetTarget(out var tobj))
                 {
                     var propinfo = typeinfo.GetProperty(name); // TODO: Cache these?
                     tobj.IsSettingValue = true;
 
                     try
                     {
-                        if (newValue is string valueAsString)
+                        object? value = newValue;
+
+                        if (value is string valueAsString)
                         {
-                            newValue = Desanitize(valueAsString);
+                            value = Desanitize(valueAsString);
                         }
 
                         propinfo?.SetValue(tobj, newValue);
@@ -249,27 +263,31 @@ namespace Monaco.Helpers
         {
             await _queue.EnqueueAsync(() =>
             {
-                if (parent.TryGetTarget(out IParentAccessorAcceptor tobj))
+                if (parent.TryGetTarget(out var tobj))
                 {
                     var propinfo = typeinfo.GetProperty(name);
                     var typeobj = LookForTypeByName(type);
 
-                    var obj = JsonConvert.DeserializeObject(newValue, typeobj);
+                    if (typeobj is not null)
+                    {
 
-                    tobj.IsSettingValue = true;
-                    try
-                    {
-                        propinfo?.SetValue(tobj, obj);
-                    }
-                    finally
-                    {
-                        tobj.IsSettingValue = false;
+                        var obj = JsonConvert.DeserializeObject(newValue, typeobj);
+
+                        tobj.IsSettingValue = true;
+                        try
+                        {
+                            propinfo?.SetValue(tobj, obj);
+                        }
+                        finally
+                        {
+                            tobj.IsSettingValue = false;
+                        }
                     }
                 }
             });
         }
 
-        private Type LookForTypeByName(string name)
+        private Type? LookForTypeByName(string name)
         {
             // First search locally
             var result = Type.GetType(name);

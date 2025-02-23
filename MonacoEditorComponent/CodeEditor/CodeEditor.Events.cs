@@ -20,29 +20,29 @@ namespace Monaco
         /// <summary>
         /// When Editor is Loading, it is ready to receive commands to the Monaco Engine.
         /// </summary>
-        public new event RoutedEventHandler Loading;
+        public new event RoutedEventHandler? Loading;
 
         /// <summary>
         /// When Editor is Loaded, it has been rendered and is ready to be displayed.
         /// </summary>
-        public new event RoutedEventHandler Loaded;
+        public new event RoutedEventHandler? Loaded;
 
         /// <summary>
         /// Called when a link is Ctrl+Clicked on in the editor, set Handled to true to prevent opening.
         /// </summary>
-        public event TypedEventHandler<ICodeEditorPresenter, WebViewNewWindowRequestedEventArgs> OpenLinkRequested;
+        public event TypedEventHandler<ICodeEditorPresenter, WebViewNewWindowRequestedEventArgs>? OpenLinkRequested;
 
         /// <summary>
         /// Called when an internal exception is encountered while executing a command. (for testing/reporting issues)
         /// </summary>
-        public event TypedEventHandler<CodeEditor, Exception> InternalException;
+        public event TypedEventHandler<CodeEditor, Exception>? InternalException;
 
         /// <summary>
         /// Custom Keyboard Handler.
         /// </summary>
-        public new event WebKeyEventHandler KeyDown;
+        public new event WebKeyEventHandler? KeyDown;
 
-        private ThemeListener _themeListener;
+        private ThemeListener? _themeListener;
 
         private void WebView_DOMContentLoaded(object sender, RoutedEventArgs args)
             => WebView_DOMContentLoaded();
@@ -57,14 +57,14 @@ namespace Monaco
 #if __WASM__
             InitialiseWebObjects();
 
-            _ = _view.Launch();
+            _ = _view?.Launch();
 
             Options.Language = CodeLanguage;
             Options.ReadOnly = ReadOnly;
 #endif
         }
 
-        private async void WebView_NavigationCompleted(ICodeEditorPresenter sender, WebViewNavigationCompletedEventArgs args)
+        private async void WebView_NavigationCompleted(ICodeEditorPresenter? sender, WebViewNavigationCompletedEventArgs? args)
         {
 #if DEBUG && !HAS_UNO_WASM
             Debug.WriteLine($"Navigation completed - {args?.IsSuccess}");
@@ -77,29 +77,31 @@ namespace Monaco
             // If we're supposed to have focus, make sure we try and refocus on our now loaded webview.
             if (FocusManager.GetFocusedElement() == this)
             {
-                _view.Focus(FocusState.Programmatic);
+                _view?.Focus(FocusState.Programmatic);
             }
 
             Loaded?.Invoke(this, new RoutedEventArgs());
         }
 
-        internal ParentAccessor _parentAccessor;
-        private KeyboardListener _keyboardListener;
-        private DebugLogger _debugLogger;
+        internal ParentAccessor? _parentAccessor;
+        private KeyboardListener? _keyboardListener;
+        private DebugLogger? _debugLogger;
         private long _themeToken;
 
-        private void WebView_NavigationStarting(ICodeEditorPresenter sender, WebViewNavigationStartingEventArgs args)
+        private void WebView_NavigationStarting(ICodeEditorPresenter? sender, WebViewNavigationStartingEventArgs? args)
         {
 #if DEBUG
-            Debug.WriteLine($"Navigation Starting {args.Uri.ToString()}");
+            Debug.WriteLine($"Navigation Starting {args?.Uri?.ToString()}");
 #endif
             InitialiseWebObjects();
         }
 
-        private void InitialiseWebObjects() {
-            Debug.WriteLine($"InitialiseWebObjects");
+        private void InitialiseWebObjects()
+        {
             try
             {
+                _queue = _queue ?? throw new InvalidOperationException("DispatcherQueue not set");
+
                 _parentAccessor = new ParentAccessor(this, _queue);
                 _parentAccessor.AddAssemblyForTypeLookup(typeof(Range).GetTypeInfo().Assembly);
                 _parentAccessor.RegisterAction("Loaded", CodeEditorLoaded);
@@ -123,6 +125,8 @@ namespace Monaco
         {
             _initialized = true;
 
+            _view = _view ?? throw new InvalidOperationException("The view not set");
+
             if (Decorations != null && Decorations.Count > 0)
             {
                 // Need to retrigger highlights after load if they were set before load.
@@ -137,8 +141,11 @@ namespace Monaco
 
             await SendScriptAsync("EditorContext.getEditorForElement(element).editor.layout();");
 
-            await InvokeScriptAsync("updateLanguage", Options.Language);
-            await InvokeScriptAsync("updateOptions", Options);
+            if (Options is not null)
+            {
+                await InvokeScriptAsync("updateLanguage", Options.Language ?? "");
+                await InvokeScriptAsync("updateOptions", Options);
+            }
 
             // If we're supposed to have focus, make sure we try and refocus on our now loaded webview.
             if (FocusManager.GetFocusedElement() == this)
@@ -151,35 +158,41 @@ namespace Monaco
             Loaded?.Invoke(this, new RoutedEventArgs());
 
 #if __WASM__
-            Dispatcher.RunAsync(CoreDispatcherPriority.Low, () => WebView_NavigationCompleted(_view, null));
+            _ = Dispatcher.RunAsync(CoreDispatcherPriority.Low, () => WebView_NavigationCompleted(_view, null));
 #endif
         }
 
-        private void WebView_NewWindowRequested(ICodeEditorPresenter sender, WebViewNewWindowRequestedEventArgs args)
+        private void WebView_NewWindowRequested(ICodeEditorPresenter? sender, WebViewNewWindowRequestedEventArgs? args)
         {
-            // TODO: Should probably create own event args here as we don't want to expose the referrer to our internal page?
-            OpenLinkRequested?.Invoke(sender, args);
+            if (sender is not null && args is not null)
+            {
+                // TODO: Should probably create own event args here as we don't want to expose the referrer to our internal page?
+                OpenLinkRequested?.Invoke(sender, args);
+            }
         }
 
-        private async void RequestedTheme_PropertyChanged(DependencyObject obj, DependencyProperty property)
+        private async void RequestedTheme_PropertyChanged(DependencyObject? obj, DependencyProperty property)
         {
-            var editor = obj as CodeEditor;
-            var theme = editor.RequestedTheme;
-            var tstr = string.Empty;
+            if (obj is CodeEditor editor
+                && _themeListener is { } listener)
+            {
+                var theme = editor.RequestedTheme;
+                var tstr = string.Empty;
 
-            if (theme == ElementTheme.Default)
-            {
-                tstr = _themeListener.CurrentThemeName;
-            }
-            else
-            {
-                tstr = theme.ToString();
-            }
+                if (theme == ElementTheme.Default)
+                {
+                    tstr = _themeListener?.CurrentThemeName;
+                }
+                else
+                {
+                    tstr = theme.ToString();
+                }
 
-            await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, async () =>
-            {
-                await InvokeScriptAsync("changeTheme", new string[] { tstr, _themeListener.IsHighContrast.ToString() });
-            });
+                await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, async () =>
+                {
+                    await InvokeScriptAsync("changeTheme", new string[] { tstr ?? "", listener.IsHighContrast.ToString() });
+                });
+            }
         }
 
         private async void ThemeListener_ThemeChanged(ThemeListener sender)
@@ -210,8 +223,5 @@ namespace Monaco
                 _view.Focus(FocusState.Programmatic);
             }
         }
-
-
-       
     }
 }

@@ -23,8 +23,8 @@ namespace Collections.Generic
 
 		// Events
 
-		public event PropertyChangedEventHandler PropertyChanged;
-		public event VectorChangedEventHandler<T> VectorChanged;
+		public event PropertyChangedEventHandler? PropertyChanged;
+		public event VectorChangedEventHandler<T>? VectorChanged;
 
 		// Constructors
 

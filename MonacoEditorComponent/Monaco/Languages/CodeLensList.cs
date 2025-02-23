@@ -5,7 +5,7 @@ namespace Monaco.Languages
     public sealed class CodeLensList // IDisposible?
     {
         [JsonProperty("lenses", NullValueHandling = NullValueHandling.Ignore)]
-        public CodeLens[] Lenses { get; set; }
+        public CodeLens[]? Lenses { get; set; }
     }
 }
 

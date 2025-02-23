@@ -19,14 +19,14 @@ namespace Monaco
         public bool? SupportThemeIcons { get; set; }
 
         [JsonProperty("uris", NullValueHandling = NullValueHandling.Ignore)]
-        public IDictionary<string, Uri> Uris { get; set; }
+        public IDictionary<string, Uri>? Uris { get; set; }
 
         [JsonProperty("value")]
-        public string Value { get; set; }
+        public string? Value { get; set; }
 
-        public IMarkdownString(string svalue) : this(svalue, false) { }
+        public IMarkdownString(string? svalue) : this(svalue, false) { }
 
-        public IMarkdownString(string svalue, bool isTrusted)
+        public IMarkdownString(string? svalue, bool isTrusted)
         {
             Value = svalue;
             IsTrusted = isTrusted;

@@ -33,12 +33,14 @@ namespace Monaco
             return new Position(LineNumber, Column);
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (obj is Position)
             {
-                var other = obj as Position;
-                return LineNumber == other.LineNumber && Column == other.Column;
+                if (obj is Position other)
+                {
+                    return LineNumber == other.LineNumber && Column == other.Column;
+                }
             }
 
             return base.Equals(obj);
@@ -74,9 +76,9 @@ namespace Monaco
 
         public int CompareTo(object obj)
         {
-            if (obj is IPosition)
+            if (obj is IPosition position)
             {
-                return CompareTo(Lift(obj as IPosition));
+                return CompareTo(Lift(position));
             }
 
             throw new NotImplementedException();

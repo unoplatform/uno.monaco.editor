@@ -8,7 +8,7 @@ namespace Monaco.Editor
     public sealed class MarkerData : IMarkerData
     {
         [JsonProperty("code", NullValueHandling = NullValueHandling.Ignore)]
-        public string Code { get; set; }
+        public string? Code { get; set; }
 
         [JsonProperty("endColumn")]
         public uint EndColumn { get; set; }
@@ -17,16 +17,16 @@ namespace Monaco.Editor
         public uint EndLineNumber { get; set; }
 
         [JsonProperty("message")]
-        public string Message { get; set; }
+        public string? Message { get; set; }
 
         [JsonProperty("relatedInformation", NullValueHandling = NullValueHandling.Ignore)]
-        public IRelatedInformation[] RelatedInformation { get; set; }
+        public IRelatedInformation[]? RelatedInformation { get; set; }
 
         [JsonProperty("severity")]
         public MarkerSeverity Severity { get; set; }
 
         [JsonProperty("source", NullValueHandling = NullValueHandling.Ignore)]
-        public string Source { get; set; }
+        public string? Source { get; set; }
 
         [JsonProperty("startColumn")]
         public uint StartColumn { get; set; }
@@ -35,7 +35,7 @@ namespace Monaco.Editor
         public uint StartLineNumber { get; set; }
 
         [JsonProperty("tags", NullValueHandling = NullValueHandling.Ignore)]
-        public MarkerTag[] Tags { get; set; }
+        public MarkerTag[]? Tags { get; set; }
 
         public MarkerData() { }
 

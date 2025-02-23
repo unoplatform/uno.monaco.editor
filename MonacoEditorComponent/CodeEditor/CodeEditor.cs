@@ -21,14 +21,14 @@ namespace Monaco
     public sealed partial class CodeEditor : Control, INotifyPropertyChanged, IDisposable
     {
         private bool _initialized;
-        private DispatcherQueue _queue;
+        private DispatcherQueue? _queue;
 
-        private ICodeEditorPresenter _view;
+        private ICodeEditorPresenter? _view;
 
-        private ModelHelper _model;
-        private CssStyleBroker _cssBroker;
+        private ModelHelper? _model;
+        private CssStyleBroker? _cssBroker;
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         /// <summary>
         /// Template Property used during loading to prevent blank control visibility when it's still loading WebView.
@@ -61,7 +61,7 @@ namespace Monaco
         /// Construct a new IStandAloneCodeEditor.
         /// </summary>
         /// <param name="queue"><see cref="DispatcherQueue"/> for the UI Thread, if none pass assumes the current thread is the UI thread.</param>
-        public CodeEditor(DispatcherQueue queue)
+        public CodeEditor(DispatcherQueue? queue)
         {
             _queue = queue ?? DispatcherQueue.GetForCurrentThread();
 
@@ -108,10 +108,11 @@ namespace Monaco
             });
         }
 
-        private async void Options_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        private async void Options_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (!(sender is StandaloneEditorConstructionOptions options)) return;
-            if (e.PropertyName == nameof(StandaloneEditorConstructionOptions.Language))
+            if (e.PropertyName == nameof(StandaloneEditorConstructionOptions.Language)
+                && options.Language is not null)
             {
                 await InvokeScriptAsync("updateLanguage", options.Language);
                 if (CodeLanguage != options.Language) CodeLanguage = options.Language;
@@ -136,6 +137,8 @@ namespace Monaco
 
         private void CodeEditor_Loaded(object sender, RoutedEventArgs e)
         {
+            Console.WriteLine("CodeEditor_Loaded");
+
 #if __WASM__
             LoadedPartial();
 #endif
@@ -155,6 +158,8 @@ namespace Monaco
             {
                 ReadOnly = Options.ReadOnly.Value;
             }
+
+            Console.WriteLine($"CodeEditor_Loaded [{_model}] [{_view}] ({GetHashCode():x8})");
 
             // Do this the 2nd time around.
             if (_model == null && _view != null)
@@ -177,7 +182,10 @@ namespace Monaco
                 Unloaded -= CodeEditor_Unloaded;
                 Unloaded += CodeEditor_Unloaded;
 
-                Window.Current.SizeChanged += OnWindowSizeChanged;
+                if (Window.Current is not null)
+                {
+                    Window.Current.SizeChanged += OnWindowSizeChanged;
+                }
 
                 Loaded?.Invoke(this, new RoutedEventArgs());
             }
@@ -266,19 +274,19 @@ namespace Monaco
         }
 
         internal async Task SendScriptAsync(string script,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
             await SendScriptAsync<object>(script, member, file, line);
         }
 
-        internal async Task<T> SendScriptAsync<T>(string script,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+        internal async Task<T?> SendScriptAsync<T>(string script,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
-            if (_initialized)
+            if (_initialized && _view is not null)
             {
                 try
                 {
@@ -301,46 +309,46 @@ namespace Monaco
 
         internal async Task InvokeScriptAsync(
             string method,
-            object arg,
+            object? arg,
             bool serialize = true,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
-            await InvokeScriptAsync<object>(method, new object[] { arg }, serialize, member, file, line);
+            await InvokeScriptAsync<object>(method, [arg], serialize, member, file, line);
         }
 
         internal async Task InvokeScriptAsync(
             string method,
             object[] args,
             bool serialize = true,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
             await InvokeScriptAsync<object>(method, args, serialize, member, file, line);
         }
 
-        internal async Task<T> InvokeScriptAsync<T>(
+        internal async Task<T?> InvokeScriptAsync<T>(
             string method,
             object arg,
             bool serialize = true,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
-            return await InvokeScriptAsync<T>(method, new object[] { arg }, serialize, member, file, line);
+            return await InvokeScriptAsync<T>(method, [arg], serialize, member, file, line);
         }
 
-        internal async Task<T> InvokeScriptAsync<T>(
+        internal async Task<T?> InvokeScriptAsync<T>(
             string method,
-            object[] args,
+            object?[] args,
             bool serialize = true,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
-            if (_initialized)
+            if (_initialized && _view is not null)
             {
                 try
                 {
@@ -366,7 +374,7 @@ namespace Monaco
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        public void Dispose()
+        public new void Dispose()
         {
             _cssBroker?.Dispose();
             _cssBroker = null;
@@ -377,7 +385,7 @@ namespace Monaco
 
     public static class UriHelper
     {
-        private static readonly string UNO_BOOTSTRAP_APP_BASE = global::System.Environment.GetEnvironmentVariable(nameof(UNO_BOOTSTRAP_APP_BASE));
+        private static readonly string UNO_BOOTSTRAP_APP_BASE = global::System.Environment.GetEnvironmentVariable(nameof(UNO_BOOTSTRAP_APP_BASE)) ?? "";
         private static readonly string UNO_BOOTSTRAP_WEBAPP_BASE_PATH = Environment.GetEnvironmentVariable(nameof(UNO_BOOTSTRAP_WEBAPP_BASE_PATH)) ?? "";
 
         public static string AbsoluteUriString(this System.Uri uri)

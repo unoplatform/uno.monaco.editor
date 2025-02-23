@@ -26,14 +26,14 @@ namespace Monaco.Helpers
         public ApplicationTheme CurrentTheme { get; set; }
         public bool IsHighContrast { get; set; }
 
-        public event ThemeChangedEvent ThemeChanged;
+        public event ThemeChangedEvent? ThemeChanged;
 
         private readonly AccessibilitySettings _accessible = new AccessibilitySettings();
         private readonly UISettings _settings = new UISettings();
 
         public ThemeListener(CodeEditor codeEditor) : this(codeEditor, null) { }
 
-        public ThemeListener(CodeEditor codeEditor, DispatcherQueue queue)
+        public ThemeListener(CodeEditor codeEditor, DispatcherQueue? queue)
         {
             _queue = queue ?? DispatcherQueue.GetForCurrentThread();
             _owner = codeEditor;
@@ -47,7 +47,10 @@ namespace Monaco.Helpers
             _settings.ColorValuesChanged += _settings_ColorValuesChanged;
 
             // Fallback in case either of the above fail, we'll check when we get activated next.
-            Window.Current.CoreWindow.Activated += CoreWindow_Activated;
+            if (Window.Current?.CoreWindow is not null)
+            {
+                Window.Current.CoreWindow.Activated += CoreWindow_Activated;
+            }
 
             PartialCtor();
         }
@@ -59,7 +62,10 @@ namespace Monaco.Helpers
             _accessible.HighContrastChanged -= _accessible_HighContrastChanged;
             _settings.ColorValuesChanged -= _settings_ColorValuesChanged;
 
-            Window.Current.CoreWindow.Activated -= CoreWindow_Activated;
+            if (Window.Current?.CoreWindow is not null)
+            {
+                Window.Current.CoreWindow.Activated -= CoreWindow_Activated;
+            }
         }
 
         private void _accessible_HighContrastChanged(AccessibilitySettings sender, object args)

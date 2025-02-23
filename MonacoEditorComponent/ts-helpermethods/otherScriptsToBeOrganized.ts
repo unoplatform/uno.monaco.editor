@@ -20,6 +20,15 @@ class EditorContext {
         return context;
     }
 
+    public static getElementFromModel(model: monaco.editor.ITextModel): any {
+        for (let [key, value] of EditorContext._editors) {
+            if (value.model === model) {
+                return key;
+            }
+        }
+        return null;
+    }
+
     constructor() {
         this.modifingSelection = false;
         this.contexts = {};

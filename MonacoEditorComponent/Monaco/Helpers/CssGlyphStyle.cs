@@ -6,11 +6,11 @@ namespace Monaco.Helpers
     public sealed class CssGlyphStyle : ICssStyle
     {
         [JsonIgnore]
-        public System.Uri GlyphImage { get; set; }
+        public System.Uri? GlyphImage { get; set; }
 
         public uint Id { get; }
 
-        public string Name { get; }
+        public string? Name { get; }
 
         public CssGlyphStyle()
         {
@@ -20,7 +20,7 @@ namespace Monaco.Helpers
 
         public string ToCss()
         {
-            return this.WrapCssClassName(string.Format("background: url(\"{0}\");", GlyphImage.AbsoluteUriString()));
+            return this.WrapCssClassName($"background: url(\"{GlyphImage?.AbsoluteUriString()}\");");
         }
     }
 }

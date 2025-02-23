@@ -20,12 +20,12 @@ namespace Monaco.Editor
         /// The range to replace. This can be empty to emulate a simple insert.
         /// </summary>
         [JsonProperty("range")]
-        public IRange Range { get; set; }
+        public IRange? Range { get; set; }
 
         /// <summary>
         /// The text to replace with. This can be null to emulate a simple delete.
         /// </summary>
         [JsonProperty("text")]
-        public string Text { get; set; }
+        public string? Text { get; set; }
     }
 }

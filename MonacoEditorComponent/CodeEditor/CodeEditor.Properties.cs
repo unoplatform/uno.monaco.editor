@@ -57,7 +57,7 @@ namespace Monaco
                 if (codeEditor.IsEditorLoaded && !codeEditor.IsSettingValue)
                 {
                     // link:updateSelectedContent.ts:updateSelectedContent
-                    codeEditor.InvokeScriptAsync("updateSelectedContent", e.NewValue.ToString());
+                    _ = codeEditor.InvokeScriptAsync("updateSelectedContent", e.NewValue.ToString());
                 }
 
 				codeEditor.NotifyPropertyChanged(nameof(SelectedText));
@@ -183,7 +183,7 @@ namespace Monaco
                     if ((old != null && old.Count > 0) ||
                              e.NewValue == null)
                     {
-                        await editor.DeltaDecorationsHelperAsync(null);
+                        await editor.DeltaDecorationsHelperAsync([]);
                     }
 
                     if (e.NewValue is IObservableVector<IModelDeltaDecoration> value)

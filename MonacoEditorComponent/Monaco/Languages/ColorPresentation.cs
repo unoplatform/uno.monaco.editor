@@ -15,17 +15,17 @@ namespace Monaco.Languages
         /// nor with themselves.
         /// </summary>
         [JsonProperty("additionalTextEdits", NullValueHandling = NullValueHandling.Ignore)]
-        public ISingleEditOperation[] AdditionalTextEdits { get; set; }
+        public ISingleEditOperation[]? AdditionalTextEdits { get; set; }
 
         /// <summary>
         /// The label of this color presentation. It will be shown on the color picker header. 
         /// By default this is also the text that is inserted when selecting this color presentation.
         /// </summary>
         [JsonProperty("label")]
-        public string Label { get; set; }
+        public string? Label { get; set; }
 
         [JsonProperty("textEdit", NullValueHandling = NullValueHandling.Ignore)]
-        public ISingleEditOperation TextEdit { get; set; }
+        public ISingleEditOperation? TextEdit { get; set; }
 
         public ColorPresentation(string label)
         {

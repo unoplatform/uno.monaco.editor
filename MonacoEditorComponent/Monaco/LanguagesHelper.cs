@@ -24,9 +24,9 @@ namespace Monaco
             _editor = new WeakReference<CodeEditor>(editor);
         }
 
-        public IAsyncOperation<IList<ILanguageExtensionPoint>> GetLanguagesAsync()
+        public IAsyncOperation<IList<ILanguageExtensionPoint>?>? GetLanguagesAsync()
         {
-            if (_editor.TryGetTarget(out CodeEditor editor))
+            if (_editor.TryGetTarget(out var editor))
             {
                 return editor.SendScriptAsync<IList<ILanguageExtensionPoint>>("monaco.languages.getLanguages()").AsAsyncOperation();
             }
@@ -34,9 +34,9 @@ namespace Monaco
             return null;
         }
 
-        public IAsyncAction RegisterAsync(ILanguageExtensionPoint language)
+        public IAsyncAction? RegisterAsync(ILanguageExtensionPoint language)
         {
-            if (_editor.TryGetTarget(out CodeEditor editor))
+            if (_editor.TryGetTarget(out var editor))
             {
                 return editor.InvokeScriptAsync("monaco.languages.register", language).AsAsyncAction();
             }
@@ -44,27 +44,32 @@ namespace Monaco
             return null;
         }
 
-        public IAsyncAction RegisterCodeActionProviderAsync(string languageId, CodeActionProvider provider)
+        public IAsyncAction? RegisterCodeActionProviderAsync(string languageId, CodeActionProvider provider)
         {
-            if (_editor.TryGetTarget(out CodeEditor editor))
+            if (_editor.TryGetTarget(out var editor))
             {
                 // link:registerCodeActionProvider.ts:ProvideCodeActions
-                editor._parentAccessor.RegisterEvent("ProvideCodeActions" + languageId, async (args) =>
+                editor._parentAccessor?.RegisterEvent("ProvideCodeActions" + languageId, async (args) =>
                 {
                     if (args != null && args.Length >= 2)
                     {
                         var range = JsonConvert.DeserializeObject<Range>(args[0]);
                         var context = JsonConvert.DeserializeObject<CodeActionContext>(args[1]);
 
-                        var list = await provider.ProvideCodeActionsAsync(editor.GetModel(), range, context);
-
-                        if (list != null)
+                        if (editor.GetModel() is { } model
+                            && range is not null
+                            && context is not null)
                         {
-                            return JsonConvert.SerializeObject(list);
+                            var list = await provider.ProvideCodeActionsAsync(model, range, context);
+
+                            if (list != null)
+                            {
+                                return JsonConvert.SerializeObject(list);
+                            }
                         }
                     }
 
-                    return null;
+                    return "";
                 });
 
                 // link:registerCodeActionProvider.ts:registerCodeActionProvider
@@ -74,21 +79,24 @@ namespace Monaco
             return null;
         }
 
-        public IAsyncAction RegisterCodeLensProviderAsync(string languageId, CodeLensProvider provider)
+        public IAsyncAction? RegisterCodeLensProviderAsync(string languageId, CodeLensProvider provider)
         {
-            if (_editor.TryGetTarget(out CodeEditor editor))
+            if (_editor.TryGetTarget(out var editor) && editor._parentAccessor is not null)
             {
                 // link:registerCodeLensProvider.ts:ProvideCodeLenses
                 editor._parentAccessor.RegisterEvent("ProvideCodeLenses" + languageId, async (args) =>
                 {
-                    var list = await provider.ProvideCodeLensesAsync(editor.GetModel());
-
-                    if (list != null)
+                    if (editor.GetModel() is { } model)
                     {
-                        return JsonConvert.SerializeObject(list);
+                        var list = await provider.ProvideCodeLensesAsync(model);
+
+                        if (list != null)
+                        {
+                            return JsonConvert.SerializeObject(list);
+                        }
                     }
 
-                    return null;
+                    return "";
                 });
 
                 // link:registerCodeLensProvider.ts:ResolveCodeLens
@@ -96,15 +104,19 @@ namespace Monaco
                 {
                     if (args != null && args.Length >= 1)
                     {
-                        var lens = await provider.ResolveCodeLensAsync(editor.GetModel(), JsonConvert.DeserializeObject<CodeLens>(args[0]));
-
-                        if (lens != null)
+                        if (editor.GetModel() is { } model
+                            && JsonConvert.DeserializeObject<CodeLens>(args[0]) is { } codeLens)
                         {
-                            return JsonConvert.SerializeObject(lens);
+                            var lens = await provider.ResolveCodeLensAsync(model, codeLens);
+
+                            if (lens != null)
+                            {
+                                return JsonConvert.SerializeObject(lens);
+                            }
                         }
                     }
 
-                    return null;
+                    return "";
                 });
 
                 // link:registerCodeLensProvider.ts:registerCodeLensProvider
@@ -114,16 +126,37 @@ namespace Monaco
             return null;
         }
 
-        public IAsyncAction RegisterColorProviderAsync(string languageId, DocumentColorProvider provider)
+        public IAsyncAction? RegisterColorProviderAsync(string languageId, DocumentColorProvider provider)
         {
-            if (_editor.TryGetTarget(out CodeEditor editor))
+            if (_editor.TryGetTarget(out var editor)
+                && editor._parentAccessor is not null)
             {
                 // link:registerColorProvider.ts:ProvideColorPresentations
                 editor._parentAccessor.RegisterEvent("ProvideColorPresentations" + languageId, async (args) =>
                 {
                     if (args != null && args.Length >= 1)
                     {
-                        var items = await provider.ProvideColorPresentationsAsync(editor.GetModel(), JsonConvert.DeserializeObject<ColorInformation>(args[0]));
+                        if (editor.GetModel() is { } model
+                        && JsonConvert.DeserializeObject<ColorInformation>(args[0]) is { } colorInformation)
+                        {
+                            var items = await provider.ProvideColorPresentationsAsync(model, colorInformation);
+
+                            if (items != null)
+                            {
+                                return JsonConvert.SerializeObject(items);
+                            }
+                        }
+                    }
+
+                    return "";
+                });
+
+                // link:registerColorProvider.ts:ProvideDocumentColors
+                editor._parentAccessor.RegisterEvent("ProvideDocumentColors" + languageId, async (args) =>
+                {
+                    if (editor.GetModel() is { } model)
+                    {
+                        var items = await provider.ProvideDocumentColorsAsync(model);
 
                         if (items != null)
                         {
@@ -131,20 +164,7 @@ namespace Monaco
                         }
                     }
 
-                    return null;
-                });
-
-                // link:registerColorProvider.ts:ProvideDocumentColors
-                editor._parentAccessor.RegisterEvent("ProvideDocumentColors" + languageId, async (args) =>
-                {
-                    var items = await provider.ProvideDocumentColorsAsync(editor.GetModel());
-
-                    if (items != null)
-                    {
-                        return JsonConvert.SerializeObject(items);
-                    }
-
-                    return null;
+                    return "";
                 });
 
                 // link:registerColorProvider.ts:registerColorProvider
@@ -154,9 +174,10 @@ namespace Monaco
             return null;
         }
 
-        public IAsyncAction RegisterCompletionItemProviderAsync(string languageId, CompletionItemProvider provider)
+        public IAsyncAction? RegisterCompletionItemProviderAsync(string languageId, CompletionItemProvider provider)
         {
-            if (_editor.TryGetTarget(out CodeEditor editor))
+            if (_editor.TryGetTarget(out var editor)
+                && editor._parentAccessor is not null)
             {
                 // TODO: Add Incremented Id so that we can register multiple providers per language?
                 // link:registerCompletionItemProvider.ts:CompletionItemProvider
@@ -164,18 +185,23 @@ namespace Monaco
                 {
                     if (args != null && args.Length >= 2)
                     {
-                        var items = await provider.ProvideCompletionItemsAsync(editor.GetModel(), JsonConvert.DeserializeObject<Position>(args[0]), JsonConvert.DeserializeObject<CompletionContext>(args[1]));
-
-                        if (items != null)
+                        if (editor.GetModel() is { } model
+                        && JsonConvert.DeserializeObject<Position>(args[0]) is { } position
+                        && JsonConvert.DeserializeObject<CompletionContext>(args[1]) is { } completionContext)
                         {
-                            System.Diagnostics.Debug.WriteLine("Items: " + items);
-                            var serialized= JsonConvert.SerializeObject(items);
-                            System.Diagnostics.Debug.WriteLine("Items in JSON: " + serialized);
-                            return serialized;
+                            var items = await provider.ProvideCompletionItemsAsync(model, position, completionContext);
+
+                            if (items != null)
+                            {
+                                System.Diagnostics.Debug.WriteLine("Items: " + items);
+                                var serialized = JsonConvert.SerializeObject(items);
+                                System.Diagnostics.Debug.WriteLine("Items in JSON: " + serialized);
+                                return serialized;
+                            }
                         }
                     }
 
-                    return null;
+                    return "";
                 });
 
                 // link:registerCompletionItemProvider.ts:CompletionItemRequested
@@ -183,16 +209,19 @@ namespace Monaco
                 {
                     if (args != null && args.Length >= 1)
                     {
-                        var requestedItem = JsonConvert.DeserializeObject<CompletionItem>(args[0]);
-                        var completionItem = await provider.ResolveCompletionItemAsync(editor.GetModel(), requestedItem);
-
-                        if (completionItem != null)
+                        if (editor.GetModel() is { } model
+                        && JsonConvert.DeserializeObject<CompletionItem>(args[0]) is { } requestedItem)
                         {
-                            return JsonConvert.SerializeObject(completionItem);
+                            var completionItem = await provider.ResolveCompletionItemAsync(model, requestedItem);
+
+                            if (completionItem != null)
+                            {
+                                return JsonConvert.SerializeObject(completionItem);
+                            }
                         }
                     }
 
-                    return null;
+                    return "";
                 });
 
                 // link:registerCompletionItemProvider.ts:registerCompletionItemProvider
@@ -202,9 +231,10 @@ namespace Monaco
             return null;
         }
 
-        public IAsyncAction RegisterHoverProviderAsync(string languageId, HoverProvider provider)
+        public IAsyncAction? RegisterHoverProviderAsync(string languageId, HoverProvider provider)
         {
-            if (_editor.TryGetTarget(out CodeEditor editor))
+            if (_editor.TryGetTarget(out var editor)
+                && editor._parentAccessor is not null)
             {
                 // Wrapper around Hover Provider to Monaco editor.
                 // TODO: Add Incremented Id so that we can register multiple providers per language?
@@ -213,11 +243,15 @@ namespace Monaco
                     System.Diagnostics.Debug.WriteLine($"Hover provider.......... {args!=null}");
                     if (args != null && args.Length >= 1)
                     {
-                        var hover = await provider.ProvideHover(editor.GetModel(), JsonConvert.DeserializeObject<Position>(args[0]));
-
-                        if (hover != null)
+                        if (editor.GetModel() is { } model
+                        && JsonConvert.DeserializeObject<Position>(args[0]) is { } position)
                         {
-                            return JsonConvert.SerializeObject(hover);
+                            var hover = await provider.ProvideHover(model, position);
+
+                            if (hover != null)
+                            {
+                                return JsonConvert.SerializeObject(hover);
+                            }
                         }
                     }
 

@@ -14,39 +14,39 @@ namespace Monaco.Editor
         /// If set, the decoration will be rendered after the text with this CSS class name.
         /// </summary>
         [JsonProperty("afterContentClassName")]
-        public string AfterContentClassName { get; set; }
+        public string? AfterContentClassName { get; set; }
 
         /// <summary>
         /// If set, the decoration will be rendered before the text with this CSS class name.
         /// </summary>
         [JsonProperty("beforeContentClassName")]
-        public string BeforeContentClassName { get; set; }
+        public string? BeforeContentClassName { get; set; }
 
         /// <summary>
         /// CSS class name describing the decoration.
         /// </summary>
         [JsonProperty("className")]
         [JsonConverter(typeof(CssStyleConverter))]
-        public CssLineStyle ClassName { get; set; }
+        public CssLineStyle? ClassName { get; set; }
 
         /// <summary>
         /// If set, the decoration will be rendered in the glyph margin with this CSS class name.
         /// </summary>
         [JsonProperty("glyphMarginClassName")]
         [JsonConverter(typeof(CssStyleConverter))]
-        public CssGlyphStyle GlyphMarginClassName { get; set; }
+        public CssGlyphStyle? GlyphMarginClassName { get; set; }
 
         /// <summary>
         /// Message to be rendered when hovering over the glyph margin decoration.
         /// </summary>
         [JsonProperty("glyphMarginHoverMessage")]
-        public IMarkdownString[] GlyphMarginHoverMessage { get; set; }
+        public IMarkdownString[]? GlyphMarginHoverMessage { get; set; }
 
         /// <summary>
         /// Array of MarkdownString to render as the decoration message.
         /// </summary>
         [JsonProperty("hoverMessage")]
-        public IMarkdownString[] HoverMessage { get; set; }
+        public IMarkdownString[]? HoverMessage { get; set; }
 
         /// <summary>
         /// If set, the decoration will be rendered inline with the text with this CSS class name.
@@ -56,7 +56,7 @@ namespace Monaco.Editor
         /// </summary>
         [JsonProperty("inlineClassName")]
         [JsonConverter(typeof(CssStyleConverter))]
-        public CssInlineStyle InlineClassName { get; set; }
+        public CssInlineStyle? InlineClassName { get; set; }
 
         /// <summary>
         /// If there is an `inlineClassName` which affects letter spacing.
@@ -74,26 +74,26 @@ namespace Monaco.Editor
         /// If set, the decoration will be rendered in the lines decorations with this CSS class name.
         /// </summary>
         [JsonProperty("linesDecorationsClassName")]
-        public string LinesDecorationsClassName { get; set; }
+        public string? LinesDecorationsClassName { get; set; }
 
         /// <summary>
         /// If set, the decoration will be rendered in the margin (covering its full width) with this
         /// CSS class name.
         /// </summary>
         [JsonProperty("marginClassName")]
-        public string MarginClassName { get; set; }
+        public string? MarginClassName { get; set; }
 
         /// <summary>
         /// If set, render this decoration in the minimap.
         /// </summary>
         [JsonProperty("minimap")]
-        public IModelDecorationMinimapOptions Minimap { get; set; }
+        public IModelDecorationMinimapOptions? Minimap { get; set; }
 
         /// <summary>
         /// If set, render this decoration in the overview ruler.
         /// </summary>
         [JsonProperty("overviewRuler")]
-        public IModelDecorationOverviewRulerOptions OverviewRuler { get; set; }
+        public IModelDecorationOverviewRulerOptions? OverviewRuler { get; set; }
 
         /// <summary>
         /// Customize the growing behavior of the decoration when typing at the edges of the

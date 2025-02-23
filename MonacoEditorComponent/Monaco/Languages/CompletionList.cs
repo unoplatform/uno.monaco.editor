@@ -8,6 +8,6 @@ namespace Monaco.Languages
         public bool? Incomplete { get; set; }
 
         [JsonProperty("suggestions")]
-        public CompletionItem[] Suggestions { get; set; }
+        public CompletionItem[]? Suggestions { get; set; }
     }
 }

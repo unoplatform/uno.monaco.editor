@@ -8,15 +8,15 @@ namespace Monaco.Languages
     public sealed class Command
     {
         [JsonProperty("arguments", NullValueHandling = NullValueHandling.Ignore)]
-        public object[] Arguments { get; set; }
+        public object[]? Arguments { get; set; }
 
         [JsonProperty("id")]
-        public string Id { get; set; }
+        public string? Id { get; set; }
 
         [JsonProperty("title")]
-        public string Title { get; set; }
+        public string? Title { get; set; }
 
         [JsonProperty("tooltip", NullValueHandling = NullValueHandling.Ignore)]
-        public string Tooltip { get; set; }
+        public string? Tooltip { get; set; }
     }
 }
