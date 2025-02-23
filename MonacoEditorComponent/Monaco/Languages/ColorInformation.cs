@@ -16,9 +16,9 @@ namespace Monaco.Languages
 
         [JsonProperty("range")]
         [JsonConverter(typeof(InterfaceToClassConverter<IRange, Range>))]
-        public IRange Range { get; set; }
+        public IRange? Range { get; set; }
 
-        public ColorInformation(Color color, IRange range)
+        public ColorInformation(Color color, IRange? range)
         {
             Color = color;
             Range = range;

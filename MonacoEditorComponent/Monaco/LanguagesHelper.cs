@@ -24,27 +24,25 @@ namespace Monaco
             _editor = new WeakReference<CodeEditor>(editor);
         }
 
-        public IAsyncOperation<IList<ILanguageExtensionPoint>?>? GetLanguagesAsync()
+        public async Task<IList<ILanguageExtensionPoint>?> GetLanguagesAsync()
         {
             if (_editor.TryGetTarget(out var editor))
             {
-                return editor.SendScriptAsync<IList<ILanguageExtensionPoint>>("monaco.languages.getLanguages()").AsAsyncOperation();
+                return await editor.SendScriptAsync<IList<ILanguageExtensionPoint>>("monaco.languages.getLanguages()").AsAsyncOperation();
             }
 
             return null;
         }
 
-        public IAsyncAction? RegisterAsync(ILanguageExtensionPoint language)
+        public async Task RegisterAsync(ILanguageExtensionPoint language)
         {
             if (_editor.TryGetTarget(out var editor))
             {
-                return editor.InvokeScriptAsync("monaco.languages.register", language).AsAsyncAction();
+                await editor.InvokeScriptAsync("monaco.languages.register", language).AsAsyncAction();
             }
-
-            return null;
         }
 
-        public IAsyncAction? RegisterCodeActionProviderAsync(string languageId, CodeActionProvider provider)
+        public async Task RegisterCodeActionProviderAsync(string languageId, CodeActionProvider provider)
         {
             if (_editor.TryGetTarget(out var editor))
             {
@@ -73,13 +71,11 @@ namespace Monaco
                 });
 
                 // link:registerCodeActionProvider.ts:registerCodeActionProvider
-                return editor.InvokeScriptAsync("registerCodeActionProvider", new object[] { languageId }).AsAsyncAction();
+                await editor.InvokeScriptAsync("registerCodeActionProvider", new object[] { languageId }).AsAsyncAction();
             }
-
-            return null;
         }
 
-        public IAsyncAction? RegisterCodeLensProviderAsync(string languageId, CodeLensProvider provider)
+        public async Task RegisterCodeLensProviderAsync(string languageId, CodeLensProvider provider)
         {
             if (_editor.TryGetTarget(out var editor) && editor._parentAccessor is not null)
             {
@@ -120,13 +116,11 @@ namespace Monaco
                 });
 
                 // link:registerCodeLensProvider.ts:registerCodeLensProvider
-                return editor.InvokeScriptAsync("registerCodeLensProvider", new object[] { languageId }).AsAsyncAction();
+                await editor.InvokeScriptAsync("registerCodeLensProvider", new object[] { languageId }).AsAsyncAction();
             }
-
-            return null;
         }
 
-        public IAsyncAction? RegisterColorProviderAsync(string languageId, DocumentColorProvider provider)
+        public async Task RegisterColorProviderAsync(string languageId, DocumentColorProvider provider)
         {
             if (_editor.TryGetTarget(out var editor)
                 && editor._parentAccessor is not null)
@@ -168,13 +162,11 @@ namespace Monaco
                 });
 
                 // link:registerColorProvider.ts:registerColorProvider
-                return editor.InvokeScriptAsync("registerColorProvider", new object[] { languageId }).AsAsyncAction();
+                await editor.InvokeScriptAsync("registerColorProvider", new object[] { languageId }).AsAsyncAction();
             }
-
-            return null;
         }
 
-        public IAsyncAction? RegisterCompletionItemProviderAsync(string languageId, CompletionItemProvider provider)
+        public async Task RegisterCompletionItemProviderAsync(string languageId, CompletionItemProvider provider)
         {
             if (_editor.TryGetTarget(out var editor)
                 && editor._parentAccessor is not null)
@@ -225,13 +217,11 @@ namespace Monaco
                 });
 
                 // link:registerCompletionItemProvider.ts:registerCompletionItemProvider
-                return editor.InvokeScriptAsync("registerCompletionItemProvider", new object[] { languageId, provider.TriggerCharacters }).AsAsyncAction();
+                await editor.InvokeScriptAsync("registerCompletionItemProvider", new object[] { languageId, provider.TriggerCharacters }).AsAsyncAction();
             }
-
-            return null;
         }
 
-        public IAsyncAction? RegisterHoverProviderAsync(string languageId, HoverProvider provider)
+        public async Task RegisterHoverProviderAsync(string languageId, HoverProvider provider)
         {
             if (_editor.TryGetTarget(out var editor)
                 && editor._parentAccessor is not null)
@@ -259,10 +249,8 @@ namespace Monaco
                 });
 
                 // link:otherScriptsToBeOrganized.ts:registerHoverProvider
-                return editor.InvokeScriptAsync("registerHoverProvider", languageId).AsAsyncAction();
+                await editor.InvokeScriptAsync("registerHoverProvider", languageId).AsAsyncAction();
             }
-
-            return null;
         }
     }
 }

@@ -17,7 +17,7 @@ namespace MonacoEditorTestApp.Helpers
         {
             var textUntilPosition = await document.GetValueInRangeAsync(new Monaco.Range(1, 1, position.LineNumber, position.Column));
 
-            if (textUntilPosition.EndsWith("boo"))
+            if (textUntilPosition is not null && textUntilPosition.EndsWith("boo"))
             {
                 return new CompletionList()
                 {

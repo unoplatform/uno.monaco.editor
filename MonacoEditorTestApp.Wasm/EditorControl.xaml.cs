@@ -38,7 +38,7 @@ namespace MonacoEditorTestApp
         public static readonly DependencyProperty CodeContentProperty =
             DependencyProperty.Register("CodeContent", typeof(string), typeof(EditorControl), new PropertyMetadata(""));
 
-        private ContextKey _myCondition;
+        private ContextKey? _myCondition;
 
         #region CSS Style Objects
         private readonly CssLineStyle CssLineDarkRed = new CssLineStyle()
@@ -86,7 +86,7 @@ namespace MonacoEditorTestApp
             Editor.PropertyChanged += Editor_PropertyChanged;
         }
 
-        private void Editor_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        private void Editor_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             Debug.WriteLine("Property changed - " + e.PropertyName);
         }
@@ -99,6 +99,11 @@ namespace MonacoEditorTestApp
 
         private async void Editor_Loading(object sender, RoutedEventArgs e)
         {
+            if (Editor is null)
+            {
+                return;
+            }
+
             if (string.IsNullOrWhiteSpace(CodeContent))
             {
                 CodeContent = await FileIO.ReadTextAsync(await StorageFile.GetFileFromApplicationUriAsync(new System.Uri("ms-appx:///Content.txt")));
@@ -113,13 +118,16 @@ namespace MonacoEditorTestApp
             //Debugger.Break();
 
             // Code Lens Action
-            string cmdId = await Editor.AddCommandAsync(0, async (args) =>
+            var cmdId = await Editor.AddCommandAsync(0, async (args) =>
             {
-                var md = new MessageDialog("You hit the CodeLens command " + args[0].ToString());
+                var md = new MessageDialog("You hit the CodeLens command " + args[0]?.ToString());
                 await md.ShowAsync();
             });
 
-            await Editor.Languages.RegisterCodeLensProviderAsync("csharp", new EditorCodeLensProvider(cmdId));
+            if (cmdId is not null)
+            {
+                await Editor.Languages.RegisterCodeLensProviderAsync("csharp", new EditorCodeLensProvider(cmdId));
+            }
 
             await Editor.Languages.RegisterColorProviderAsync("csharp", new ColorProvider());
 
@@ -142,27 +150,33 @@ namespace MonacoEditorTestApp
 
             await Editor.AddCommandAsync(KeyMod.CtrlCmd | KeyCode.KEY_R, async (args) =>
             {
-                var range = await Editor.GetModel().GetFullModelRangeAsync();
+                if (Editor.GetModel() is { } model)
+                {
+                    var range = await model.GetFullModelRangeAsync();
 
-                var md = new MessageDialog("Document Range: " + range.ToString());
-                await md.ShowAsync();
+                    var md = new MessageDialog("Document Range: " + range?.ToString());
+                    await md.ShowAsync();
+                }
 
                 Editor.Focus(FocusState.Programmatic);
             });
 
             await Editor.AddCommandAsync(KeyMod.CtrlCmd | KeyCode.KEY_W, async (args) =>
             {
-                var word = await Editor.GetModel().GetWordAtPositionAsync(await Editor.GetPositionAsync());
+                if (Editor.GetModel() is { } model && await Editor.GetPositionAsync() is { } position)
+                {
+                    var word = await model.GetWordAtPositionAsync(position);
 
-                if (word == null)
-                {
-                    var md = new MessageDialog("No Word Found.");
-                    await md.ShowAsync();
-                }
-                else
-                {
-                    var md = new MessageDialog("Word: " + word.Word + "[" + word.StartColumn + ", " + word.EndColumn + "]");
-                    await md.ShowAsync();
+                    if (word == null)
+                    {
+                        var md = new MessageDialog("No Word Found.");
+                        await md.ShowAsync();
+                    }
+                    else
+                    {
+                        var md = new MessageDialog("Word: " + word.Word + "[" + word.StartColumn + ", " + word.EndColumn + "]");
+                        await md.ShowAsync();
+                    }
                 }
 
                 Editor.Focus(FocusState.Programmatic);
@@ -170,24 +184,30 @@ namespace MonacoEditorTestApp
 
             await Editor.AddCommandAsync(KeyMod.CtrlCmd | KeyCode.KEY_L, async (args) =>
             {
-                var model = Editor.GetModel();
-                var line = await model.GetLineContentAsync((await Editor.GetPositionAsync()).LineNumber);
-                var lines = await model.GetLinesContentAsync();
-                var count = await model.GetLineCountAsync();
+                if (Editor.GetModel() is { } model
+                    && await Editor.GetPositionAsync() is { } position)
+                {
+                    var line = await model.GetLineContentAsync(position.LineNumber);
+                    var lines = await model.GetLinesContentAsync();
+                    var count = await model.GetLineCountAsync();
 
-                var md = new MessageDialog("Current Line: " + line + "\nAll Lines [" + count + "]:\n" + string.Join("\n", lines));
-                await md.ShowAsync();
+                    var md = new MessageDialog("Current Line: " + line + "\nAll Lines [" + count + "]:\n" + string.Join("\n", lines));
+                    await md.ShowAsync();
+                }
 
                 Editor.Focus(FocusState.Programmatic);
             });
 
             await Editor.AddCommandAsync(KeyMod.CtrlCmd | KeyCode.KEY_U, async (args) =>
             {
-                var range = new Monaco.Range(2, 10, 3, 8);
-                var seg = await Editor.GetModel().GetValueInRangeAsync(range);
+                if (Editor.GetModel() is { } model)
+                {
+                    var range = new Monaco.Range(2, 10, 3, 8);
+                    var seg = await model.GetValueInRangeAsync(range);
 
-                var md = new MessageDialog("Segment " + range.ToString() + ": " + seg);
-                await md.ShowAsync();
+                    var md = new MessageDialog("Segment " + range.ToString() + ": " + seg);
+                    await md.ShowAsync();
+                }
 
                 Editor.Focus(FocusState.Programmatic);
             });
@@ -218,7 +238,7 @@ namespace MonacoEditorTestApp
             await this.Editor.RevealPositionInCenterAsync(new Monaco.Position(10, 5));
         }
 
-        private void ButtonHighlightRange_Click(object sender, RoutedEventArgs e)
+        private void ButtonHighlightRange_Click(object? sender, RoutedEventArgs? e)
         {
             Editor.Decorations.Add(
                 new IModelDeltaDecoration(new Monaco.Range(3, 1, 3, 10), new IModelDecorationOptions()
@@ -253,17 +273,21 @@ namespace MonacoEditorTestApp
                         "'Maybe'..."
                     }).ToMarkdownString()
                 }));
-            Editor.Decorations.Add(
-                new IModelDeltaDecoration(new Monaco.Range(2, 1, 2, await Editor.GetModel().GetLineLengthAsync(2)), new IModelDecorationOptions()
-                {
-                    IsWholeLine = true,
-                    InlineClassName = CssInlineStrikeThrough,
-                    GlyphMarginClassName = CssGlyphWarning,
-                    HoverMessage = (new string[]
+
+            if (Editor.GetModel() is { } model)
+            {
+                Editor.Decorations.Add(
+                    new IModelDeltaDecoration(new Monaco.Range(2, 1, 2, await model.GetLineLengthAsync(2)), new IModelDecorationOptions()
                     {
+                        IsWholeLine = true,
+                        InlineClassName = CssInlineStrikeThrough,
+                        GlyphMarginClassName = CssGlyphWarning,
+                        HoverMessage = (new string[]
+                        {
                         "Deprecated"
-                    }).ToMarkdownString()
-                }));
+                        }).ToMarkdownString()
+                    }));
+            }
         }
 
         private void ButtonClearHighlights_Click(object sender, RoutedEventArgs e)
@@ -362,19 +386,20 @@ namespace MonacoEditorTestApp
         //// Example to show toggling visibility and impact on control.
         private void HideButton_Click(object sender, RoutedEventArgs e)
         {
-            var btn = sender as Button;
-
-            if (btn.Content.ToString() == "Hide")
+            if (sender is Button btn)
             {
-                Editor.Visibility = Visibility.Collapsed;
+                if (btn.Content.ToString() == "Hide")
+                {
+                    Editor.Visibility = Visibility.Collapsed;
 
-                btn.Content = "Show";
-            }
-            else
-            {
-                Editor.Visibility = Visibility.Visible;
+                    btn.Content = "Show";
+                }
+                else
+                {
+                    Editor.Visibility = Visibility.Visible;
 
-                btn.Content = "Hide";
+                    btn.Content = "Hide";
+                }
             }
         }
 
@@ -382,78 +407,80 @@ namespace MonacoEditorTestApp
         //// Example to show keeping a reference to the editor but removing from Visual Tree.
         private void DetachButton_Click(object sender, RoutedEventArgs e)
         {
-            var btn = sender as Button;
-
-            if (btn.Content.ToString() == "Detach")
+            if (sender is Button btn)
             {
-                RootGrid.Children.Remove(Editor);
+                if (btn.Content.ToString() == "Detach")
+                {
+                    RootGrid.Children.Remove(Editor);
 
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
 
-                btn.Content = "Attach";
-            }
-            else
-            {
-                RootGrid.Children.Add(Editor);
+                    btn.Content = "Attach";
+                }
+                else
+                {
+                    RootGrid.Children.Add(Editor);
 
-                btn.Content = "Detach";
+                    btn.Content = "Detach";
+                }
             }
         }
 
         //// Example to show memory usage when deconstructing and reconstructing editor.
         private void RemoveButton_Click(object sender, RoutedEventArgs e)
         {
-            var btn = sender as Button;
-
-            if (btn.Content.ToString() == "Remove")
+            if (sender is Button btn)
             {
-                _myCondition = null;
-                Editor.KeyDown -= Editor_KeyDown;
-
-                Editor.Loaded -= Editor_Loaded;
-                Editor.Loading -= Editor_Loading;
-                Editor.OpenLinkRequested -= Editor_OpenLinkRequest;
-                Editor.InternalException -= Editor_InternalException;
-
-                RootGrid.Children.Remove(Editor);
-                Editor.Dispose();
-                Editor = null;
-
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-
-                btn.Content = "Add";
-            }
-            else
-            {
-                Editor = new CodeEditor()
+                if (btn.Content.ToString() == "Remove")
                 {
-                    TabIndex = 0,
-                    HasGlyphMargin = true,
-                    CodeLanguage = "csharp"
-                };
+                    _myCondition = null;
+                    Editor.KeyDown -= Editor_KeyDown;
 
-                Editor.KeyDown += Editor_KeyDown;
+                    Editor.Loaded -= Editor_Loaded;
+                    Editor.Loading -= Editor_Loading;
+                    Editor.OpenLinkRequested -= Editor_OpenLinkRequest;
+                    Editor.InternalException -= Editor_InternalException;
 
-                Editor.Loading += Editor_Loading;
-                Editor.Loaded += Editor_Loaded;
-                Editor.OpenLinkRequested += Editor_OpenLinkRequest;
-                Editor.InternalException += Editor_InternalException;
+                    RootGrid.Children.Remove(Editor);
+                    Editor.Dispose();
+                    Editor = null;
 
-                Grid.SetColumn(Editor, 1);
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
 
-                RootGrid.Children.Add(Editor);
+                    btn.Content = "Add";
+                }
+                else
+                {
+                    Editor = new CodeEditor()
+                    {
+                        TabIndex = 0,
+                        HasGlyphMargin = true,
+                        CodeLanguage = "csharp"
+                    };
 
-                // TODO: My Condition?
+                    Editor.KeyDown += Editor_KeyDown;
 
-                btn.Content = "Remove";
+                    Editor.Loading += Editor_Loading;
+                    Editor.Loaded += Editor_Loaded;
+                    Editor.OpenLinkRequested += Editor_OpenLinkRequest;
+                    Editor.InternalException += Editor_InternalException;
+
+                    Grid.SetColumn(Editor, 1);
+
+                    RootGrid.Children.Add(Editor);
+
+                    // TODO: My Condition?
+
+                    btn.Content = "Remove";
+                }
             }
         }
 
         private void ComboBoxTheme_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            switch (e.AddedItems.FirstOrDefault().ToString())
+            switch (e.AddedItems?.FirstOrDefault()?.ToString())
             {
                 case "System":
                     RequestedTheme = ElementTheme.Default;

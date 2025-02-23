@@ -11,7 +11,7 @@ namespace MonacoEditorTestApp.Helpers
 {
     class EditorHoverProvider : HoverProvider
     {
-        public async Task<Hover> ProvideHover(IModel model, Position position)
+        public async Task<Hover?> ProvideHover(IModel model, Position position)
         {
             var word = await model.GetWordAtPositionAsync(position);
             if (word != null && word.Word != null && word.Word.IndexOf("Hit", 0, StringComparison.CurrentCultureIgnoreCase) != -1)
@@ -24,7 +24,7 @@ namespace MonacoEditorTestApp.Helpers
                 }, new Monaco.Range(position.LineNumber, position.Column, position.LineNumber, position.Column + 5));
             }
 
-            return default(Hover);
+            return null;
         }
     }
 }

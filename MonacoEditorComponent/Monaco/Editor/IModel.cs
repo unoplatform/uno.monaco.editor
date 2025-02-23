@@ -29,10 +29,10 @@ public interface IModel
     /// 
     /// </returns>
     [DefaultOverload]
-    Task<IEnumerable<FindMatch>> FindMatchesAsync(string searchString, bool searchOnlyEditableRange, bool isRegex, bool matchCase, string wordSeparators, bool captureMatches);
+    Task<IEnumerable<FindMatch>> FindMatchesAsync(string searchString, bool searchOnlyEditableRange, bool isRegex, bool matchCase, string? wordSeparators, bool captureMatches);
 
     [DefaultOverload]
-    Task<IEnumerable<FindMatch>> FindMatchesAsync(string searchString, bool searchOnlyEditableRange, bool isRegex, bool matchCase, string wordSeparators, bool captureMatches, double limitResultCount);
+    Task<IEnumerable<FindMatch>> FindMatchesAsync(string searchString, bool searchOnlyEditableRange, bool isRegex, bool matchCase, string? wordSeparators, bool captureMatches, double limitResultCount);
 
     /// <summary>
     /// Search the model.
@@ -78,7 +78,7 @@ public interface IModel
     Task<uint> GetLineLengthAsync(uint lineNumber);
     Task<uint> GetLineMaxColumnAsync(uint lineNumber);
     Task<uint> GetLineMinColumnAsync(uint lineNumber);
-    Task<IEnumerable<string>>? GetLinesContentAsync();
+    Task<IEnumerable<string>> GetLinesContentAsync();
     //GetLinesDecorationsAsync
     Task<string?> GetModelIdAsync();
     Task<uint> GetOffsetAtAsync(IPosition position);

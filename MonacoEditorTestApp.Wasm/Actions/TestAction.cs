@@ -11,15 +11,15 @@ namespace MonacoEditorTestApp.Actions
 {
     class TestAction : IActionDescriptor
     {
-        public string ContextMenuGroupId => "navigation";
+        public string? ContextMenuGroupId => "navigation";
         public float ContextMenuOrder => 1.5f;
         public string Id => "meta-test-action";
-        public string KeybindingContext => null;
+        public string? KeybindingContext => null;
         public int[] Keybindings => new int[] { Monaco.KeyMod.Chord(Monaco.KeyMod.CtrlCmd | Monaco.KeyCode.KEY_K, Monaco.KeyMod.CtrlCmd | Monaco.KeyCode.KEY_M) };
-        public string Label => "Test Action";
-        public string Precondition => null;
+        public string? Label => "Test Action";
+        public string? Precondition => null;
 
-        public async void Run(CodeEditor editor, object[] args)
+        public async void Run(CodeEditor editor, object[]? args)
         {
             var md = new MessageDialog("You have selected text:\n\n" + editor.SelectedText);
             await md.ShowAsync();
