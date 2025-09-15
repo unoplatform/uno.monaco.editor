@@ -5,13 +5,17 @@
     See https://aka.platform.uno/using-uno-sdk for more information.
     See https://aka.platform.uno/using-uno-sdk#implicit-packages for more information regarding the Implicit Packages.
   -->
+	<PropertyGroup>
+		<CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+	</PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageVersion Include="Nito.AsyncEx" Version="5.0.0" />
     <PackageVersion Include="Uno.CommunityToolkit.WinUI" Version="7.1.204" />
-    <PackageVersion Include="Uno.WinUI" Version="6.2.58" />
+    <PackageVersion Include="Uno.WinUI" Version="6.3.0-dev.193" />
     <PackageVersion Include="Uno.Core.Extensions.Logging" Version="4.0.1" />
     <PackageVersion Include="Uno.Core.Extensions.Logging.Singleton" Version="4.0.1" />
     <PackageVersion Include="Microsoft.TypeScript.MSBuild" Version="3.9.7" />
+    <PackageVersion Include="System.Private.Uri" Version="4.3.2" />
   </ItemGroup>
 </Project>

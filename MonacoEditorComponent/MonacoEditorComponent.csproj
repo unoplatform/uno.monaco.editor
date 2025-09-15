@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net9.0</TargetFrameworks>
+		<TargetFrameworks>net10.0;net9.0</TargetFrameworks>
 		<Title>MonacoEditorComponent</Title>
 		<NoWarn>$(NoWarn);Uno0001;CA1416;CS1998;CS0067</NoWarn>
 		<PackageId>Uno.Monaco.Editor</PackageId>
@@ -48,7 +48,7 @@
 		<TypeScriptSourceMap>false</TypeScriptSourceMap>
 	</PropertyGroup>
 
-	<PropertyGroup Condition="'$(TargetFramework)' == 'net9.0'">
+	<PropertyGroup Condition="'$(TargetFramework)' == 'net9.0' or '$(TargetFramework)' == 'net10.0' ">
 		<DefineConstants>$(DefineConstants);__WASM__</DefineConstants>
 		<MonoRuntimeDebuggerEnabled>true</MonoRuntimeDebuggerEnabled>
 	</PropertyGroup>
@@ -70,7 +70,7 @@
 		<PackageReference Include="Uno.Core.Extensions.Logging.Singleton" />
 	</ItemGroup>
 
-	<ItemGroup Condition="'$(TargetFramework)' == 'net9.0'">
+	<ItemGroup Condition="'$(TargetFramework)' == 'net9.0' or '$(TargetFramework)' == 'net10.0'">
 		<PackageReference Include="Microsoft.TypeScript.MSBuild">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -101,7 +101,7 @@
 		<EmbeddedResource Include="Properties\MonacoEditorComponent.rd.xml" />
 	</ItemGroup>
 
-	<ItemGroup Condition="'$(TargetFramework)' == 'net9.0'">
+	<ItemGroup Condition="'$(TargetFramework)' == 'net9.0' or '$(TargetFramework)' == 'net10.0' ">
 		<Content Remove="ts-helpermethods\tsconfig.json" />
 		<Content Include="ts-helpermethods-wasm\tsconfig.json" />
 		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.js" />
@@ -110,7 +110,7 @@
 		</EmbeddedResource>
 	</ItemGroup>
 
-	<ItemGroup Condition="'$(TargetFramework)' == 'net9.0'">
+	<ItemGroup Condition="'$(TargetFramework)' == 'net9.0' or '$(TargetFramework)' == 'net10.0'">
 		<Compile Include="**\*.wasm.cs" />
 	</ItemGroup>
 
