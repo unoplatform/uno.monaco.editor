@@ -1,4 +1,4 @@
-<Project Sdk="Uno.Sdk">
+﻿<Project Sdk="Uno.Sdk">
 	<PropertyGroup>
 		<TargetFrameworks>net9.0-browserwasm</TargetFrameworks>
 
@@ -25,7 +25,7 @@
 			SkiaRenderer;
 		</UnoFeatures>
 
-		<UnoDisableHotDesign>true</UnoDisableHotDesign>
+		<!--<UnoDisableHotDesign>true</UnoDisableHotDesign>-->
 		
 		<WasmShellMonoRuntimeExecutionMode>InterpreterAndAOT</WasmShellMonoRuntimeExecutionMode>
 
@@ -37,6 +37,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <None Include="bin\Debug\net9.0-browserwasm\wwwroot\**\*.*" />	 
 	  <Content Include="Content.txt" />
 	</ItemGroup>
 

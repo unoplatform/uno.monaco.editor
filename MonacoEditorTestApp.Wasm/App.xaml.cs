@@ -1,11 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Navigation;
-using System;
-using Uno.Resizetizer;
-using Uno.UI;
+﻿namespace MonacoEditorTestApp;
 
-namespace MonacoEditorTestApp;
 
 public partial class App : Application
 {
@@ -24,7 +18,7 @@ public partial class App : Application
     {
         MainWindow = new Window();
 #if DEBUG
-        // MainWindow.UseStudio();
+        MainWindow.UseStudio();
 #endif
 
 

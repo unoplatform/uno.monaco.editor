@@ -1,5 +1,5 @@
 ﻿<!DOCTYPE html>
-<html>
+<html style="height:100%">
 <head>
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
@@ -9,19 +9,22 @@
         html, body {
             height: 100%;
             margin: 0;
+            padding: 0;
+            overflow: hidden;
         }
         /* Just have Monaco Fill All Available Space within control */
         #container {
             height: 100%;
             width: 100%;
+            overflow: hidden;
         }
     </style>
     <style id="dynamic">
     </style>
 </head>
-<body>
+<body style="height:100%;margin:0;overflow:hidden;">
 
-    <div id="container" onkeydown="keyDown(event)"></div>
+    <div id="container" style="height:100%;width:100%;overflow:hidden;" onkeydown="keyDown(event)"></div>
 
     <script src="ms-appx-web:///Monaco/ts-helpermethods/ts-helpermethods-uwp/asyncCallbackHelpers.js"></script>
     <script src="ms-appx-web:///Monaco/monaco-editor/min/vs/loader.js"></script>

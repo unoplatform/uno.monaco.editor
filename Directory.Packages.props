@@ -9,7 +9,7 @@
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageVersion Include="Nito.AsyncEx" Version="5.1.2" />
     <PackageVersion Include="Uno.CommunityToolkit.WinUI" Version="7.1.204" />
-    <PackageVersion Include="Uno.WinUI" Version="6.2.58" />
+    <PackageVersion Include="Uno.WinUI" Version="6.3.49" />
     <PackageVersion Include="Uno.Core.Extensions.Logging" Version="4.1.1" />
     <PackageVersion Include="Uno.Core.Extensions.Logging.Singleton" Version="4.1.1" />
     <PackageVersion Include="Microsoft.TypeScript.MSBuild" Version="5.9.2" PrivateAssets="all" />

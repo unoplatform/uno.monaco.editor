@@ -1,13 +1,8 @@
-﻿using Monaco.Helpers;
+﻿using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices.JavaScript;
+
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
-using System;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
-using Windows.Data.Json;
-using Microsoft.UI.Xaml.Controls;
-using System.Runtime.InteropServices.JavaScript;
 
 namespace Monaco.Extensions
 {
@@ -24,8 +19,8 @@ namespace Monaco.Extensions
         }
 
         public static async Task<T?> RunScriptAsync<T>(
-            this ICodeEditorPresenter _view, 
-            string script, 
+            this ICodeEditorPresenter _view,
+            string script,
             [CallerMemberName] string? member = null,
             [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
@@ -47,14 +42,14 @@ namespace Monaco.Extensions
 
             //if (_view.Dispatcher.HasThreadAccess)
             //{
-                try
-                {
-                    return await RunScriptHelperAsync<T>(_view, fullscript);
-                }
-                catch (Exception e)
-                {
-                    throw new JavaScriptExecutionException(member, file, line, script, e);
-                }
+            try
+            {
+                return await RunScriptHelperAsync<T>(_view, fullscript);
+            }
+            catch (Exception e)
+            {
+                throw new JavaScriptExecutionException(member, file, line, script, e);
+            }
             //}
             //else
             //{
@@ -79,10 +74,10 @@ namespace Monaco.Extensions
             // TODO: Need to decode the error correctly
             if (returnstring.Contains("wv_internal_error"))
             {
-                throw new JavaScriptInnerException(returnstring,"");
+                throw new JavaScriptInnerException(returnstring, "");
             }
 
-            if (returnstring != null && returnstring != "null")
+            if (!string.IsNullOrEmpty(returnstring) && returnstring != "\"\"" && returnstring != "null")
             {
                 return JsonConvert.DeserializeObject<T>(returnstring);
             }
@@ -177,7 +172,7 @@ namespace Monaco.Extensions
 
                 return await RunScriptAsync<T>(_view, script, member, file, line);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error {ex.Message} {ex.StackTrace} {ex.InnerException?.Message})");
                 return default(T);
