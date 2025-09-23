@@ -1,27 +1,22 @@
-﻿using Microsoft.UI.Xaml;
+﻿using System.Runtime.InteropServices.JavaScript;
+
 using Microsoft.UI.Xaml.Controls;
-using Monaco.Extensions;
+
 using Monaco.Helpers;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.InteropServices.JavaScript;
-using System.Threading.Tasks;
+
 using Uno.Extensions;
-using Uno.Foundation;
 using Uno.Logging;
 using Uno.UI.NativeElementHosting;
-using Uno.UI.Runtime.Skia;
+
 using Windows.Foundation;
-using Windows.Media.Playback;
 using Windows.UI.Core;
 
 namespace Monaco
 {
     public partial class CodeEditorPresenter : ContentControl, ICodeEditorPresenter
-	{
-		private static readonly string UNO_BOOTSTRAP_APP_BASE = global::System.Environment.GetEnvironmentVariable(nameof(UNO_BOOTSTRAP_APP_BASE)) ?? "";
-		private static readonly string UNO_BOOTSTRAP_WEBAPP_BASE_PATH = Environment.GetEnvironmentVariable(nameof(UNO_BOOTSTRAP_WEBAPP_BASE_PATH)) ?? "";
+    {
+        private static readonly string UNO_BOOTSTRAP_APP_BASE = global::System.Environment.GetEnvironmentVariable(nameof(UNO_BOOTSTRAP_APP_BASE)) ?? "";
+        private static readonly string UNO_BOOTSTRAP_WEBAPP_BASE_PATH = Environment.GetEnvironmentVariable(nameof(UNO_BOOTSTRAP_WEBAPP_BASE_PATH)) ?? "";
         private readonly BrowserHtmlElement _element;
 
         public CodeEditorPresenter()
@@ -29,43 +24,49 @@ namespace Monaco
             Console.WriteLine("CodeEditorPresenter()");
             Content = _element = BrowserHtmlElement.CreateHtmlElement("monaco-" + this.GetHashCode(), "div");
 
-			LayoutUpdated += (s, e) => NativeMethods.RefreshLayout(_element.ElementId);
+            LayoutUpdated += (s, e) =>
+            {
+                if (ParentCodeEditor is not null && ParentCodeEditor.IsEditorLoaded)
+                {
+                    NativeMethods.RefreshLayout(_element.ElementId);
+                }
+            };
         }
 
-		public string ElementId => _element.ElementId;
+        public string ElementId => _element.ElementId;
 
         /// <inheritdoc />
         public event TypedEventHandler<ICodeEditorPresenter?, WebViewNewWindowRequestedEventArgs?>? NewWindowRequested; // ignored for now (external navigation)
 
-		/// <inheritdoc />
-		public event TypedEventHandler<ICodeEditorPresenter?, WebViewNavigationStartingEventArgs?>? NavigationStarting;
+        /// <inheritdoc />
+        public event TypedEventHandler<ICodeEditorPresenter?, WebViewNavigationStartingEventArgs?>? NavigationStarting;
 
-		/// <inheritdoc />
-		public event TypedEventHandler<ICodeEditorPresenter?, WebViewNavigationCompletedEventArgs?>? NavigationCompleted; // ignored for now (only focus the editor)
+        /// <inheritdoc />
+        public event TypedEventHandler<ICodeEditorPresenter?, WebViewNavigationCompletedEventArgs?>? NavigationCompleted; // ignored for now (only focus the editor)
 
-		public CodeEditor? ParentCodeEditor { get; set; }
+        public CodeEditor? ParentCodeEditor { get; set; }
 
-		public bool IsSettingValue
-		{
-			get => ParentCodeEditor?.IsSettingValue ?? false;
-			set
-			{
-				if (ParentCodeEditor is not null)
-				{
-					ParentCodeEditor.IsSettingValue = value;
-				}
-			}
-		}
+        public bool IsSettingValue
+        {
+            get => ParentCodeEditor?.IsSettingValue ?? false;
+            set
+            {
+                if (ParentCodeEditor is not null)
+                {
+                    ParentCodeEditor.IsSettingValue = value;
+                }
+            }
+        }
 
-        public bool TriggerKeyDown(WebKeyEventArgs args) 
-			=> ParentCodeEditor?.TriggerKeyDown(args) ?? false;
+        public bool TriggerKeyDown(WebKeyEventArgs args)
+            => ParentCodeEditor?.TriggerKeyDown(args) ?? false;
 
         /// <inheritdoc />
         public global::System.Uri Source
-		{
-			get => new global::System.Uri(NativeMethods.GetSrc(_element.ElementId));
-			set
-			{
+        {
+            get => new global::System.Uri(NativeMethods.GetSrc(_element.ElementId));
+            set
+            {
                 //var path = Environment.GetEnvironmentVariable("UNO_BOOTSTRAP_APP_BASE");
                 //var target = $"/{path}/MonacoCodeEditor.html";
                 //var target = (value.IsAbsoluteUri && value.IsFile)
@@ -73,54 +74,54 @@ namespace Monaco
                 //	: value.ToString();
 
                 string target;
-				if (value.IsAbsoluteUri)
-				{
-					if (value.Scheme == "file")
-					{
-						// Local files are assumed as coming from the remoter server
-						target = UNO_BOOTSTRAP_APP_BASE == null ? value.PathAndQuery : UNO_BOOTSTRAP_WEBAPP_BASE_PATH + UNO_BOOTSTRAP_APP_BASE + value.PathAndQuery;
-					}
-					else
-					{
-						target = value.AbsoluteUri;
+                if (value.IsAbsoluteUri)
+                {
+                    if (value.Scheme == "file")
+                    {
+                        // Local files are assumed as coming from the remoter server
+                        target = UNO_BOOTSTRAP_APP_BASE == null ? value.PathAndQuery : UNO_BOOTSTRAP_WEBAPP_BASE_PATH + UNO_BOOTSTRAP_APP_BASE + value.PathAndQuery;
+                    }
+                    else
+                    {
+                        target = value.AbsoluteUri;
 
-					}
-				}
-				else
-				{
-					target = UNO_BOOTSTRAP_APP_BASE == null
-						? value.OriginalString
-						: UNO_BOOTSTRAP_WEBAPP_BASE_PATH + UNO_BOOTSTRAP_APP_BASE + "/" + value.OriginalString;
-				}
+                    }
+                }
+                else
+                {
+                    target = UNO_BOOTSTRAP_APP_BASE == null
+                        ? value.OriginalString
+                        : UNO_BOOTSTRAP_WEBAPP_BASE_PATH + UNO_BOOTSTRAP_APP_BASE + "/" + value.OriginalString;
+                }
 
-				if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Information))
-				{
-					this.Log().Debug($"Loading {target} (Nav is null {NavigationStarting == null})");
-				}
+                if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Information))
+                {
+                    this.Log().Debug($"Loading {target} (Nav is null {NavigationStarting == null})");
+                }
 
                 NativeMethods.SetSrc(_element.ElementId, target);
 
-				//NavigationStarting?.Invoke(this, new WebViewNavigationStartingEventArgs());
-				_ = Dispatcher.RunAsync(CoreDispatcherPriority.Low, () => NavigationStarting?.Invoke(this, null));
-			}
-		}
+                //NavigationStarting?.Invoke(this, new WebViewNavigationStartingEventArgs());
+                _ = Dispatcher.RunAsync(CoreDispatcherPriority.Low, () => NavigationStarting?.Invoke(this, null));
+            }
+        }
 
         public async Task Launch()
         {
-			try
-			{
-				if(ParentCodeEditor is null)
-				{
-					throw new InvalidOperationException($"The ParentCodeEditor property must be set");
-				}
+            try
+            {
+                if (ParentCodeEditor is null)
+                {
+                    throw new InvalidOperationException($"The ParentCodeEditor property must be set");
+                }
 
-				Console.WriteLine($"InitializeMonaco({this.GetHashCode():X8})");
+                Console.WriteLine($"InitializeMonaco({this.GetHashCode():X8})");
                 await NativeMethods.InitializeMonaco(this, _element.ElementId, $"{UNO_BOOTSTRAP_WEBAPP_BASE_PATH}{UNO_BOOTSTRAP_APP_BASE}");
             }
             catch (Exception e)
-			{
+            {
                 Console.WriteLine(e);
-			}
+            }
         }
 
         static partial class NativeMethods
@@ -134,7 +135,7 @@ namespace Monaco
             [JSImport("globalThis.createMonacoEditor")]
             public static partial Task InitializeMonaco([JSMarshalAs<JSType.Any>] object managedOwner, string elementId, string baseUri);
 
-			[JSImport("globalThis.refreshLayout")]
+            [JSImport("globalThis.refreshLayout")]
             public static partial void RefreshLayout(string elementId);
         }
     }
