@@ -1,4 +1,4 @@
-﻿<Project Sdk="Uno.Sdk">
+﻿<Project Sdk="Uno.Sdk.Private">
 	<PropertyGroup>
 		<TargetFrameworks>net9.0-browserwasm</TargetFrameworks>
 
@@ -52,4 +52,5 @@
 			<WasmNativeDebugSymbols>true</WasmNativeDebugSymbols>
 		</PropertyGroup>
 	</Target>
+
 </Project>

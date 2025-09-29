@@ -1,6 +1,7 @@
 {
   "msbuild-sdks": {
-    "Uno.Sdk": "6.3.18"
+    "Uno.Sdk": "6.3.26",
+    "Uno.Sdk.Private": "6.4.0-dev.84"
   },
   "sdk": {"allowPrerelease": false}
 }
