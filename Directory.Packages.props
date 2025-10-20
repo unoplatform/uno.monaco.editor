@@ -12,6 +12,6 @@
     <PackageVersion Include="Uno.WinUI" Version="6.4.0-dev.212" />
     <PackageVersion Include="Uno.Core.Extensions.Logging" Version="4.1.1" />
     <PackageVersion Include="Uno.Core.Extensions.Logging.Singleton" Version="4.1.1" />
-    <PackageVersion Include="Microsoft.TypeScript.MSBuild" Version="5.9.2" PrivateAssets="all" />
+    <PackageVersion Include="Microsoft.TypeScript.MSBuild" Version="5.9.3" />
   </ItemGroup>
 </Project>
