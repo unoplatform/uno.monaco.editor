@@ -2,22 +2,24 @@
 
 	<PropertyGroup>
 		<TargetFrameworks>net9.0;net10.0</TargetFrameworks>
-		<Title>MonacoEditorComponent</Title>
+		<Title>Monaco Editor Component WASM</Title>
 		<NoWarn>$(NoWarn);Uno0001;CA1416;CS1998;CS0067</NoWarn>
 		<PackageId>Uno.Monaco.Editor</PackageId>
 		<!-- Ensures the .xr.xml files are generated in a proper layout folder --> 
 		<GenerateLibraryLayout>true</GenerateLibraryLayout>
-		<NuspecProperties>version=$(PackageVersion);configuration=$(Configuration)</NuspecProperties>
 		<DebugSymbols>true</DebugSymbols>
 		<DebugType>portable</DebugType>
 		<!--<Nullable>enable</Nullable>-->
 		<DefineConstants>$(DefineConstants);__WASM__</DefineConstants>
 		<MonoRuntimeDebuggerEnabled>true</MonoRuntimeDebuggerEnabled>
-		<NuspecFile>$(MSBuildThisFileDirectory)$(MSBuildProjectName).nuspec</NuspecFile>
 		<Product>Uno.Monaco.Editor</Product>
-		<Description>Uno version of the MonacoEditor Component</Description>
+		<Description>A WASM wrapper around the web-based Monaco Editor. Designed for use with the Uno Platform</Description>
+    <Authors>Uno Platform</Authors>
+    <Copyright>Copyright (C) 2015-2025 Uno Platform inc. - all rights reserved</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>    
 		<RepositoryUrl>https://github.com/unoplatform/uno.monaco-editor-uwp</RepositoryUrl>
 		<PackageProjectUrl>https://github.com/unoplatform/uno.monaco-editor-uwp</PackageProjectUrl>
+    <PackageTags>wasm monaco editor controls</PackageTags>
 		<GeneratePackageOnBuild Condition="'$(Configuration)'=='Release'">true</GeneratePackageOnBuild>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<TypeScriptToolsVersion>Latest</TypeScriptToolsVersion>
@@ -54,11 +56,11 @@
 
 		<None Remove="monaco-editor\dev\**\*.*" />
 		<None Remove="monaco-editor\dev\esm\*.*" />
-		<Content Include="CodeEditor\CodeEditor.html" />
-		<Content Include="tsconfig.json" />
+		<Content Include="CodeEditor\CodeEditor.html" Pack="false" />
+		<Content Include="tsconfig.json" Pack="false" />
 		
-		<Content Include="monaco-editor\*.*" />
-		<Content Include="monaco-editor\min\**\*.*" />
+		<Content Include="monaco-editor\*.*" Pack="false" />
+		<Content Include="monaco-editor\min\**\*.*"  />
 		
 		<EmbeddedResource Include="Properties\MonacoEditorComponent.rd.xml" />
 		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.js" />

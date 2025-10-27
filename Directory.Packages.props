@@ -13,5 +13,6 @@
     <PackageVersion Include="Uno.Core.Extensions.Logging" Version="4.1.1" />
     <PackageVersion Include="Uno.Core.Extensions.Logging.Singleton" Version="4.1.1" />
     <PackageVersion Include="Microsoft.TypeScript.MSBuild" Version="5.9.3" />
+    <GlobalPackageReference Include="Nerdbank.GitVersioning" Version="3.8.118"/>
   </ItemGroup>
 </Project>
