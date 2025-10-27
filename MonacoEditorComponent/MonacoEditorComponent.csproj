@@ -5,8 +5,6 @@
 		<Title>Monaco Editor Component WASM</Title>
 		<NoWarn>$(NoWarn);Uno0001;CA1416;CS1998;CS0067</NoWarn>
 		<PackageId>Uno.Monaco.Editor</PackageId>
-		<!-- Ensures the .xr.xml files are generated in a proper layout folder --> 
-		<GenerateLibraryLayout>true</GenerateLibraryLayout>
 		<DebugSymbols>true</DebugSymbols>
 		<DebugType>portable</DebugType>
 		<!--<Nullable>enable</Nullable>-->
@@ -15,7 +13,7 @@
 		<Product>Uno.Monaco.Editor</Product>
 		<Description>A WASM wrapper around the web-based Monaco Editor. Designed for use with the Uno Platform</Description>
     <Authors>Uno Platform</Authors>
-    <Copyright>Copyright (C) 2015-2025 Uno Platform inc. - all rights reserved</Copyright>
+    <Copyright>Copyright (C) 2015-$([System.DateTime]::UtcNow.Year) Uno Platform inc. - all rights reserved</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>    
 		<RepositoryUrl>https://github.com/unoplatform/uno.monaco-editor-uwp</RepositoryUrl>
 		<PackageProjectUrl>https://github.com/unoplatform/uno.monaco-editor-uwp</PackageProjectUrl>
@@ -23,6 +21,12 @@
 		<GeneratePackageOnBuild Condition="'$(Configuration)'=='Release'">true</GeneratePackageOnBuild>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<TypeScriptToolsVersion>Latest</TypeScriptToolsVersion>
+    <!-- pick the first TFM from TargetFrameworks -->
+    <IncludeContentInPack>false</IncludeContentInPack>
+    <_PrimaryTfm>$([System.String]::Copy('$(TargetFrameworks)').Split(';')[0])</_PrimaryTfm>
+    <AllowedOutputExtensionsInPackageBuildOutputFolder>
+      $(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb
+    </AllowedOutputExtensionsInPackageBuildOutputFolder>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
@@ -54,17 +58,34 @@
 
 	<ItemGroup>
 
-		<None Remove="monaco-editor\dev\**\*.*" />
-		<None Remove="monaco-editor\dev\esm\*.*" />
-		<Content Include="CodeEditor\CodeEditor.html" Pack="false" />
-		<Content Include="tsconfig.json" Pack="false" />
+		<Content Include="CodeEditor\CodeEditor.html" />
+		<Content Include="tsconfig.json" />
 		
-		<Content Include="monaco-editor\*.*" Pack="false" />
-		<Content Include="monaco-editor\min\**\*.*"  />
+		<Content Include="monaco-editor\*.*" />
+		<Content Include="monaco-editor\min\**\*.*" />
+       
 		
 		<EmbeddedResource Include="Properties\MonacoEditorComponent.rd.xml" />
 		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.js" />
     <EmbeddedResource Include="monaco-editor\min\vs\loader.js" />
+
 	</ItemGroup>
 
+  <PropertyGroup>
+    <TargetsForTfmSpecificContentInPackage>
+      $(TargetsForTfmSpecificContentInPackage);AddMonacoContent
+    </TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+
+  <Target Name="AddMonacoContent" Condition="'$(TargetFramework)' == '$(_PrimaryTfm)'">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="monaco-editor\min\**\*.*">
+        <PackagePath>contentFiles/any/$(TargetFramework)/monaco-editor/min</PackagePath>
+        <BuildAction>Content</BuildAction>
+      </TfmSpecificPackageFile>
+      <TfmSpecificPackageFile Include="..\README.md" PackagePath="content" />
+      <TfmSpecificPackageFile Include="..\changelog.md" PackagePath="content" />
+      <TfmSpecificPackageFile Include="..\LICENSE*" PackagePath="content" />
+    </ItemGroup>
+  </Target>
 </Project>
