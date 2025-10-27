@@ -46,6 +46,10 @@
 		<ProjectReference Include="..\MonacoEditorComponent\MonacoEditorComponent.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="bin\Debug\" />
+	</ItemGroup>
+
 	<Target Name="AdjustStrip" BeforeTargets="_WasmCommonPrepareForWasmBuildNative">
 		<PropertyGroup>
 			<!-- Enable debug symbols for release mode to profiling -->

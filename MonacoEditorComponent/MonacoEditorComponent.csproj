@@ -60,10 +60,9 @@
 		<Content Include="monaco-editor\*.*" />
 		<Content Include="monaco-editor\min\**\*.*" />
 		
-		<None Remove="WasmScripts\uno-monaco-helpers.js" />
 		<EmbeddedResource Include="Properties\MonacoEditorComponent.rd.xml" />
-		<!--<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.js" />
-		<EmbeddedResource Include="monaco-editor\min\vs\loader.js" />-->
+		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.js" />
+    <EmbeddedResource Include="monaco-editor\min\vs\loader.js" />
 	</ItemGroup>
 
 </Project>
