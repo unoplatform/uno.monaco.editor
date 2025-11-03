@@ -8,6 +8,7 @@
 		<DebugSymbols>true</DebugSymbols>
 		<DebugType>portable</DebugType>
 		<DefineConstants>$(DefineConstants);__WASM__</DefineConstants>
+    <GenerateLibraryLayout>true</GenerateLibraryLayout>
 		<MonoRuntimeDebuggerEnabled>true</MonoRuntimeDebuggerEnabled>
 		<Product>Uno.Monaco.Editor</Product>
 		<Description>A WASM wrapper around the web-based Monaco Editor. Designed for use with the Uno Platform</Description>
@@ -58,8 +59,6 @@
 	<ItemGroup>
 
 		<Content Include="CodeEditor\CodeEditor.html" />
-
-		<Content Include="Monaco\.editorconfig" />
 		<Content Include="tsconfig.json" />
 		
 		<Content Include="monaco-editor\*.*" />
