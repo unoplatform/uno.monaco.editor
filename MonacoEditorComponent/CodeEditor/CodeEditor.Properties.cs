@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 
 using Monaco.Editor;
 using Monaco.Helpers;
@@ -83,7 +83,7 @@ namespace Monaco
             set => SetValue(CodeLanguageProperty, value);
         }
 
-        internal static DependencyProperty CodeLanguageProperty { get; } = DependencyProperty.Register(nameof(CodeLanguage), typeof(string), typeof(CodeEditor), new PropertyMetadata("xml", (d, e) =>
+        public static DependencyProperty CodeLanguageProperty { get; } = DependencyProperty.Register(nameof(CodeLanguage), typeof(string), typeof(CodeEditor), new PropertyMetadata("xml", (d, e) =>
         {
             if (d is not CodeEditor editor) return;
             editor.Options?.Language = e.NewValue.ToString();
@@ -98,7 +98,7 @@ namespace Monaco
             set => SetValue(ReadOnlyProperty, value);
         }
 
-        internal static DependencyProperty ReadOnlyProperty { get; } = DependencyProperty.Register(nameof(ReadOnly), typeof(bool), typeof(CodeEditor), new PropertyMetadata(false, (d, e) =>
+        public static DependencyProperty ReadOnlyProperty { get; } = DependencyProperty.Register(nameof(ReadOnly), typeof(bool), typeof(CodeEditor), new PropertyMetadata(false, (d, e) =>
         {
             if (d is not CodeEditor editor) return;
             editor.Options?.ReadOnly = bool.Parse(e.NewValue?.ToString() ?? "false");
