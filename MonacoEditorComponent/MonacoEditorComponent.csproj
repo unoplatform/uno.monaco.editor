@@ -22,7 +22,7 @@
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<TypeScriptToolsVersion>Latest</TypeScriptToolsVersion>
     <!-- pick the first TFM from TargetFrameworks -->
-    <IncludeContentInPack>false</IncludeContentInPack>
+    <IncludeContentInPack>false</IncludeContentInPack>    
     <_PrimaryTfm>$([System.String]::Copy('$(TargetFrameworks)').Split(';')[0])</_PrimaryTfm>
     <AllowedOutputExtensionsInPackageBuildOutputFolder>
       $(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb
@@ -58,24 +58,25 @@
 
 	<ItemGroup>
 
-		<Content Include="CodeEditor\CodeEditor.html" />
-		<Content Include="tsconfig.json" />
+    <TypeScriptCompile Include="tsconfig.json" />
+    
+		<None Include="CodeEditor\CodeEditor.html" />
 		
-		<Content Include="monaco-editor\*.*" />
+		<Content Include="monaco-editor\*.txt" />
+		<Content Include="monaco-editor\LICENSE" />
 		<Content Include="monaco-editor\min\**\*.*" />
-       
 		
 		<EmbeddedResource Include="Properties\MonacoEditorComponent.rd.xml" />
 		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.js" />
     <EmbeddedResource Include="monaco-editor\min\vs\loader.js" />
 
 	</ItemGroup>
-
-  <PropertyGroup>
+  
+  <!--<PropertyGroup>
     <TargetsForTfmSpecificContentInPackage>
       $(TargetsForTfmSpecificContentInPackage);AddMonacoContent
     </TargetsForTfmSpecificContentInPackage>
-  </PropertyGroup>
+  </PropertyGroup>-->
 
   <Target Name="AddMonacoContent" Condition="'$(TargetFramework)' == '$(_PrimaryTfm)'">
     <ItemGroup>
