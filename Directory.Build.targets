@@ -1,5 +1,6 @@
 ﻿<Project>
   <ItemGroup>
-    <SourceRoot Condition="'$(ArtifactsPath)' != ''" Include="$(ArtifactsPath)" />
+    <SourceRoot Condition="'$(ArtifactsPath)' != '' and !HasTrailingSlash('$(ArtifactsPath)')" Include="$(ArtifactsPath)\" />
+    <SourceRoot Condition="'$(ArtifactsPath)' != '' and HasTrailingSlash('$(ArtifactsPath)')" Include="$(ArtifactsPath)" />
   </ItemGroup>
 </Project>
