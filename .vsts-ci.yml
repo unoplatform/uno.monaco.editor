@@ -33,7 +33,7 @@ jobs:
   #     ArtifactDirectory: $(Build.ArtifactStagingDirectory)
   #   condition: and(succeeded(), not(eq(variables['build.reason'], 'PullRequest')), not(eq(variables['SignClientSecret'], '')), not(eq(variables['SignClientUser'], '')))
 
-  - publish: $(Build.ArtifactStagingDirectory)/package
+  - publish: $(Build.ArtifactStagingDirectory)/package/release
     displayName: Publish Build Logs
     condition: always()
     artifact: packages
