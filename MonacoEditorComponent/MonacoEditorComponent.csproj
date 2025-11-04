@@ -22,7 +22,7 @@
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<TypeScriptToolsVersion>Latest</TypeScriptToolsVersion>
     <!-- pick the first TFM from TargetFrameworks -->
-    <!--<IncludeContentInPack>false</IncludeContentInPack>-->    
+    <IncludeContentInPack>false</IncludeContentInPack>    
     <_PrimaryTfm>$([System.String]::Copy('$(TargetFrameworks)').Split(';')[0])</_PrimaryTfm>
     <AllowedOutputExtensionsInPackageBuildOutputFolder>
       $(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb
