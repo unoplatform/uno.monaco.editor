@@ -1,8 +1,7 @@
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+
+using Microsoft.UI.Xaml.Controls;
 
 namespace Monaco.Helpers
 {
@@ -17,7 +16,7 @@ namespace Monaco.Helpers
     public abstract class DelayedInitControl : Control, INotifyPropertyChanged
     {
         private readonly Queue<Func<Task>> _propertyChangeQueue = new();
-        private readonly object _queueLock = new();
+        private readonly Lock _queueLock = new();
         private bool _isInitializationComplete;
 
         public event PropertyChangedEventHandler? PropertyChanged;
