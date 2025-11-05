@@ -133,12 +133,6 @@ namespace Monaco
 
             _view = _view ?? throw new InvalidOperationException("The view not set");
 
-            if (Decorations != null && Decorations.Count > 0)
-            {
-                // Need to retrigger highlights after load if they were set before load.
-                await DeltaDecorationsHelperAsync([.. Decorations]);
-            }
-
             // Now we're done loading
             EditorLoading?.Invoke(this, new RoutedEventArgs());
 
@@ -154,6 +148,7 @@ namespace Monaco
             }
 
             // Replay any property changes that occurred before initialization
+            // This will handle Text, SelectedText, Decorations, Markers, and any other queued changes
             ReplayQueuedPropertyChanges();
 
             // If we're supposed to have focus, make sure we try and refocus on our now loaded webview.

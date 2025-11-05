@@ -169,11 +169,14 @@ namespace Monaco
         {
             if (sender != null)
             {
-                // Need to recall mutex as this is called from outside of this initial callback setting it up.
-                using (await _mutexLineDecorations.LockAsync())
+                QueueOrExecutePropertyChange(async () =>
                 {
-                    await DeltaDecorationsHelperAsync([.. sender]);
-                }
+                    // Need to recall mutex as this is called from outside of this initial callback setting it up.
+                    using (await _mutexLineDecorations.LockAsync())
+                    {
+                        await DeltaDecorationsHelperAsync([.. sender]);
+                    }
+                });
             }
         }
 
@@ -181,28 +184,31 @@ namespace Monaco
         {
             if (d is CodeEditor editor)
             {
-                // We only want to do this one at a time per editor.
-                using (await editor._mutexLineDecorations.LockAsync())
+                editor.QueueOrExecutePropertyChange(async () =>
                 {
-                    var old = e.OldValue as IObservableVector<IModelDeltaDecoration>;
-                    // Clear out the old line decorations if we're replacing them or setting back to null
-                    if ((old != null && old.Count > 0) ||
-                             e.NewValue == null)
+                    // We only want to do this one at a time per editor.
+                    using (await editor._mutexLineDecorations.LockAsync())
                     {
-                        await editor.DeltaDecorationsHelperAsync([]);
-                    }
-
-                    if (e.NewValue is IObservableVector<IModelDeltaDecoration> value)
-                    {
-                        if (value.Count > 0)
+                        var old = e.OldValue as IObservableVector<IModelDeltaDecoration>;
+                        // Clear out the old line decorations if we're replacing them or setting back to null
+                        if ((old != null && old.Count > 0) ||
+                                 e.NewValue == null)
                         {
-                            await editor.DeltaDecorationsHelperAsync([.. value]);
+                            await editor.DeltaDecorationsHelperAsync([]);
                         }
 
-                        value.VectorChanged -= editor.Decorations_VectorChanged;
-                        value.VectorChanged += editor.Decorations_VectorChanged;
+                        if (e.NewValue is IObservableVector<IModelDeltaDecoration> value)
+                        {
+                            if (value.Count > 0)
+                            {
+                                await editor.DeltaDecorationsHelperAsync([.. value]);
+                            }
+
+                            value.VectorChanged -= editor.Decorations_VectorChanged;
+                            value.VectorChanged += editor.Decorations_VectorChanged;
+                        }
                     }
-                }
+                });
             }
         }));
 
@@ -222,11 +228,14 @@ namespace Monaco
         {
             if (sender != null)
             {
-                // Need to recall mutex as this is called from outside of this initial callback setting it up.
-                using (await _mutexMarkers.LockAsync())
+                QueueOrExecutePropertyChange(async () =>
                 {
-                    await SetModelMarkersAsync("CodeEditor", [.. sender]);
-                }
+                    // Need to recall mutex as this is called from outside of this initial callback setting it up.
+                    using (await _mutexMarkers.LockAsync())
+                    {
+                        await SetModelMarkersAsync("CodeEditor", [.. sender]);
+                    }
+                });
             }
         }
 
@@ -234,29 +243,32 @@ namespace Monaco
         {
             if (d is CodeEditor editor)
             {
-                // We only want to do this one at a time per editor.
-                using (await editor._mutexMarkers.LockAsync())
+                editor.QueueOrExecutePropertyChange(async () =>
                 {
-                    var old = e.OldValue as IObservableVector<IMarkerData>;
-                    // Clear out the old markers if we're replacing them or setting back to null
-                    if ((old != null && old.Count > 0) ||
-                             e.NewValue == null)
+                    // We only want to do this one at a time per editor.
+                    using (await editor._mutexMarkers.LockAsync())
                     {
-                        // TODO: Can I simplify this in this case?
-                        await editor.SetModelMarkersAsync("CodeEditor", []);
-                    }
-
-                    if (e.NewValue is IObservableVector<IMarkerData> value)
-                    {
-                        if (value.Count > 0)
+                        var old = e.OldValue as IObservableVector<IMarkerData>;
+                        // Clear out the old markers if we're replacing them or setting back to null
+                        if ((old != null && old.Count > 0) ||
+                                 e.NewValue == null)
                         {
-                            await editor.SetModelMarkersAsync("CodeEditor", [.. value]);
+                            // TODO: Can I simplify this in this case?
+                            await editor.SetModelMarkersAsync("CodeEditor", []);
                         }
 
-                        value.VectorChanged -= editor.Markers_VectorChanged;
-                        value.VectorChanged += editor.Markers_VectorChanged;
+                        if (e.NewValue is IObservableVector<IMarkerData> value)
+                        {
+                            if (value.Count > 0)
+                            {
+                                await editor.SetModelMarkersAsync("CodeEditor", [.. value]);
+                            }
+
+                            value.VectorChanged -= editor.Markers_VectorChanged;
+                            value.VectorChanged += editor.Markers_VectorChanged;
+                        }
                     }
-                }
+                });
             }
         }));
     }
