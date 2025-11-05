@@ -30,7 +30,7 @@ namespace Monaco
         private CssStyleBroker? _cssBroker;
 
         // Queue for property changes that occur before initialization
-        private readonly Queue<Action> _propertyChangeQueue = new();
+        private readonly Queue<Func<Task>> _propertyChangeQueue = new();
         private readonly object _queueLock = new();
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -382,14 +382,15 @@ namespace Monaco
         /// Queues a property change action to be executed after initialization, or executes immediately if already initialized.
         /// </summary>
         /// <param name="action">The action to execute</param>
-        private void QueueOrExecutePropertyChange(Action action)
+        private void QueueOrExecutePropertyChange(Func<Task> action)
         {
             lock (_queueLock)
             {
                 if (_initialized)
                 {
                     // Already initialized, execute immediately
-                    action();
+                    // Fire and forget - we don't await here as this is called from property change callbacks
+                    _ = action();
                 }
                 else
                 {
@@ -402,9 +403,9 @@ namespace Monaco
         /// <summary>
         /// Replays all queued property changes. Called after initialization is complete.
         /// </summary>
-        private void ReplayQueuedPropertyChanges()
+        private async void ReplayQueuedPropertyChanges()
         {
-            Queue<Action> actionsToReplay;
+            Queue<Func<Task>> actionsToReplay;
             
             lock (_queueLock)
             {
@@ -414,7 +415,7 @@ namespace Monaco
                 }
 
                 // Copy the queue to process outside the lock
-                actionsToReplay = new Queue<Action>(_propertyChangeQueue);
+                actionsToReplay = new Queue<Func<Task>>(_propertyChangeQueue);
                 _propertyChangeQueue.Clear();
             }
 
@@ -424,7 +425,7 @@ namespace Monaco
                 var action = actionsToReplay.Dequeue();
                 try
                 {
-                    action();
+                    await action();
                 }
                 catch (Exception ex)
                 {
