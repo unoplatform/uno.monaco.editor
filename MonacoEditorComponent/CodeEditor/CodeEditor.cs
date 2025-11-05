@@ -120,19 +120,21 @@ namespace Monaco
 
             QueueOrExecutePropertyChange(async () =>
             {
-                if (e.PropertyName == nameof(StandaloneEditorConstructionOptions.Language)
-                    && options.Language is not null)
+                switch (e.PropertyName)
                 {
-                    await InvokeScriptAsync("updateLanguage", options.Language);
-                    if (CodeLanguage != options.Language) CodeLanguage = options.Language;
-                }
-                if (e.PropertyName == nameof(StandaloneEditorConstructionOptions.GlyphMargin))
-                {
-                    if (HasGlyphMargin != options.GlyphMargin) options.GlyphMargin = HasGlyphMargin;
-                }
-                if (e.PropertyName == nameof(StandaloneEditorConstructionOptions.ReadOnly))
-                {
-                    if (ReadOnly != options.ReadOnly) options.ReadOnly = ReadOnly;
+                    case nameof(StandaloneEditorConstructionOptions.Language):
+                        if (options.Language is not null)
+                        {
+                            await InvokeScriptAsync("updateLanguage", options.Language);
+                            if (CodeLanguage != options.Language) CodeLanguage = options.Language;
+                        }
+                        break;
+                    case nameof(StandaloneEditorConstructionOptions.GlyphMargin):
+                        if (HasGlyphMargin != options.GlyphMargin) options.GlyphMargin = HasGlyphMargin;
+                        break;
+                    case nameof(StandaloneEditorConstructionOptions.ReadOnly):
+                        if (ReadOnly != options.ReadOnly) options.ReadOnly = ReadOnly;
+                        break;
                 }
                 await InvokeScriptAsync("updateOptions", options);
             });
@@ -412,8 +414,25 @@ namespace Monaco
             }
             catch (Exception ex)
             {
+                // Rethrow critical exceptions
+                if (IsCriticalException(ex))
+                {
+                    throw;
+                }
                 Debug.WriteLine($"Error executing property change: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Determines if the exception is critical and should not be caught.
+        /// </summary>
+        private static bool IsCriticalException(Exception ex)
+        {
+            return ex is OutOfMemoryException
+                || ex is StackOverflowException
+                || ex is AccessViolationException
+                || ex is AppDomainUnloadedException
+                || ex is ThreadAbortException;
         }
 
         /// <summary>
@@ -449,6 +468,11 @@ namespace Monaco
                 }
                 catch (Exception ex)
                 {
+                    // Rethrow critical exceptions
+                    if (IsCriticalException(ex))
+                    {
+                        throw;
+                    }
                     Debug.WriteLine($"Error replaying property change: {ex.Message}");
                 }
             }

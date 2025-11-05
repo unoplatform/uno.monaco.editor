@@ -67,9 +67,26 @@ namespace Monaco.Helpers
             }
             catch (Exception ex)
             {
+                // Rethrow critical exceptions
+                if (IsCriticalException(ex))
+                {
+                    throw;
+                }
                 Debug.WriteLine($"Error executing property change: {ex.Message}");
                 OnPropertyChangeReplayError(ex);
             }
+        }
+
+        /// <summary>
+        /// Determines if the exception is critical and should not be caught.
+        /// </summary>
+        private static bool IsCriticalException(Exception ex)
+        {
+            return ex is OutOfMemoryException
+                || ex is StackOverflowException
+                || ex is AccessViolationException
+                || ex is AppDomainUnloadedException
+                || ex is ThreadAbortException;
         }
 
         /// <summary>
@@ -111,6 +128,11 @@ namespace Monaco.Helpers
                 }
                 catch (Exception ex)
                 {
+                    // Rethrow critical exceptions
+                    if (IsCriticalException(ex))
+                    {
+                        throw;
+                    }
                     Debug.WriteLine($"Error replaying property change: {ex.Message}");
                     OnPropertyChangeReplayError(ex);
                 }
