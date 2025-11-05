@@ -129,8 +129,6 @@ namespace Monaco
 
         private async void CodeEditorLoaded()
         {
-            _initialized = true;
-
             _view = _view ?? throw new InvalidOperationException("The view not set");
 
             // Now we're done loading
@@ -149,6 +147,7 @@ namespace Monaco
 
             // Replay any property changes that occurred before initialization
             // This will handle Text, SelectedText, Decorations, Markers, and any other queued changes
+            // ReplayQueuedPropertyChanges() will set _initialized = true atomically with copying the queue
             await ReplayQueuedPropertyChanges();
 
             // If we're supposed to have focus, make sure we try and refocus on our now loaded webview.

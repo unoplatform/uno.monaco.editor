@@ -388,9 +388,9 @@ namespace Monaco
             {
                 if (_initialized)
                 {
-                    // Already initialized, execute immediately
-                    // Fire and forget - we don't await here as this is called from property change callbacks
-                    _ = action();
+                    // Already initialized, execute immediately (fire and forget)
+                    // We don't await here as this is called from property change callbacks
+                    _ = ExecutePropertyChangeAsync(action);
                 }
                 else
                 {
@@ -401,7 +401,23 @@ namespace Monaco
         }
 
         /// <summary>
+        /// Executes a property change action with proper error handling (fire and forget helper).
+        /// </summary>
+        private async Task ExecutePropertyChangeAsync(Func<Task> action)
+        {
+            try
+            {
+                await action();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error executing property change: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Replays all queued property changes. Called after initialization is complete.
+        /// This method sets _initialized to true atomically with copying the queue to prevent race conditions.
         /// </summary>
         private async Task ReplayQueuedPropertyChanges()
         {
@@ -409,6 +425,9 @@ namespace Monaco
             
             lock (_queueLock)
             {
+                // Set initialized flag here to ensure atomicity with queue copy
+                _initialized = true;
+
                 if (_propertyChangeQueue.Count == 0)
                 {
                     return;

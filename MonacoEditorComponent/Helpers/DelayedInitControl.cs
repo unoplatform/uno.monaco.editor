@@ -47,7 +47,7 @@ namespace Monaco.Helpers
                 if (_isInitializationComplete)
                 {
                     // Already initialized, execute immediately (fire and forget)
-                    _ = action();
+                    _ = ExecutePropertyChangeAsync(action);
                 }
                 else
                 {
@@ -58,8 +58,25 @@ namespace Monaco.Helpers
         }
 
         /// <summary>
+        /// Executes a property change action with proper error handling (fire and forget helper).
+        /// </summary>
+        private async Task ExecutePropertyChangeAsync(Func<Task> action)
+        {
+            try
+            {
+                await action();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error executing property change: {ex.Message}");
+                OnPropertyChangeReplayError(ex);
+            }
+        }
+
+        /// <summary>
         /// Marks initialization as complete and replays all queued property changes.
         /// This should be called when the control is fully initialized and ready to process changes.
+        /// The initialization flag is set atomically with copying the queue to prevent race conditions.
         /// </summary>
         protected async Task CompleteInitializationAsync()
         {
@@ -72,6 +89,7 @@ namespace Monaco.Helpers
                     return; // Already completed
                 }
 
+                // Set initialization complete flag here to ensure atomicity with queue copy
                 _isInitializationComplete = true;
 
                 if (_propertyChangeQueue.Count == 0)
