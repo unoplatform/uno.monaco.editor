@@ -390,6 +390,7 @@ namespace Monaco
                 {
                     // Already initialized, execute immediately (fire and forget)
                     // We don't await here as this is called from property change callbacks
+                    // Exceptions are handled in ExecutePropertyChangeAsync to prevent unobserved task exceptions
                     _ = ExecutePropertyChangeAsync(action);
                 }
                 else

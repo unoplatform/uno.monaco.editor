@@ -120,8 +120,10 @@ namespace Monaco.Helpers
 
         /// <summary>
         /// Marks initialization as complete and replays all queued property changes (fire and forget version).
-        /// This overload is provided for convenience when called from event handlers or other contexts
-        /// where awaiting is not possible. Consider using CompleteInitializationAsync() when possible.
+        /// WARNING: This is an async void method and should only be used when the async/await pattern is not
+        /// possible (e.g., event handlers or callbacks that require void return type).
+        /// Consider using CompleteInitializationAsync() when possible for better error handling and control flow.
+        /// Exceptions are caught and logged within CompleteInitializationAsync().
         /// </summary>
         protected async void CompleteInitialization()
         {
