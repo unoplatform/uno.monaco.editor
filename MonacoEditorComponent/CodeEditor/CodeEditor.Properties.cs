@@ -36,11 +36,14 @@ namespace Monaco
                     codeEditor.QueueOrExecutePropertyChange(async () =>
                     {
                         // link:otherScriptsToBeOrganized.ts:updateContent
-                        await codeEditor.InvokeScriptAsync("updateContent", e.NewValue.ToString());
+                        await codeEditor.InvokeScriptAsync("updateContent", e.NewValue?.ToString() ?? string.Empty);
+                        codeEditor.NotifyPropertyChanged(nameof(Text));
                     });
                 }
-
-                codeEditor.NotifyPropertyChanged(nameof(Text));
+                else
+                {
+                    codeEditor.NotifyPropertyChanged(nameof(Text));
+                }
             }
         }));
 
@@ -62,11 +65,14 @@ namespace Monaco
                     codeEditor.QueueOrExecutePropertyChange(async () =>
                     {
                         // link:updateSelectedContent.ts:updateSelectedContent
-                        await codeEditor.InvokeScriptAsync("updateSelectedContent", e.NewValue.ToString());
+                        await codeEditor.InvokeScriptAsync("updateSelectedContent", e.NewValue?.ToString() ?? string.Empty);
+                        codeEditor.NotifyPropertyChanged(nameof(SelectedText));
                     });
                 }
-
-                codeEditor.NotifyPropertyChanged(nameof(SelectedText));
+                else
+                {
+                    codeEditor.NotifyPropertyChanged(nameof(SelectedText));
+                }
             }
         }));
 
@@ -92,7 +98,18 @@ namespace Monaco
         public static DependencyProperty CodeLanguageProperty { get; } = DependencyProperty.Register(nameof(CodeLanguage), typeof(string), typeof(CodeEditor), new PropertyMetadata("xml", (d, e) =>
         {
             if (d is not CodeEditor editor) return;
-            editor.Options?.Language = e.NewValue.ToString();
+            var language = e.NewValue?.ToString();
+            if (editor.Options != null)
+            {
+                editor.Options.Language = language;
+            }
+            editor.QueueOrExecutePropertyChange(async () =>
+            {
+                if (language != null)
+                {
+                    await editor.InvokeScriptAsync("updateLanguage", language);
+                }
+            });
         }));
 
         /// <summary>
@@ -107,7 +124,15 @@ namespace Monaco
         public static DependencyProperty ReadOnlyProperty { get; } = DependencyProperty.Register(nameof(ReadOnly), typeof(bool), typeof(CodeEditor), new PropertyMetadata(false, (d, e) =>
         {
             if (d is not CodeEditor editor) return;
-            editor.Options?.ReadOnly = bool.Parse(e.NewValue?.ToString() ?? "false");
+            var readOnly = bool.Parse(e.NewValue?.ToString() ?? "false");
+            if (editor.Options != null)
+            {
+                editor.Options.ReadOnly = readOnly;
+            }
+            editor.QueueOrExecutePropertyChange(async () =>
+            {
+                await editor.InvokeScriptAsync("updateOptions", editor.Options);
+            });
         }));
 
         /// <summary>
@@ -151,7 +176,15 @@ namespace Monaco
         public static DependencyProperty HasGlyphMarginProperty { get; } = DependencyProperty.Register(nameof(HasGlyphMargin), typeof(bool), typeof(CodeEditor), new PropertyMetadata(false, (d, e) =>
         {
             if (d is not CodeEditor editor) return;
-            editor.Options?.GlyphMargin = e.NewValue as bool?;
+            var glyphMargin = e.NewValue as bool?;
+            if (editor.Options != null)
+            {
+                editor.Options.GlyphMargin = glyphMargin;
+            }
+            editor.QueueOrExecutePropertyChange(async () =>
+            {
+                await editor.InvokeScriptAsync("updateOptions", editor.Options);
+            });
         }));
 
         /// <summary>
