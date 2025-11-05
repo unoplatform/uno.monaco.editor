@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 
@@ -60,7 +61,7 @@ namespace Monaco.Helpers
         /// Marks initialization as complete and replays all queued property changes.
         /// This should be called when the control is fully initialized and ready to process changes.
         /// </summary>
-        protected async void CompleteInitialization()
+        protected async Task CompleteInitializationAsync()
         {
             Queue<Func<Task>> actionsToReplay;
 
@@ -97,6 +98,16 @@ namespace Monaco.Helpers
                     OnPropertyChangeReplayError(ex);
                 }
             }
+        }
+
+        /// <summary>
+        /// Marks initialization as complete and replays all queued property changes (fire and forget version).
+        /// This overload is provided for convenience when called from event handlers or other contexts
+        /// where awaiting is not possible. Consider using CompleteInitializationAsync() when possible.
+        /// </summary>
+        protected async void CompleteInitialization()
+        {
+            await CompleteInitializationAsync();
         }
 
         /// <summary>

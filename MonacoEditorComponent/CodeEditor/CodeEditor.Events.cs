@@ -149,7 +149,7 @@ namespace Monaco
 
             // Replay any property changes that occurred before initialization
             // This will handle Text, SelectedText, Decorations, Markers, and any other queued changes
-            ReplayQueuedPropertyChanges();
+            await ReplayQueuedPropertyChanges();
 
             // If we're supposed to have focus, make sure we try and refocus on our now loaded webview.
 #pragma warning disable CS0618 // Type or member is obsolete

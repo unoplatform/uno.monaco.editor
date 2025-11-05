@@ -403,7 +403,7 @@ namespace Monaco
         /// <summary>
         /// Replays all queued property changes. Called after initialization is complete.
         /// </summary>
-        private async void ReplayQueuedPropertyChanges()
+        private async Task ReplayQueuedPropertyChanges()
         {
             Queue<Func<Task>> actionsToReplay;
             
