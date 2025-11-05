@@ -153,6 +153,9 @@ namespace Monaco
                 await InvokeScriptAsync("updateOptions", Options);
             }
 
+            // Replay any property changes that occurred before initialization
+            ReplayQueuedPropertyChanges();
+
             // If we're supposed to have focus, make sure we try and refocus on our now loaded webview.
 #pragma warning disable CS0618 // Type or member is obsolete
             if (FocusManager.GetFocusedElement() == this)

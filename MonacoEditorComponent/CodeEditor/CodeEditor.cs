@@ -29,6 +29,10 @@ namespace Monaco
         private ModelHelper? _model;
         private CssStyleBroker? _cssBroker;
 
+        // Queue for property changes that occur before initialization
+        private readonly Queue<Action> _propertyChangeQueue = new();
+        private readonly object _queueLock = new();
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         /// <summary>
@@ -110,24 +114,28 @@ namespace Monaco
 
         private async void Options_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (!_initialized || _view == null) return;
-
+            if (_view == null) return;
+            
             if (sender is not StandaloneEditorConstructionOptions options) return;
-            if (e.PropertyName == nameof(StandaloneEditorConstructionOptions.Language)
-                && options.Language is not null)
+
+            QueueOrExecutePropertyChange(async () =>
             {
-                await InvokeScriptAsync("updateLanguage", options.Language);
-                if (CodeLanguage != options.Language) CodeLanguage = options.Language;
-            }
-            if (e.PropertyName == nameof(StandaloneEditorConstructionOptions.GlyphMargin))
-            {
-                if (HasGlyphMargin != options.GlyphMargin) options.GlyphMargin = HasGlyphMargin;
-            }
-            if (e.PropertyName == nameof(StandaloneEditorConstructionOptions.ReadOnly))
-            {
-                if (ReadOnly != options.ReadOnly) options.ReadOnly = ReadOnly;
-            }
-            await InvokeScriptAsync("updateOptions", options);
+                if (e.PropertyName == nameof(StandaloneEditorConstructionOptions.Language)
+                    && options.Language is not null)
+                {
+                    await InvokeScriptAsync("updateLanguage", options.Language);
+                    if (CodeLanguage != options.Language) CodeLanguage = options.Language;
+                }
+                if (e.PropertyName == nameof(StandaloneEditorConstructionOptions.GlyphMargin))
+                {
+                    if (HasGlyphMargin != options.GlyphMargin) options.GlyphMargin = HasGlyphMargin;
+                }
+                if (e.PropertyName == nameof(StandaloneEditorConstructionOptions.ReadOnly))
+                {
+                    if (ReadOnly != options.ReadOnly) options.ReadOnly = ReadOnly;
+                }
+                await InvokeScriptAsync("updateOptions", options);
+            });
         }
 
         private void CodeEditor_SizeChanged(object sender, RoutedEventArgs e)
@@ -368,6 +376,61 @@ namespace Monaco
         private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        /// <summary>
+        /// Queues a property change action to be executed after initialization, or executes immediately if already initialized.
+        /// </summary>
+        /// <param name="action">The action to execute</param>
+        private void QueueOrExecutePropertyChange(Action action)
+        {
+            lock (_queueLock)
+            {
+                if (_initialized)
+                {
+                    // Already initialized, execute immediately
+                    action();
+                }
+                else
+                {
+                    // Not yet initialized, queue for later
+                    _propertyChangeQueue.Enqueue(action);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Replays all queued property changes. Called after initialization is complete.
+        /// </summary>
+        private void ReplayQueuedPropertyChanges()
+        {
+            Queue<Action> actionsToReplay;
+            
+            lock (_queueLock)
+            {
+                if (_propertyChangeQueue.Count == 0)
+                {
+                    return;
+                }
+
+                // Copy the queue to process outside the lock
+                actionsToReplay = new Queue<Action>(_propertyChangeQueue);
+                _propertyChangeQueue.Clear();
+            }
+
+            // Execute all queued actions
+            while (actionsToReplay.Count > 0)
+            {
+                var action = actionsToReplay.Dequeue();
+                try
+                {
+                    action();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error replaying property change: {ex.Message}");
+                }
+            }
         }
 
         public new void Dispose()

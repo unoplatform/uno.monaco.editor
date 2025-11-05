@@ -31,10 +31,13 @@ namespace Monaco
         {
             if (d is CodeEditor codeEditor)
             {
-                if (codeEditor.IsEditorLoaded && !codeEditor.IsSettingValue)
+                if (!codeEditor.IsSettingValue)
                 {
-                    // link:otherScriptsToBeOrganized.ts:updateContent
-                    await codeEditor.InvokeScriptAsync("updateContent", e.NewValue.ToString());
+                    codeEditor.QueueOrExecutePropertyChange(async () =>
+                    {
+                        // link:otherScriptsToBeOrganized.ts:updateContent
+                        await codeEditor.InvokeScriptAsync("updateContent", e.NewValue.ToString());
+                    });
                 }
 
                 codeEditor.NotifyPropertyChanged(nameof(Text));
@@ -54,10 +57,13 @@ namespace Monaco
         {
             if (d is CodeEditor codeEditor)
             {
-                if (codeEditor.IsEditorLoaded && !codeEditor.IsSettingValue)
+                if (!codeEditor.IsSettingValue)
                 {
-                    // link:updateSelectedContent.ts:updateSelectedContent
-                    _ = codeEditor.InvokeScriptAsync("updateSelectedContent", e.NewValue.ToString());
+                    codeEditor.QueueOrExecutePropertyChange(async () =>
+                    {
+                        // link:updateSelectedContent.ts:updateSelectedContent
+                        await codeEditor.InvokeScriptAsync("updateSelectedContent", e.NewValue.ToString());
+                    });
                 }
 
                 codeEditor.NotifyPropertyChanged(nameof(SelectedText));
