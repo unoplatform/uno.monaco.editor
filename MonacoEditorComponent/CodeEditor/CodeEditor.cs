@@ -29,9 +29,15 @@ namespace Monaco
         private ModelHelper? _model;
         private CssStyleBroker? _cssBroker;
 
-        // Queue for property changes that occur before initialization
-        private readonly Queue<Func<Task>> _propertyChangeQueue = new();
+        // Queue for property changes that occur before initialization  
+        // We use a priority queue to ensure certain properties (like CodeLanguage) are set before others (like Text)
+        private readonly List<(int Priority, Func<Task> Action)> _propertyChangeQueue = new();
         private readonly object _queueLock = new();
+        
+        // Priority constants - lower numbers execute first
+        internal const int PRIORITY_OPTIONS = 0;      // Options, CodeLanguage, ReadOnly, HasGlyphMargin
+        internal const int PRIORITY_CONTENT = 10;     // Text, SelectedText
+        internal const int PRIORITY_DECORATIONS = 20; // Decorations, Markers
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -388,7 +394,8 @@ namespace Monaco
         /// Queues a property change action to be executed after initialization, or executes immediately if already initialized.
         /// </summary>
         /// <param name="action">The action to execute</param>
-        private void QueueOrExecutePropertyChange(Func<Task> action)
+        /// <param name="priority">Priority for queue ordering (lower values execute first)</param>
+        private void QueueOrExecutePropertyChange(Func<Task> action, int priority = PRIORITY_CONTENT)
         {
             lock (_queueLock)
             {
@@ -401,8 +408,8 @@ namespace Monaco
                 }
                 else
                 {
-                    // Not yet initialized, queue for later
-                    _propertyChangeQueue.Enqueue(action);
+                    // Not yet initialized, queue for later with priority
+                    _propertyChangeQueue.Add((priority, action));
                 }
             }
         }
@@ -442,10 +449,11 @@ namespace Monaco
         /// <summary>
         /// Replays all queued property changes. Called after initialization is complete.
         /// This method sets _initialized to true atomically with copying the queue to prevent race conditions.
+        /// Actions are replayed in priority order (lower priority values first) to ensure correct initialization sequence.
         /// </summary>
         private async Task ReplayQueuedPropertyChanges()
         {
-            Queue<Func<Task>> actionsToReplay;
+            List<(int Priority, Func<Task> Action)> actionsToReplay;
             
             lock (_queueLock)
             {
@@ -457,17 +465,17 @@ namespace Monaco
                     return;
                 }
 
-                // Copy the queue to process outside the lock
-                actionsToReplay = new Queue<Func<Task>>(_propertyChangeQueue);
+                // Copy and sort the queue by priority (lower values first)
+                actionsToReplay = [.. _propertyChangeQueue.OrderBy(x => x.Priority)];
                 _propertyChangeQueue.Clear();
             }
 
-            // Execute all queued actions
-            while (actionsToReplay.Count > 0)
+            // Execute all queued actions in priority order
+            foreach (var (priority, action) in actionsToReplay)
             {
-                var action = actionsToReplay.Dequeue();
                 try
                 {
+                    Debug.WriteLine($"Replaying property change with priority {priority}");
                     await action();
                 }
                 catch (Exception ex)

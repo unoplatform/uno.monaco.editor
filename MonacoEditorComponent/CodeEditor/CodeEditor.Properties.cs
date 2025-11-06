@@ -38,7 +38,7 @@ namespace Monaco
                         // link:otherScriptsToBeOrganized.ts:updateContent
                         await codeEditor.InvokeScriptAsync("updateContent", e.NewValue?.ToString() ?? string.Empty);
                         codeEditor.NotifyPropertyChanged(nameof(Text));
-                    });
+                    }, CodeEditor.PRIORITY_CONTENT); // Text should be set after language
                 }
                 else
                 {
@@ -67,7 +67,7 @@ namespace Monaco
                         // link:updateSelectedContent.ts:updateSelectedContent
                         await codeEditor.InvokeScriptAsync("updateSelectedContent", e.NewValue?.ToString() ?? string.Empty);
                         codeEditor.NotifyPropertyChanged(nameof(SelectedText));
-                    });
+                    }, CodeEditor.PRIORITY_CONTENT);
                 }
                 else
                 {
@@ -109,7 +109,7 @@ namespace Monaco
                 {
                     await editor.InvokeScriptAsync("updateLanguage", language);
                 }
-            });
+            }, CodeEditor.PRIORITY_OPTIONS); // Language must be set before content
         }));
 
         /// <summary>
@@ -132,7 +132,7 @@ namespace Monaco
             editor.QueueOrExecutePropertyChange(async () =>
             {
                 await editor.InvokeScriptAsync("updateOptions", editor.Options);
-            });
+            }, CodeEditor.PRIORITY_OPTIONS);
         }));
 
         /// <summary>
@@ -184,7 +184,7 @@ namespace Monaco
             editor.QueueOrExecutePropertyChange(async () =>
             {
                 await editor.InvokeScriptAsync("updateOptions", editor.Options);
-            });
+            }, CodeEditor.PRIORITY_OPTIONS);
         }));
 
         /// <summary>
@@ -209,7 +209,7 @@ namespace Monaco
                     {
                         await DeltaDecorationsHelperAsync([.. sender]);
                     }
-                });
+                }, CodeEditor.PRIORITY_DECORATIONS);
             }
         }
 
@@ -241,7 +241,7 @@ namespace Monaco
                             value.VectorChanged += editor.Decorations_VectorChanged;
                         }
                     }
-                });
+                }, CodeEditor.PRIORITY_DECORATIONS);
             }
         }));
 
@@ -268,7 +268,7 @@ namespace Monaco
                     {
                         await SetModelMarkersAsync("CodeEditor", [.. sender]);
                     }
-                });
+                }, CodeEditor.PRIORITY_DECORATIONS);
             }
         }
 
@@ -301,7 +301,7 @@ namespace Monaco
                             value.VectorChanged += editor.Markers_VectorChanged;
                         }
                     }
-                });
+                }, CodeEditor.PRIORITY_DECORATIONS);
             }
         }));
     }
