@@ -133,9 +133,6 @@ namespace Monaco
         {
             _view = _view ?? throw new InvalidOperationException("The view not set");
 
-            // Now we're done loading
-            EditorLoading?.Invoke(this, new RoutedEventArgs());
-
             // Make sure inner editor is focused
             await SendScriptAsync("EditorContext.getEditorForElement(element).editor.focus();");
 
@@ -156,6 +153,8 @@ namespace Monaco
 
             IsEditorLoaded = true;
 
+            // Fire events AFTER queue replay so properties set in event handlers work correctly
+            EditorLoading?.Invoke(this, new RoutedEventArgs());
             EditorLoaded?.Invoke(this, new RoutedEventArgs());
 
 #if __WASM__
