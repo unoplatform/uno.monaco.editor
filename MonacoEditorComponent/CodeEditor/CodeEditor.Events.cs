@@ -51,15 +51,17 @@ namespace Monaco
 #if DEBUG
             Console.WriteLine("WebView_DOMContentLoaded()");
 #endif
-            _initialized = true;
+            // Don't set _initialized here - let ReplayQueuedPropertyChanges do it atomically
+            // This prevents properties from executing immediately before the queue is replayed
 
 #if __WASM__
             InitialiseWebObjects();
 
             _ = _view?.Launch();
 
-            Options.Language = CodeLanguage;
-            Options.ReadOnly = ReadOnly;
+            // Don't update Options here - the queued property changes will handle it
+            // Options.Language = CodeLanguage;
+            // Options.ReadOnly = ReadOnly;
 #endif
         }
 
@@ -139,14 +141,8 @@ namespace Monaco
 
             await SendScriptAsync("EditorContext.getEditorForElement(element).editor.layout();");
 
-            if (Options is not null)
-            {
-                await InvokeScriptAsync("updateLanguage", Options.Language ?? "");
-                await InvokeScriptAsync("updateOptions", Options);
-            }
-
             // Replay any property changes that occurred before initialization
-            // This will handle Text, SelectedText, Decorations, Markers, and any other queued changes
+            // This will handle Text, SelectedText, CodeLanguage, ReadOnly, HasGlyphMargin, Decorations, Markers, and any other queued changes
             // ReplayQueuedPropertyChanges() will set _initialized = true atomically with copying the queue
             await ReplayQueuedPropertyChanges();
 

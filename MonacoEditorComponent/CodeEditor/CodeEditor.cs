@@ -184,8 +184,12 @@ namespace Monaco
                 Markers.VectorChanged -= Markers_VectorChanged;
                 Markers.VectorChanged += Markers_VectorChanged;
 
-                Debug.WriteLine("Setting initialized - true");
+                Debug.WriteLine("Setting initialized - true (non-WASM path)");
+                // Don't set _initialized here for WASM - let ReplayQueuedPropertyChanges do it atomically
+                // For non-WASM platforms, we may need to set it here since CodeEditorLoaded might not be called
+#if !__WASM__
                 _initialized = true;
+#endif
 
                 Unloaded -= CodeEditor_Unloaded;
                 Unloaded += CodeEditor_Unloaded;
