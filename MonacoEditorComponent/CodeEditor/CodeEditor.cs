@@ -34,9 +34,6 @@ namespace Monaco
         private readonly List<(int Priority, Func<Task> Action)> _propertyChangeQueue = new();
         private readonly object _queueLock = new();
         
-        // Semaphore to serialize property changes even after initialization to prevent race conditions
-        private readonly SemaphoreSlim _propertyChangeSemaphore = new SemaphoreSlim(1, 1);
-        
         // Priority constants - lower numbers execute first
         internal const int PRIORITY_OPTIONS = 0;      // Options, CodeLanguage, ReadOnly, HasGlyphMargin
         internal const int PRIORITY_CONTENT = 10;     // Text, SelectedText
@@ -397,22 +394,21 @@ namespace Monaco
 
         /// <summary>
         /// Queues a property change action to be executed after initialization, or executes immediately if already initialized.
-        /// Property changes are serialized using a semaphore to prevent DOM timing issues when properties change rapidly.
         /// Priority only matters during the initial queue replay to ensure Monaco is configured correctly (language before content).
+        /// After initialization, properties execute immediately (fire and forget).
         /// </summary>
         /// <param name="action">The action to execute</param>
-        /// <param name="priority">Priority for queue ordering during replay (lower values execute first). Serialized after initialization.</param>
+        /// <param name="priority">Priority for queue ordering during replay (lower values execute first). Ignored after initialization.</param>
         private void QueueOrExecutePropertyChange(Func<Task> action, int priority = PRIORITY_CONTENT)
         {
             lock (_queueLock)
             {
                 if (_initialized)
                 {
-                    // Already initialized, execute with serialization to prevent DOM timing issues
-                    // Use semaphore to ensure property changes don't race when set rapidly via databinding
+                    // Already initialized, execute immediately (fire and forget)
                     // We don't await here as this is called from property change callbacks
                     // Exceptions are handled in ExecutePropertyChangeAsync to prevent unobserved task exceptions
-                    _ = ExecutePropertyChangeSerializedAsync(action);
+                    _ = ExecutePropertyChangeAsync(action);
                 }
                 else
                 {
@@ -436,28 +432,6 @@ namespace Monaco
             {
                 // Exception filter preserves call stack for critical exceptions
                 Debug.WriteLine($"Error executing property change: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Executes a property change action with serialization to prevent DOM timing issues.
-        /// Uses a semaphore to ensure property changes complete in order when set rapidly via databinding.
-        /// </summary>
-        private async Task ExecutePropertyChangeSerializedAsync(Func<Task> action)
-        {
-            await _propertyChangeSemaphore.WaitAsync();
-            try
-            {
-                await action();
-            }
-            catch (Exception ex) when (!IsCriticalException(ex))
-            {
-                // Exception filter preserves call stack for critical exceptions
-                Debug.WriteLine($"Error executing property change: {ex.Message}");
-            }
-            finally
-            {
-                _propertyChangeSemaphore.Release();
             }
         }
 
