@@ -51,15 +51,14 @@ namespace Monaco
 #if DEBUG
             Console.WriteLine("WebView_DOMContentLoaded()");
 #endif
-            _initialized = true;
+            // Don't set _initialized here - it will be set in CodeEditorLoaded after ApplyInitialPropertyValues
 
 #if __WASM__
             InitialiseWebObjects();
 
             _ = _view?.Launch();
 
-            Options.Language = CodeLanguage;
-            Options.ReadOnly = ReadOnly;
+            // Don't set Options here - ApplyInitialPropertyValues will handle this
 #endif
         }
 
