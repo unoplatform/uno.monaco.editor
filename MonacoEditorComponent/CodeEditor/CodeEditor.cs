@@ -1,4 +1,8 @@
-﻿using Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
+
+using Collections.Generic;
 
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
@@ -7,10 +11,6 @@ using Microsoft.UI.Xaml.Controls;
 using Monaco.Editor;
 using Monaco.Extensions;
 using Monaco.Helpers;
-
-using System.ComponentModel;
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
 
 namespace Monaco
 {
@@ -113,7 +113,7 @@ namespace Monaco
             if (!_initialized || _view == null) return;
 
             if (sender is not StandaloneEditorConstructionOptions options) return;
-            
+
             switch (e.PropertyName)
             {
                 case nameof(StandaloneEditorConstructionOptions.Language):
@@ -254,19 +254,13 @@ namespace Monaco
 
                 if (_view.IsLoaded)
                 {
-                    WebView_DOMContentLoaded();
+                    WebView_DOMContentLoaded(_view, new());
                 }
                 else
                 {
                     _view.Loaded += WebView_DOMContentLoaded;
                 }
 
-#if __WASM__
-                //_view.Source = new System.Uri("ms-appx-web:///Monaco/CodeEditor/CodeEditor.html");
-#else
-                _view.Source = new System.Uri("ms-appx-web:///Monaco/CodeEditor/CodeEditor.html");
-#endif
-                //_view.Source = new System.Uri("file:///MonacoCodeEditor.html", UriKind.RelativeOrAbsolute);
             }
 
             base.OnApplyTemplate();

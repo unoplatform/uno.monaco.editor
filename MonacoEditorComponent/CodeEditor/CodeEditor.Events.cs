@@ -1,11 +1,11 @@
-﻿using Microsoft.UI.Xaml;
+using System.Diagnostics;
+using System.Reflection;
+
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 
 using Monaco.Helpers;
-
-using System.Diagnostics;
-using System.Reflection;
 
 using Windows.Foundation;
 using Windows.UI.Core;
@@ -43,22 +43,21 @@ namespace Monaco
 
         private ThemeListener? _themeListener;
 
-        private void WebView_DOMContentLoaded(object sender, RoutedEventArgs args)
-            => WebView_DOMContentLoaded();
-
-        private void WebView_DOMContentLoaded()
+        private async void WebView_DOMContentLoaded(object sender, RoutedEventArgs args)
         {
 #if DEBUG
             Console.WriteLine("WebView_DOMContentLoaded()");
 #endif
-            // Don't set _initialized here - it will be set in CodeEditorLoaded after ApplyInitialPropertyValues
 
 #if __WASM__
             InitialiseWebObjects();
 
-            _ = _view?.Launch();
 
-            // Don't set Options here - ApplyInitialPropertyValues will handle this
+            await ((ICodeEditorPresenter)sender).Launch();
+
+
+            Options.Language = CodeLanguage;
+            Options.ReadOnly = ReadOnly;
 #endif
         }
 
@@ -79,6 +78,8 @@ namespace Monaco
                 _view?.Focus(FocusState.Programmatic);
             }
 #pragma warning restore CS0618 // Type or member is obsolete
+
+            await ApplyInitialPropertyValues();
 
             EditorLoaded?.Invoke(this, new RoutedEventArgs());
         }
@@ -152,8 +153,8 @@ namespace Monaco
 #pragma warning restore CS0618 // Type or member is obsolete
 
             // Fire events after initialization so properties set in event handlers work immediately
-            EditorLoading?.Invoke(this, new RoutedEventArgs());
-            EditorLoaded?.Invoke(this, new RoutedEventArgs());
+            EditorLoading?.Invoke(this, new());
+            EditorLoaded?.Invoke(this, new());
 
 #if __WASM__
             _ = Dispatcher.RunAsync(CoreDispatcherPriority.Low, () => WebView_NavigationCompleted(_view, null));
@@ -173,15 +174,7 @@ namespace Monaco
                 await InvokeScriptAsync("updateLanguage", CodeLanguage);
             }
 
-            if (Options is not null)
-            {
-                // Sync Options.Language with CodeLanguage if set
-                if (!string.IsNullOrEmpty(CodeLanguage) && Options.Language != CodeLanguage)
-                {
-                    Options.Language = CodeLanguage;
-                }
-                await InvokeScriptAsync("updateOptions", Options);
-            }
+            await InvokeScriptAsync("updateOptions", Options);
 
             // 2. Apply content after language is configured
             if (!string.IsNullOrEmpty(Text))
