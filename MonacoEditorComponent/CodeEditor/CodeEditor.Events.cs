@@ -133,6 +133,9 @@ namespace Monaco
         {
             _view = _view ?? throw new InvalidOperationException("The view not set");
 
+            // Set IsEditorLoaded BEFORE replaying queue so InvokeScriptAsync checks pass
+            IsEditorLoaded = true;
+
             // Make sure inner editor is focused
             await SendScriptAsync("EditorContext.getEditorForElement(element).editor.focus();");
 
@@ -150,8 +153,6 @@ namespace Monaco
                 _view.Focus(FocusState.Programmatic);
             }
 #pragma warning restore CS0618 // Type or member is obsolete
-
-            IsEditorLoaded = true;
 
             // Fire events AFTER queue replay so properties set in event handlers work correctly
             EditorLoading?.Invoke(this, new RoutedEventArgs());
