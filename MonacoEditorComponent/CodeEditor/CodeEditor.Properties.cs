@@ -83,10 +83,25 @@ namespace Monaco
             set => SetValue(CodeLanguageProperty, value);
         }
 
-        public static DependencyProperty CodeLanguageProperty { get; } = DependencyProperty.Register(nameof(CodeLanguage), typeof(string), typeof(CodeEditor), new PropertyMetadata("xml", (d, e) =>
+        public static DependencyProperty CodeLanguageProperty { get; } = DependencyProperty.Register(nameof(CodeLanguage), typeof(string), typeof(CodeEditor), new PropertyMetadata("xml", async (d, e) =>
         {
             if (d is not CodeEditor editor) return;
             editor.Options?.Language = e.NewValue.ToString();
+
+            var newLanguage = e.NewValue?.ToString();
+            if (string.IsNullOrEmpty(newLanguage)) return;
+
+            // Update Options.Language to keep them in sync
+            if (editor.Options is not null)
+            {
+                editor.Options.Language = newLanguage;
+            }
+
+            // If initialized, update the language in Monaco directly
+            if (editor._initialized && editor._view is not null)
+            {
+                await editor.InvokeScriptAsync("updateLanguage", newLanguage);
+            }
         }));
 
         /// <summary>
