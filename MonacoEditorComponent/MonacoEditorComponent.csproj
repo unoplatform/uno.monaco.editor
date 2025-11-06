@@ -59,11 +59,9 @@
 	<ItemGroup>
 
     <TypeScriptCompile Include="tsconfig.json" />
-    
-		<None Include="CodeEditor\CodeEditor.html" />
 		
 		<Content Include="monaco-editor\*.txt" />
-		<Content Include="monaco-editor\LICENSE" />
+		<Content Include="monaco-editor\LICENSE" PackagePath="monaco-editor\LICENSE.txt" />
 		<Content Include="monaco-editor\min\**\*.*" />
 		
 		<EmbeddedResource Include="Properties\MonacoEditorComponent.rd.xml" />
@@ -72,21 +70,4 @@
 
 	</ItemGroup>
   
-  <!--<PropertyGroup>
-    <TargetsForTfmSpecificContentInPackage>
-      $(TargetsForTfmSpecificContentInPackage);AddMonacoContent
-    </TargetsForTfmSpecificContentInPackage>
-  </PropertyGroup>-->
-
-  <Target Name="AddMonacoContent" Condition="'$(TargetFramework)' == '$(_PrimaryTfm)'">
-    <ItemGroup>
-      <TfmSpecificPackageFile Include="monaco-editor\min\**\*.*">
-        <PackagePath>contentFiles/any/$(TargetFramework)/monaco-editor/min</PackagePath>
-        <BuildAction>Content</BuildAction>
-      </TfmSpecificPackageFile>
-      <TfmSpecificPackageFile Include="..\README.md" PackagePath="content" />
-      <TfmSpecificPackageFile Include="..\changelog.md" PackagePath="content" />
-      <TfmSpecificPackageFile Include="..\LICENSE*" PackagePath="content" />
-    </ItemGroup>
-  </Target>
 </Project>

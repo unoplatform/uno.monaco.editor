@@ -1,11 +1,11 @@
-﻿using Microsoft.UI.Xaml;
+using System.Diagnostics;
+using System.Reflection;
+
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 
 using Monaco.Helpers;
-
-using System.Diagnostics;
-using System.Reflection;
 
 using Windows.Foundation;
 using Windows.UI.Core;
@@ -43,20 +43,18 @@ namespace Monaco
 
         private ThemeListener? _themeListener;
 
-        private void WebView_DOMContentLoaded(object sender, RoutedEventArgs args)
-            => WebView_DOMContentLoaded();
-
-        private void WebView_DOMContentLoaded()
+        private async void WebView_DOMContentLoaded(object sender, RoutedEventArgs args)
         {
 #if DEBUG
             Console.WriteLine("WebView_DOMContentLoaded()");
 #endif
-            _initialized = true;
 
 #if __WASM__
             InitialiseWebObjects();
 
-            _ = _view?.Launch();
+
+            await ((ICodeEditorPresenter)sender).Launch();
+
 
             Options.Language = CodeLanguage;
             Options.ReadOnly = ReadOnly;
@@ -80,6 +78,8 @@ namespace Monaco
                 _view?.Focus(FocusState.Programmatic);
             }
 #pragma warning restore CS0618 // Type or member is obsolete
+
+            await ApplyInitialPropertyValues();
 
             EditorLoaded?.Invoke(this, new RoutedEventArgs());
         }
@@ -129,29 +129,20 @@ namespace Monaco
 
         private async void CodeEditorLoaded()
         {
-            _initialized = true;
-
             _view = _view ?? throw new InvalidOperationException("The view not set");
-
-            if (Decorations != null && Decorations.Count > 0)
-            {
-                // Need to retrigger highlights after load if they were set before load.
-                await DeltaDecorationsHelperAsync([.. Decorations]);
-            }
-
-            // Now we're done loading
-            EditorLoading?.Invoke(this, new RoutedEventArgs());
 
             // Make sure inner editor is focused
             await SendScriptAsync("EditorContext.getEditorForElement(element).editor.focus();");
 
             await SendScriptAsync("EditorContext.getEditorForElement(element).editor.layout();");
 
-            if (Options is not null)
-            {
-                await InvokeScriptAsync("updateLanguage", Options.Language ?? "");
-                await InvokeScriptAsync("updateOptions", Options);
-            }
+            // Apply all current property values in the correct order
+            // This ensures properties set before IsEditorLoaded=true take effect
+            await ApplyInitialPropertyValues();
+
+            // Now mark as initialized and loaded
+            _initialized = true;
+            IsEditorLoaded = true;
 
             // If we're supposed to have focus, make sure we try and refocus on our now loaded webview.
 #pragma warning disable CS0618 // Type or member is obsolete
@@ -161,13 +152,51 @@ namespace Monaco
             }
 #pragma warning restore CS0618 // Type or member is obsolete
 
-            IsEditorLoaded = true;
-
-            EditorLoaded?.Invoke(this, new RoutedEventArgs());
+            // Fire events after initialization so properties set in event handlers work immediately
+            EditorLoading?.Invoke(this, new());
+            EditorLoaded?.Invoke(this, new());
 
 #if __WASM__
             _ = Dispatcher.RunAsync(CoreDispatcherPriority.Low, () => WebView_NavigationCompleted(_view, null));
 #endif
+        }
+
+        /// <summary>
+        /// Applies all current property values to Monaco in the correct order.
+        /// Called during initialization to ensure properties set before IsEditorLoaded=true take effect.
+        /// Order matters: language/options must be set before content for proper syntax highlighting.
+        /// </summary>
+        private async Task ApplyInitialPropertyValues()
+        {
+            // 1. Apply language and options first
+            if (!string.IsNullOrEmpty(CodeLanguage))
+            {
+                await InvokeScriptAsync("updateLanguage", CodeLanguage);
+            }
+
+            await InvokeScriptAsync("updateOptions", Options);
+
+            // 2. Apply content after language is configured
+            if (!string.IsNullOrEmpty(Text))
+            {
+                await InvokeScriptAsync("updateContent", Text);
+            }
+
+            if (!string.IsNullOrEmpty(SelectedText))
+            {
+                await InvokeScriptAsync("updateSelectedContent", SelectedText);
+            }
+
+            // 3. Apply decorations and markers last
+            if (Decorations != null && Decorations.Count > 0)
+            {
+                await DeltaDecorationsHelperAsync([.. Decorations]);
+            }
+
+            if (Markers != null && Markers.Count > 0)
+            {
+                await SetModelMarkersAsync("CodeEditor", [.. Markers]);
+            }
         }
 
         private void WebView_NewWindowRequested(ICodeEditorPresenter? sender, WebViewNewWindowRequestedEventArgs? args)

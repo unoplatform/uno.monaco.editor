@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.WinUI;
+using CommunityToolkit.WinUI;
 
 using Monaco.Editor;
 using Monaco.Extensions;
@@ -129,7 +129,6 @@ namespace Monaco
         {
             return await AddCommandAsync(0, handler, string.Empty);
         }
-
         public async Task<string?> AddCommandAsync(int keybinding, CommandHandler handler)
         {
             return await AddCommandAsync(keybinding, handler, string.Empty);

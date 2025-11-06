@@ -148,9 +148,10 @@ const updateOptions = function (element: any, opt: monaco.editor.IEditorOptions)
     }
 };
 
-const updateLanguage = function (element: any, language) {
+const updateLanguage = function (element: any, language: string) {
     var editorContext = EditorContext.getEditorForElement(element);
-    monaco.editor.setModelLanguage(editorContext.model, language);
+
+    monaco.editor.setModelLanguage(editorContext.model, language);    
 };
 
 const changeTheme = function (element: any, theme: string, highcontrast) {
