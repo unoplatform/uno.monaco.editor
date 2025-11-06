@@ -113,19 +113,22 @@ namespace Monaco
             if (!_initialized || _view == null) return;
 
             if (sender is not StandaloneEditorConstructionOptions options) return;
-            if (e.PropertyName == nameof(StandaloneEditorConstructionOptions.Language)
-                && options.Language is not null)
+            
+            switch (e.PropertyName)
             {
-                await InvokeScriptAsync("updateLanguage", options.Language);
-                if (CodeLanguage != options.Language) CodeLanguage = options.Language;
-            }
-            if (e.PropertyName == nameof(StandaloneEditorConstructionOptions.GlyphMargin))
-            {
-                if (HasGlyphMargin != options.GlyphMargin) options.GlyphMargin = HasGlyphMargin;
-            }
-            if (e.PropertyName == nameof(StandaloneEditorConstructionOptions.ReadOnly))
-            {
-                if (ReadOnly != options.ReadOnly) options.ReadOnly = ReadOnly;
+                case nameof(StandaloneEditorConstructionOptions.Language):
+                    if (options.Language is not null)
+                    {
+                        await InvokeScriptAsync("updateLanguage", options.Language);
+                        if (CodeLanguage != options.Language) CodeLanguage = options.Language;
+                    }
+                    break;
+                case nameof(StandaloneEditorConstructionOptions.GlyphMargin):
+                    if (HasGlyphMargin != options.GlyphMargin) options.GlyphMargin = HasGlyphMargin;
+                    break;
+                case nameof(StandaloneEditorConstructionOptions.ReadOnly):
+                    if (ReadOnly != options.ReadOnly) options.ReadOnly = ReadOnly;
+                    break;
             }
             await InvokeScriptAsync("updateOptions", options);
         }

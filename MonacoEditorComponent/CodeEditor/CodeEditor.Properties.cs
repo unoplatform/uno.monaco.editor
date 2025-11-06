@@ -34,7 +34,7 @@ namespace Monaco
                 if (codeEditor.IsEditorLoaded && !codeEditor.IsSettingValue)
                 {
                     // link:otherScriptsToBeOrganized.ts:updateContent
-                    await codeEditor.InvokeScriptAsync("updateContent", e.NewValue.ToString());
+                    await codeEditor.InvokeScriptAsync("updateContent", e.NewValue != null ? e.NewValue.ToString() : string.Empty);
                 }
 
                 codeEditor.NotifyPropertyChanged(nameof(Text));
@@ -57,7 +57,7 @@ namespace Monaco
                 if (codeEditor.IsEditorLoaded && !codeEditor.IsSettingValue)
                 {
                     // link:updateSelectedContent.ts:updateSelectedContent
-                    _ = codeEditor.InvokeScriptAsync("updateSelectedContent", e.NewValue.ToString());
+                    _ = codeEditor.InvokeScriptAsync("updateSelectedContent", e.NewValue != null ? e.NewValue.ToString() : string.Empty);
                 }
 
                 codeEditor.NotifyPropertyChanged(nameof(SelectedText));
