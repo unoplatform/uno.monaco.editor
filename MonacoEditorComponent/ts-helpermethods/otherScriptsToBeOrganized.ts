@@ -148,9 +148,16 @@ const updateOptions = function (element: any, opt: monaco.editor.IEditorOptions)
     }
 };
 
-const updateLanguage = function (element: any, language) {
+const updateLanguage = async function (element: any, language) {
     var editorContext = EditorContext.getEditorForElement(element);
+    
+    // Set the language on the model
     monaco.editor.setModelLanguage(editorContext.model, language);
+    
+    // Give Monaco a chance to load the language module and tokenize
+    // This is necessary for languages like markdown and C# that require
+    // language-specific tokenization rules to be loaded
+    await new Promise(resolve => setTimeout(resolve, 50));
 };
 
 const changeTheme = function (element: any, theme: string, highcontrast) {
