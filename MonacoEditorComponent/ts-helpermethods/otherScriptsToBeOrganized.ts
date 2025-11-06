@@ -165,8 +165,8 @@ const updateLanguage = async function (element: any, language) {
     // language-specific tokenization rules to be loaded asynchronously
     const lineCount = editorContext.model.getLineCount();
     if (lineCount > 0) {
-        // Force tokenization of all lines
-        editorContext.model.tokenization.forceTokenization(lineCount);
+        // Force tokenization of all lines - use any cast since tokenization API may not be in type definitions
+        (editorContext.model as any).tokenization?.forceTokenization(lineCount);
     }
     
     // Wait for tokenization to complete before proceeding
