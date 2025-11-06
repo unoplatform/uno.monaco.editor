@@ -1,7 +1,6 @@
 using Microsoft.UI.Xaml;
 
 using Monaco.Editor;
-using Monaco.Extensions;
 using Monaco.Helpers;
 
 using Nito.AsyncEx;
@@ -88,27 +87,6 @@ namespace Monaco
         {
             if (d is not CodeEditor editor) return;
             editor.Options?.Language = e.NewValue.ToString();
-        }));
-
-
-        /// <summary>
-        /// Set the Filename to determine the Code Language for the Code CodeEditor.
-        /// 
-        /// </summary>
-        public string FileExtension
-        {
-            get => (string)GetValue(FileExtensionProperty);
-            set => SetValue(FileExtensionProperty, value);
-        }
-
-        public static DependencyProperty FileExtensionProperty { get; } = DependencyProperty.Register(nameof(FileExtension), typeof(string), typeof(CodeEditor), new PropertyMetadata(default, (d, e) =>
-        {
-            if (d is not CodeEditor editor) return;
-
-
-            var lang = NativeMethods.LanguageIdFromFileName(e.NewValue as string);
-
-            editor.CodeLanguage = lang;
         }));
 
         /// <summary>

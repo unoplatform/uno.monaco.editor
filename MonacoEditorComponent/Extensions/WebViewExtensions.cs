@@ -172,6 +172,6 @@ namespace Monaco.Extensions
         public static partial string InvokeJS(string elementId, string script);
 
         [JSImport("globalThis.languageIdFromFileName")]
-        public static partial string LanguageIdFromFileName(string? fileName);
+        public static partial string LanguageIdFromExtension(string? extension);
     }
 }

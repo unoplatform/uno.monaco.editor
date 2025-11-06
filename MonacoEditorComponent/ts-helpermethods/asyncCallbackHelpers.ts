@@ -234,10 +234,10 @@ globalThis.refreshLayout = (elementId: string) => {
     EditorContext.getEditorForElement(document.getElementById(elementId)).editor.layout();
 }
 
-globalThis.languageIdFromFileName = (fileName: string): string => {
+globalThis.languageIdFromExtension = (extension: string): string => {
 
-    if (fileName != null) {
-        const lower = fileName.toLowerCase();
+    if (extension != null) {
+        const lower = extension.toLowerCase();
         const langs = monaco.languages.getLanguages();
         for (const l of langs) {
             if (!l.extensions) continue;

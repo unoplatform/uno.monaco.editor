@@ -1,8 +1,8 @@
-﻿using Monaco.Languages;
+using System.ComponentModel;
+
+using Monaco.Languages;
 
 using Newtonsoft.Json;
-
-using System.ComponentModel;
 
 namespace Monaco
 {
@@ -15,7 +15,7 @@ namespace Monaco
                                                              /// Helper to static Monaco.Languages Namespace methods.
                                                              /// https://microsoft.github.io/monaco-editor/api/modules/monaco.languages.html
                                                              /// </summary>
-    public sealed class LanguagesHelper(CodeEditor editor)
+    public sealed partial class LanguagesHelper(CodeEditor editor)
     {
         private readonly WeakReference<CodeEditor> _editor = new(editor);
 
