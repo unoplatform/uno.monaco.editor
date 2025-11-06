@@ -157,26 +157,13 @@ const updateLanguage = async function (element: any, language) {
     }
     
     // Set the language on the model
-    // This triggers async loading of language-specific tokenization rules
+    // This triggers async loading of language-specific tokenization rules for languages like markdown and C#
     monaco.editor.setModelLanguage(editorContext.model, language);
     
-    // Force Monaco to tokenize all content with the new language
-    // This is necessary for languages like markdown and C# that require
-    // language-specific tokenization rules to be loaded asynchronously
-    const lineCount = editorContext.model.getLineCount();
-    if (lineCount > 0) {
-        // Force tokenization of all lines - use any cast since tokenization API may not be in type definitions
-        (editorContext.model as any).tokenization?.forceTokenization(lineCount);
-    }
-    
-    // Wait for tokenization to complete before proceeding
+    // Wait a brief moment for Monaco to load the language module and apply tokenization
+    // This ensures proper syntax highlighting when content is set immediately after
     await new Promise<void>((resolve) => {
-        // Use requestIdleCallback if available, otherwise setTimeout
-        if (typeof requestIdleCallback !== 'undefined') {
-            requestIdleCallback(() => resolve());
-        } else {
-            setTimeout(() => resolve(), 0);
-        }
+        setTimeout(() => resolve(), 100);
     });
 };
 
