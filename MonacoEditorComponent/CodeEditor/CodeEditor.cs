@@ -392,9 +392,11 @@ namespace Monaco
 
         /// <summary>
         /// Queues a property change action to be executed after initialization, or executes immediately if already initialized.
+        /// Properties are idempotent and can be set in any order after initialization.
+        /// Priority only matters during the initial queue replay to ensure Monaco is configured correctly (language before content).
         /// </summary>
         /// <param name="action">The action to execute</param>
-        /// <param name="priority">Priority for queue ordering (lower values execute first)</param>
+        /// <param name="priority">Priority for queue ordering during replay (lower values execute first). Ignored after initialization.</param>
         private void QueueOrExecutePropertyChange(Func<Task> action, int priority = PRIORITY_CONTENT)
         {
             lock (_queueLock)
@@ -402,6 +404,7 @@ namespace Monaco
                 if (_initialized)
                 {
                     // Already initialized, execute immediately (fire and forget)
+                    // Priority is ignored after initialization - Monaco handles property changes idempotently
                     // We don't await here as this is called from property change callbacks
                     // Exceptions are handled in ExecutePropertyChangeAsync to prevent unobserved task exceptions
                     _ = ExecutePropertyChangeAsync(action);
@@ -409,6 +412,7 @@ namespace Monaco
                 else
                 {
                     // Not yet initialized, queue for later with priority
+                    // Priority ensures correct initialization order (e.g., language before content)
                     _propertyChangeQueue.Add((priority, action));
                 }
             }
@@ -423,13 +427,9 @@ namespace Monaco
             {
                 await action();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!IsCriticalException(ex))
             {
-                // Rethrow critical exceptions
-                if (IsCriticalException(ex))
-                {
-                    throw;
-                }
+                // Exception filter preserves call stack for critical exceptions
                 Debug.WriteLine($"Error executing property change: {ex.Message}");
             }
         }
@@ -478,13 +478,9 @@ namespace Monaco
                     Debug.WriteLine($"Replaying property change with priority {priority}");
                     await action();
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!IsCriticalException(ex))
                 {
-                    // Rethrow critical exceptions
-                    if (IsCriticalException(ex))
-                    {
-                        throw;
-                    }
+                    // Exception filter preserves call stack for critical exceptions
                     Debug.WriteLine($"Error replaying property change: {ex.Message}");
                 }
             }

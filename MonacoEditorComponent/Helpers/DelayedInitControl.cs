@@ -65,13 +65,9 @@ namespace Monaco.Helpers
             {
                 await action();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!IsCriticalException(ex))
             {
-                // Rethrow critical exceptions
-                if (IsCriticalException(ex))
-                {
-                    throw;
-                }
+                // Exception filter preserves call stack for critical exceptions
                 Debug.WriteLine($"Error executing property change: {ex.Message}");
                 OnPropertyChangeReplayError(ex);
             }
@@ -126,13 +122,9 @@ namespace Monaco.Helpers
                 {
                     await action();
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!IsCriticalException(ex))
                 {
-                    // Rethrow critical exceptions
-                    if (IsCriticalException(ex))
-                    {
-                        throw;
-                    }
+                    // Exception filter preserves call stack for critical exceptions
                     Debug.WriteLine($"Error replaying property change: {ex.Message}");
                     OnPropertyChangeReplayError(ex);
                 }
