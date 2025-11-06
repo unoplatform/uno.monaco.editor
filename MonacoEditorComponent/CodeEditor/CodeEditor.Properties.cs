@@ -31,19 +31,13 @@ namespace Monaco
         {
             if (d is CodeEditor codeEditor)
             {
-                if (!codeEditor.IsSettingValue)
+                if (codeEditor.IsEditorLoaded && !codeEditor.IsSettingValue)
                 {
-                    codeEditor.QueueOrExecutePropertyChange(async () =>
-                    {
-                        // link:otherScriptsToBeOrganized.ts:updateContent
-                        await codeEditor.InvokeScriptAsync("updateContent", e.NewValue?.ToString() ?? string.Empty);
-                        codeEditor.NotifyPropertyChanged(nameof(Text));
-                    }, CodeEditor.PRIORITY_CONTENT); // Text should be set after language
+                    // link:otherScriptsToBeOrganized.ts:updateContent
+                    await codeEditor.InvokeScriptAsync("updateContent", e.NewValue.ToString());
                 }
-                else
-                {
-                    codeEditor.NotifyPropertyChanged(nameof(Text));
-                }
+
+                codeEditor.NotifyPropertyChanged(nameof(Text));
             }
         }));
 
@@ -60,19 +54,13 @@ namespace Monaco
         {
             if (d is CodeEditor codeEditor)
             {
-                if (!codeEditor.IsSettingValue)
+                if (codeEditor.IsEditorLoaded && !codeEditor.IsSettingValue)
                 {
-                    codeEditor.QueueOrExecutePropertyChange(async () =>
-                    {
-                        // link:updateSelectedContent.ts:updateSelectedContent
-                        await codeEditor.InvokeScriptAsync("updateSelectedContent", e.NewValue?.ToString() ?? string.Empty);
-                        codeEditor.NotifyPropertyChanged(nameof(SelectedText));
-                    }, CodeEditor.PRIORITY_CONTENT);
+                    // link:updateSelectedContent.ts:updateSelectedContent
+                    _ = codeEditor.InvokeScriptAsync("updateSelectedContent", e.NewValue.ToString());
                 }
-                else
-                {
-                    codeEditor.NotifyPropertyChanged(nameof(SelectedText));
-                }
+
+                codeEditor.NotifyPropertyChanged(nameof(SelectedText));
             }
         }));
 
@@ -98,18 +86,7 @@ namespace Monaco
         public static DependencyProperty CodeLanguageProperty { get; } = DependencyProperty.Register(nameof(CodeLanguage), typeof(string), typeof(CodeEditor), new PropertyMetadata("xml", (d, e) =>
         {
             if (d is not CodeEditor editor) return;
-            var language = e.NewValue?.ToString();
-            if (editor.Options != null)
-            {
-                editor.Options.Language = language;
-            }
-            editor.QueueOrExecutePropertyChange(async () =>
-            {
-                if (language != null)
-                {
-                    await editor.InvokeScriptAsync("updateLanguage", language);
-                }
-            }, CodeEditor.PRIORITY_OPTIONS); // Language must be set before content
+            editor.Options?.Language = e.NewValue.ToString();
         }));
 
         /// <summary>
@@ -124,15 +101,7 @@ namespace Monaco
         public static DependencyProperty ReadOnlyProperty { get; } = DependencyProperty.Register(nameof(ReadOnly), typeof(bool), typeof(CodeEditor), new PropertyMetadata(false, (d, e) =>
         {
             if (d is not CodeEditor editor) return;
-            var readOnly = bool.Parse(e.NewValue?.ToString() ?? "false");
-            if (editor.Options != null)
-            {
-                editor.Options.ReadOnly = readOnly;
-            }
-            editor.QueueOrExecutePropertyChange(async () =>
-            {
-                await editor.InvokeScriptAsync("updateOptions", editor.Options);
-            }, CodeEditor.PRIORITY_OPTIONS);
+            editor.Options?.ReadOnly = bool.Parse(e.NewValue?.ToString() ?? "false");
         }));
 
         /// <summary>
@@ -176,15 +145,7 @@ namespace Monaco
         public static DependencyProperty HasGlyphMarginProperty { get; } = DependencyProperty.Register(nameof(HasGlyphMargin), typeof(bool), typeof(CodeEditor), new PropertyMetadata(false, (d, e) =>
         {
             if (d is not CodeEditor editor) return;
-            var glyphMargin = e.NewValue as bool?;
-            if (editor.Options != null)
-            {
-                editor.Options.GlyphMargin = glyphMargin;
-            }
-            editor.QueueOrExecutePropertyChange(async () =>
-            {
-                await editor.InvokeScriptAsync("updateOptions", editor.Options);
-            }, CodeEditor.PRIORITY_OPTIONS);
+            editor.Options?.GlyphMargin = e.NewValue as bool?;
         }));
 
         /// <summary>
@@ -202,14 +163,11 @@ namespace Monaco
         {
             if (sender != null)
             {
-                QueueOrExecutePropertyChange(async () =>
+                // Need to recall mutex as this is called from outside of this initial callback setting it up.
+                using (await _mutexLineDecorations.LockAsync())
                 {
-                    // Need to recall mutex as this is called from outside of this initial callback setting it up.
-                    using (await _mutexLineDecorations.LockAsync())
-                    {
-                        await DeltaDecorationsHelperAsync([.. sender]);
-                    }
-                }, CodeEditor.PRIORITY_DECORATIONS);
+                    await DeltaDecorationsHelperAsync([.. sender]);
+                }
             }
         }
 
@@ -217,31 +175,28 @@ namespace Monaco
         {
             if (d is CodeEditor editor)
             {
-                editor.QueueOrExecutePropertyChange(async () =>
+                // We only want to do this one at a time per editor.
+                using (await editor._mutexLineDecorations.LockAsync())
                 {
-                    // We only want to do this one at a time per editor.
-                    using (await editor._mutexLineDecorations.LockAsync())
+                    var old = e.OldValue as IObservableVector<IModelDeltaDecoration>;
+                    // Clear out the old line decorations if we're replacing them or setting back to null
+                    if ((old != null && old.Count > 0) ||
+                             e.NewValue == null)
                     {
-                        var old = e.OldValue as IObservableVector<IModelDeltaDecoration>;
-                        // Clear out the old line decorations if we're replacing them or setting back to null
-                        if ((old != null && old.Count > 0) ||
-                                 e.NewValue == null)
-                        {
-                            await editor.DeltaDecorationsHelperAsync([]);
-                        }
-
-                        if (e.NewValue is IObservableVector<IModelDeltaDecoration> value)
-                        {
-                            if (value.Count > 0)
-                            {
-                                await editor.DeltaDecorationsHelperAsync([.. value]);
-                            }
-
-                            value.VectorChanged -= editor.Decorations_VectorChanged;
-                            value.VectorChanged += editor.Decorations_VectorChanged;
-                        }
+                        await editor.DeltaDecorationsHelperAsync([]);
                     }
-                }, CodeEditor.PRIORITY_DECORATIONS);
+
+                    if (e.NewValue is IObservableVector<IModelDeltaDecoration> value)
+                    {
+                        if (value.Count > 0)
+                        {
+                            await editor.DeltaDecorationsHelperAsync([.. value]);
+                        }
+
+                        value.VectorChanged -= editor.Decorations_VectorChanged;
+                        value.VectorChanged += editor.Decorations_VectorChanged;
+                    }
+                }
             }
         }));
 
@@ -261,14 +216,11 @@ namespace Monaco
         {
             if (sender != null)
             {
-                QueueOrExecutePropertyChange(async () =>
+                // Need to recall mutex as this is called from outside of this initial callback setting it up.
+                using (await _mutexMarkers.LockAsync())
                 {
-                    // Need to recall mutex as this is called from outside of this initial callback setting it up.
-                    using (await _mutexMarkers.LockAsync())
-                    {
-                        await SetModelMarkersAsync("CodeEditor", [.. sender]);
-                    }
-                }, CodeEditor.PRIORITY_DECORATIONS);
+                    await SetModelMarkersAsync("CodeEditor", [.. sender]);
+                }
             }
         }
 
@@ -276,32 +228,29 @@ namespace Monaco
         {
             if (d is CodeEditor editor)
             {
-                editor.QueueOrExecutePropertyChange(async () =>
+                // We only want to do this one at a time per editor.
+                using (await editor._mutexMarkers.LockAsync())
                 {
-                    // We only want to do this one at a time per editor.
-                    using (await editor._mutexMarkers.LockAsync())
+                    var old = e.OldValue as IObservableVector<IMarkerData>;
+                    // Clear out the old markers if we're replacing them or setting back to null
+                    if ((old != null && old.Count > 0) ||
+                             e.NewValue == null)
                     {
-                        var old = e.OldValue as IObservableVector<IMarkerData>;
-                        // Clear out the old markers if we're replacing them or setting back to null
-                        if ((old != null && old.Count > 0) ||
-                                 e.NewValue == null)
-                        {
-                            // TODO: Can I simplify this in this case?
-                            await editor.SetModelMarkersAsync("CodeEditor", []);
-                        }
-
-                        if (e.NewValue is IObservableVector<IMarkerData> value)
-                        {
-                            if (value.Count > 0)
-                            {
-                                await editor.SetModelMarkersAsync("CodeEditor", [.. value]);
-                            }
-
-                            value.VectorChanged -= editor.Markers_VectorChanged;
-                            value.VectorChanged += editor.Markers_VectorChanged;
-                        }
+                        // TODO: Can I simplify this in this case?
+                        await editor.SetModelMarkersAsync("CodeEditor", []);
                     }
-                }, CodeEditor.PRIORITY_DECORATIONS);
+
+                    if (e.NewValue is IObservableVector<IMarkerData> value)
+                    {
+                        if (value.Count > 0)
+                        {
+                            await editor.SetModelMarkersAsync("CodeEditor", [.. value]);
+                        }
+
+                        value.VectorChanged -= editor.Markers_VectorChanged;
+                        value.VectorChanged += editor.Markers_VectorChanged;
+                    }
+                }
             }
         }));
     }

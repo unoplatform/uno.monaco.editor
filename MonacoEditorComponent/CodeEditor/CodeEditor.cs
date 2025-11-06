@@ -29,16 +29,6 @@ namespace Monaco
         private ModelHelper? _model;
         private CssStyleBroker? _cssBroker;
 
-        // Queue for property changes that occur before initialization  
-        // We use a priority queue to ensure certain properties (like CodeLanguage) are set before others (like Text)
-        private readonly List<(int Priority, Func<Task> Action)> _propertyChangeQueue = new();
-        private readonly object _queueLock = new();
-        
-        // Priority constants - lower numbers execute first
-        internal const int PRIORITY_OPTIONS = 0;      // Options, CodeLanguage, ReadOnly, HasGlyphMargin
-        internal const int PRIORITY_CONTENT = 10;     // Text, SelectedText
-        internal const int PRIORITY_DECORATIONS = 20; // Decorations, Markers
-
         public event PropertyChangedEventHandler? PropertyChanged;
 
         /// <summary>
@@ -120,30 +110,24 @@ namespace Monaco
 
         private async void Options_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (_view == null) return;
-            
-            if (sender is not StandaloneEditorConstructionOptions options) return;
+            if (!_initialized || _view == null) return;
 
-            QueueOrExecutePropertyChange(async () =>
+            if (sender is not StandaloneEditorConstructionOptions options) return;
+            if (e.PropertyName == nameof(StandaloneEditorConstructionOptions.Language)
+                && options.Language is not null)
             {
-                switch (e.PropertyName)
-                {
-                    case nameof(StandaloneEditorConstructionOptions.Language):
-                        if (options.Language is not null)
-                        {
-                            await InvokeScriptAsync("updateLanguage", options.Language);
-                            if (CodeLanguage != options.Language) CodeLanguage = options.Language;
-                        }
-                        break;
-                    case nameof(StandaloneEditorConstructionOptions.GlyphMargin):
-                        if (HasGlyphMargin != options.GlyphMargin) options.GlyphMargin = HasGlyphMargin;
-                        break;
-                    case nameof(StandaloneEditorConstructionOptions.ReadOnly):
-                        if (ReadOnly != options.ReadOnly) options.ReadOnly = ReadOnly;
-                        break;
-                }
-                await InvokeScriptAsync("updateOptions", options);
-            });
+                await InvokeScriptAsync("updateLanguage", options.Language);
+                if (CodeLanguage != options.Language) CodeLanguage = options.Language;
+            }
+            if (e.PropertyName == nameof(StandaloneEditorConstructionOptions.GlyphMargin))
+            {
+                if (HasGlyphMargin != options.GlyphMargin) options.GlyphMargin = HasGlyphMargin;
+            }
+            if (e.PropertyName == nameof(StandaloneEditorConstructionOptions.ReadOnly))
+            {
+                if (ReadOnly != options.ReadOnly) options.ReadOnly = ReadOnly;
+            }
+            await InvokeScriptAsync("updateOptions", options);
         }
 
         private void CodeEditor_SizeChanged(object sender, RoutedEventArgs e)
@@ -190,12 +174,8 @@ namespace Monaco
                 Markers.VectorChanged -= Markers_VectorChanged;
                 Markers.VectorChanged += Markers_VectorChanged;
 
-                Debug.WriteLine("Setting initialized - true (non-WASM path)");
-                // Don't set _initialized here for WASM - let ReplayQueuedPropertyChanges do it atomically
-                // For non-WASM platforms, we may need to set it here since CodeEditorLoaded might not be called
-#if !__WASM__
+                Debug.WriteLine("Setting initialized - true");
                 _initialized = true;
-#endif
 
                 Unloaded -= CodeEditor_Unloaded;
                 Unloaded += CodeEditor_Unloaded;
@@ -364,9 +344,7 @@ namespace Monaco
             [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
-            // Check both _initialized flag AND IsEditorLoaded to ensure DOM is ready
-            // This prevents calling JavaScript before Monaco editor is fully ready in the DOM
-            if (_initialized && _view is not null && IsEditorLoaded)
+            if (_initialized && _view is not null)
             {
                 try
                 {
@@ -380,7 +358,7 @@ namespace Monaco
             else
             {
 #if DEBUG
-                Debug.WriteLine($"WARNING: Tried to call '{method}' before editor fully loaded. _initialized={_initialized}, IsEditorLoaded={IsEditorLoaded}");
+                Debug.WriteLine("WARNING: Tried to call " + method + " before initialized.");
 #endif
             }
 
@@ -390,101 +368,6 @@ namespace Monaco
         private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        /// <summary>
-        /// Queues a property change action to be executed after initialization, or executes immediately if already initialized.
-        /// Priority only matters during the initial queue replay to ensure Monaco is configured correctly (language before content).
-        /// After initialization, properties execute immediately (fire and forget).
-        /// </summary>
-        /// <param name="action">The action to execute</param>
-        /// <param name="priority">Priority for queue ordering during replay (lower values execute first). Ignored after initialization.</param>
-        private void QueueOrExecutePropertyChange(Func<Task> action, int priority = PRIORITY_CONTENT)
-        {
-            lock (_queueLock)
-            {
-                if (_initialized)
-                {
-                    // Already initialized, execute immediately (fire and forget)
-                    // We don't await here as this is called from property change callbacks
-                    // Exceptions are handled in ExecutePropertyChangeAsync to prevent unobserved task exceptions
-                    _ = ExecutePropertyChangeAsync(action);
-                }
-                else
-                {
-                    // Not yet initialized, queue for later with priority
-                    // Priority ensures correct initialization order (e.g., language before content)
-                    _propertyChangeQueue.Add((priority, action));
-                }
-            }
-        }
-
-        /// <summary>
-        /// Executes a property change action with proper error handling (fire and forget helper).
-        /// </summary>
-        private async Task ExecutePropertyChangeAsync(Func<Task> action)
-        {
-            try
-            {
-                await action();
-            }
-            catch (Exception ex) when (!IsCriticalException(ex))
-            {
-                // Exception filter preserves call stack for critical exceptions
-                Debug.WriteLine($"Error executing property change: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Determines if the exception is critical and should not be caught.
-        /// </summary>
-        private static bool IsCriticalException(Exception ex)
-        {
-            return ex is OutOfMemoryException
-                || ex is StackOverflowException
-                || ex is AccessViolationException
-                || ex is AppDomainUnloadedException
-                || ex is ThreadAbortException;
-        }
-
-        /// <summary>
-        /// Replays all queued property changes. Called after initialization is complete.
-        /// This method sets _initialized to true atomically with copying the queue to prevent race conditions.
-        /// Actions are replayed in priority order (lower priority values first) to ensure correct initialization sequence.
-        /// </summary>
-        private async Task ReplayQueuedPropertyChanges()
-        {
-            List<(int Priority, Func<Task> Action)> actionsToReplay;
-            
-            lock (_queueLock)
-            {
-                // Set initialized flag here to ensure atomicity with queue copy
-                _initialized = true;
-
-                if (_propertyChangeQueue.Count == 0)
-                {
-                    return;
-                }
-
-                // Copy and sort the queue by priority (lower values first)
-                actionsToReplay = [.. _propertyChangeQueue.OrderBy(x => x.Priority)];
-                _propertyChangeQueue.Clear();
-            }
-
-            // Execute all queued actions in priority order
-            foreach (var (priority, action) in actionsToReplay)
-            {
-                try
-                {
-                    Debug.WriteLine($"Replaying property change with priority {priority}");
-                    await action();
-                }
-                catch (Exception ex) when (!IsCriticalException(ex))
-                {
-                    // Exception filter preserves call stack for critical exceptions
-                    Debug.WriteLine($"Error replaying property change: {ex.Message}");
-                }
-            }
         }
 
         public new void Dispose()
