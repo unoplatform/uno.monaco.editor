@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Runtime.InteropServices.JavaScript;
 
 using Microsoft.UI.Xaml.Controls;

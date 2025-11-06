@@ -1,8 +1,8 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
-
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices.JavaScript;
+
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 
 namespace Monaco.Extensions
 {
@@ -170,5 +170,8 @@ namespace Monaco.Extensions
     {
         [JSImport("globalThis.InvokeJS")]
         public static partial string InvokeJS(string elementId, string script);
+
+        [JSImport("globalThis.languageIdFromFileName")]
+        public static partial string LanguageIdFromFileName(string? fileName);
     }
 }
