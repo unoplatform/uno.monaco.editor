@@ -148,19 +148,28 @@ const updateOptions = function (element: any, opt: monaco.editor.IEditorOptions)
     }
 };
 
-const updateLanguage = function (element: any, language) {
-    var editorContext = EditorContext.getEditorForElement(element);
-    
-    // Return immediately if already set to the requested language
-    if (editorContext.model.getLanguageId() === language) {
-        return;
-    }
-    
-    // Set the language on the model
-    // Monaco will automatically load the language tokenizer asynchronously if needed
-    // and retokenize the content once the tokenizer is loaded
-    // This works correctly for all languages including markdown and C#
-    monaco.editor.setModelLanguage(editorContext.model, language);
+const updateLanguage = function (element: any, language): Promise<void> {
+    return new Promise<void>((resolve) => {
+        var editorContext = EditorContext.getEditorForElement(element);
+        
+        // Return immediately if already set to the requested language
+        if (editorContext.model.getLanguageId() === language) {
+            resolve();
+            return;
+        }
+        
+        // Use monaco.languages.onLanguage to wait for the language tokenizer to load
+        // This is the correct Monaco API for waiting for language modules
+        const disposable = monaco.languages.onLanguage(language, () => {
+            disposable.dispose();
+            resolve();
+        });
+        
+        // Set the language on the model
+        // This triggers async loading of the language tokenizer
+        // The onLanguage callback will fire once the tokenizer is loaded
+        monaco.editor.setModelLanguage(editorContext.model, language);
+    });
 };
 
 const changeTheme = function (element: any, theme: string, highcontrast) {
