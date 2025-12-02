@@ -3,11 +3,11 @@ name: CI
 on:
   push:
     branches:
-      - main
+      - uno
       - release/*/*
   pull_request:
     branches:
-      - main
+      - uno
       - release/*/*
   workflow_dispatch:
 
