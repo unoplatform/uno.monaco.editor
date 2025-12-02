@@ -1,22 +1,18 @@
-﻿using Monaco.Editor;
-using Monaco.Helpers;
-using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using Windows.Foundation;
+using CommunityToolkit.WinUI;
 
-#if !NETSTANDARD2_0
-using System.Runtime.InteropServices.WindowsRuntime;
-#else
-using ReadOnlyArrayAttribute = Monaco.Helpers.Stubs.ReadOnlyArrayAttribute;
-#endif
+using Monaco.Editor;
+using Monaco.Extensions;
+
+using Newtonsoft.Json;
+
+using Windows.Foundation;
 
 namespace Monaco
 {
     /// <summary>
     /// Action delegate for <see cref="CodeEditor.AddCommandAsync(int, CommandHandler)"/> and <see cref="CodeEditor.AddCommandAsync(int, CommandHandler, string)"/>.
     /// </summary>
-    public delegate void CommandHandler(object[] parameters);
+    public delegate void CommandHandler(object?[] parameters);
 
     /// <summary>
     /// This file contains Monaco IEditor method implementations we can call on our control.
@@ -25,7 +21,7 @@ namespace Monaco
     /// </summary>
     public partial class CodeEditor
     {
-#region Reveal Methods
+        #region Reveal Methods
         public IAsyncAction RevealLineAsync(uint lineNumber)
         {
             return SendScriptAsync("editor.revealLine(" + lineNumber + ")").AsAsyncAction();
@@ -68,44 +64,46 @@ namespace Monaco
 
         public IAsyncAction RevealPositionAsync(IPosition position, bool revealVerticalInCenter, bool revealHorizontal)
         {
-            return SendScriptAsync("editor.revealPosition(JSON.parse('" + position.ToJson() + "'), " + JsonConvert.ToString(revealVerticalInCenter) + ", " + JsonConvert.ToString(revealHorizontal) + ")").AsAsyncAction();
+            return SendScriptAsync("editor.revealPosition(JSON.parse('" + JsonConvert.SerializeObject(position) + "'), " + JsonConvert.ToString(revealVerticalInCenter) + ", " + JsonConvert.ToString(revealHorizontal) + ")").AsAsyncAction();
         }
 
         public IAsyncAction RevealPositionInCenterAsync(IPosition position)
         {
-            return SendScriptAsync("editor.revealPositionInCenter(JSON.parse('" + position.ToJson() + "'))").AsAsyncAction();
+            return SendScriptAsync("editor.revealPositionInCenter(JSON.parse('" + JsonConvert.SerializeObject(position) + "'))").AsAsyncAction();
         }
 
         public IAsyncAction RevealPositionInCenterIfOutsideViewportAsync(IPosition position)
         {
-            return SendScriptAsync("editor.revealPositionInCenterIfOutsideViewport(JSON.parse('" + position.ToJson() + "'))").AsAsyncAction();
+            return SendScriptAsync("editor.revealPositionInCenterIfOutsideViewport(JSON.parse('" + JsonConvert.SerializeObject(position) + "'))").AsAsyncAction();
         }
 
         public IAsyncAction RevealRangeAsync(IRange range)
         {
-            return SendScriptAsync("editor.revealRange(JSON.parse('" + range.ToJson() + "'))").AsAsyncAction();
+            return SendScriptAsync("editor.revealRange(JSON.parse('" + JsonConvert.SerializeObject(range) + "'))").AsAsyncAction();
         }
 
         public IAsyncAction RevealRangeAtTopAsync(IRange range)
         {
-            return SendScriptAsync("editor.revealRangeAtTop(JSON.parse('" + range.ToJson() + "'))").AsAsyncAction();
+            return SendScriptAsync("editor.revealRangeAtTop(JSON.parse('" + JsonConvert.SerializeObject(range) + "'))").AsAsyncAction();
         }
 
         public IAsyncAction RevealRangeInCenterAsync(IRange range)
         {
-            return SendScriptAsync("editor.revealRangeInCenter(JSON.parse('" + range.ToJson() + "'))").AsAsyncAction();
+            return SendScriptAsync("editor.revealRangeInCenter(JSON.parse('" + JsonConvert.SerializeObject(range) + "'))").AsAsyncAction();
         }
 
         public IAsyncAction RevealRangeInCenterIfOutsideViewportAsync(IRange range)
         {
-            return SendScriptAsync("editor.revealRangeInCenterIfOutsideViewport(JSON.parse('" + range.ToJson() + "'))").AsAsyncAction();
+            return SendScriptAsync("editor.revealRangeInCenterIfOutsideViewport(JSON.parse('" + JsonConvert.SerializeObject(range) + "'))").AsAsyncAction();
         }
-#endregion
+        #endregion
 
         public IAsyncAction AddActionAsync(IActionDescriptor action)
         {
+            _parentAccessor = _parentAccessor ?? throw new InvalidOperationException($"_parentAccessor is not available");
+
             var wref = new WeakReference<CodeEditor>(this);
-            _parentAccessor.RegisterAction("Action" + action.Id, new Action(() => { if (wref.TryGetTarget(out CodeEditor editor)) { action?.Run(editor, null); } }));
+            _parentAccessor.RegisterAction("Action" + action.Id, new Action(() => { if (wref.TryGetTarget(out var editor)) { action?.Run(editor, null); } }));
             return InvokeScriptAsync("addAction", action).AsAsyncAction();
         }
 
@@ -114,24 +112,41 @@ namespace Monaco
         /// </summary>
         /// <param name="script">Script to invoke</param>
         /// <returns>An async operation result to string</returns>
-        public IAsyncOperation<string> InvokeScriptAsync(string script)
+        public async Task<string?> InvokeScriptAsync(string script)
         {
-            return _view.InvokeScriptAsync("eval", new[] { script });
+            if (_view is not null)
+            {
+                var r = await _view.InvokeScriptAsync("eval", [script]);
+                return r?.ToString();
+            }
+
+            return null;
         }
 
-        public IAsyncOperation<string> AddCommandAsync(int keybinding, CommandHandler handler)
+        private int _commandIndex = 0;
+
+        public async Task<string?> AddCommandAsync(CommandHandler handler)
         {
-            return AddCommandAsync(keybinding, handler, string.Empty);
+            return await AddCommandAsync(0, handler, string.Empty);
+        }
+        public async Task<string?> AddCommandAsync(int keybinding, CommandHandler handler)
+        {
+            return await AddCommandAsync(keybinding, handler, string.Empty);
         }
 
-        public IAsyncOperation<string> AddCommandAsync(int keybinding, CommandHandler handler, string context)
+        public async Task<string?> AddCommandAsync(int keybinding, CommandHandler handler, string context)
         {
-            var name = "Command" + keybinding;
-            _parentAccessor.RegisterActionWithParameters(name, (parameters) => 
+            if (_parentAccessor == null)
+            {
+                throw new InvalidOperationException($"_parentAccessor is not available");
+            }
+
+            var name = "Command" + Interlocked.Increment(ref _commandIndex);
+            _parentAccessor.RegisterActionWithParameters(name, (parameters) =>
             {
                 if (parameters != null && parameters.Length > 0)
                 {
-                    object[] args = new object[parameters.Length];
+                    object?[] args = new object[parameters.Length];
                     for (int i = 0; i < parameters.Length; i++)
                     {
                         args[i] = JsonConvert.DeserializeObject<object>(parameters[i]);
@@ -141,45 +156,44 @@ namespace Monaco
                 }
                 else
                 {
-                    handler?.Invoke(new object[] {});
+                    handler?.Invoke([]);
                 }
             });
-            return InvokeScriptAsync<string>("addCommand", new object[] { keybinding, name, context }).AsAsyncOperation();
+            return await InvokeScriptAsync<string>("addCommand", [keybinding, name, context]);
         }
 
-        public IAsyncOperation<ContextKey> CreateContextKeyAsync(string key, bool defaultValue)
+        public async Task<ContextKey> CreateContextKeyAsync(string key, bool defaultValue)
         {
             var ck = new ContextKey(this, key, defaultValue);
 
-            return InvokeScriptAsync("createContext", ck).ContinueWith((noop) =>
-            {
-                return ck;
-            }).AsAsyncOperation();
+            await InvokeScriptAsync("createContext", ck);
+
+            return ck;
         }
 
-        public IModel GetModel()
+        public IModel? GetModel()
         {
             return _model;
         }
 
-        public IAsyncOperation<IEnumerable<Marker>> GetModelMarkersAsync() // TODO: Filter (string? owner, Uri? resource, int? take)
+        public async Task<IEnumerable<Marker?>> GetModelMarkersAsync() // TODO: Filter (string? owner, Uri? resource, int? take)
         {
-            return SendScriptAsync<IEnumerable<Marker>>("monaco.editor.getModelMarkers();").AsAsyncOperation();
+            return await SendScriptAsync<IEnumerable<Marker>>("monaco.editor.getModelMarkers();").AsAsyncOperation();
         }
 
-        public IAsyncAction SetModelMarkersAsync(string owner, IMarkerData[] markers)
+        public async Task SetModelMarkersAsync(string owner, IMarkerData[] markers)
         {
-            return SendScriptAsync("monaco.editor.setModelMarkers(model, " + JsonConvert.ToString(owner) + ", " + JsonConvert.SerializeObject(markers) + ");").AsAsyncAction();
+            await SendScriptAsync("monaco.editor.setModelMarkers(EditorContext.getEditorForElement(element).model, " + JsonConvert.ToString(owner) + ", " + JsonConvert.SerializeObject(markers) + ");").AsAsyncAction();
         }
 
-        public IAsyncOperation<Position> GetPositionAsync()
+        public async Task<Position?> GetPositionAsync()
         {
-            return SendScriptAsync<Position>("editor.getPosition();").AsAsyncOperation();
+            return await SendScriptAsync<Position>("EditorContext.getEditorForElement(element).editor.getPosition();").AsAsyncOperation();
         }
 
         public IAsyncAction SetPositionAsync(IPosition position)
         {
-            return SendScriptAsync("editor.setPosition(" + JsonConvert.SerializeObject(position) + ");").AsAsyncAction();
+            return SendScriptAsync("EditorContext.getEditorForElement(element).editor.setPosition(" + JsonConvert.SerializeObject(position) + ");").AsAsyncAction();
         }
 
         /// <summary>
@@ -189,31 +203,25 @@ namespace Monaco
         /// </summary>
         /// <param name="newDecorations"></param>
         /// <returns></returns>
-        private IAsyncAction DeltaDecorationsHelperAsync(IModelDeltaDecoration[] newDecorations)
+        private async Task DeltaDecorationsHelperAsync(IModelDeltaDecoration[] newDecorations)
         {
-            var newDecorationsAdjust = newDecorations ?? Array.Empty<IModelDeltaDecoration>();
-            System.Diagnostics.Debug.WriteLine("associating decorations");
-            if (_cssBroker.AssociateStyles(newDecorations))
+            _queue = _queue ?? throw new InvalidOperationException($"_queue is not available");
+
+            await _queue.EnqueueAsync(async () =>
             {
-                System.Diagnostics.Debug.WriteLine("updating associated styles");
-                // Update Styles First
-                return InvokeScriptAsync("updateStyle", _cssBroker.GetStyles()).ContinueWith((noop) =>
+                var newDecorationsAdjust = newDecorations ?? [];
+
+                if (_cssBroker is not null
+                    && _cssBroker.AssociateStyles(newDecorationsAdjust))
                 {
-                    System.Diagnostics.Debug.WriteLine($"updating decorations {newDecorationsAdjust}");
+                    // Update Styles First
+                    await InvokeScriptAsync("updateStyle", _cssBroker.GetStyles());
+                }
 
-                    // Send Command to Modify Decorations
-                    // IMPORTANT: Need to cast to object here as we want this to be a single array object passed as a parameter, not a list of parameters to expand.
-                    return InvokeScriptAsync("updateDecorations", (object)newDecorationsAdjust);
-                }).AsAsyncAction();
-            }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine("updating unassociated decorations");
-
-                // Only Send Command to Modify Decorations themselves
+                // Send Command to Modify Decorations
                 // IMPORTANT: Need to cast to object here as we want this to be a single array object passed as a parameter, not a list of parameters to expand.
-                return InvokeScriptAsync("updateDecorations", (object)newDecorationsAdjust).AsAsyncAction();
-            }             
+                await InvokeScriptAsync("updateDecorations", (object)newDecorationsAdjust);
+            });
         }
     }
 }

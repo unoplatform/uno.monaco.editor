@@ -1,5 +1,4 @@
 ﻿using Newtonsoft.Json;
-using System;
 
 namespace Monaco
 {
@@ -52,16 +51,32 @@ namespace Monaco
             return new Range(StartColumn, StartColumn, StartLineNumber, StartColumn);
         }
 
-        public Range ContainsPosition(IPosition position)
+        public bool ContainsPosition(IPosition position)
         {
-            // TODO
-            throw new NotImplementedException();
+            if (StartLineNumber == position.LineNumber && position.LineNumber == EndLineNumber)
+            {
+                return StartColumn <= position.Column && position.Column <= EndColumn;
+            }
+            else if (StartLineNumber == position.LineNumber)
+            {
+                return StartColumn <= position.Column;
+            }
+            else if (EndLineNumber == position.LineNumber)
+            {
+                return position.Column <= EndColumn;
+            }
+
+            return StartLineNumber < position.LineNumber && EndLineNumber > position.LineNumber;
         }
 
         public bool ContainsRange(IRange range)
         {
-            // TODO
-            throw new NotImplementedException();
+            bool isStart = StartLineNumber <= range.StartLineNumber;
+            bool isStartColumn = StartLineNumber != range.StartLineNumber || StartColumn <= range.StartColumn;
+            bool isEnd = EndLineNumber >= range.EndLineNumber;
+            bool isEndColumn = EndLineNumber != range.EndLineNumber || EndColumn >= range.EndColumn;
+
+            return isStart && isStartColumn && isEnd && isEndColumn;
         }
 
         public bool EqualsRange(Range other)

@@ -1,17 +1,57 @@
-﻿///<reference path="../monaco-editor/monaco.d.ts" />
-declare var Parent: ParentAccessor;
-declare var Keyboard: KeyboardListener;
+﻿    ///<reference path="../monaco-editor/monaco.d.ts" />
 
-declare var editor: monaco.editor.IStandaloneCodeEditor;
-declare var model: monaco.editor.ITextModel;
-declare var contexts: { [index: string]: monaco.editor.IContextKey<any> };//{};
-declare var decorations: string[];
-declare var modifingSelection:boolean; // Supress updates to selection when making edits.
+class EditorContext {
+    static _editors: Map<any, EditorContext> = new Map<any, EditorContext>();
 
-var registerHoverProvider = function (languageId: string) {
+    public static registerEditorForElement(element: any, editor: monaco.editor.IStandaloneCodeEditor): EditorContext {
+        var value = EditorContext.getEditorForElement(element);
+        value.editor = editor;
+        return value;
+    }
+
+    public static getEditorForElement(element: any): EditorContext {
+        var context = EditorContext._editors.get(element);
+
+        if (!context) {
+            context = new EditorContext();
+            EditorContext._editors.set(element, context);
+        }
+
+        return context;
+    }
+
+    public static getElementFromModel(model: monaco.editor.ITextModel): any {
+        for (let [key, value] of EditorContext._editors) {
+            if (value.model === model) {
+                return key;
+            }
+        }
+        return null;
+    }
+
+    constructor() {
+        this.modifingSelection = false;
+        this.contexts = {};
+        this.decorations = [];
+    }
+
+    public Accessor: ParentAccessor;
+    public Keyboard: KeyboardListener;
+    public Theme: ThemeAccessor;
+
+    public editor: monaco.editor.IStandaloneCodeEditor;
+    public model: monaco.editor.ITextModel;
+    public contexts: { [index: string]: monaco.editor.IContextKey<any> };
+    public decorations: string[];
+    public modifingSelection: boolean; // Supress updates to selection when making edits.
+}
+
+const registerHoverProvider = function (unused: any, languageId: string) {
+
     return monaco.languages.registerHoverProvider(languageId, {
         provideHover: function (model, position) {
-            return callParentEventAsync("HoverProvider" + languageId, [JSON.stringify(position)]).then(result => {
+            var element = EditorContext.getElementFromModel(model);
+            return callParentEventAsync(element, "HoverProvider" + languageId, [JSON.stringify(position)]).then(result => {
                 if (result) {
                     return JSON.parse(result);
                 }
@@ -20,96 +60,103 @@ var registerHoverProvider = function (languageId: string) {
     });
 };
 
-var addAction = function (action: monaco.editor.IActionDescriptor) {
+const addAction = function (element: any, action: monaco.editor.IActionDescriptor) {
+    var editorContext = EditorContext.getEditorForElement(element);
+
     action.run = function (ed) {
-        Parent.callAction("Action" + action.id)
+        editorContext.Accessor.callAction("Action" + action.id)
     };
 
-    editor.addAction(action);
+    editorContext.editor.addAction(action);
 };
 
-var addCommand = function (keybindingStr, handlerName, context) {
-    return editor.addCommand(parseInt(keybindingStr),
-        function() {
-            let objs = [];
-            if (arguments
-            ) { // Use arguments as Monaco will pass each as it's own parameter, so we don't know how many that may be.
-                for (let i = 1; i < arguments.length; i++) { // Skip first one as that's the sender?
-                    objs.push(arguments[i]);
-                }
+const addCommand = function (element: any, keybindingStr, handlerName, context) {
+    var editorContext = EditorContext.getEditorForElement(element);
+
+    return editorContext.editor.addCommand(parseInt(keybindingStr), function () {
+        const objs = [];
+        if (arguments) { // Use arguments as Monaco will pass each as it's own parameter, so we don't know how many that may be.
+            for (let i = 1; i < arguments.length; i++) { // Skip first one as that's the sender?
+                objs.push(JSON.stringify(arguments[i]));
             }
-
-            return callParentActionWithParameters(handlerName, objs);
-        },
-        context
-    );
+        }
+        editorContext.Accessor.callActionWithParameters2(handlerName, objs);
+    }, context);
 };
 
-var createContext = function (context) {
+const createContext = function (element: any, context) {
+    var editorContext = EditorContext.getEditorForElement(element);
+
     if (context) {
-        contexts[context.key] = editor.createContextKey(context.key, context.defaultValue);
+        editorContext.contexts[context.key] = editorContext.editor.createContextKey(context.key, context.defaultValue);
     }
 };
 
-var updateContext = function (key, value) {
-    contexts[key].set(value);
+const updateContext = function (element: any, key, value) {
+    var editorContext = EditorContext.getEditorForElement(element);
+
+    editorContext.contexts[key].set(value);
 }
 
-var updateContent = function (content) {
-    // Need to ignore updates from us notifying of a change
-    if (content != model.getValue()) {
-        model.setValue(content);
+// link:CodeEditor.Properties.cs:updateContent
+const updateContent = function (element: any, content) {
+    var editorContext = EditorContext.getEditorForElement(element);
+
+   // Need to ignore updates from us notifying of a change
+    if (content !== editorContext.model.getValue()) {
+        editorContext.model.setValue(content);
     }
 };
 
+const updateDecorations = function (element: any, newHighlights) {
+    var editorContext = EditorContext.getEditorForElement(element);
 
-
-
-
-
-
-var updateDecorations = function (newHighlights) {
     if (newHighlights) {
-        decorations = editor.deltaDecorations(decorations, newHighlights);
+        editorContext.decorations = editorContext.editor.deltaDecorations(editorContext.decorations, newHighlights);
     } else {
-        decorations = editor.deltaDecorations(decorations, []);
+        editorContext.decorations = editorContext.editor.deltaDecorations(editorContext.decorations, []);
     }
 };
 
-var updateStyle = function (innerStyle) {
+const updateStyle = function (innerStyle) {
     var style = document.getElementById("dynamic");
     style.innerHTML = innerStyle;
 };
 
-var getOptionsJson = function (): monaco.editor.IEditorOptions {
+const getOptions = async function (element: any): Promise<monaco.editor.IEditorOptions> {
+    var editorContext = EditorContext.getEditorForElement(element);
+
     let opt = null;
     try {
-        var jopt = getParentJsonValue("Options");
-       // console.log('Options: ' + jopt);
-        opt = JSON.parse(jopt);
+        opt = getParentValue(element, "Options");
     } finally {
 
     }
 
-    if (opt != null && typeof opt === "object") {
+    if (opt !== null && typeof opt === "object") {
         return opt;
     }
 
     return {};
 };
 
-var updateMonacoOptions = function (opt: monaco.editor.IEditorOptions) {
-    if (opt != null && typeof opt === "object") {
-        editor.updateOptions(opt);
+const updateOptions = function (element: any, opt: monaco.editor.IEditorOptions) {
+    var editorContext = EditorContext.getEditorForElement(element);
+
+    if (opt !== null && typeof opt === "object") {
+        editorContext.editor.updateOptions(opt);
     }
 };
 
-var updateLanguage = function (language) {
-    monaco.editor.setModelLanguage(model, language);
+const updateLanguage = function (element: any, language: string) {
+    var editorContext = EditorContext.getEditorForElement(element);
+
+    monaco.editor.setModelLanguage(editorContext.model, language);    
 };
 
-var changeTheme = function (theme: string, highcontrast) {
-    var newTheme = 'vs';
+const changeTheme = function (element: any, theme: string, highcontrast) {
+    var editorContext = EditorContext.getEditorForElement(element);
+    let newTheme = 'vs';
     if (highcontrast == "True" || highcontrast == "true") {
         newTheme = 'hc-black';
     } else if (theme == "Dark") {
@@ -121,9 +168,10 @@ var changeTheme = function (theme: string, highcontrast) {
 
 
 
-var keyDown = function (event) {
+const keyDown = async function (element: any, event) {
+    var editorContext = EditorContext.getEditorForElement(element);
     //Debug.log("Key Down:" + event.keyCode + " " + event.ctrlKey);
-    var result = Keyboard.keyDown(event.keyCode, event.ctrlKey, event.shiftKey, event.altKey, event.metaKey);
+    const result = await editorContext.Keyboard.keyDown(event.keyCode, event.ctrlKey, event.shiftKey, event.altKey, event.metaKey);
     if (result) {
         event.cancelBubble = true;
         event.preventDefault();

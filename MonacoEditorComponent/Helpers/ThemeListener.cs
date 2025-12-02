@@ -1,9 +1,12 @@
-﻿using System;
+﻿using CommunityToolkit.WinUI;
+
+using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml;
+
 using System.Diagnostics;
-using Windows.ApplicationModel.Core;
+
 using Windows.Foundation.Metadata;
 using Windows.UI.ViewManagement;
-using Microsoft.UI.Xaml;
 
 namespace Monaco.Helpers
 {
@@ -14,30 +17,41 @@ namespace Monaco.Helpers
     /// and Signals an Event when they occur.
     /// </summary>
     [AllowForWeb]
-    public sealed partial class ThemeListener
+    public sealed partial class ThemeListener // This is a copy of the Toolkit ThemeListener, for some reason if we try and use it directly it's not read by the WebView
     {
+        private readonly DispatcherQueue _queue;
+        private readonly ICodeEditorPresenter _owner;
+
         public string CurrentThemeName { get { return CurrentTheme.ToString(); } } // For Web Retrieval
 
         public ApplicationTheme CurrentTheme { get; set; }
         public bool IsHighContrast { get; set; }
 
-        public event ThemeChangedEvent ThemeChanged;
+        public event ThemeChangedEvent? ThemeChanged;
 
-        private readonly AccessibilitySettings _accessible = new AccessibilitySettings();
-        private readonly UISettings _settings = new UISettings();
+        private readonly AccessibilitySettings _accessible = new();
+        private readonly UISettings _settings = new();
 
-        public ThemeListener()
+        public ThemeListener(ICodeEditorPresenter presenter) : this(presenter, null) { }
+
+        public ThemeListener(ICodeEditorPresenter presenter, DispatcherQueue? queue)
         {
+            _queue = queue ?? DispatcherQueue.GetForCurrentThread();
+            _owner = presenter;
+
             CurrentTheme = Application.Current.RequestedTheme;
 #if !__WASM__
             IsHighContrast = _accessible.HighContrast;
 #endif
 
-            _accessible.HighContrastChanged += _accessible_HighContrastChanged;
-            _settings.ColorValuesChanged += _settings_ColorValuesChanged;
+            _accessible.HighContrastChanged += Accessible_HighContrastChanged;
+            _settings.ColorValuesChanged += Settings_ColorValuesChanged;
 
             // Fallback in case either of the above fail, we'll check when we get activated next.
-            Window.Current.CoreWindow.Activated += CoreWindow_Activated;
+            if (Window.Current?.CoreWindow is not null)
+            {
+                Window.Current.CoreWindow.Activated += CoreWindow_Activated;
+            }
 
             PartialCtor();
         }
@@ -46,13 +60,16 @@ namespace Monaco.Helpers
 
         ~ThemeListener()
         {
-            _accessible.HighContrastChanged -= _accessible_HighContrastChanged;
-            _settings.ColorValuesChanged -= _settings_ColorValuesChanged;
+            _accessible.HighContrastChanged -= Accessible_HighContrastChanged;
+            _settings.ColorValuesChanged -= Settings_ColorValuesChanged;
 
-            Window.Current.CoreWindow.Activated -= CoreWindow_Activated;
+            if (Window.Current?.CoreWindow is not null)
+            {
+                Window.Current.CoreWindow.Activated -= CoreWindow_Activated;
+            }
         }
 
-        private void _accessible_HighContrastChanged(AccessibilitySettings sender, object args)
+        private void Accessible_HighContrastChanged(AccessibilitySettings sender, object args)
         {
 #if DEBUG
             Debug.WriteLine("HighContrast Changed");
@@ -62,29 +79,29 @@ namespace Monaco.Helpers
         }
 
         // Note: This can get called multiple times during HighContrast switch, do we care?
-        private async void _settings_ColorValuesChanged(UISettings sender, object args)
+        private async void Settings_ColorValuesChanged(UISettings sender, object args)
         {
             // Getting called off thread, so we need to dispatch to request value.
-            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
-			{
-				// TODO: This doesn't stop the multiple calls if we're in our faked 'White' HighContrast Mode below.
-				if (CurrentTheme != Application.Current.RequestedTheme ||
-					IsHighContrast != IsSystemHighContrast())
-				{
+            await _queue.EnqueueAsync(() =>
+            {
+                // TODO: This doesn't stop the multiple calls if we're in our faked 'White' HighContrast Mode below.
+                if (CurrentTheme != Application.Current.RequestedTheme ||
+                    IsHighContrast != _accessible.HighContrast)
+                {
 #if DEBUG
-					Debug.WriteLine("Color Values Changed");
+                    Debug.WriteLine("Color Values Changed");
 #endif
 
-					UpdateProperties();
-				}
-			});            
+                    UpdateProperties();
+                }
+            });
         }
 
-		private bool IsSystemHighContrast() =>
+        private bool IsSystemHighContrast() =>
             ApiInformation.IsPropertyPresent("Windows.UI.ViewManagement.HighContrast", "HighContrast")
-			&& _accessible.HighContrast;
+            && _accessible.HighContrast;
 
-		private void CoreWindow_Activated(Windows.UI.Core.CoreWindow sender, Windows.UI.Core.WindowActivatedEventArgs args)
+        private void CoreWindow_Activated(Windows.UI.Core.CoreWindow sender, Windows.UI.Core.WindowActivatedEventArgs args)
         {
             if (CurrentTheme != Application.Current.RequestedTheme ||
                 IsHighContrast != IsSystemHighContrast())
@@ -103,7 +120,7 @@ namespace Monaco.Helpers
         private void UpdateProperties()
         {
             // TODO: Not sure if HighContrastScheme names are localized?
-            if (IsSystemHighContrast() && _accessible.HighContrastScheme.IndexOf("white", StringComparison.OrdinalIgnoreCase) != -1)
+            if (IsSystemHighContrast() && _accessible.HighContrastScheme.Contains("white", StringComparison.OrdinalIgnoreCase))
             {
                 // If our HighContrastScheme is ON & a lighter one, then we should remain in 'Light' theme mode for Monaco Themes Perspective
                 IsHighContrast = false;

@@ -1,5 +1,4 @@
 ﻿using Newtonsoft.Json;
-using System;
 
 namespace Monaco.Helpers
 {
@@ -17,29 +16,23 @@ namespace Monaco.Helpers
     {
         public override bool CanConvert(Type t) => t == typeof(TextDecoration) || t == typeof(TextDecoration?);
 
-        public override object ReadJson(JsonReader reader, Type t, object existingValue, JsonSerializer serializer)
+        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
         {
             if (reader.TokenType == JsonToken.Null) return null;
             var value = serializer.Deserialize<string>(reader);
-            switch (value)
+            return value switch
             {
-                case "none":
-                    return TextDecoration.None;
-                case "underline":
-                    return TextDecoration.Underline;
-                case "overline":
-                    return TextDecoration.Overline;
-                case "line-through":
-                    return TextDecoration.LineThrough;
-                case "initial":
-                    return TextDecoration.Initial;
-                case "inherit":
-                    return TextDecoration.Inherit;
-            }
-            throw new Exception("Cannot unmarshal type TextDecoration");
+                "none" => TextDecoration.None,
+                "underline" => TextDecoration.Underline,
+                "overline" => TextDecoration.Overline,
+                "line-through" => TextDecoration.LineThrough,
+                "initial" => TextDecoration.Initial,
+                "inherit" => TextDecoration.Inherit,
+                _ => throw new Exception("Cannot unmarshal type TextDecoration"),
+            };
         }
 
-        public override void WriteJson(JsonWriter writer, object untypedValue, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
         {
             if (untypedValue == null)
             {
@@ -51,22 +44,22 @@ namespace Monaco.Helpers
             {
                 case TextDecoration.None:
                     serializer.Serialize(writer, "none");
-                    return ;
+                    return;
                 case TextDecoration.Underline:
                     serializer.Serialize(writer, "underline");
-                    return ;
+                    return;
                 case TextDecoration.Overline:
                     serializer.Serialize(writer, "overline");
-                    return ;
+                    return;
                 case TextDecoration.LineThrough:
                     serializer.Serialize(writer, "line-through");
-                    return ;
+                    return;
                 case TextDecoration.Initial:
                     serializer.Serialize(writer, "initial");
-                    return ;
+                    return;
                 case TextDecoration.Inherit:
                     serializer.Serialize(writer, "inherit");
-                    return ;
+                    return;
             }
             throw new Exception("Cannot marshal type TextDecoration");
         }

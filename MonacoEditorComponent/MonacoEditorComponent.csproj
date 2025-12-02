@@ -1,40 +1,32 @@
-﻿<Project Sdk="MSBuild.Sdk.Extras">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net7.0</TargetFrameworks>
-		<Title>MonacoEditorComponent</Title>
-		<NoWarn>$(NoWarn);Uno0001</NoWarn>
+		<TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+		<Title>Monaco Editor Component WASM</Title>
+		<NoWarn>$(NoWarn);Uno0001;CA1416;CS1998;CS0067</NoWarn>
 		<PackageId>Uno.Monaco.Editor</PackageId>
-		<LangVersion>8.0</LangVersion>
-		<!-- Ensures the .xr.xml files are generated in a proper layout folder -->
-		<GenerateLibraryLayout>true</GenerateLibraryLayout>
-		<NuspecProperties>version=$(PackageVersion);configuration=$(Configuration)</NuspecProperties>
 		<DebugSymbols>true</DebugSymbols>
 		<DebugType>portable</DebugType>
-
-		<IsWindows>$(TargetFramework.StartsWith('uap'))</IsWindows>
-		<NuspecFile>$(MSBuildThisFileDirectory)$(MSBuildProjectName).nuspec</NuspecFile>
+		<DefineConstants>$(DefineConstants);__WASM__</DefineConstants>
+    <GenerateLibraryLayout>true</GenerateLibraryLayout>
+		<MonoRuntimeDebuggerEnabled>true</MonoRuntimeDebuggerEnabled>
 		<Product>Uno.Monaco.Editor</Product>
-		<Description>Uno version of the MonacoEditor Component</Description>
+		<Description>A WASM wrapper around the web-based Monaco Editor. Designed for use with the Uno Platform</Description>
+    <Authors>Uno Platform</Authors>
+    <Copyright>Copyright (C) 2015-$([System.DateTime]::UtcNow.Year) Uno Platform inc. - all rights reserved</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>    
 		<RepositoryUrl>https://github.com/unoplatform/uno.monaco-editor-uwp</RepositoryUrl>
 		<PackageProjectUrl>https://github.com/unoplatform/uno.monaco-editor-uwp</PackageProjectUrl>
+    <PackageTags>wasm monaco editor controls</PackageTags>
 		<GeneratePackageOnBuild Condition="'$(Configuration)'=='Release'">true</GeneratePackageOnBuild>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(IsWindows)' == 'true'">
-		<OutputType>winmdobj</OutputType>
-		<AppDesignerFolder>Properties</AppDesignerFolder>
-		<RootNamespace>Monaco</RootNamespace>
-		<AssemblyName>MonacoEditorComponent</AssemblyName>
-		<DefaultLanguage>en-US</DefaultLanguage>
-		<TargetPlatformIdentifier>UAP</TargetPlatformIdentifier>
-		<TargetPlatformVersion Condition=" '$(TargetPlatformVersion)' == '' ">10.0.19041.0</TargetPlatformVersion>
-		<TargetPlatformMinVersion>10.0.16299.0</TargetPlatformMinVersion>
-		<MinimumVisualStudioVersion>14</MinimumVisualStudioVersion>
-		<FileAlignment>512</FileAlignment>
-		<AllowCrossPlatformRetargeting>false</AllowCrossPlatformRetargeting>
-		<DefineConstants>$(DefineConstants);NETFX_CORE;WINDOWS_UWP</DefineConstants>
-		<IncludeSymbols>True</IncludeSymbols>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<TypeScriptToolsVersion>Latest</TypeScriptToolsVersion>
+    <!-- pick the first TFM from TargetFrameworks -->
+    <IncludeContentInPack>false</IncludeContentInPack>    
+    <_PrimaryTfm>$([System.String]::Copy('$(TargetFrameworks)').Split(';')[0])</_PrimaryTfm>
+    <AllowedOutputExtensionsInPackageBuildOutputFolder>
+      $(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb
+    </AllowedOutputExtensionsInPackageBuildOutputFolder>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
@@ -46,39 +38,15 @@
 		<TypeScriptRemoveComments>true</TypeScriptRemoveComments>
 		<TypeScriptSourceMap>false</TypeScriptSourceMap>
 	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(TargetFramework)' == 'net7.0'">
-		<DefineConstants>$(DefineConstants);__WASM__</DefineConstants>
-		<MonoRuntimeDebuggerEnabled>true</MonoRuntimeDebuggerEnabled>
-	</PropertyGroup>
-
+		
 	<ItemGroup>
-		<PackageReference Include="Microsoft.TypeScript.MSBuild" Condition="'$(IsWindows)' == 'true'">
-			<Version>3.8.3</Version>
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-			<PrivateAssets>all</PrivateAssets>
-		</PackageReference>
-	</ItemGroup>
-	
-	<ItemGroup>
-		<PackageReference Include="Newtonsoft.Json">
-			<Version>12.0.3</Version>
-		</PackageReference>
-		<PackageReference Include="Nito.AsyncEx">
-			<Version>5.0.0</Version>
-		</PackageReference>
-		<PackageReference Include="Uno.WinUI" Version="5.0.19" />
-		<PackageReference Include="Uno.WinUI.Runtime.WebAssembly" Version="5.0.19" />
-		<PackageReference Include="Uno.Core.Extensions.Logging" Version="4.0.1" />
-		<PackageReference Include="Uno.Core.Extensions.Logging.Singleton" Version="4.0.1"  />
-	</ItemGroup>
-
-	<ItemGroup Condition="'$(TargetFramework)' == 'net7.0'">
-		<PackageReference Include="Microsoft.TypeScript.MSBuild" Version="3.9.7">
-			<PrivateAssets>all</PrivateAssets>
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		</PackageReference>
-
+		<PackageReference Include="Newtonsoft.Json" />
+		<PackageReference Include="Nito.AsyncEx" />
+		<PackageReference Include="Uno.CommunityToolkit.WinUI" />
+		<PackageReference Include="Uno.WinUI" />
+		<PackageReference Include="Uno.Core.Extensions.Logging" />
+		<PackageReference Include="Uno.Core.Extensions.Logging.Singleton" />
+		<PackageReference Include="Microsoft.TypeScript.MSBuild" PrivateAssets="all" />		
 	</ItemGroup>
 
 	<ItemGroup>
@@ -87,53 +55,19 @@
 			<SubType>Designer</SubType>
 		</Page>
 	</ItemGroup>
+
 	<ItemGroup>
-		<Compile Remove="**\*.uwp.*" />
-		<Compile Remove="**\*.wasm.*" />
-		<None Remove="monaco-editor\**\*.*" />
-		<TypeScriptCompile Remove="monaco-editor\**\*.*" />
-		<Content Include="CodeEditor\CodeEditor.html" />
-		<Content Include="ts-helpermethods\tsconfig.json" />
-		<Content Include="monaco-editor\*.*" />
+
+    <TypeScriptCompile Include="tsconfig.json" />
+		
+		<Content Include="monaco-editor\*.txt" />
+		<Content Include="monaco-editor\LICENSE" PackagePath="monaco-editor\LICENSE.txt" />
 		<Content Include="monaco-editor\min\**\*.*" />
-		<Content Include="ts-helpermethods\*.js">
-			<DependentUpon>%(Filename).ts</DependentUpon>
-		</Content>
-		<None Remove="ts-helpermethods\tsconfig.json" />
-		<None Remove="WasmScripts\uno-monaco-helpers.js" />
+		
 		<EmbeddedResource Include="Properties\MonacoEditorComponent.rd.xml" />
-	</ItemGroup>
-
-	<ItemGroup Condition="'$(TargetFramework)' == 'net7.0'">
-		<Content Remove="ts-helpermethods\tsconfig.json" />
-		<Content Include="ts-helpermethods-wasm\tsconfig.json" />
 		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.js" />
-		<EmbeddedResource Include="monaco-editor\min\vs\loader.js">
-			<LogicalName>MonacoEditorComponent.WasmScripts.monaco-loader.js</LogicalName>
-		</EmbeddedResource>
+    <EmbeddedResource Include="monaco-editor\min\vs\loader.js" />
+
 	</ItemGroup>
-
-
-	<ItemGroup Condition="'$(IsWindows)' == 'true'">
-		<PackageReference Include="Microsoft.NETCore.UniversalWindowsPlatform">
-			<Version>6.2.10</Version>
-		</PackageReference>
-	</ItemGroup>
-
-	<ItemGroup Condition="'$(TargetFramework)' == 'net7.0'">
-		<Compile Include="**\*.wasm.cs" />
-	</ItemGroup>
-
-	<ItemGroup Condition="'$(IsWindows)' == 'true'">
-		<Compile Include="**\*.uwp.cs" />
-		<None Include="**\*.wasm.cs" />
-	</ItemGroup>
-
-	<Target Name="RemoveWinMDPDB" AfterTargets="ExportWindowsMDFile">
-		<ItemGroup>
-			<!-- The PDB file for the Monaco.WinMD is not generated, and fails during packing -->
-			<WinMDExpArtifacts Remove="$(WinMDExpOutputPdb)" />
-		</ItemGroup>
-	</Target>
-
+  
 </Project>

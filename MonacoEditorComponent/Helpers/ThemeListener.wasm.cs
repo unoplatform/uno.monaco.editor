@@ -1,60 +1,40 @@
-﻿using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using Uno;
-using Uno.Foundation;
-using Uno.Foundation.Interop;
+﻿using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices.JavaScript;
 
 namespace Monaco.Helpers
 {
-	partial class ThemeListener : IJSObject
-	{
-		partial void PartialCtor()
-		{
-			Handle = JSObjectHandle.Create(this);
+    partial class ThemeListener
+    {
+        private static readonly ConditionalWeakTable<object, ThemeListener> _instances = [];
 
-			getCurrentThemeName(null);
-			getIsHighContrast(null);
-		}
-
-		public JSObjectHandle Handle { get; private set; }
-
-        [Preserve]
-        public void getCurrentThemeName(string returnId)
+        partial void PartialCtor()
         {
-            getJsonValue(returnId, CurrentThemeName);
+            _instances.Add(_owner, this);
         }
 
-        [Preserve]
-        public void getIsHighContrast(string returnId)
+        [JSExport]
+        public static string ManagedGetCurrentThemeName([JSMarshalAs<JSType.Any>] object managedOwner)
         {
-            getJsonValue(returnId, IsHighContrast);
+            if (_instances.TryGetValue(managedOwner, out var listener))
+            {
+                return listener.CurrentThemeName;
+            }
+            else
+            {
+                throw new InvalidOperationException($"ThemeListener not found for owner {managedOwner}");
+            }
         }
 
-        private void getJsonValue<T>(string returnId, T obj)
+        [JSExport]
+        public static bool ManagedGetIsHighContrast([JSMarshalAs<JSType.Any>] object managedOwner)
         {
-            if (Handle == null) return;
-
-            string returnJson = "";
-            if (obj != null)
+            if (_instances.TryGetValue(managedOwner, out var listener))
             {
-                returnJson = JsonConvert.SerializeObject(obj, new JsonSerializerSettings()
-                {
-                    NullValueHandling = NullValueHandling.Ignore
-                });
-               // System.Diagnostics.Debug.WriteLine($"Json Object - {returnJson}");
+                return listener.IsHighContrast;
             }
-            returnJson = ParentAccessor.Santize(returnJson);
-
-            try
+            else
             {
-                var callbackMethod = $"returnValueCallback('{returnId}','{returnJson}');";
-                var result = WebAssemblyRuntime.InvokeJS(callbackMethod);
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine($"Result Callback - error {e.Message}");
+                throw new InvalidOperationException($"ThemeListener not found for owner {managedOwner}");
             }
         }
     }

@@ -15,23 +15,20 @@ namespace Monaco.Editor
     {
         public override bool CanConvert(Type t) => t == typeof(ScrollbarBehavior) || t == typeof(ScrollbarBehavior?);
 
-        public override object ReadJson(JsonReader reader, Type t, object existingValue, JsonSerializer serializer)
+        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
         {
             if (reader.TokenType == JsonToken.Null) return null;
             var value = serializer.Deserialize<string>(reader);
-            switch (value)
+            return value switch
             {
-                case "auto":
-                    return ScrollbarBehavior.Auto;
-                case "hidden":
-                    return ScrollbarBehavior.Hidden;
-                case "visible":
-                    return ScrollbarBehavior.Visible;
-            }
-            throw new Exception("Cannot unmarshal type ScrollbarBehavior");
+                "auto" => ScrollbarBehavior.Auto,
+                "hidden" => ScrollbarBehavior.Hidden,
+                "visible" => ScrollbarBehavior.Visible,
+                _ => throw new Exception("Cannot unmarshal type ScrollbarBehavior"),
+            };
         }
 
-        public override void WriteJson(JsonWriter writer, object untypedValue, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
         {
             if (untypedValue == null)
             {

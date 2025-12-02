@@ -15,25 +15,21 @@ namespace Monaco.Editor
     {
         public override bool CanConvert(Type t) => t == typeof(AutoClosingBrackets) || t == typeof(AutoClosingBrackets?);
 
-        public override object ReadJson(JsonReader reader, Type t, object existingValue, JsonSerializer serializer)
+        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
         {
             if (reader.TokenType == JsonToken.Null) return null;
             var value = serializer.Deserialize<string>(reader);
-            switch (value)
+            return value switch
             {
-                case "always":
-                    return AutoClosingBrackets.Always;
-                case "beforeWhitespace":
-                    return AutoClosingBrackets.BeforeWhitespace;
-                case "languageDefined":
-                    return AutoClosingBrackets.LanguageDefined;
-                case "never":
-                    return AutoClosingBrackets.Never;
-            }
-            throw new Exception("Cannot unmarshal type AutoClosingBrackets");
+                "always" => AutoClosingBrackets.Always,
+                "beforeWhitespace" => AutoClosingBrackets.BeforeWhitespace,
+                "languageDefined" => AutoClosingBrackets.LanguageDefined,
+                "never" => AutoClosingBrackets.Never,
+                _ => throw new Exception("Cannot unmarshal type AutoClosingBrackets"),
+            };
         }
 
-        public override void WriteJson(JsonWriter writer, object untypedValue, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
         {
             if (untypedValue == null)
             {

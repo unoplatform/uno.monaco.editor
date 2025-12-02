@@ -24,19 +24,19 @@ namespace Monaco.Editor
 		 * Defaults to null (don't show in context menu).
 		 */
         [JsonProperty("contextMenuGroupId", NullValueHandling = NullValueHandling.Ignore)]
-        string ContextMenuGroupId { get; }
+        string? ContextMenuGroupId { get; }
 
         [JsonProperty("contextMenuOrder", NullValueHandling = NullValueHandling.Ignore)]
         float ContextMenuOrder { get; }
 
         [JsonProperty("id")]
-        string Id { get; }
+        string? Id { get; }
 
         /// <summary>
         /// <see cref="IContextKey"/>
         /// </summary>
         [JsonProperty("keybindingContext", NullValueHandling = NullValueHandling.Ignore)]
-        string KeybindingContext { get; }
+        string? KeybindingContext { get; }
 
         /// <summary>
         /// <see cref="KeyMod"/>, <see cref="KeyCode"/>, and <see cref="KeyMod.Chord(int, int)"/>
@@ -45,14 +45,14 @@ namespace Monaco.Editor
         int[] Keybindings { get; }
 
         [JsonProperty("label")]
-        string Label { get; }
+        string? Label { get; }
 
         /// <summary>
         /// <see cref="IContextKey"/>
         /// </summary>
         [JsonProperty("precondition", NullValueHandling = NullValueHandling.Ignore)]
-        string Precondition { get; }
+        string? Precondition { get; }
 
-        void Run(CodeEditor editor, object[] args);
+        void Run(CodeEditor editor, object[]? args);
     }
 }

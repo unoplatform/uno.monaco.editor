@@ -8,19 +8,19 @@ namespace Monaco.Editor
     public sealed class GoToLocationOptions
     {
         [JsonProperty("alternativeDeclarationCommand", NullValueHandling = NullValueHandling.Ignore)]
-        public string AlternativeDeclarationCommand { get; set; }
+        public string? AlternativeDeclarationCommand { get; set; }
 
         [JsonProperty("alternativeDefinitionCommand", NullValueHandling = NullValueHandling.Ignore)]
-        public string AlternativeDefinitionCommand { get; set; }
+        public string? AlternativeDefinitionCommand { get; set; }
 
         [JsonProperty("alternativeImplementationCommand", NullValueHandling = NullValueHandling.Ignore)]
-        public string AlternativeImplementationCommand { get; set; }
+        public string? AlternativeImplementationCommand { get; set; }
 
         [JsonProperty("alternativeReferenceCommand", NullValueHandling = NullValueHandling.Ignore)]
-        public string AlternativeReferenceCommand { get; set; }
+        public string? AlternativeReferenceCommand { get; set; }
 
         [JsonProperty("alternativeTypeDefinitionCommand", NullValueHandling = NullValueHandling.Ignore)]
-        public string AlternativeTypeDefinitionCommand { get; set; }
+        public string? AlternativeTypeDefinitionCommand { get; set; }
 
         [JsonProperty("multiple", NullValueHandling = NullValueHandling.Ignore)]
         public Multiple? Multiple { get; set; }

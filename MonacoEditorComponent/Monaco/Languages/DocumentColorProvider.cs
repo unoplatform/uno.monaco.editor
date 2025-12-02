@@ -1,6 +1,7 @@
 ﻿using Monaco.Editor;
 using Newtonsoft.Json;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Windows.Foundation;
 
 namespace Monaco.Languages
@@ -14,11 +15,11 @@ namespace Monaco.Languages
         /// <summary>
         /// Provide the string representations for a color.
         /// </summary>
-        IAsyncOperation<IEnumerable<ColorPresentation>> ProvideColorPresentationsAsync(IModel model, ColorInformation colorInfo);
+        Task<IEnumerable<ColorPresentation>> ProvideColorPresentationsAsync(IModel model, ColorInformation colorInfo);
 
         /// <summary>
         /// Provides the color ranges for a specific model.
         /// </summary>
-        IAsyncOperation<IEnumerable<ColorInformation>> ProvideDocumentColorsAsync(IModel model);
+        Task<IEnumerable<ColorInformation>> ProvideDocumentColorsAsync(IModel model);
     }
 }

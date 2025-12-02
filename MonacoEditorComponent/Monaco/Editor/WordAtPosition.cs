@@ -23,6 +23,6 @@ namespace Monaco.Editor
         /// The word.
         /// </summary>
         [JsonProperty("word")]
-        public string Word { get; private set; }
+        public string? Word { get; private set; }
     }
 }

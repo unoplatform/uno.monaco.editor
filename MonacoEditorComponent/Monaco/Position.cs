@@ -8,37 +8,33 @@ namespace Monaco
     /// <summary>
     /// A position in the editor.
     /// </summary>
-    public sealed class Position : IPosition
+    public sealed class Position(uint lineNumber, uint column) : IPosition
     {
         /// <summary>
         /// column (the first character in a line is between column 1 and column 2)
         /// </summary>
         [JsonProperty("column")]
-        public uint Column { get; private set; }
+        public uint Column { get; private set; } = column;
 
         /// <summary>
         /// line number (starts at 1)
         /// </summary>
         [JsonProperty("lineNumber")]
-        public uint LineNumber { get; private set; }
-
-        public Position(uint lineNumber, uint column)
-        {
-            Column = column;
-            LineNumber = lineNumber;
-        }
+        public uint LineNumber { get; private set; } = lineNumber;
 
         public Position Clone()
         {
             return new Position(LineNumber, Column);
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (obj is Position)
             {
-                var other = obj as Position;
-                return LineNumber == other.LineNumber && Column == other.Column;
+                if (obj is Position other)
+                {
+                    return LineNumber == other.LineNumber && Column == other.Column;
+                }
             }
 
             return base.Equals(obj);
@@ -74,9 +70,9 @@ namespace Monaco
 
         public int CompareTo(object obj)
         {
-            if (obj is IPosition)
+            if (obj is IPosition position)
             {
-                return CompareTo(Lift(obj as IPosition));
+                return CompareTo(Lift(position));
             }
 
             throw new NotImplementedException();

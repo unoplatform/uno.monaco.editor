@@ -14,7 +14,7 @@ namespace Monaco.Languages
         /// `undefined` if provider was not triggered by a character.
         /// </summary>
         [JsonProperty("triggerCharacter", NullValueHandling = NullValueHandling.Ignore)]
-        public string TriggerCharacter { get; set; }
+        public string? TriggerCharacter { get; set; }
 
         /// <summary>
         /// How the completion was triggered.

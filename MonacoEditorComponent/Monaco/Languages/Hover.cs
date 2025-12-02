@@ -1,7 +1,6 @@
 ﻿using Newtonsoft.Json;
 
 #if !NETSTANDARD2_0
-using System.Runtime.InteropServices.WindowsRuntime;
 #else
 using ReadOnlyArrayAttribute = Monaco.Helpers.Stubs.ReadOnlyArrayAttribute;
 #endif
@@ -12,13 +11,13 @@ namespace Monaco.Languages
     /// A hover represents additional information for a symbol or word. Hovers are
     /// rendered in a tooltip-like widget.
     /// </summary>
-    public sealed class Hover
+    public sealed class Hover(string[] contents, IRange range, bool isTrusted)
     {
         /// <summary>
         /// The contents of this hover.
         /// </summary>
         [JsonProperty("contents")]
-        public IMarkdownString[] Contents { get; set; }
+        public IMarkdownString[] Contents { get; set; } = contents.ToMarkdownString(isTrusted);
 
         /// <summary>
         /// The range to which this hover applies. When missing, the
@@ -26,14 +25,8 @@ namespace Monaco.Languages
         /// current position itself.
         /// </summary>
         [JsonProperty("range", NullValueHandling = NullValueHandling.Ignore)]
-        public IRange Range { get; set; }
+        public IRange Range { get; set; } = range;
 
         public Hover(string[] contents, IRange range) : this(contents, range, false) { }
-        
-        public Hover(string[] contents, IRange range, bool isTrusted)
-        {
-            Contents = contents.ToMarkdownString(isTrusted);
-            Range = range;
-        }
     }
 }

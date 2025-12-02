@@ -15,25 +15,21 @@ namespace Monaco.Editor
     {
         public override bool CanConvert(Type t) => t == typeof(WrappingIndent) || t == typeof(WrappingIndent?);
 
-        public override object ReadJson(JsonReader reader, Type t, object existingValue, JsonSerializer serializer)
+        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
         {
             if (reader.TokenType == JsonToken.Null) return null;
             var value = serializer.Deserialize<string>(reader);
-            switch (value)
+            return value switch
             {
-                case "deepIndent":
-                    return WrappingIndent.DeepIndent;
-                case "indent":
-                    return WrappingIndent.Indent;
-                case "none":
-                    return WrappingIndent.None;
-                case "same":
-                    return WrappingIndent.Same;
-            }
-            throw new Exception("Cannot unmarshal type WrappingIndent");
+                "deepIndent" => WrappingIndent.DeepIndent,
+                "indent" => WrappingIndent.Indent,
+                "none" => WrappingIndent.None,
+                "same" => WrappingIndent.Same,
+                _ => throw new Exception("Cannot unmarshal type WrappingIndent"),
+            };
         }
 
-        public override void WriteJson(JsonWriter writer, object untypedValue, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
         {
             if (untypedValue == null)
             {

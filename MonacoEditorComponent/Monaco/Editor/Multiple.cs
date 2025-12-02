@@ -10,23 +10,20 @@ namespace Monaco.Editor
     {
         public override bool CanConvert(Type t) => t == typeof(Multiple) || t == typeof(Multiple?);
 
-        public override object ReadJson(JsonReader reader, Type t, object existingValue, JsonSerializer serializer)
+        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
         {
             if (reader.TokenType == JsonToken.Null) return null;
             var value = serializer.Deserialize<string>(reader);
-            switch (value)
+            return value switch
             {
-                case "goto":
-                    return Multiple.Goto;
-                case "gotoAndPeek":
-                    return Multiple.GotoAndPeek;
-                case "peek":
-                    return Multiple.Peek;
-            }
-            throw new Exception("Cannot unmarshal type Multiple");
+                "goto" => Multiple.Goto,
+                "gotoAndPeek" => Multiple.GotoAndPeek,
+                "peek" => Multiple.Peek,
+                _ => throw new Exception("Cannot unmarshal type Multiple"),
+            };
         }
 
-        public override void WriteJson(JsonWriter writer, object untypedValue, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
         {
             if (untypedValue == null)
             {

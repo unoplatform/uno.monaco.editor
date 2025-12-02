@@ -8,21 +8,15 @@ namespace Monaco.Languages
     /// <summary>
     /// A color range is a range in a text model which represents a color.
     /// </summary>
-    public sealed class ColorInformation
+    public sealed class ColorInformation(Color color, IRange? range)
     {
         [JsonProperty("color")]
         [JsonConverter(typeof(ColorConverter))]
-        public Color Color { get; set; }
+        public Color Color { get; set; } = color;
 
         [JsonProperty("range")]
         [JsonConverter(typeof(InterfaceToClassConverter<IRange, Range>))]
-        public IRange Range { get; set; }
-
-        public ColorInformation(Color color, IRange range)
-        {
-            Color = color;
-            Range = range;
-        }
+        public IRange? Range { get; set; } = range;
     }
 
     /// <summary>
@@ -32,9 +26,9 @@ namespace Monaco.Languages
     {
         public override bool CanConvert(Type t) => t == typeof(Color) || t == typeof(Color?);
 
-        public override object ReadJson(JsonReader reader, Type t, object existingValue, JsonSerializer serializer)
+        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
         {
-            Color color = new Color();
+            Color color = new();
 
             if (reader.Read())
             {
@@ -43,16 +37,16 @@ namespace Monaco.Languages
                     switch (reader.Value)
                     {
                         case "alpha":
-                            color.A = (byte)(reader.ReadAsDouble() * 255);
+                            color.A = (byte)((reader.ReadAsDouble() ?? 0) * 255);
                             break;
                         case "red":
-                            color.R = (byte)(reader.ReadAsDouble() * 255);
+                            color.R = (byte)((reader.ReadAsDouble() ?? 0) * 255);
                             break;
                         case "green":
-                            color.G = (byte)(reader.ReadAsDouble() * 255);
+                            color.G = (byte)((reader.ReadAsDouble() ?? 0) * 255);
                             break;
                         case "blue":
-                            color.B = (byte)(reader.ReadAsDouble() * 255);
+                            color.B = (byte)((reader.ReadAsDouble() ?? 0) * 255);
                             break;
                     }
 
@@ -63,7 +57,7 @@ namespace Monaco.Languages
             return color;
         }
 
-        public override void WriteJson(JsonWriter writer, object untypedValue, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
         {
             if (untypedValue == null)
             {

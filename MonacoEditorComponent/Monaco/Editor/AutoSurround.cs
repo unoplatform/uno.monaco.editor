@@ -14,25 +14,21 @@ namespace Monaco.Editor
     {
         public override bool CanConvert(Type t) => t == typeof(AutoSurround) || t == typeof(AutoSurround?);
 
-        public override object ReadJson(JsonReader reader, Type t, object existingValue, JsonSerializer serializer)
+        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
         {
             if (reader.TokenType == JsonToken.Null) return null;
             var value = serializer.Deserialize<string>(reader);
-            switch (value)
+            return value switch
             {
-                case "brackets":
-                    return AutoSurround.Brackets;
-                case "languageDefined":
-                    return AutoSurround.LanguageDefined;
-                case "never":
-                    return AutoSurround.Never;
-                case "quotes":
-                    return AutoSurround.Quotes;
-            }
-            throw new Exception("Cannot unmarshal type AutoSurround");
+                "brackets" => AutoSurround.Brackets,
+                "languageDefined" => AutoSurround.LanguageDefined,
+                "never" => AutoSurround.Never,
+                "quotes" => AutoSurround.Quotes,
+                _ => throw new Exception("Cannot unmarshal type AutoSurround"),
+            };
         }
 
-        public override void WriteJson(JsonWriter writer, object untypedValue, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
         {
             if (untypedValue == null)
             {

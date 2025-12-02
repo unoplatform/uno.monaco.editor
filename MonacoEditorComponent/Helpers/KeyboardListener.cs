@@ -1,4 +1,8 @@
-﻿using System;
+﻿using Microsoft.UI.Dispatching;
+
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices.JavaScript;
+
 using Windows.Foundation.Metadata;
 
 namespace Monaco.Helpers
@@ -21,16 +25,21 @@ namespace Monaco.Helpers
     [AllowForWeb]
     public sealed partial class KeyboardListener
     {
-        private readonly WeakReference<CodeEditor> parent;
+        private static readonly ConditionalWeakTable<object, KeyboardListener> _instances = [];
+        private readonly WeakReference<ICodeEditorPresenter> parent;
+        private readonly DispatcherQueue _queue;
 
-        public KeyboardListener(CodeEditor parent) // TODO: Make Interface for event usage
+        public KeyboardListener(ICodeEditorPresenter parent, DispatcherQueue queue)
         {
-            this.parent = new WeakReference<CodeEditor>(parent);
+            this.parent = new WeakReference<ICodeEditorPresenter>(parent);
+            _queue = queue;
 
-            PartialCtor();
+            _instances.Add(parent, this);
+
+            PartialCtor(parent);
         }
 
-        partial void PartialCtor();
+        partial void PartialCtor(ICodeEditorPresenter parent);
 
         /// <summary>
         /// Called from JavaScript, returns if event was handled or not.
@@ -43,7 +52,7 @@ namespace Monaco.Helpers
         /// <returns></returns>
         public bool KeyDown(int keycode, bool ctrl, bool shift, bool alt, bool meta)
         {
-            if (parent.TryGetTarget(out CodeEditor editor))
+            if (parent.TryGetTarget(out var editor))
             {
                 return editor.TriggerKeyDown(new WebKeyEventArgs()
                 {
@@ -56,6 +65,19 @@ namespace Monaco.Helpers
             }
 
             return false;
+        }
+
+        [JSExport]
+        internal static bool NativeKeyDown([JSMarshalAs<JSType.Any>] object managedOwner, int keycode, bool ctrl, bool shift, bool alt, bool meta)
+        {
+            if (_instances.TryGetValue(managedOwner, out var listener))
+            {
+                return listener.KeyDown(keycode, ctrl, shift, alt, meta);
+            }
+            else
+            {
+                throw new InvalidOperationException($"KeyboardListener not found for owner {managedOwner}");
+            }
         }
     }
 }

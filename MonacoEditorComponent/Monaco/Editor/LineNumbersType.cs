@@ -10,25 +10,21 @@ namespace Monaco.Editor
     {
         public override bool CanConvert(Type t) => t == typeof(LineNumbersType) || t == typeof(LineNumbersType?);
 
-        public override object ReadJson(JsonReader reader, Type t, object existingValue, JsonSerializer serializer)
+        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
         {
             if (reader.TokenType == JsonToken.Null) return null;
             var value = serializer.Deserialize<string>(reader);
-            switch (value)
+            return value switch
             {
-                case "interval":
-                    return LineNumbersType.Interval;
-                case "off":
-                    return LineNumbersType.Off;
-                case "on":
-                    return LineNumbersType.On;
-                case "relative":
-                    return LineNumbersType.Relative;
-            }
-            throw new Exception("Cannot unmarshal type LineNumbersType");
+                "interval" => LineNumbersType.Interval,
+                "off" => LineNumbersType.Off,
+                "on" => LineNumbersType.On,
+                "relative" => LineNumbersType.Relative,
+                _ => throw new Exception("Cannot unmarshal type LineNumbersType"),
+            };
         }
 
-        public override void WriteJson(JsonWriter writer, object untypedValue, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
         {
             if (untypedValue == null)
             {

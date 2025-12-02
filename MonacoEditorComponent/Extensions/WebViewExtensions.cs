@@ -1,12 +1,8 @@
-﻿using Monaco.Helpers;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices.JavaScript;
+
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
-using System;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
-using Windows.Data.Json;
-using Microsoft.UI.Xaml.Controls;
 
 namespace Monaco.Extensions
 {
@@ -15,79 +11,43 @@ namespace Monaco.Extensions
         public static async Task RunScriptAsync(
             this ICodeEditorPresenter _view,
             string script,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
             await _view.RunScriptAsync<object>(script, member, file, line);
         }
 
-        public static async Task<T> RunScriptAsync<T>(
-            this ICodeEditorPresenter _view, 
-            string script, 
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+        public static async Task<T?> RunScriptAsync<T>(
+            this ICodeEditorPresenter _view,
+            string script,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
-            var start = "try {\n";
-            if (typeof(T) != typeof(object))
-            {
-                script = script.Trim(';');
-                 start += "return JSON.stringify(" + script + ");";
-            }
-            else
-            {
-                start += script;
-            }
-            var fullscript = start + 
-                "\n} catch (err) { return JSON.stringify({ wv_internal_error: true, message: err.message, description: err.description, number: err.number, stack: err.stack }); }";
+            var fullscript = script;
 
-            if (_view.Dispatcher.HasThreadAccess)
+            try
             {
-                try
-                {
-                    return await RunScriptHelperAsync<T>(_view, fullscript);
-                }
-                catch (Exception e)
-                {
-                    throw new JavaScriptExecutionException(member, file, line, script, e);
-                }
+                return await RunScriptHelperAsync<T>(_view, fullscript);
             }
-            else
+            catch (Exception e)
             {
-                return await _view.Dispatcher.RunTaskAsync(async () =>
-                {
-                    try
-                    {
-                        return await RunScriptHelperAsync<T>(_view, fullscript);
-                    }
-                    catch (Exception e)
-                    {
-                        throw new JavaScriptExecutionException(member, file, line, script, e);
-                    }
-                });
+                throw new JavaScriptExecutionException(member, file, line, script, e);
             }
         }
 
-        private static async Task<T> RunScriptHelperAsync<T>(ICodeEditorPresenter _view, string script)
-        {            
-            var returnstring = await _view.InvokeScriptAsync("eval", new string[] { script });
-
-            //if (JsonObject.TryParse(returnstring, out JsonObject result))
-            //{
-            //    if (result.ContainsKey("wv_internal_error") && result["wv_internal_error"].ValueType == JsonValueType.Boolean && result["wv_internal_error"].GetBoolean())
-            //    {
-            //        throw new JavaScriptInnerException(result["message"].GetString(), result["stack"].GetString());
-            //    }
-            //}
+        private static async Task<T?> RunScriptHelperAsync<T>(ICodeEditorPresenter _view, string script)
+        {
+            var returnstring = NativeMethods.InvokeJS(_view.ElementId, script);
 
             // TODO: Need to decode the error correctly
             if (returnstring.Contains("wv_internal_error"))
             {
-                throw new JavaScriptInnerException(returnstring,"");
+                throw new JavaScriptInnerException(returnstring, "");
             }
 
-            if (returnstring != null && returnstring != "null")
+            if (!string.IsNullOrEmpty(returnstring) && returnstring != "\"\"" && returnstring != "null")
             {
                 return JsonConvert.DeserializeObject<T>(returnstring);
             }
@@ -95,7 +55,7 @@ namespace Monaco.Extensions
             return default;
         }
 
-        private static readonly JsonSerializerSettings _settings = new JsonSerializerSettings()
+        private static readonly JsonSerializerSettings _settings = new()
         {
             NullValueHandling = NullValueHandling.Ignore,
             ContractResolver = new CamelCasePropertyNamesContractResolver()
@@ -106,54 +66,54 @@ namespace Monaco.Extensions
             string method,
             object arg,
             bool serialize = true,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
             await _view.InvokeScriptAsync<object>(method, arg, serialize, member, file, line);
         }
 
-        public static async Task InvokeScriptAsync(
+        public static async Task<object?> InvokeScriptAsync(
             this ICodeEditorPresenter _view,
             string method,
             object[] args,
             bool serialize = true,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
-            await _view.InvokeScriptAsync<object>(method, args, serialize, member, file, line);
+            return await _view.InvokeScriptAsync<object>(method, args, serialize, member, file, line);
         }
 
-        public static async Task<T> InvokeScriptAsync<T>(
+        public static async Task<T?> InvokeScriptAsync<T>(
             this ICodeEditorPresenter _view,
             string method,
             object arg,
             bool serialize = true,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
-            return await _view.InvokeScriptAsync<T>(method, new object[] { arg }, serialize, member, file, line);
+            return await _view.InvokeScriptAsync<T>(method, [arg], serialize, member, file, line);
         }
 
-        public static async Task<T> InvokeScriptAsync<T>(
+        public static async Task<T?> InvokeScriptAsync<T>(
             this ICodeEditorPresenter _view,
             string method,
-            object[] args,
+            object?[] args,
             bool serialize = true,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
-            string[] sanitizedargs;
+            string?[] sanitizedargs;
 
             try
             {
                 System.Diagnostics.Debug.WriteLine($"Begin invoke script (serialize - {serialize})");
                 if (serialize)
                 {
-                    sanitizedargs = args.Select(item =>
+                    sanitizedargs = [.. args.Select(item =>
                     {
                         if (item is int || item is double)
                         {
@@ -165,59 +125,53 @@ namespace Monaco.Extensions
                         }
                         else
                         {
-                        // TODO: Need JSON.parse?
-                        return JsonConvert.SerializeObject(item, _settings);
+                            // TODO: Need JSON.parse?
+                            return JsonConvert.SerializeObject(item, _settings);
                         }
-                    }).ToArray();
+                    })];
                 }
                 else
                 {
-                    sanitizedargs = args.Select(item => item.ToString()).ToArray();
+                    sanitizedargs = [.. args.Select(item => item?.ToString())];
                 }
 
-                var script = method + "(" + string.Join(",", sanitizedargs) + ");";
+                var script = method + "(element," + string.Join(",", sanitizedargs) + ");";
 
                 System.Diagnostics.Debug.WriteLine($"Script {script})");
 
 
                 return await RunScriptAsync<T>(_view, script, member, file, line);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error {ex.Message} {ex.StackTrace} {ex.InnerException?.Message})");
-                return default(T);
+                return default;
             }
         }
     }
 
-    internal sealed class JavaScriptExecutionException : Exception
+    internal sealed class JavaScriptExecutionException(string? member, string? filename, int line, string? script, Exception inner) : Exception("Error Executing JavaScript Code for " + member + "\nLine " + line + " of " + filename + "\n" + script + "\n", inner)
     {
-        public string Script { get; private set; }
+        public string? Script { get; private set; } = script;
 
-        public string Member { get; private set; }
+        public string? Member { get; private set; } = member;
 
-        public string FileName { get; private set; }
+        public string? FileName { get; private set; } = filename;
 
-        public int LineNumber { get; private set; }
-
-        public JavaScriptExecutionException(string member, string filename, int line, string script, Exception inner)
-            : base("Error Executing JavaScript Code for " + member + "\nLine " + line + " of " + filename + "\n" + script + "\n", inner)
-        {
-            Member = member;
-            FileName = filename;
-            LineNumber = line;
-            Script = script;
-        }
+        public int LineNumber { get; private set; } = line;
     }
 
-    internal sealed class JavaScriptInnerException : Exception
+    internal sealed class JavaScriptInnerException(string message, string stack) : Exception(message)
     {
-        public string JavaScriptStackTrace { get; private set; } // TODO Use Enum of JS error types https://www.w3schools.com/js/js_errors.asp
+        public string JavaScriptStackTrace { get; private set; } = stack;
+    }
 
-        public JavaScriptInnerException(string message, string stack)
-            : base(message)
-        {
-            JavaScriptStackTrace = stack;
-        }
+    internal partial class NativeMethods
+    {
+        [JSImport("globalThis.InvokeJS")]
+        public static partial string InvokeJS(string elementId, string script);
+
+        [JSImport("globalThis.languageIdFromExtension")]
+        public static partial string LanguageIdFromExtension(string? extension);
     }
 }

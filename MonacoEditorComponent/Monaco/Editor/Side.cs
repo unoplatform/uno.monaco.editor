@@ -15,21 +15,19 @@ namespace Monaco.Editor
     {
         public override bool CanConvert(Type t) => t == typeof(Side) || t == typeof(Side?);
 
-        public override object ReadJson(JsonReader reader, Type t, object existingValue, JsonSerializer serializer)
+        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
         {
             if (reader.TokenType == JsonToken.Null) return null;
             var value = serializer.Deserialize<string>(reader);
-            switch (value)
+            return value switch
             {
-                case "left":
-                    return Side.Left;
-                case "right":
-                    return Side.Right;
-            }
-            throw new Exception("Cannot unmarshal type Side");
+                "left" => Side.Left,
+                "right" => Side.Right,
+                _ => throw new Exception("Cannot unmarshal type Side"),
+            };
         }
 
-        public override void WriteJson(JsonWriter writer, object untypedValue, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
         {
             if (untypedValue == null)
             {

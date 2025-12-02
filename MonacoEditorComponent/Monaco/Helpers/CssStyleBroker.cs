@@ -1,6 +1,5 @@
 ﻿using Monaco.Editor;
-using System;
-using System.Collections.Generic;
+
 using System.Text;
 
 namespace Monaco.Helpers
@@ -13,18 +12,18 @@ namespace Monaco.Helpers
         private static uint Id = 0;
 
         // Track styles registered to this particular editor.
-        private static readonly Dictionary<uint, WeakReference<ICssStyle>> _registry = new Dictionary<uint, WeakReference<ICssStyle>>();
+        private static readonly Dictionary<uint, WeakReference<ICssStyle>> _registry = [];
 
-        private static readonly Dictionary<WeakReference<CodeEditor>, HashSet<uint>> _knownStyles = new Dictionary<WeakReference<CodeEditor>, HashSet<uint>>();
+        private static readonly Dictionary<WeakReference<CodeEditor>, HashSet<uint>> _knownStyles = [];
 
-        private static readonly Dictionary<WeakReference<CodeEditor>, bool> _isDirty = new Dictionary<WeakReference<CodeEditor>, bool>();
+        private static readonly Dictionary<WeakReference<CodeEditor>, bool> _isDirty = [];
 
-        private WeakReference<CodeEditor> _parent;
+        private readonly WeakReference<CodeEditor> _parent;
 
         public CssStyleBroker(CodeEditor codeEditor)
         {
             _parent = new WeakReference<CodeEditor>(codeEditor);
-            _knownStyles.Add(_parent, new HashSet<uint>());
+            _knownStyles.Add(_parent, []);
             _isDirty.Add(_parent, false);
         }
 
@@ -80,7 +79,7 @@ namespace Monaco.Helpers
         /// <returns></returns>
         public string GetStyles()
         {
-            StringBuilder rules = new StringBuilder(100);
+            StringBuilder rules = new(100);
             _knownStyles[_parent].RemoveWhere(id =>
             {
                 if (_registry[id].TryGetTarget(out var style))

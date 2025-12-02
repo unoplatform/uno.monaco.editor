@@ -16,21 +16,19 @@ namespace Monaco.Editor
     {
         public override bool CanConvert(Type t) => t == typeof(MultiCursorPaste) || t == typeof(MultiCursorPaste?);
 
-        public override object ReadJson(JsonReader reader, Type t, object existingValue, JsonSerializer serializer)
+        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
         {
             if (reader.TokenType == JsonToken.Null) return null;
             var value = serializer.Deserialize<string>(reader);
-            switch (value)
+            return value switch
             {
-                case "full":
-                    return MultiCursorPaste.Full;
-                case "spread":
-                    return MultiCursorPaste.Spread;
-            }
-            throw new Exception("Cannot unmarshal type MultiCursorPaste");
+                "full" => MultiCursorPaste.Full,
+                "spread" => MultiCursorPaste.Spread,
+                _ => throw new Exception("Cannot unmarshal type MultiCursorPaste"),
+            };
         }
 
-        public override void WriteJson(JsonWriter writer, object untypedValue, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
         {
             if (untypedValue == null)
             {

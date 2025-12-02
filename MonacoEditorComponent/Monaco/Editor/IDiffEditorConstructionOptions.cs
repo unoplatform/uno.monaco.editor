@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json;
 
-namespace Monaco.Monaco.Editor
+namespace Monaco.Editor
 {
     /// <summary>
     /// The options to create a diff editor.

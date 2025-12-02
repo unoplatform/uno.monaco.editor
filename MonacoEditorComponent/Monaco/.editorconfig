@@ -1,0 +1,9 @@
+﻿root = false
+
+[*.cs]
+
+# Naming rule violation: Missing prefix: 'I'
+dotnet_diagnostic.IDE1006.severity = none
+
+# Naming: identifiers should have the right prefix
+dotnet_diagnostic.CA1715.severity = none

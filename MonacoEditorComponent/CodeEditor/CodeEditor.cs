@@ -1,16 +1,16 @@
-﻿using Collections.Generic;
-using Monaco.Editor;
-using Monaco.Extensions;
-using Monaco.Helpers;
-using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
+
+using Collections.Generic;
+
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
-// The Templated Control item template is documented at https://go.microsoft.com/fwlink/?LinkId=234235
+using Monaco.Editor;
+using Monaco.Extensions;
+using Monaco.Helpers;
 
 namespace Monaco
 {
@@ -18,15 +18,18 @@ namespace Monaco
     /// UWP Windows Runtime Component wrapper for the Monaco CodeEditor
     /// https://microsoft.github.io/monaco-editor/
     /// </summary>
-    [TemplatePart(Name = "View", Type = typeof(ICodeEditorPresenter))]
+    [TemplatePart(Name = "RootBorder", Type = typeof(Border))]
     public sealed partial class CodeEditor : Control, INotifyPropertyChanged, IDisposable
     {
         private bool _initialized;
-        private ICodeEditorPresenter _view;
-        private ModelHelper _model;
-        private CssStyleBroker _cssBroker;
+        private DispatcherQueue? _queue;
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        private ICodeEditorPresenter? _view;
+
+        private ModelHelper? _model;
+        private CssStyleBroker? _cssBroker;
+
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         /// <summary>
         /// Template Property used during loading to prevent blank control visibility when it's still loading WebView.
@@ -37,83 +40,162 @@ namespace Monaco
             private set => SetValue(IsEditorLoadedProperty, value);
         }
 
-        public static DependencyProperty IsEditorLoadedProperty { get; } = DependencyProperty.Register(nameof(IsEditorLoaded), typeof(string), typeof(CodeEditor), new PropertyMetadata(false));
+        public static DependencyProperty IsEditorLoadedProperty { get; } = DependencyProperty.Register(
+            nameof(IsEditorLoaded),
+            typeof(string),
+            typeof(CodeEditor),
+            new PropertyMetadata(false, OnIsEditorLoadedChanged));
+
+        private static void OnIsEditorLoadedChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+
+        }
+
+        /// <summary>
+        /// Construct a new Stand Alone Code Editor, assumes being constructed on UI Thread.
+        /// </summary>
+        public CodeEditor() : this(null) { }
 
         /// <summary>
         /// Construct a new IStandAloneCodeEditor.
         /// </summary>
-        public CodeEditor()
+        /// <param name="queue"><see cref="DispatcherQueue"/> for the UI Thread, if none pass assumes the current thread is the UI thread.</param>
+        public CodeEditor(DispatcherQueue? queue)
         {
+            _queue = queue ?? DispatcherQueue.GetForCurrentThread();
+
             DefaultStyleKey = typeof(CodeEditor);
-
-            Options = new StandaloneEditorConstructionOptions
+            if (ReadLocalValue(OptionsProperty) == DependencyProperty.UnsetValue)
             {
-                AutomaticLayout = true
-            };
-            //if (Options != null)
-            //{
-                // Set Pass-Thru Properties
-                Options.GlyphMargin = HasGlyphMargin;
-
-                //// Register for changes
-                //Options.PropertyChanged += Options_PropertyChanged;
-            //}
+                Options = new StandaloneEditorConstructionOptions
+                {
+                    // Set Pass-Thru Properties
+                    GlyphMargin = HasGlyphMargin,
+                    Language = CodeLanguage,
+                    ReadOnly = ReadOnly,
+                    AutomaticLayout = true
+                };
+            }
 
             // Initialize this here so property changed event will fire and register collection changed event.
             Decorations = new ObservableVector<IModelDeltaDecoration>();
             Markers = new ObservableVector<IMarkerData>();
             //_model = new ModelHelper(this);
-            #pragma warning disable CS0618 // Type or member is obsolete
+#pragma warning disable CS0618 // Type or member is obsolete
             Languages = new LanguagesHelper(this);
-            #pragma warning restore CS0618 // Type or member is obsolete
+#pragma warning restore CS0618 // Type or member is obsolete
             _cssBroker = new CssStyleBroker(this);
 
-            base.Loaded += CodeEditor_Loaded;
+            Loaded += CodeEditor_Loaded;
+            SizeChanged += CodeEditor_SizeChanged;
             Unloaded += CodeEditor_Unloaded;
+
+            // <WebView
+            //     HorizontalAlignment="Stretch"
+            //     VerticalAlignment="Stretch"
+            //_view = new WebView(WebViewExecutionMode.SeparateProcess)
+            //{
+            //    Margin = Padding,
+            //    HorizontalAlignment = HorizontalAlignment.Stretch,
+            //    VerticalAlignment = VerticalAlignment.Stretch,
+            //    Visibility = IsEditorLoaded ? Visibility.Visible : Visibility.Collapsed
+            //};
+
+            //     Margin="{TemplateBinding Padding}"
+            RegisterPropertyChangedCallback(PaddingProperty, (s, e) =>
+            {
+                // _view.Margin = Padding;
+            });
         }
 
-        private async void Options_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        private async void Options_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (!(sender is StandaloneEditorConstructionOptions options)) return;
-            if (e.PropertyName == nameof(StandaloneEditorConstructionOptions.Language))
+            if (!_initialized || _view == null) return;
+
+            if (sender is not StandaloneEditorConstructionOptions options) return;
+
+            switch (e.PropertyName)
             {
-                await InvokeScriptAsync("updateLanguage", options.Language);
-                if (CodeLanguage != options.Language) CodeLanguage = options.Language;
+                case nameof(StandaloneEditorConstructionOptions.Language):
+                    if (options.Language is not null)
+                    {
+                        await InvokeScriptAsync("updateLanguage", options.Language);
+                        if (CodeLanguage != options.Language) CodeLanguage = options.Language;
+                    }
+                    break;
+                case nameof(StandaloneEditorConstructionOptions.GlyphMargin):
+                    if (HasGlyphMargin != options.GlyphMargin) options.GlyphMargin = HasGlyphMargin;
+                    break;
+                case nameof(StandaloneEditorConstructionOptions.ReadOnly):
+                    if (ReadOnly != options.ReadOnly) options.ReadOnly = ReadOnly;
+                    break;
             }
-            if (e.PropertyName == nameof(StandaloneEditorConstructionOptions.GlyphMargin))
-            {
-                if (HasGlyphMargin != options.GlyphMargin) options.GlyphMargin = HasGlyphMargin;
-            }
-            if (e.PropertyName == nameof(StandaloneEditorConstructionOptions.ReadOnly))
-            {
-                if (ReadOnly != options.ReadOnly) options.ReadOnly = ReadOnly;
-            }
-            await InvokeScriptAsync("updateMonacoOptions", options);
+            await InvokeScriptAsync("updateOptions", options);
         }
+
+        private void CodeEditor_SizeChanged(object sender, RoutedEventArgs e)
+        {
+            SizeChangedPartial();
+        }
+
+        partial void SizeChangedPartial();
 
         private void CodeEditor_Loaded(object sender, RoutedEventArgs e)
         {
+#if __WASM__
+            LoadedPartial();
+#endif
+
+            // Sync initial pass-thru properties
+            if (ReadLocalValue(HasGlyphMarginProperty) == DependencyProperty.UnsetValue && Options.GlyphMargin.HasValue)
+            {
+                HasGlyphMargin = Options.GlyphMargin.Value;
+            }
+
+            if (ReadLocalValue(CodeLanguageProperty) == DependencyProperty.UnsetValue && Options.Language != null)
+            {
+                CodeLanguage = Options.Language;
+            }
+
+            if (ReadLocalValue(ReadOnlyProperty) == DependencyProperty.UnsetValue && Options.ReadOnly.HasValue)
+            {
+                ReadOnly = Options.ReadOnly.Value;
+            }
+
+            Debug.WriteLine($"CodeEditor_Loaded [{_model}] [{_view}] ({GetHashCode():x8})");
+
             // Do this the 2nd time around.
             if (_model == null && _view != null)
             {
                 _model = new ModelHelper(this);
 
-                //Options.PropertyChanged += Options_PropertyChanged;
-                Debug.WriteLine("Connecting options property changed");
+                Options.PropertyChanged -= Options_PropertyChanged;
+                Options.PropertyChanged += Options_PropertyChanged;
 
+                Decorations.VectorChanged -= Decorations_VectorChanged;
                 Decorations.VectorChanged += Decorations_VectorChanged;
+                Markers.VectorChanged -= Markers_VectorChanged;
                 Markers.VectorChanged += Markers_VectorChanged;
 
                 Debug.WriteLine("Setting initialized - true");
                 _initialized = true;
 
-                Loading?.Invoke(this, new RoutedEventArgs());
-
+                Unloaded -= CodeEditor_Unloaded;
                 Unloaded += CodeEditor_Unloaded;
 
-                Loaded?.Invoke(this, new RoutedEventArgs());
+                if (Window.Current is not null)
+                {
+                    Window.Current.SizeChanged += OnWindowSizeChanged;
+                }
             }
         }
+
+        private void OnWindowSizeChanged(object sender, WindowSizeChangedEventArgs e)
+        {
+            SizeChangedPartial();
+        }
+
+        partial void LoadedPartial();
 
         private void CodeEditor_Unloaded(object sender, RoutedEventArgs e)
         {
@@ -139,7 +221,7 @@ namespace Monaco
                 _themeListener.ThemeChanged -= ThemeListener_ThemeChanged;
             }
             _themeListener = null;
-            
+
             UnregisterPropertyChangedCallback(RequestedThemeProperty, _themeToken);
             _keyboardListener = null;
             _model = null;
@@ -147,6 +229,8 @@ namespace Monaco
 
         protected override void OnApplyTemplate()
         {
+            Console.WriteLine("OnApplyTemplate()");
+
             if (_view != null)
             {
                 _view.NavigationStarting -= WebView_NavigationStarting;
@@ -161,48 +245,41 @@ namespace Monaco
 
             if (_view != null)
             {
+                _view.ParentCodeEditor = this;
+
+                _view.NavigationStarting -= WebView_NavigationStarting;
                 _view.NavigationStarting += WebView_NavigationStarting;
                 _view.NavigationCompleted += WebView_NavigationCompleted;
                 _view.NewWindowRequested += WebView_NewWindowRequested;
 
                 if (_view.IsLoaded)
                 {
-                    WebView_DOMContentLoaded();
+                    WebView_DOMContentLoaded(_view, new());
                 }
                 else
                 {
                     _view.Loaded += WebView_DOMContentLoaded;
                 }
 
-#if __WASM__
-                //_view.Source = new System.Uri("ms-appx-web:///Monaco/CodeEditor/CodeEditor.html");
-#else
-                _view.Source = new System.Uri("ms-appx-web:///Monaco/CodeEditor/CodeEditor.html");
-#endif
-                //_view.Source = new System.Uri("file:///MonacoCodeEditor.html", UriKind.RelativeOrAbsolute);
             }
 
             base.OnApplyTemplate();
-
-#if __WASM__
-            CodeEditor_Loaded(this, null);
-#endif
         }
 
         internal async Task SendScriptAsync(string script,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
             await SendScriptAsync<object>(script, member, file, line);
         }
 
-        internal async Task<T> SendScriptAsync<T>(string script,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+        internal async Task<T?> SendScriptAsync<T>(string script,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
-            if (_initialized)
+            if (_initialized && _view is not null)
             {
                 try
                 {
@@ -225,46 +302,46 @@ namespace Monaco
 
         internal async Task InvokeScriptAsync(
             string method,
-            object arg,
+            object? arg,
             bool serialize = true,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
-            await InvokeScriptAsync<object>(method, new object[] { arg }, serialize, member, file, line);
+            await InvokeScriptAsync<object>(method, [arg], serialize, member, file, line);
         }
 
         internal async Task InvokeScriptAsync(
             string method,
             object[] args,
             bool serialize = true,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
             await InvokeScriptAsync<object>(method, args, serialize, member, file, line);
         }
 
-        internal async Task<T> InvokeScriptAsync<T>(
+        internal async Task<T?> InvokeScriptAsync<T>(
             string method,
             object arg,
             bool serialize = true,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
-            return await InvokeScriptAsync<T>(method, new object[] { arg }, serialize, member, file, line);
+            return await InvokeScriptAsync<T>(method, [arg], serialize, member, file, line);
         }
 
-        internal async Task<T> InvokeScriptAsync<T>(
+        internal async Task<T?> InvokeScriptAsync<T>(
             string method,
-            object[] args,
+            object?[] args,
             bool serialize = true,
-            [CallerMemberName] string member = null,
-            [CallerFilePath] string file = null,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
         {
-            if (_initialized)
+            if (_initialized && _view is not null)
             {
                 try
                 {
@@ -290,7 +367,7 @@ namespace Monaco
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        public void Dispose()
+        public new void Dispose()
         {
             _cssBroker?.Dispose();
             _cssBroker = null;
@@ -301,7 +378,7 @@ namespace Monaco
 
     public static class UriHelper
     {
-        private static readonly string UNO_BOOTSTRAP_APP_BASE = global::System.Environment.GetEnvironmentVariable(nameof(UNO_BOOTSTRAP_APP_BASE));
+        private static readonly string UNO_BOOTSTRAP_APP_BASE = global::System.Environment.GetEnvironmentVariable(nameof(UNO_BOOTSTRAP_APP_BASE)) ?? "";
         private static readonly string UNO_BOOTSTRAP_WEBAPP_BASE_PATH = Environment.GetEnvironmentVariable(nameof(UNO_BOOTSTRAP_WEBAPP_BASE_PATH)) ?? "";
 
         public static string AbsoluteUriString(this System.Uri uri)
@@ -310,7 +387,7 @@ namespace Monaco
             if (uri.IsAbsoluteUri)
             {
 #if __WASM__
-                if (uri.Scheme == "file" || uri.Scheme== "ms-appx-web")
+                if (uri.Scheme == "file" || uri.Scheme == "ms-appx-web")
                 {
                     // Local files are assumed as coming from the remoter server
                     target = UNO_BOOTSTRAP_APP_BASE == null ? uri.PathAndQuery : UNO_BOOTSTRAP_WEBAPP_BASE_PATH + UNO_BOOTSTRAP_APP_BASE + uri.PathAndQuery;

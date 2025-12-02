@@ -1,0 +1,65 @@
+﻿using Monaco;
+using Monaco.Editor;
+using Monaco.Languages;
+using System;
+using System.Runtime.InteropServices.WindowsRuntime;
+using System.Threading;
+using System.Threading.Tasks;
+using Windows.Foundation;
+
+namespace MonacoEditorTestApp.Helpers
+{
+    public class LanguageProvider : CompletionItemProvider
+    {
+        public string[] TriggerCharacters => ["c"];
+
+        public async Task<CompletionList> ProvideCompletionItemsAsync(IModel document, Position position, CompletionContext context)
+        {
+            var textUntilPosition = await document.GetValueInRangeAsync(new Monaco.Range(1, 1, position.LineNumber, position.Column));
+
+            if (textUntilPosition is not null && textUntilPosition.EndsWith("boo"))
+            {
+                return new CompletionList()
+                {
+                    Suggestions =
+                    [
+                            new CompletionItem("booyah", "booyah", CompletionItemKind.Folder),
+                            new CompletionItem("booboo", "booboo", CompletionItemKind.File),
+                        ]
+                };
+            }
+            else if (context.TriggerKind == CompletionTriggerKind.TriggerCharacter)
+            {
+                return new CompletionList()
+                {
+                    Suggestions =
+                    [
+                            new CompletionItem("class", "class", CompletionItemKind.Keyword),
+                            new CompletionItem("cookie", "cookie", CompletionItemKind.Reference),
+                        ]
+                };
+            }
+
+            return new CompletionList()
+            {
+                Suggestions =
+                [
+                        new CompletionItem("foreach", "foreach (var ${2:element} in ${1:array}) {\n\t$0\n}", CompletionItemKind.Snippet)
+                        {
+                            InsertTextRules = CompletionItemInsertTextRule.InsertAsSnippet
+                        }
+                    ]
+            };
+        }
+
+        public async Task<CompletionItem> ResolveCompletionItemAsync(IModel model, Position position, CompletionItem item)
+        {
+            return item;
+        }
+
+        public Task<CompletionItem> ResolveCompletionItemAsync(IModel model, CompletionItem item)
+        {
+            throw new NotImplementedException();
+        }
+    }
+}

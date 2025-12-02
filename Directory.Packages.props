@@ -1,0 +1,18 @@
+<Project ToolsVersion="15.0">
+  <!--
+    To update the version of Uno, you should instead update the Sdk version in the global.json file.
+
+    See https://aka.platform.uno/using-uno-sdk for more information.
+    See https://aka.platform.uno/using-uno-sdk#implicit-packages for more information regarding the Implicit Packages.
+  -->
+  <ItemGroup>
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageVersion Include="Nito.AsyncEx" Version="5.1.2" />
+    <PackageVersion Include="Uno.CommunityToolkit.WinUI" Version="7.1.204" />
+    <PackageVersion Include="Uno.WinUI" Version="6.4.185" />
+    <PackageVersion Include="Uno.Core.Extensions.Logging" Version="4.1.1" />
+    <PackageVersion Include="Uno.Core.Extensions.Logging.Singleton" Version="4.1.1" />
+    <PackageVersion Include="Microsoft.TypeScript.MSBuild" Version="5.9.3" />
+    <GlobalPackageReference Include="Nerdbank.GitVersioning" Version="3.8.118"/>
+  </ItemGroup>
+</Project>

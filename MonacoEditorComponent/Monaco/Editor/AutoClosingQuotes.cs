@@ -15,25 +15,21 @@ namespace Monaco.Editor
     {
         public override bool CanConvert(Type t) => t == typeof(AutoClosingQuotes) || t == typeof(AutoClosingQuotes?);
 
-        public override object ReadJson(JsonReader reader, Type t, object existingValue, JsonSerializer serializer)
+        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
         {
             if (reader.TokenType == JsonToken.Null) return null;
             var value = serializer.Deserialize<string>(reader);
-            switch (value)
+            return value switch
             {
-                case "always":
-                    return AutoClosingQuotes.Always;
-                case "beforeWhitespace":
-                    return AutoClosingQuotes.BeforeWhitespace;
-                case "languageDefined":
-                    return AutoClosingQuotes.LanguageDefined;
-                case "never":
-                    return AutoClosingQuotes.Never;
-            }
-            throw new Exception("Cannot unmarshal type AutoClosingQuotes");
+                "always" => AutoClosingQuotes.Always,
+                "beforeWhitespace" => AutoClosingQuotes.BeforeWhitespace,
+                "languageDefined" => AutoClosingQuotes.LanguageDefined,
+                "never" => AutoClosingQuotes.Never,
+                _ => throw new Exception("Cannot unmarshal type AutoClosingQuotes"),
+            };
         }
 
-        public override void WriteJson(JsonWriter writer, object untypedValue, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
         {
             if (untypedValue == null)
             {
@@ -59,6 +55,6 @@ namespace Monaco.Editor
             throw new Exception("Cannot marshal type AutoClosingQuotes");
         }
 
-        public static readonly AutoClosingQuotesConverter Singleton = new AutoClosingQuotesConverter();
+        public static readonly AutoClosingQuotesConverter Singleton = new();
     }
 }
