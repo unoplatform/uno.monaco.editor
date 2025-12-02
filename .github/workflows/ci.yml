@@ -20,6 +20,15 @@ env:
   NUGET_XMLDOC_MODE: skip
   ARTIFACTS_DIR: ${{ github.workspace }}/artifacts
 
+# Required secrets for signing and publishing jobs:
+# - SIGN_AZURE_CLIENT_ID: Azure client ID for code signing
+# - SIGN_AZURE_TENANT_ID: Azure tenant ID for code signing
+# - SIGN_AZURE_SUBSCRIPTION_ID: Azure subscription ID for code signing
+# - SIGN_KEY_VAULT_URL: Azure Key Vault URL for code signing
+# - SIGN_KEY_VAULT_CERTIFICATE_ID: Key Vault certificate ID for code signing
+# - UNO_NUGET_FEED_API_KEY: API key for Uno NuGet feed publishing
+# - NUGET_ORG_API_KEY: API key for NuGet.org publishing
+
 jobs:
   build:
     name: Build
@@ -80,7 +89,7 @@ jobs:
     name: Sign
     runs-on: windows-latest
     needs: build
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/'))
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/uno' || startsWith(github.ref, 'refs/heads/release/'))
     environment: PackageSign
     permissions:
       contents: read
