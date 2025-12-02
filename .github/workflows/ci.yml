@@ -1,0 +1,192 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - release/*/*
+  pull_request:
+    branches:
+      - main
+      - release/*/*
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_NOLOGO: 1
+  NUGET_XMLDOC_MODE: skip
+  ARTIFACTS_DIR: artifacts
+
+# Required secrets:
+#   SIGN_AZURE_CLIENT_ID
+#   SIGN_AZURE_TENANT_ID
+#   SIGN_AZURE_SUBSCRIPTION_ID
+#   SIGN_KEY_VAULT_URL
+#   SIGN_KEY_VAULT_CERTIFICATE_ID
+#   UNO_NUGET_FEED_API_KEY
+#   NUGET_ORG_API_KEY
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version (NBGV)
+        id: nbgv
+        uses: dotnet/nbgv@f088059084cb5d872e9d1a994433ca6440c2bf72 # v0.4.2
+        with:
+          toolVersion: 3.8.118
+          setAllVars: true
+
+      - name: Export informative version
+        shell: pwsh
+        run: |
+          $buildingRef = "${{ github.ref }}"
+          $informationalVersion = "${{ steps.nbgv.outputs.SemVer2 }}+${{ steps.nbgv.outputs.GitCommitId }}-$buildingRef" -replace 'refs/heads/','' -replace '/','-'
+          "NBGV_AssemblyInformationalVersion=$informationalVersion" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install workloads
+        run: dotnet workload install wasm-tools wasm-tools-net9
+
+      - name: Prepare artifacts directory
+        run: |
+          rm -rf "$ARTIFACTS_DIR"
+          mkdir -p "$ARTIFACTS_DIR/log"
+
+      - name: Build solution
+        run: dotnet build MonacoEditorComponent.slnx -c Release -p:ArtifactsPath="$ARTIFACTS_DIR" /bl:"$ARTIFACTS_DIR/log/build.binlog"
+
+      - name: Upload packages
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: NuGet
+          path: artifacts/package/release
+          if-no-files-found: warn
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs
+          path: artifacts/log
+          if-no-files-found: warn
+
+  sign:
+    name: Sign
+    runs-on: windows-latest
+    needs: build
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/'))
+    environment: PackageSign
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: NuGet
+          path: artifacts
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Install Sign CLI tool
+        run: dotnet tool install --tool-path . sign --version 0.9.1-beta.25278.1
+
+      - name: Az CLI login
+        uses: azure/login@v2
+        with:
+          allow-no-subscriptions: true
+          client-id: ${{ secrets.SIGN_AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.SIGN_AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.SIGN_AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign artifacts
+        shell: pwsh
+        run: >-
+          ./sign code azure-key-vault artifacts/**/*.nupkg --publisher-name "uno.monaco-editor-uwp"
+          --description "Uno Monaco Editor UWP"
+          --description-url "https://github.com/${{ github.repository }}"
+          --azure-key-vault-managed-identity true
+          --azure-key-vault-url "${{ secrets.SIGN_KEY_VAULT_URL }}"
+          --azure-key-vault-certificate "${{ secrets.SIGN_KEY_VAULT_CERTIFICATE_ID }}"
+          --verbosity information
+
+      - name: Upload signed packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: NuGet-Signed
+          path: artifacts
+
+  publish_dev:
+    name: Publish Dev
+    runs-on: ubuntu-latest
+    needs: sign
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Uno feed publish
+        uses: ./.github/actions/nuget-uno-publish
+        with:
+          token: ${{ secrets.UNO_NUGET_FEED_API_KEY }}
+
+      - name: nuget.org publish
+        uses: ./.github/actions/nuget-org-publish
+        with:
+          token: ${{ secrets.NUGET_ORG_API_KEY }}
+
+  publish_release_uno:
+    name: Publish Internal Feed
+    runs-on: ubuntu-latest
+    environment: Stable
+    needs: sign
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Uno feed publish
+        uses: ./.github/actions/nuget-uno-publish
+        with:
+          token: ${{ secrets.UNO_NUGET_FEED_API_KEY }}
+
+  publish_release_nuget_org:
+    name: Publish Production
+    runs-on: ubuntu-latest
+    environment: Stable
+    needs: publish_release_uno
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: nuget.org publish
+        uses: ./.github/actions/nuget-org-publish
+        with:
+          token: ${{ secrets.NUGET_ORG_API_KEY }}
+
+      - name: Tag Release
+        uses: ./.github/actions/tag-release
