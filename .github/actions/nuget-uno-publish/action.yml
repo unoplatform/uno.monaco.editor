@@ -24,7 +24,6 @@ runs:
     shell: pwsh
     env:
       FEED_ENDPOINT: https://pkgs.dev.azure.com/uno-platform/1dd81cbd-cb35-41de-a570-b0df3571a196/_packaging/unoplatformdev/nuget/v3/index.json
-      VSS_NUGET_EXTERNAL_FEED_ENDPOINTS: >-
-        {"endpointCredentials":[{"endpoint":"https://pkgs.dev.azure.com/uno-platform/1dd81cbd-cb35-41de-a570-b0df3571a196/_packaging/unoplatformdev/nuget/v3/index.json","username":"az","password":"${{ inputs.token }}"}]}
+      NUGET_AUTH_TOKEN: ${{ inputs.token }}
     run: |
-        dotnet nuget push artifacts/*.nupkg --source $env:FEED_ENDPOINT --api-key az --skip-duplicate
+        dotnet nuget push artifacts/*.nupkg --source $env:FEED_ENDPOINT --api-key AzureDevOps --skip-duplicate
