@@ -24,14 +24,6 @@ namespace Monaco
         {
             Debug.WriteLine("CodeEditorPresenter()");
             Content = _element = BrowserHtmlElement.CreateHtmlElement("monaco-" + this.GetHashCode(), "div");
-
-            LayoutUpdated += (s, e) =>
-            {
-                if (ParentCodeEditor is not null && ParentCodeEditor.IsEditorLoaded)
-                {
-                    NativeMethods.RefreshLayout(_element.ElementId);
-                }
-            };
         }
 
         public string ElementId => _element.ElementId;
@@ -115,8 +107,6 @@ namespace Monaco
 
                 Debug.WriteLine($"InitializeMonaco({this.GetHashCode():X8})");
                 await NativeMethods.InitializeMonaco(this, _element.ElementId, $"{UNO_BOOTSTRAP_WEBAPP_BASE_PATH}{UNO_BOOTSTRAP_APP_BASE}");
-
-                NativeMethods.RefreshLayout(_element.ElementId);
             }
             catch (Exception e)
             {
@@ -134,9 +124,6 @@ namespace Monaco
 
             [JSImport("globalThis.createMonacoEditor")]
             public static partial Task InitializeMonaco([JSMarshalAs<JSType.Any>] object managedOwner, string elementId, string baseUri);
-
-            [JSImport("globalThis.refreshLayout")]
-            public static partial void RefreshLayout(string elementId);
         }
     }
 }
