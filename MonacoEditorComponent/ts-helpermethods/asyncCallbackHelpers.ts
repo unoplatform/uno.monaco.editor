@@ -8,6 +8,7 @@ const initializeMonacoEditor = (managedOwner: any, element: any) => {
         var opt = {}
     };
 
+    console.log("ramez initializeMonacoEditor")
     //console.debug("Getting Host container");
     //console.debug("Creating Editor");
     const editor = monaco.editor.create(element, opt);
@@ -63,13 +64,11 @@ const initializeMonacoEditor = (managedOwner: any, element: any) => {
   //  console.debug("Changing theme");
     changeTheme(element, theme, getThemeIsHighContrast(element));
 
-    // Update Monaco Size when we receive a window resize event
-//    console.debug("Listen for resize events on the window and resize the editor");
-    window.addEventListener("resize", () => {
-        {
-            editor.layout();
-        }
+    // Listen for parent element size changes
+    const resizeObserver = new ResizeObserver(() => {
+        editor.layout();
     });
+    resizeObserver.observe(element);
 
     // Disable WebView Scrollbar so Monaco Scrollbar can do heavy lifting
     document.body.style.overflow = 'hidden';
