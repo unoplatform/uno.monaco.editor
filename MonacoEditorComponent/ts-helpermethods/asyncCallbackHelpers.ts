@@ -8,7 +8,6 @@ const initializeMonacoEditor = (managedOwner: any, element: any) => {
         var opt = {}
     };
 
-    console.log("ramez initializeMonacoEditor")
     //console.debug("Getting Host container");
     //console.debug("Creating Editor");
     const editor = monaco.editor.create(element, opt);
