@@ -51,6 +51,9 @@ TestResult.xml
 [Rr]eleasePS/
 dlldata.c
 
+.DS_Store
+Thumbs.db
+
 # DNX
 project.lock.json
 project.fragment.lock.json
