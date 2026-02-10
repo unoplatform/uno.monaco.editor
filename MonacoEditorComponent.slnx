@@ -18,5 +18,5 @@
     <File Path="ThirdPartyNotices.txt" />
   </Folder>
   <Project Path="MonacoEditorComponent/MonacoEditorComponent.csproj" />
-  <Project Path="MonacoEditorTestApp.Wasm/MonacoEditorTestApp.csproj" />
+  <Project Path="MonacoEditorTestApp/MonacoEditorTestApp.csproj" />
 </Solution>

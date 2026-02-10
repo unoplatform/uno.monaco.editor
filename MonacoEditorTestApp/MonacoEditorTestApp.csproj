@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Uno.Sdk">
 	<PropertyGroup>
-		<TargetFrameworks>net10.0-browserwasm</TargetFrameworks>
+		<TargetFrameworks>net10.0-browserwasm;net10.0-desktop</TargetFrameworks>
 
 		<OutputType>Exe</OutputType>
 		<UnoSingleProject>true</UnoSingleProject>
@@ -48,6 +48,7 @@
 
 	<ItemGroup>
 	  <Folder Include="bin\Debug\" />
+	  <Folder Include="Platforms/Desktop/" />
 	</ItemGroup>
 
 	<Target Name="AdjustStrip" BeforeTargets="_WasmCommonPrepareForWasmBuildNative">
