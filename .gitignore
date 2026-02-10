@@ -274,6 +274,5 @@ paket-files/
 __pycache__/
 *.pyc
 
-.flow/
-scripts/ralph/
-CLAUDE.md
+!.flow/bin/
+scripts/ralph/run/
