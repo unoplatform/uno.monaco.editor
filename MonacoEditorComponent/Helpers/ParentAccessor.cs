@@ -260,17 +260,10 @@ namespace Monaco.Helpers
 
                     try
                     {
-                        object? value = newValue;
-
-                        // Desanitize only on WASM -- desktop values arrive as clean JSON
-                        // via JSON-RPC and do not use the sanitize/desanitize encoding.
-                        if (OperatingSystem.IsBrowser() && value is string valueAsString)
-                        {
-                            value = BridgeEncoding.Desanitize(valueAsString);
-                        }
-
-                        // Use desanitized value, not the original newValue
-                        propinfo?.SetValue(tobj, value);
+                        // Desanitization is handled at the JSExport boundary
+                        // (ManagedSetValue in ParentAccessor.wasm.cs). Do not
+                        // desanitize here -- callers pass already-decoded values.
+                        propinfo?.SetValue(tobj, newValue);
                     }
                     finally
                     {
