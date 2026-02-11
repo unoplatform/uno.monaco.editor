@@ -84,3 +84,9 @@ When converting float channel values (0-1) to byte (0-255), always clamp and rou
 
 ## 2026-02-11 manual [pitfall]
 When replacing 'using Newtonsoft.Json' with 'using System.Text.Json.Serialization', [JsonIgnore] silently changes namespace - Newtonsoft no longer recognizes it. Add explicit [Newtonsoft.Json.JsonIgnore] on any property that must be ignored by both serializers during dual-stack period.
+
+## 2026-02-11 manual [pitfall]
+When building runtime type registries (Dictionary<string, T>) that are written via registration APIs and read during request processing, use ConcurrentDictionary to prevent data races between concurrent registration and lookup.
+
+## 2026-02-11 manual [pitfall]
+Catch-all exception handlers in interop/bridge code should exclude STJ metadata exceptions (InvalidOperationException, NotSupportedException) so AOT registration failures surface immediately instead of being silently swallowed.
