@@ -21,8 +21,7 @@ import {
     desanitize,
     stringifyForMarshalling,
     callParentEventAsync,
-    callParentActionWithParameters,
-    initializeMonacoEditor
+    callParentActionWithParameters
 } from './asyncCallbackHelpers';
 
 import {
