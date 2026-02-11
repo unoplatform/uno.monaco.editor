@@ -123,6 +123,12 @@ namespace Monaco
             // signal for a more precise Loaded transition. Until then, both WASM and
             // desktop use this handler as the lifecycle trigger.
 
+            // Enable script execution before init-time calls. SendScriptAsync and
+            // InvokeScriptAsync are gated by _initialized, so we must set it before
+            // applying initial properties. If any script fails, InternalException
+            // is surfaced by the existing try/catch in those helpers.
+            _initialized = true;
+
             // Make sure inner editor is focused
             await SendScriptAsync("EditorContext.getEditorForElement(element).editor.focus();");
 
@@ -137,7 +143,6 @@ namespace Monaco
             await ApplyInitialPropertyValues();
 
             // Use lifecycle state machine for exactly-once semantics
-            _initialized = true;
             TransitionLifecycle(EditorLifecycleState.Loaded);
         }
 
@@ -287,6 +292,11 @@ namespace Monaco
         {
             _view = _view ?? throw new InvalidOperationException("The view not set");
 
+            // Enable script execution before init-time calls. SendScriptAsync and
+            // InvokeScriptAsync are gated by _initialized, so we must set it before
+            // applying initial properties.
+            _initialized = true;
+
             // Make sure inner editor is focused
             await SendScriptAsync("EditorContext.getEditorForElement(element).editor.focus();");
 
@@ -295,9 +305,6 @@ namespace Monaco
             // Apply all current property values in the correct order
             // This ensures properties set before IsEditorLoaded=true take effect
             await ApplyInitialPropertyValues();
-
-            // Now mark as initialized
-            _initialized = true;
 
             // If we're supposed to have focus, make sure we try and refocus on our now loaded webview.
 #pragma warning disable CS0618 // Type or member is obsolete
