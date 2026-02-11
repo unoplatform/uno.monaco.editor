@@ -96,10 +96,17 @@ namespace Monaco
             InitialiseWebObjects();
         }
 
+        private bool _webObjectsInitialized;
+
         private void InitialiseWebObjects()
         {
             try
             {
+                if (_webObjectsInitialized)
+                {
+                    return;
+                }
+
                 _queue = _queue ?? throw new InvalidOperationException("DispatcherQueue not set");
 
                 if (_view == null)
@@ -118,6 +125,7 @@ namespace Monaco
                 _keyboardListener = new KeyboardListener(_view, _queue);
                 _debugLogger = new DebugLogger(_view);
 
+                _webObjectsInitialized = true;
                 Debug.WriteLine($"InitialiseWebObjects - Completed");
             }
             catch (Exception ex)
@@ -220,10 +228,13 @@ namespace Monaco
                     tstr = theme.ToString();
                 }
 
-                _queue!.TryEnqueue(DispatcherQueuePriority.Normal, async () =>
+                if (!_queue!.TryEnqueue(DispatcherQueuePriority.Normal, async () =>
                 {
                     await InvokeScriptAsync("changeTheme", [tstr ?? "", listener.IsHighContrast.ToString()]);
-                });
+                }))
+                {
+                    Debug.WriteLine("Failed to enqueue theme change — dispatcher queue unavailable");
+                }
             }
         }
 
@@ -231,10 +242,13 @@ namespace Monaco
         {
             if (RequestedTheme == ElementTheme.Default)
             {
-                _queue!.TryEnqueue(DispatcherQueuePriority.Normal, async () =>
+                if (!_queue!.TryEnqueue(DispatcherQueuePriority.Normal, async () =>
                 {
                     await InvokeScriptAsync("changeTheme", args: [sender.CurrentTheme.ToString(), sender.IsHighContrast.ToString()]);
-                });
+                }))
+                {
+                    Debug.WriteLine("Failed to enqueue theme change — dispatcher queue unavailable");
+                }
             }
         }
 

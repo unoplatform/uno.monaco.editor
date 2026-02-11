@@ -100,7 +100,10 @@ namespace Monaco
                 NativeMethods.SetSrc(_element.ElementId, target);
 
                 //NavigationStarting?.Invoke(this, new WebViewNavigationStartingEventArgs());
-                DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => NavigationStarting?.Invoke(this, null));
+                if (!DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => NavigationStarting?.Invoke(this, null)))
+                {
+                    Debug.WriteLine("Failed to enqueue NavigationStarting — dispatcher queue unavailable");
+                }
             }
         }
 

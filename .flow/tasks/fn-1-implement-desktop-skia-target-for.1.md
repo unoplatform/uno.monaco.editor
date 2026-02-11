@@ -33,3 +33,10 @@ Consolidate the library to single `net10.0` TFM, replace all preprocessor-based 
 - [ ] `global.json` has `"test": { "runner": "Microsoft.Testing.Platform" }`
 - [ ] `dotnet build MonacoEditorComponent.slnx` succeeds
 - [ ] MonacoEditorTestApp builds for both `net10.0-browserwasm` and `net10.0-desktop`
+
+## Done summary
+Consolidated library TFM from net9.0;net10.0 to single net10.0, replaced all #if __WASM__ preprocessor directives with OperatingSystem.IsBrowser() runtime checks, migrated CoreDispatcher to DispatcherQueue throughout, fixed IsEditorLoadedProperty DP type from string to bool, added RenderingBackend enum and read-only dependency property, and added MTP2 test runner config to global.json.
+## Evidence
+- Commits: ad1b504, 3e93b57
+- Tests: dotnet build MonacoEditorComponent.slnx --no-restore, dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm, dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-desktop
+- PRs:
