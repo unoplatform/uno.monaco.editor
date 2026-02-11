@@ -73,3 +73,9 @@ If automated Playwright tests pass but manual testing reveals edge cases, the Pl
 - [ ] Failure artifacts stored in `test-artifacts/` (unified with Task 8)
 - [ ] Performance acceptable (10K+ line file smoke test)
 - [ ] Bug fixes (if any) are root-cause-only — no refactoring or unrelated changes
+
+## Done summary
+
+
+## Evidence
+
