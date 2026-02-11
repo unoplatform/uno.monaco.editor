@@ -13,20 +13,29 @@ Update PR #38 title and body to reflect the full scope of changes (fn-1 Desktop 
    - Body: structured summary with sections for Desktop Skia support, STJ migration, CI multi-platform testing
    - Mark PR as ready for review (remove draft status)
 
-2. Monitor CI: `gh pr checks 38 --repo unoplatform/uno.monaco.editor --watch`
+2. Trigger CI manually (since dev/cnov/desktop-head is not in the pull_request trigger list):
+   - Run: `gh workflow run ci.yml -r dev/cnov/desktop-head --repo unoplatform/uno.monaco.editor`
+   - Or retarget PR #38 to `main` (not recommended for current draft state)
 
-3. If any job fails:
+3. Monitor CI: `gh pr checks 38 --repo unoplatform/uno.monaco.editor --watch`
+
+4. If any job fails:
    - Check logs: `gh run view <run-id> --repo unoplatform/uno.monaco.editor --log-failed`
    - Diagnose and fix
-   - Push fix and re-monitor
+   - Push fix and re-trigger CI
 
 ## Key context
 
 - PR #38 currently titled "Add support for Skia Desktop" with planning-only body — stale
-- CI triggers on push to PR branch via `pull_request` trigger (ci.yml:8-11)
-- Three CI jobs should run: `build` (ubuntu), `desktop-tests` (windows), `build-macos` (macos-15)
+- **NOTE:** CI does NOT trigger on push to `dev/cnov/desktop-head` branch. The `pull_request` trigger in ci.yml (lines 8-11) only activates for PRs targeting `main` or `release/*/*`, not for custom feature branches.
+- To run CI for this PR, either:
+  - Retarget PR #38 to `main` (not recommended for draft PR), OR
+  - Manually trigger CI via `gh workflow run ci.yml -r dev/cnov/desktop-head`
+- When CI runs, three jobs should execute: `build` (ubuntu), `desktop-tests` (windows), `build-macos` (macos-15)
 - `sign`/`publish` jobs only run on push to main/release — won't trigger on PR
 - `gh pr checks` exit codes: 0=pass, 1=fail, 8=pending
+
+<!-- Updated by plan-sync: fn-3.1 completed merge, but CI does not auto-trigger for dev/cnov/desktop-head branch -->
 ## Acceptance
 - [ ] PR #38 title updated to reflect fn-1 + fn-2 + CI scope
 - [ ] PR #38 body has structured summary of all changes

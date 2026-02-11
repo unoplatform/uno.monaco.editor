@@ -29,9 +29,8 @@ Fast-forward merge the ralph branch into `dev/cnov/desktop-head` and push the up
 - [ ] CI triggered on PR #38
 
 ## Done summary
-TBD
-
+Fast-forward merged ralph-20260211-093916-012f into dev/cnov/desktop-head (ce90741..2e77127) and pushed to origin, updating PR #38 with all commits from epics fn-1, fn-2, and fn-3 tasks .2/.3. CI triggered (Build + Build macOS ARM).
 ## Evidence
-- Commits:
-- Tests:
-- PRs:
+- Commits: 2e7712763c2f75ed74235a5c5d27edd9c2cd2bba
+- Tests: git merge-base --is-ancestor dev/cnov/desktop-head ralph-20260211-093916-012f, gh pr checks 38 --repo unoplatform/uno.monaco.editor
+- PRs: https://github.com/unoplatform/uno.monaco.editor/pull/38
