@@ -64,9 +64,8 @@ Migrate all `JsonConvert.SerializeObject`/`DeserializeObject` call sites to `Jso
 - [ ] Build succeeds for both TFMs
 
 ## Done summary
-TBD
-
+Migrated all JsonConvert.SerializeObject/DeserializeObject call sites in WebViewExtensions, CodeEditor.Methods, LanguagesHelper, ModelHelper, and ParentAccessor to System.Text.Json with MonacoJsonContext. Redesigned ParentAccessor for AOT by replacing runtime Type.GetType() assembly scanning with FQN-keyed Dictionary<string, JsonTypeInfo> type map, added RegisterTypeInfo extensibility API, and added 15 new tests covering callback round-trips and type registry behavior.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 3c782eb, e434648
+- Tests: ./artifacts/bin/MonacoEditorComponent.Tests/debug/MonacoEditorComponent.Tests -trait Category=Serialization (77 passed), dotnet build MonacoEditorComponent.slnx --no-restore (0 errors, 0 warnings)
 - PRs:
