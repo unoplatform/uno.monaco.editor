@@ -57,3 +57,9 @@ When multiple init methods can create the same resource (e.g., JsonRpc), ensure 
 
 ## 2026-02-11 manual [pitfall]
 When JSON-RPC notifications are emitted during initialization, gate them on transport readiness -- early lifecycle events can fire before the underlying transport (WebView2/CoreWebView2) is initialized, causing faulted tasks
+
+## 2026-02-11 manual [pitfall]
+Use Channel.CreateBounded (not Unbounded) for inbound message queues from untrusted sources to prevent DoS via memory exhaustion
+
+## 2026-02-11 manual [pitfall]
+Playwright NuGet build/buildTransitive targets conflict with UseArtifactsOutput+OutputType=Exe on macOS/Linux; exclude those assets and install browsers from NuGet cache path instead
