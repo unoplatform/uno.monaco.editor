@@ -26,6 +26,14 @@ namespace Monaco.Serialization;
 /// <b>Do NOT set <c>UseStringEnumConverter = true</c></b> — that would break numeric
 /// enum contracts with the Monaco JS runtime.
 /// </para>
+/// <para>
+/// <b>SYSLIB1031 suppression</b>: <c>Monaco.Uri</c> and <c>System.Uri</c> both appear as
+/// discovered types (from <c>IMarkdownString.Uris</c> and <c>IRelatedInformation.Resource</c>
+/// respectively). The source generator picks the first and warns about the TypeInfo property
+/// name collision. This is safe; both types serialize correctly via their own metadata.
+/// The suppression is in .csproj because SG diagnostics cannot be suppressed via pragma.
+/// A dedicated test (<c>UriCollision_BothTypesSerializeCorrectly</c>) validates correctness.
+/// </para>
 /// </remarks>
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,

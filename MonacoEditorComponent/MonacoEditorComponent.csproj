@@ -3,6 +3,14 @@
 	<PropertyGroup>
 		<TargetFrameworks>net10.0</TargetFrameworks>
 		<Title>Monaco Editor Component</Title>
+		<!--
+			SYSLIB1031: Monaco.Uri and System.Uri both appear as discovered types in
+			MonacoJsonContext (from IMarkdownString.Uris and IRelatedInformation.Resource).
+			The source generator picks the first and warns about the TypeInfo property name
+			collision. This is safe — both types serialize correctly via their own metadata.
+			A dedicated test (UriCollision_BothTypesSerializeCorrectly) validates this.
+			Cannot use #pragma in user code because SG diagnostics are emitted on generated files.
+		-->
 		<NoWarn>$(NoWarn);Uno0001;CA1416;CS1998;CS0067;SYSLIB1031</NoWarn>
 		<PackageId>Uno.Monaco.Editor</PackageId>
 		<DebugSymbols>true</DebugSymbols>

@@ -69,13 +69,10 @@ public class SerializationContractTests
         };
         var json = NewtonsoftSerializer.SerializeObject(item, NewtonsoftSettings);
 
-        // Verify key structural elements
-        var doc = JsonDocument.Parse(json);
-        Assert.Equal("console.log()", doc.RootElement.GetProperty("insertText").GetString());
-        Assert.Equal("log", doc.RootElement.GetProperty("label").GetString());
-        Assert.Equal(1, doc.RootElement.GetProperty("kind").GetInt32()); // Function = 1 (numeric)
-        Assert.Equal("Log output", doc.RootElement.GetProperty("detail").GetString());
-        Assert.Equal("0001", doc.RootElement.GetProperty("sortText").GetString());
+        // Full exact-match baseline: every field, property order, null omission
+        Assert.Equal(
+            """{"detail":"Log output","insertText":"console.log()","kind":1,"label":"log","sortText":"0001"}""",
+            json);
     }
 
     [Fact]
@@ -88,10 +85,11 @@ public class SerializationContractTests
             IsPreferred = true,
         };
         var json = NewtonsoftSerializer.SerializeObject(action, NewtonsoftSettings);
-        var doc = JsonDocument.Parse(json);
-        Assert.Equal("Extract method", doc.RootElement.GetProperty("title").GetString());
-        Assert.Equal("refactor.extract", doc.RootElement.GetProperty("kind").GetString());
-        Assert.True(doc.RootElement.GetProperty("isPreferred").GetBoolean());
+
+        // Full exact-match baseline: field order, naming, boolean, null omission
+        Assert.Equal(
+            """{"isPreferred":true,"kind":"refactor.extract","title":"Extract method"}""",
+            json);
     }
 
     [Fact]
@@ -101,8 +99,11 @@ public class SerializationContractTests
             ["**bold** text"],
             new Range(1, 1, 1, 10));
         var json = NewtonsoftSerializer.SerializeObject(hover, NewtonsoftSettings);
-        var doc = JsonDocument.Parse(json);
-        Assert.Equal("**bold** text", doc.RootElement.GetProperty("contents")[0].GetProperty("value").GetString());
+
+        // Full exact-match baseline: contents array with IMarkdownString fields, range object
+        Assert.Equal(
+            """{"contents":[{"isTrusted":false,"value":"**bold** text"}],"range":{"endColumn":10,"endLineNumber":1,"startColumn":1,"startLineNumber":1}}""",
+            json);
     }
 
     [Fact]
@@ -118,23 +119,28 @@ public class SerializationContractTests
             EndColumn = 10,
         };
         var json = NewtonsoftSerializer.SerializeObject(marker, NewtonsoftSettings);
-        var doc = JsonDocument.Parse(json);
-        Assert.Equal(8, doc.RootElement.GetProperty("severity").GetInt32()); // Error = 8
-        Assert.Equal("Syntax error", doc.RootElement.GetProperty("message").GetString());
+
+        // Full exact-match baseline: all fields including zero-valued, enum as integer
+        Assert.Equal(
+            """{"endColumn":10,"endLineNumber":1,"message":"Syntax error","severity":8,"startColumn":1,"startLineNumber":1}""",
+            json);
     }
 
     [Fact]
     public void Golden_ColorInformation()
     {
-        // ColorInformation uses a custom Newtonsoft converter for Color.
-        // Just verify it serializes without error and has expected structure.
+        // ColorInformation uses custom Newtonsoft converters (ColorConverter,
+        // InterfaceToClassConverter) so the output includes converter-specific
+        // float representations. Full exact-match baseline captures this.
         var colorInfo = new ColorInformation(
             Windows.UI.Color.FromArgb(255, 128, 64, 32),
             new Range(1, 1, 1, 10));
         var json = NewtonsoftSerializer.SerializeObject(colorInfo, NewtonsoftSettings);
-        var doc = JsonDocument.Parse(json);
-        Assert.True(doc.RootElement.TryGetProperty("color", out _));
-        Assert.True(doc.RootElement.TryGetProperty("range", out _));
+
+        // Full exact-match baseline: color as {alpha,red,green,blue} floats, range object
+        Assert.Equal(
+            """{"color":{"alpha":1.0,"red":0.5019608,"green":0.2509804,"blue":0.1254902},"range":{"endColumn":10,"endLineNumber":1,"startColumn":1,"startLineNumber":1}}""",
+            json);
     }
 
     #endregion
@@ -377,6 +383,48 @@ public class SerializationContractTests
         // UnsafeRelaxedJsonEscaping should preserve <, >, & as-is
         Assert.Contains("<string>", json);
         Assert.Contains("&none", json);
+    }
+
+    #endregion
+
+    #region SYSLIB1031 Uri collision safety verification
+
+    [Fact]
+    public void UriCollision_BothTypesSerializeCorrectly()
+    {
+        // SYSLIB1031 is suppressed because Monaco.Uri and System.Uri both appear
+        // as discovered types. This test proves both serialize correctly despite
+        // the source-gen property name collision.
+
+        // IMarkdownString.Uris uses Monaco.Uri (IDictionary<string, Monaco.Uri>)
+        var markdown = new IMarkdownString("test")
+        {
+            Uris = new Dictionary<string, Monaco.Uri>
+            {
+                ["link"] = new Monaco.Uri { Scheme = "https", Path = "/doc" },
+            },
+        };
+        var mdJson = JsonSerializer.Serialize(markdown, MonacoJsonContext.Default.IMarkdownString);
+        var mdDoc = JsonDocument.Parse(mdJson);
+        Assert.Equal("https", mdDoc.RootElement.GetProperty("uris").GetProperty("link").GetProperty("scheme").GetString());
+        Assert.Equal("/doc", mdDoc.RootElement.GetProperty("uris").GetProperty("link").GetProperty("path").GetString());
+
+        // IRelatedInformation.Resource and Marker.Resource use Monaco.Uri
+        // (declared as Uri in Monaco.Editor namespace where it resolves to Monaco.Uri)
+        var marker = new Marker
+        {
+            Severity = MarkerSeverity.Info,
+            Message = "test",
+            Resource = new Monaco.Uri { Scheme = "file", Path = "/src/main.ts" },
+            StartLineNumber = 1,
+            StartColumn = 1,
+            EndLineNumber = 1,
+            EndColumn = 5,
+        };
+        var markerJson = JsonSerializer.Serialize(marker, MonacoJsonContext.Default.Marker);
+        var markerDoc = JsonDocument.Parse(markerJson);
+        Assert.Equal("file", markerDoc.RootElement.GetProperty("resource").GetProperty("scheme").GetString());
+        Assert.Equal("/src/main.ts", markerDoc.RootElement.GetProperty("resource").GetProperty("path").GetString());
     }
 
     #endregion
