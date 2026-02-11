@@ -244,15 +244,7 @@ namespace Monaco
 
             Options.PropertyChanged -= Options_PropertyChanged;
 
-            if (_themeListener != null)
-            {
-                _themeListener.ThemeChanged -= ThemeListener_ThemeChanged;
-            }
-            _themeListener = null;
-
-            UnregisterPropertyChangedCallback(RequestedThemeProperty, _themeToken);
-            _keyboardListener = null;
-            _initializedPresenter = null;
+            TeardownWebObjects();
             _model = null;
         }
 
@@ -268,7 +260,7 @@ namespace Monaco
                 _view.Loaded -= WebView_DOMContentLoaded;
                 Debug.WriteLine("Setting initialized - false");
                 _initialized = false;
-                _initializedPresenter = null;
+                TeardownWebObjects();
             }
 
             _view = (ICodeEditorPresenter)GetTemplateChild("View");

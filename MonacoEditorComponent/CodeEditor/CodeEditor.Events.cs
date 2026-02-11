@@ -98,6 +98,32 @@ namespace Monaco
 
         private ICodeEditorPresenter? _initializedPresenter;
 
+        /// <summary>
+        /// Tears down web object wiring for the current presenter. Must be called
+        /// before nulling <see cref="_initializedPresenter"/> to ensure symmetric cleanup.
+        /// Safe to call when no presenter is initialized (no-op).
+        /// </summary>
+        private void TeardownWebObjects()
+        {
+            if (_initializedPresenter == null)
+            {
+                return;
+            }
+
+            if (_themeListener != null)
+            {
+                _themeListener.ThemeChanged -= ThemeListener_ThemeChanged;
+                _themeListener = null;
+            }
+            UnregisterPropertyChangedCallback(RequestedThemeProperty, _themeToken);
+            KeyboardListener.RemoveInstance(_initializedPresenter);
+            _parentAccessor?.Dispose();
+            _parentAccessor = null;
+            _keyboardListener = null;
+            _debugLogger = null;
+            _initializedPresenter = null;
+        }
+
         private void InitialiseWebObjects()
         {
             try
@@ -116,17 +142,8 @@ namespace Monaco
                     return;
                 }
 
-                // Dispose/unhook old objects if reinitializing for a new presenter
-                if (_initializedPresenter != null)
-                {
-                    if (_themeListener != null)
-                    {
-                        _themeListener.ThemeChanged -= ThemeListener_ThemeChanged;
-                    }
-                    UnregisterPropertyChangedCallback(RequestedThemeProperty, _themeToken);
-                    KeyboardListener.RemoveInstance(_initializedPresenter);
-                    _parentAccessor?.Dispose();
-                }
+                // Teardown old objects if reinitializing
+                TeardownWebObjects();
 
                 _parentAccessor = new ParentAccessor(_view, _queue);
                 _parentAccessor.AddAssemblyForTypeLookup(typeof(Range).GetTypeInfo().Assembly);
