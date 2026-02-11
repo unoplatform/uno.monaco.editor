@@ -1,58 +1,105 @@
-# This script run after downloading the npm package dependencies inorder to generate the C# typings.
+# generate-typings.ps1
+# Generates C# typings from Monaco TypeScript definitions using TypedocConverter,
+# then runs the STJ post-processor to transform attributes.
+#
 # https://github.com/hez2010/TypedocConverter
+#
+# Prerequisites:
+#   - Node.js (for npm/npx)
+#   - PowerShell 7+ (pwsh)
+#   - Run 'npm install' in this directory first
+#
+# Output goes to GenerateMonacoTypings/output/ (isolated from MonacoEditorComponent/).
 
-# Requires .NET Core Runtime 3.1.x to be installed
+$ErrorActionPreference = 'Stop'
 
-# ------------------------
 $monaco_file = ".\node_modules\monaco-editor\monaco.d.ts"
-$typedoc_bin_url = $env:npm_package_config_typedocConverter #see config in package.json
+$typedoc_bin_url = $env:npm_package_config_typedocConverter  # see config in package.json
+$outdir = $env:npm_package_config_outdir
 $temp_dir_name = ".temp"
 
 function Get-ScriptDirectory {
-    Split-Path -parent $PSCommandPath
+    Split-Path -Parent $PSCommandPath
 }
 
 $script_dir = Get-ScriptDirectory
 
 Push-Location $script_dir
 
-# Create Temp Directory and Output
-New-Item -Name $temp_dir_name -ItemType Directory | Out-Null
-
-# Make sure we can see our 'monaco.d.ts' file
-
-if (!(Test-Path $monaco_file -PathType Leaf)) {
-    Write-Error "Monaco Definitions Not Found, run npm install first."
-
-    Pop-Location
-    exit
+# Default output directory if not set via npm config
+if (-not $outdir) {
+    $outdir = "./output"
 }
 
-# Copy monaco.d.ts to monaco.ts in temp folder (need to change extension)
+# Ensure output directory exists (and is clean)
+if (Test-Path $outdir) {
+    Remove-Item $outdir -Force -Recurse
+}
+New-Item -Name $outdir -ItemType Directory | Out-Null
 
+# Create Temp Directory
+if (Test-Path $temp_dir_name) {
+    Remove-Item $temp_dir_name -Force -Recurse
+}
+New-Item -Name $temp_dir_name -ItemType Directory | Out-Null
+
+# Verify monaco.d.ts is available
+if (!(Test-Path $monaco_file -PathType Leaf)) {
+    Write-Error "Monaco Definitions Not Found, run 'npm install' first."
+    Pop-Location
+    exit 1
+}
+
+# Copy monaco.d.ts to monaco.ts in temp folder (TypeDoc requires .ts extension)
 Copy-Item $monaco_file -Destination (Join-Path $temp_dir_name "monaco.ts")
 
 Push-Location $temp_dir_name
 
-# Run typedoc to generate json representation
+# Run TypeDoc to generate JSON representation
+Write-Host "Running TypeDoc to generate JSON from monaco.d.ts..."
 Write-Output '{"compilerOptions":{"target":"es2020"}}' > tsconfig.json
-Invoke-Expression "npx typedoc monaco.ts --json monaco.json"
+$typedocResult = npx typedoc monaco.ts --json monaco.json 2>&1
+$typedocExitCode = $LASTEXITCODE
 
-# Need TypedocConverter next
-Write-Host "Downloading TypedocConverter"
+if ($typedocExitCode -ne 0) {
+    Write-Warning "TypeDoc failed (exit code $typedocExitCode). This is expected for Monaco 0.54.0 with TypeDoc 0.20.x."
+    Write-Warning "Use the standalone post-processor mode instead: pwsh ./postprocess-stj.ps1 -Standalone"
+    Write-Warning "TypeDoc output: $typedocResult"
 
+    Pop-Location
+    # Clean up temp dir
+    Remove-Item $temp_dir_name -Force -Recurse -ErrorAction SilentlyContinue
+    Pop-Location
+    exit 1
+}
+
+# Download and run TypedocConverter
+Write-Host "Downloading TypedocConverter..."
 [Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls"
 Invoke-WebRequest -Uri $typedoc_bin_url -OutFile "TypedocConverter.zip"
 
-Write-Host "Extracting..."
+Write-Host "Extracting TypedocConverter..."
 Expand-Archive "TypedocConverter.zip" -DestinationPath .
 
-# Now run TypedocConverter on our monaco.json
-Invoke-Expression ".\TypedocConverter.exe --inputfile monaco.json --splitfiles true --outputdir ../$env:npm_package_config_outdir --promise-type WinRT --nrt-disabled true"
+# Run TypedocConverter on our monaco.json
+# Output goes to isolated output directory (not MonacoEditorComponent/)
+Write-Host "Running TypedocConverter..."
+$converterOutput = "../$outdir"
+Invoke-Expression ".\TypedocConverter.exe --inputfile monaco.json --splitfiles true --outputdir `"$converterOutput`" --promise-type WinRT --nrt-disabled true"
 
 Pop-Location
 
-# Clean-up Temp Dir
+# Clean up temp dir
 Remove-Item $temp_dir_name -Force -Recurse -ErrorAction SilentlyContinue
+
+# Run post-processing to transform Newtonsoft attributes to STJ
+Write-Host ""
+Write-Host "Running STJ post-processor on generated output..."
+& (Join-Path $script_dir 'postprocess-stj.ps1') -InputDir (Join-Path $script_dir $outdir)
+
+Write-Host ""
+Write-Host "Generation complete. Output is in: $outdir/"
+Write-Host "Review the output and selectively merge into MonacoEditorComponent/Monaco/ as needed."
+Write-Host "Hand-tuned files listed in .generator-ignore have been skipped."
 
 Pop-Location

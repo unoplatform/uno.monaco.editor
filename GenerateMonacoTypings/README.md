@@ -1,18 +1,130 @@
-Generate Monaco Typings
-=======================
+# Generate Monaco Typings
 
-This [Node.js](https://nodejs.org/) project is provided as a simple way to download the required dependencies needed to take the Monaco TypeScript definition file and generate C# classes for the API via the [TypedocConverter](https://github.com/hez2010/TypedocConverter) project. 
+This directory contains the type generation pipeline for producing C# model classes
+from the Monaco Editor TypeScript definitions. The pipeline uses
+[TypedocConverter](https://github.com/hez2010/TypedocConverter) for initial
+generation and a PowerShell post-processor to emit System.Text.Json (STJ) attributes.
 
-This document assumes you have a Node.js environment setup running on Windows (as PowerShell is also required), but all other dependencies should be installed/setup as part of the script.
+## Prerequisites
 
-To get started, in this directory just run:
+- [Node.js](https://nodejs.org/) (LTS recommended)
+- PowerShell 7+ (`pwsh`)
+- .NET SDK (for verifying compiled output)
 
-```
+## Pipeline Overview
+
+The generation pipeline has two steps:
+
+1. **TypedocConverter** (`generate-typings.ps1`): Parses `monaco.d.ts` via TypeDoc
+   and generates raw C# classes with Newtonsoft.Json attributes.
+2. **STJ Post-Processor** (`postprocess-stj.ps1`): Transforms the raw output to use
+   System.Text.Json attributes matching the project's `MonacoJsonContext` conventions.
+
+### Output Directory
+
+All generated output goes to `GenerateMonacoTypings/output/` -- an isolated directory
+that does NOT overwrite files in `MonacoEditorComponent/Monaco/`. Generated files
+should be reviewed and selectively merged.
+
+### Generator Ignore List
+
+The `.generator-ignore` file lists files that have been hand-tuned and must not be
+overwritten by the generator. The post-processor skips these files in both pipeline
+and standalone modes.
+
+Key protected files include:
+- `StandaloneEditorConstructionOptions.cs` (INotifyPropertyChanged + dictionary backing)
+- Provider types (hand-written delegate signatures)
+- CSS helper types (UI-layer utilities)
+
+## Usage
+
+### Full Pipeline (TypedocConverter + Post-Processor)
+
+```bash
+cd GenerateMonacoTypings
 npm install
+npm run generate
+npm run postprocess
 ```
 
-Voila! C# Typings should be generated! Run `npm install` or `npm run postinstall` to re-generate typings again.
+> **Note:** TypedocConverter (last updated 2023) supports TypeScript 3.9-4.2. It may
+> fail on Monaco 0.54.0 which uses TypeScript 5.x features. If the full pipeline
+> fails, use standalone mode instead.
 
-**Note:** The script is configured to overwrite the existing definitions within the main repo, you can configure an alternate output directory (`outdir`) via the `npm config set` command. It defaults to the `MonacoEditorComponent` directory and the namespace will automatically create a `Monaco` sub-directory.
+### Standalone Mode (Post-Process Existing Files)
 
-**Note:** This script is currently meant as a guide-post, the typings generated are not all meant to be consumed directly by the project, and certain interfaces have been sculpted to provide a better experience to C# developers. This tool is mostly meant to boot-strap enabling features from the Monaco API and adapting to new versions of the Monaco API. If you have any questions or need a specific feature, please first file an issue on [our repo](https://github.com/hawkerm/monaco-editor-uwp). Thanks!
+When TypedocConverter cannot parse newer Monaco typings, the post-processor can run
+directly against the existing source files in `MonacoEditorComponent/Monaco/`:
+
+```bash
+cd GenerateMonacoTypings
+npm run postprocess:standalone
+```
+
+Or with PowerShell directly:
+
+```bash
+pwsh ./postprocess-stj.ps1 -Standalone
+```
+
+This mode transforms any remaining Newtonsoft.Json attributes in-place. It respects
+the `.generator-ignore` list and skips hand-tuned files.
+
+### Dry Run
+
+Preview what changes would be made without modifying files:
+
+```bash
+pwsh ./postprocess-stj.ps1 -Standalone -WhatIf
+```
+
+## STJ Transformation Rules
+
+The post-processor applies these transformations:
+
+| Newtonsoft Pattern | STJ Replacement |
+|---|---|
+| `[JsonProperty("name")]` | `[JsonPropertyName("name")]` |
+| `[JsonProperty("name", NullValueHandling = ...)]` | `[JsonPropertyName("name")]` (global `WhenWritingNull`) |
+| `[JsonConverter(typeof(StringEnumConverter))]` | `[JsonConverter(typeof(JsonStringEnumConverter<T>))]` |
+| `using Newtonsoft.Json` | `using System.Text.Json.Serialization` |
+
+### Enum Handling
+
+- **String-backed enums** (e.g., `CursorBlinking`, `AccessibilitySupport`): Get
+  `[JsonConverter(typeof(JsonStringEnumConverter<T>))]` with
+  `[JsonStringEnumMemberName("value")]` on each member.
+- **Numeric enums** (e.g., `MarkerSeverity`, `CompletionItemKind`,
+  `TrackedRangeStickiness`): Kept as integers -- no string converter added.
+
+### Generated File Markers
+
+All post-processed files receive:
+- `// <auto-generated />` header
+- `#nullable enable` directive
+
+## Conventions
+
+Generated output must match the patterns established in `MonacoJsonContext`:
+- **CamelCase naming policy** (`JsonKnownNamingPolicy.CamelCase`) -- explicit
+  `[JsonPropertyName]` only for names that deviate from PascalCase-to-camelCase.
+- **WhenWritingNull** (`DefaultIgnoreCondition`) -- per-property null handling is
+  handled globally; no per-property attributes needed.
+- **No global UseStringEnumConverter** -- numeric enums must remain numeric.
+
+## Merge Workflow
+
+After generating output:
+
+1. Run `npm run generate && npm run postprocess` (or standalone mode)
+2. Review files in `output/` against `MonacoEditorComponent/Monaco/`
+3. Diff selectively: `diff -r output/Monaco/ ../MonacoEditorComponent/Monaco/`
+4. Copy updated files, skipping hand-tuned files in `.generator-ignore`
+5. Build and verify: `dotnet build MonacoEditorComponent.slnx --no-restore`
+
+## Version History
+
+- **v2.0.0**: Modernized pipeline with STJ post-processor, isolated output directory,
+  generator-ignore manifest, and Monaco 0.54.0 reference.
+- **v1.0.0**: Original pipeline with TypedocConverter and Newtonsoft.Json output.

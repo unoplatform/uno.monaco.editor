@@ -45,9 +45,8 @@ Remove Newtonsoft.Json package dependency from the library, update build artifac
 - [ ] All serialization contract tests pass
 
 ## Done summary
-TBD
-
+Removed Newtonsoft.Json package dependency from MonacoEditorComponent: deleted package references from Directory.Packages.props and csproj, removed Newtonsoft runtime directives from rd.xml, deleted dual-stack Newtonsoft converter classes (NewtonsoftInterfaceToClassConverter, NewtonsoftCssStyleConverter, NewtonsoftColorConverter), removed [Newtonsoft.Json.JsonConverter] attributes from ~30 enum files and model types, converted serialization contract tests from Newtonsoft parity to STJ golden baselines, and added changelog entry documenting the breaking change with migration guidance.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 2930aece08a2e1e5fd4b1fde2ef3b6e1fcf06ee7, 00e0068e0db2ebae89e04fe2c8b4f0e2f103298d
+- Tests: dotnet build MonacoEditorComponent.slnx --no-restore, dotnet test --solution MonacoEditorComponent.slnx --no-build --filter-class *SerializationContractTests
 - PRs:

@@ -1,0 +1,211 @@
+# postprocess-stj.ps1
+# Post-processes C# files to transform Newtonsoft.Json attributes to System.Text.Json attributes.
+#
+# Two modes:
+#   1. Pipeline mode (default): Processes files from GenerateMonacoTypings/output/ after TypedocConverter
+#   2. Standalone mode (-Standalone): Processes files in MonacoEditorComponent/Monaco/ in-place
+#
+# Usage:
+#   pwsh ./postprocess-stj.ps1                          # Pipeline mode: process output/ directory
+#   pwsh ./postprocess-stj.ps1 -InputDir ./output       # Pipeline mode: explicit input directory
+#   pwsh ./postprocess-stj.ps1 -Standalone               # Standalone mode: process existing source files
+#   pwsh ./postprocess-stj.ps1 -WhatIf                   # Dry-run: show what would change
+
+[CmdletBinding(SupportsShouldProcess)]
+param(
+    [Parameter()]
+    [string]$InputDir,
+
+    [Parameter()]
+    [switch]$Standalone,
+
+    [Parameter()]
+    [string]$IgnoreFile
+)
+
+$ErrorActionPreference = 'Stop'
+
+function Get-ScriptDirectory {
+    Split-Path -Parent $PSCommandPath
+}
+
+$scriptDir = Get-ScriptDirectory
+
+# Determine input directory
+if ($Standalone) {
+    $targetDir = Join-Path $scriptDir '..' 'MonacoEditorComponent' 'Monaco'
+    $targetDir = (Resolve-Path $targetDir).Path
+    Write-Host "Standalone mode: processing files in $targetDir"
+} elseif ($InputDir) {
+    $targetDir = $InputDir
+} else {
+    $targetDir = Join-Path $scriptDir 'output'
+}
+
+if (-not (Test-Path $targetDir)) {
+    Write-Error "Target directory not found: $targetDir"
+    exit 1
+}
+
+# Load generator-ignore list
+if (-not $IgnoreFile) {
+    $IgnoreFile = Join-Path $scriptDir '.generator-ignore'
+}
+
+$ignoreList = @()
+if (Test-Path $IgnoreFile) {
+    $ignoreList = Get-Content $IgnoreFile |
+        Where-Object { $_ -and $_ -notmatch '^\s*#' } |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { $_ -ne '' }
+    Write-Host "Loaded $($ignoreList.Count) entries from .generator-ignore"
+}
+
+# Known numeric enums that must NOT get string enum converters.
+# These enums use integer values in the Monaco JS API contract.
+$numericEnums = @(
+    'MarkerSeverity',
+    'MarkerTag',
+    'CompletionItemKind',
+    'CompletionItemInsertTextRule',
+    'CompletionTriggerKind',
+    'TrackedRangeStickiness',
+    'EndOfLinePreference',
+    'EndOfLineSequence',
+    'SelectionDirection',
+    'KeyCode'
+)
+
+$filesProcessed = 0
+$filesSkipped = 0
+$filesModified = 0
+
+$csFiles = Get-ChildItem -Path $targetDir -Filter '*.cs' -Recurse
+
+foreach ($file in $csFiles) {
+    $fileName = $file.Name
+
+    # Skip files in the ignore list
+    if ($ignoreList -contains $fileName) {
+        Write-Verbose "Skipping (ignored): $fileName"
+        $filesSkipped++
+        continue
+    }
+
+    $content = Get-Content -Path $file.FullName -Raw
+    if (-not $content) {
+        $filesSkipped++
+        continue
+    }
+
+    $original = $content
+    $modified = $false
+
+    # --- Transform 1: Replace Newtonsoft using directives ---
+    if ($content -match 'using\s+Newtonsoft\.Json') {
+        $content = $content -replace 'using\s+Newtonsoft\.Json\.Converters\s*;\s*\r?\n', ''
+        $content = $content -replace 'using\s+Newtonsoft\.Json\s*;', 'using System.Text.Json.Serialization;'
+        $modified = $true
+    }
+
+    # --- Transform 2: Replace [JsonProperty("name")] -> [JsonPropertyName("name")] ---
+    # Simple form: [JsonProperty("name")]
+    $content = $content -replace '\[JsonProperty\("([^"]+)"\)\]', '[JsonPropertyName("$1")]'
+    # Form with NullValueHandling: [JsonProperty("name", NullValueHandling = NullValueHandling.Ignore)]
+    # MonacoJsonContext uses DefaultIgnoreCondition = WhenWritingNull globally, so just keep the name.
+    $content = $content -replace '\[JsonProperty\("([^"]+)",\s*NullValueHandling\s*=\s*NullValueHandling\.\w+\)\]', '[JsonPropertyName("$1")]'
+    # Form with just NullValueHandling on named property
+    $content = $content -replace '\[JsonProperty\(NullValueHandling\s*=\s*NullValueHandling\.\w+\)\]', ''
+
+    # --- Transform 3: Replace [JsonConverter(typeof(StringEnumConverter))] on enums ---
+    # For string-backed enums, replace with per-enum JsonStringEnumConverter<T>
+    # First detect if this file defines an enum
+    $enumMatch = [regex]::Match($content, 'public\s+enum\s+(\w+)')
+    if ($enumMatch.Success) {
+        $enumName = $enumMatch.Groups[1].Value
+
+        if ($numericEnums -contains $enumName) {
+            # Numeric enum: remove any StringEnumConverter attribute entirely
+            $content = $content -replace '\s*\[JsonConverter\(typeof\(StringEnumConverter\)\)\]\s*\r?\n', "`n"
+        } else {
+            # String-backed enum: replace with typed JsonStringEnumConverter<T>
+            $content = $content -replace '\[JsonConverter\(typeof\(StringEnumConverter\)\)\]', "[JsonConverter(typeof(JsonStringEnumConverter<$enumName>))]"
+
+            # Add [JsonStringEnumMemberName] attributes to members that have [EnumMember(Value = "...")]
+            # Pattern: [EnumMember(Value = "value")] -> [JsonStringEnumMemberName("value")] [EnumMember(Value = "value")]
+            # Use a lookahead-style replacement to insert the STJ attribute before the EnumMember line.
+            $lines = $content -split "`n"
+            $newLines = [System.Collections.Generic.List[string]]::new()
+            foreach ($line in $lines) {
+                if ($line -match '^\s+\[EnumMember\(Value\s*=\s*"([^"]+)"\)\]') {
+                    $enumValue = $Matches[1]
+                    $indent = $line -replace '(\s+)\[EnumMember.*', '$1'
+                    $newLines.Add("${indent}[JsonStringEnumMemberName(`"$enumValue`")]")
+                }
+                $newLines.Add($line)
+            }
+            $content = $newLines -join "`n"
+
+            # If no [EnumMember] attributes exist but it's a string enum, add [JsonStringEnumMemberName]
+            # based on the member names (lowercased, matching Monaco convention)
+            if ($content -notmatch 'EnumMember' -and $content -notmatch 'JsonStringEnumMemberName') {
+                # Parse enum members and add attributes
+                $enumBodyMatch = [regex]::Match($content, '(?s)enum\s+\w+\s*\{([^}]+)\}')
+                if ($enumBodyMatch.Success) {
+                    $enumBody = $enumBodyMatch.Groups[1].Value
+                    $members = [regex]::Matches($enumBody, '(\s+)(\w+)')
+                    foreach ($member in $members) {
+                        $indent = $member.Groups[1].Value
+                        $memberName = $member.Groups[2].Value
+                        $lowerName = $memberName.Substring(0, 1).ToLower() + $memberName.Substring(1)
+                        $oldText = "$indent$memberName"
+                        $newText = "${indent}[JsonStringEnumMemberName(`"$lowerName`")]`n${indent}$memberName"
+                        $content = $content.Replace($oldText, $newText)
+                    }
+                }
+            }
+        }
+    }
+
+    # --- Transform 4: Add System.Runtime.Serialization using if EnumMember is used ---
+    if ($content -match '\[EnumMember' -and $content -notmatch 'using\s+System\.Runtime\.Serialization') {
+        $content = $content -replace '(using\s+System\.Text\.Json\.Serialization\s*;)', "`$1`nusing System.Runtime.Serialization;"
+    }
+
+    # --- Transform 5: Add System.Text.Json.Serialization using if JsonPropertyName used but not imported ---
+    if ($content -match '\[JsonPropertyName' -and $content -notmatch 'using\s+System\.Text\.Json\.Serialization') {
+        # Insert after the last using statement
+        $content = $content -replace '(using\s+[^;]+;\s*\r?\n)(?!using)', "`$1using System.Text.Json.Serialization;`n"
+    }
+
+    # --- Transform 6: Add auto-generated header if not present ---
+    if ($content -notmatch '<auto-generated\s*/?>') {
+        $content = "// <auto-generated />`n#nullable enable`n`n$content"
+        $modified = $true
+    }
+
+    # --- Transform 7: Add #nullable enable if not present ---
+    if ($content -notmatch '#nullable\s+enable') {
+        $content = $content -replace '(// <auto-generated\s*/?>)', "`$1`n#nullable enable"
+    }
+
+    if ($content -ne $original) {
+        $modified = $true
+    }
+
+    if ($modified) {
+        if ($PSCmdlet.ShouldProcess($file.FullName, 'Transform Newtonsoft -> STJ attributes')) {
+            Set-Content -Path $file.FullName -Value $content -NoNewline
+            Write-Host "  Modified: $($file.FullName)"
+            $filesModified++
+        }
+    }
+
+    $filesProcessed++
+}
+
+Write-Host ""
+Write-Host "Post-processing complete."
+Write-Host "  Files scanned:  $filesProcessed"
+Write-Host "  Files modified: $filesModified"
+Write-Host "  Files skipped:  $filesSkipped"
