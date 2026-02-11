@@ -13,7 +13,7 @@
             Func<Task<T>> func, DispatcherQueuePriority priority = DispatcherQueuePriority.Normal)
         {
             var taskCompletionSource = new TaskCompletionSource<T>();
-            queue.TryEnqueue(priority, async () =>
+            if (!queue.TryEnqueue(priority, async () =>
             {
                 try
                 {
@@ -23,7 +23,11 @@
                 {
                     taskCompletionSource.SetException(ex);
                 }
-            });
+            }))
+            {
+                taskCompletionSource.SetException(
+                    new InvalidOperationException("DispatcherQueue is unavailable or shutting down."));
+            }
             return await taskCompletionSource.Task;
         }
 

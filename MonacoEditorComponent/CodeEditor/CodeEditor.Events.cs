@@ -154,11 +154,6 @@ namespace Monaco
             // Fire events after initialization so properties set in event handlers work immediately
             EditorLoading?.Invoke(this, new());
             EditorLoaded?.Invoke(this, new());
-
-            if (OperatingSystem.IsBrowser())
-            {
-                _queue!.TryEnqueue(DispatcherQueuePriority.Low, () => WebView_NavigationCompleted(_view, null));
-            }
         }
 
         /// <summary>
