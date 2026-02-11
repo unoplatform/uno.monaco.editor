@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
@@ -29,8 +30,9 @@ namespace Monaco.Helpers
         /// <summary>
         /// AOT-safe type info lookup for <see cref="SetValue(string, string, string)"/>.
         /// Keyed by both fully-qualified name and short name for backward compatibility.
+        /// Thread-safe: may be read during SetValue while written via RegisterTypeInfo.
         /// </summary>
-        private readonly Dictionary<string, JsonTypeInfo> _typeInfoMap;
+        private readonly ConcurrentDictionary<string, JsonTypeInfo> _typeInfoMap;
 
         /// <summary>
         /// Constructs a new reflective parent Accessor for the provided object.

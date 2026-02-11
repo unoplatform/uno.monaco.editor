@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json;
@@ -32,8 +33,9 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
     /// <summary>
     /// AOT-safe type info lookup for <see cref="SetValue(string, string, string)"/>.
     /// Keyed by both fully-qualified name and short name for backward compatibility.
+    /// Thread-safe: may be read during SetValue while written via RegisterTypeInfo.
     /// </summary>
-    private readonly Dictionary<string, JsonTypeInfo> _typeInfoMap;
+    private readonly ConcurrentDictionary<string, JsonTypeInfo> _typeInfoMap;
 
     public ParentAccessorDesktop(ICodeEditorPresenter parent, DispatcherQueue queue)
     {

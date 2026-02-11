@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Linq;
 using System.Text.Json;
 
 using Monaco.Languages;
@@ -135,7 +136,7 @@ namespace Monaco
 
                             if (items != null)
                             {
-                                return JsonSerializer.Serialize(items, MonacoJsonContext.Relaxed.Options);
+                                return JsonSerializer.Serialize(items.ToArray(), MonacoJsonContext.Relaxed.ColorPresentationArray);
                             }
                         }
                     }
@@ -152,7 +153,7 @@ namespace Monaco
 
                         if (items != null)
                         {
-                            return JsonSerializer.Serialize(items, MonacoJsonContext.Relaxed.Options);
+                            return JsonSerializer.Serialize(items.ToArray(), MonacoJsonContext.Relaxed.ColorInformationArray);
                         }
                     }
 

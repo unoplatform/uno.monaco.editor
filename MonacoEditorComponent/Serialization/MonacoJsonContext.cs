@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -129,11 +130,13 @@ internal partial class MonacoJsonContext : JsonSerializerContext
     /// Builds a type info lookup dictionary keyed by both fully-qualified name and short name.
     /// Used by <see cref="Monaco.Helpers.ParentAccessor"/> and <see cref="Monaco.Helpers.ParentAccessorDesktop"/>
     /// for AOT-safe deserialization in SetValue.
+    /// Thread-safe: returns a <see cref="ConcurrentDictionary{TKey,TValue}"/> since the map
+    /// may be read during SetValue while written via RegisterTypeInfo.
     /// </summary>
-    internal static Dictionary<string, JsonTypeInfo> BuildTypeInfoMap()
+    internal static ConcurrentDictionary<string, JsonTypeInfo> BuildTypeInfoMap()
     {
         var context = Default;
-        var map = new Dictionary<string, JsonTypeInfo>(StringComparer.Ordinal);
+        var map = new ConcurrentDictionary<string, JsonTypeInfo>(StringComparer.Ordinal);
 
         // Register all concrete types that may arrive from JS via setValueWithType.
         // Primary key: FullName; compatibility alias: Name (short name for JS callers).
@@ -170,7 +173,7 @@ internal partial class MonacoJsonContext : JsonSerializerContext
         return map;
     }
 
-    private static void RegisterType<T>(MonacoJsonContext context, Dictionary<string, JsonTypeInfo> map)
+    private static void RegisterType<T>(MonacoJsonContext context, ConcurrentDictionary<string, JsonTypeInfo> map)
     {
         var typeInfo = context.GetTypeInfo(typeof(T));
         if (typeInfo is null) return;
@@ -183,9 +186,6 @@ internal partial class MonacoJsonContext : JsonSerializerContext
 
         // Short name alias for backward compatibility with JS callers
         // that use unqualified type names (e.g., "Selection" instead of "Monaco.Selection").
-        if (!map.ContainsKey(type.Name))
-        {
-            map[type.Name] = typeInfo;
-        }
+        map.TryAdd(type.Name, typeInfo);
     }
 }

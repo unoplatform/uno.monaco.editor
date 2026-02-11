@@ -137,8 +137,10 @@ namespace Monaco.Extensions
 
                 return await RunScriptAsync<T>(_view, script, member, file, line);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not InvalidOperationException and not NotSupportedException)
             {
+                // Let STJ metadata/AOT failures propagate so they are not silently hidden.
+                // Only catch non-serialization exceptions (network, JS interop, etc.).
                 System.Diagnostics.Debug.WriteLine($"Error {ex.Message} {ex.StackTrace} {ex.InnerException?.Message})");
                 return default;
             }

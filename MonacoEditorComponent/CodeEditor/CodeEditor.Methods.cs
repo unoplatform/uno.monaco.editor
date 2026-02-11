@@ -65,37 +65,37 @@ namespace Monaco
 
         public IAsyncAction RevealPositionAsync(IPosition position, bool revealVerticalInCenter, bool revealHorizontal)
         {
-            return SendScriptAsync("editor.revealPosition(JSON.parse('" + JsonSerializer.Serialize(position, MonacoJsonContext.Relaxed.Options) + "'), " + JsonSerializer.Serialize(revealVerticalInCenter) + ", " + JsonSerializer.Serialize(revealHorizontal) + ")").AsAsyncAction();
+            return SendScriptAsync("editor.revealPosition(JSON.parse('" + JsonSerializer.Serialize(Position.Lift(position), MonacoJsonContext.Relaxed.Position) + "'), " + JsonSerializer.Serialize(revealVerticalInCenter) + ", " + JsonSerializer.Serialize(revealHorizontal) + ")").AsAsyncAction();
         }
 
         public IAsyncAction RevealPositionInCenterAsync(IPosition position)
         {
-            return SendScriptAsync("editor.revealPositionInCenter(JSON.parse('" + JsonSerializer.Serialize(position, MonacoJsonContext.Relaxed.Options) + "'))").AsAsyncAction();
+            return SendScriptAsync("editor.revealPositionInCenter(JSON.parse('" + JsonSerializer.Serialize(Position.Lift(position), MonacoJsonContext.Relaxed.Position) + "'))").AsAsyncAction();
         }
 
         public IAsyncAction RevealPositionInCenterIfOutsideViewportAsync(IPosition position)
         {
-            return SendScriptAsync("editor.revealPositionInCenterIfOutsideViewport(JSON.parse('" + JsonSerializer.Serialize(position, MonacoJsonContext.Relaxed.Options) + "'))").AsAsyncAction();
+            return SendScriptAsync("editor.revealPositionInCenterIfOutsideViewport(JSON.parse('" + JsonSerializer.Serialize(Position.Lift(position), MonacoJsonContext.Relaxed.Position) + "'))").AsAsyncAction();
         }
 
         public IAsyncAction RevealRangeAsync(IRange range)
         {
-            return SendScriptAsync("editor.revealRange(JSON.parse('" + JsonSerializer.Serialize(range, MonacoJsonContext.Relaxed.Options) + "'))").AsAsyncAction();
+            return SendScriptAsync("editor.revealRange(JSON.parse('" + JsonSerializer.Serialize(Range.Lift(range), MonacoJsonContext.Relaxed.Range) + "'))").AsAsyncAction();
         }
 
         public IAsyncAction RevealRangeAtTopAsync(IRange range)
         {
-            return SendScriptAsync("editor.revealRangeAtTop(JSON.parse('" + JsonSerializer.Serialize(range, MonacoJsonContext.Relaxed.Options) + "'))").AsAsyncAction();
+            return SendScriptAsync("editor.revealRangeAtTop(JSON.parse('" + JsonSerializer.Serialize(Range.Lift(range), MonacoJsonContext.Relaxed.Range) + "'))").AsAsyncAction();
         }
 
         public IAsyncAction RevealRangeInCenterAsync(IRange range)
         {
-            return SendScriptAsync("editor.revealRangeInCenter(JSON.parse('" + JsonSerializer.Serialize(range, MonacoJsonContext.Relaxed.Options) + "'))").AsAsyncAction();
+            return SendScriptAsync("editor.revealRangeInCenter(JSON.parse('" + JsonSerializer.Serialize(Range.Lift(range), MonacoJsonContext.Relaxed.Range) + "'))").AsAsyncAction();
         }
 
         public IAsyncAction RevealRangeInCenterIfOutsideViewportAsync(IRange range)
         {
-            return SendScriptAsync("editor.revealRangeInCenterIfOutsideViewport(JSON.parse('" + JsonSerializer.Serialize(range, MonacoJsonContext.Relaxed.Options) + "'))").AsAsyncAction();
+            return SendScriptAsync("editor.revealRangeInCenterIfOutsideViewport(JSON.parse('" + JsonSerializer.Serialize(Range.Lift(range), MonacoJsonContext.Relaxed.Range) + "'))").AsAsyncAction();
         }
         #endregion
 
@@ -212,7 +212,7 @@ namespace Monaco
 
         public IAsyncAction SetPositionAsync(IPosition position)
         {
-            return SendScriptAsync("EditorContext.getEditorForElement(element).editor.setPosition(" + JsonSerializer.Serialize(position, MonacoJsonContext.Relaxed.Options) + ");").AsAsyncAction();
+            return SendScriptAsync("EditorContext.getEditorForElement(element).editor.setPosition(" + JsonSerializer.Serialize(Position.Lift(position), MonacoJsonContext.Relaxed.Position) + ");").AsAsyncAction();
         }
 
         /// <summary>
