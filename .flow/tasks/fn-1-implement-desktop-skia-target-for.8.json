@@ -1,7 +1,7 @@
 {
-  "assignee": null,
+  "assignee": "claire@novotny.org",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-02-11T15:34:35.714351Z",
   "created_at": "2026-02-11T03:16:52.227472Z",
   "depends_on": [
     "fn-1-implement-desktop-skia-target-for.5",
@@ -11,7 +11,7 @@
   "id": "fn-1-implement-desktop-skia-target-for.8",
   "priority": null,
   "spec_path": ".flow/tasks/fn-1-implement-desktop-skia-target-for.8.md",
-  "status": "todo",
+  "status": "done",
   "title": "Playwright integration tests for desktop and WASM",
-  "updated_at": "2026-02-11T03:34:46.507866Z"
+  "updated_at": "2026-02-11T15:59:30.799885Z"
 }
