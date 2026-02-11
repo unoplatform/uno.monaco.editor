@@ -1010,6 +1010,60 @@ public class SerializationContractTests
         Assert.Equal("Expected <string> but got &none", restored[0].Message);
     }
 
+    /// <summary>
+    /// Verifies that List&lt;T&gt; returned from providers is correctly materialized to T[]
+    /// before serialization, matching the LanguagesHelper pattern (items.ToArray()).
+    /// This guards against AOT failures when providers return List&lt;T&gt; instead of T[].
+    /// </summary>
+    [Fact]
+    public void CallbackRoundTrip_Color_ListToArray_Materialization()
+    {
+        // Provider returns List<ColorPresentation> (runtime type, not in MonacoJsonContext)
+        var presentations = new List<ColorPresentation>
+        {
+            new("rgb(128, 64, 32)"),
+            new("#804020"),
+        };
+
+        // LanguagesHelper materializes to array before serialization: items.ToArray()
+        var asArray = presentations.ToArray();
+        var resultJson = JsonSerializer.Serialize(asArray, MonacoJsonContext.Relaxed.ColorPresentationArray);
+        var doc = JsonDocument.Parse(resultJson);
+
+        Assert.Equal(JsonValueKind.Array, doc.RootElement.ValueKind);
+        Assert.Equal(2, doc.RootElement.GetArrayLength());
+        Assert.Equal("rgb(128, 64, 32)", doc.RootElement[0].GetProperty("label").GetString());
+        Assert.Equal("#804020", doc.RootElement[1].GetProperty("label").GetString());
+    }
+
+    /// <summary>
+    /// Verifies that List&lt;ColorInformation&gt; returned from providers is correctly
+    /// materialized to ColorInformation[] before serialization.
+    /// </summary>
+    [Fact]
+    public void CallbackRoundTrip_DocumentColors_ListToArray_Materialization()
+    {
+        var colors = new List<ColorInformation>
+        {
+            new(Windows.UI.Color.FromArgb(255, 255, 0, 0), new Range(1, 1, 1, 10)),
+            new(Windows.UI.Color.FromArgb(255, 0, 255, 0), new Range(2, 1, 2, 10)),
+        };
+
+        var asArray = colors.ToArray();
+        var resultJson = JsonSerializer.Serialize(asArray, MonacoJsonContext.Relaxed.ColorInformationArray);
+        var doc = JsonDocument.Parse(resultJson);
+
+        Assert.Equal(JsonValueKind.Array, doc.RootElement.ValueKind);
+        Assert.Equal(2, doc.RootElement.GetArrayLength());
+
+        // Round-trip deserialize
+        var restored = JsonSerializer.Deserialize<ColorInformation[]>(resultJson, MonacoJsonContext.Default.Options);
+        Assert.NotNull(restored);
+        Assert.Equal(2, restored.Length);
+        Assert.Equal(255, restored[0].Color.R);
+        Assert.Equal(0, restored[1].Color.R);
+    }
+
     #endregion
 
     #region ParentAccessor type registry tests
