@@ -15,9 +15,9 @@ namespace Monaco.Serialization;
 /// <remarks>
 /// <para>
 /// This context uses <c>CamelCase</c> naming and <c>WhenWritingNull</c> ignore
-/// semantics to match existing Newtonsoft behavior. <c>UnsafeRelaxedJsonEscaping</c>
+/// semantics to match the legacy serialization behavior. <c>UnsafeRelaxedJsonEscaping</c>
 /// is used because Monaco content includes code with characters (&lt;, &gt;, &amp;)
-/// that STJ escapes by default but Newtonsoft does not.
+/// that STJ escapes by default but the prior serializer did not.
 /// </para>
 /// <para>
 /// Numeric enums (MarkerSeverity, CompletionItemKind, TrackedRangeStickiness, etc.)

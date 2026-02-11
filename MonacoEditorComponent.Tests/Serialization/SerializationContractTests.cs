@@ -233,7 +233,7 @@ public class SerializationContractTests
         var original = new Selection(2, 5, 8, 12);
         var json = JsonSerializer.Serialize(original, MonacoJsonContext.Default.Selection);
 
-        // Direction should be excluded from JSON (JsonIgnore on both STJ and Newtonsoft)
+        // Direction should be excluded from JSON (marked JsonIgnore)
         var doc = JsonDocument.Parse(json);
         Assert.False(doc.RootElement.TryGetProperty("direction", out _));
 

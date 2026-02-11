@@ -162,9 +162,8 @@ namespace Monaco
             {
                 if (parameters != null && parameters.Length > 0)
                 {
-                    // Breaking change: returns JsonElement instead of Newtonsoft JObject.
-                    // Consumers should use JsonElement API (GetProperty, GetString, etc.)
-                    // instead of JObject indexers.
+                    // Breaking change: returns JsonElement instead of JObject.
+                    // Consumers should use JsonElement API (GetProperty, GetString, etc.).
                     object?[] args = new object[parameters.Length];
                     for (int i = 0; i < parameters.Length; i++)
                     {

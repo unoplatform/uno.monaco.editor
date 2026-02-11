@@ -11,7 +11,7 @@ Standard JSON-RPC 2.0:
 
 ## Implementations
 
-- **C# side**: StreamJsonRpc with `SystemTextJsonFormatter` (AOT-compatible, no Newtonsoft.Json)
+- **C# side**: StreamJsonRpc with `SystemTextJsonFormatter` (AOT-compatible, STJ source-gen)
 - **JS side**: `vscode-jsonrpc` (from `vscode-jsonrpc/browser` entry point)
 
 Both libraries implement the same JSON-RPC 2.0 specification and are wire-compatible by design.
