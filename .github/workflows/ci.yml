@@ -11,6 +11,10 @@ on:
       - release/*/*
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -87,7 +91,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-artifacts
+          name: test-artifacts-ubuntu
           path: |
             ${{ env.ARTIFACTS_DIR }}/TestResults
             **/test-results.xml
@@ -125,14 +129,11 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Install workloads
-        run: dotnet workload install wasm-tools wasm-tools-net9
-
-      - name: Build solution
-        run: dotnet build MonacoEditorComponent.slnx -c Release
-
       - name: Build desktop test app
         run: dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-desktop -c Release
+
+      - name: Build test project
+        run: dotnet build MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release
 
       - name: Install Playwright browsers
         shell: pwsh
@@ -149,16 +150,63 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: desktop-test-artifacts
+          name: test-artifacts-windows
           path: |
             **/desktop-test-results.xml
+            **/test-artifacts/**
+          if-no-files-found: ignore
+
+  build-macos:
+    name: Build (macOS ARM)
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install workloads
+        run: dotnet workload install wasm-tools
+
+      - name: Build solution
+        run: dotnet build MonacoEditorComponent.slnx -c Release
+
+      - name: Build WASM test app
+        run: dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm -c Release
+
+      - name: Build desktop test app
+        run: dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-desktop -c Release
+
+      - name: Install Playwright browsers
+        shell: pwsh
+        run: |
+          $globalPkgs = dotnet nuget locals global-packages --list | ForEach-Object { ($_ -split '\s+',2)[1].Trim() }
+          $pwScript = Get-ChildItem -Path (Join-Path $globalPkgs "microsoft.playwright") -Filter "playwright.ps1" -Recurse | Sort-Object -Property FullName -Descending | Select-Object -First 1
+          if (-not $pwScript) { throw "Playwright install script not found in NuGet cache" }
+          & $pwScript.FullName install --with-deps chromium
+
+      - name: Run tests
+        run: dotnet test MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release --no-build -- --filter-not-trait "Category=DesktopCDP" --report-xunit --report-xunit-filename test-results.xml
+
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts-macos
+          path: |
+            **/test-results.xml
             **/test-artifacts/**
           if-no-files-found: ignore
 
   sign:
     name: Sign
     runs-on: windows-latest
-    needs: build
+    needs: [build, desktop-tests, build-macos]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/'))
     environment: PackageSign
     permissions:
