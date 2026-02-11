@@ -1,4 +1,4 @@
-import { isDesktopHost, getConnection, sendRequestWithTimeout, releaseConnection } from './bridge/jsonRpcBridge';
+import { isDesktopHost, getConnection, sendRequestWithTimeout, releaseConnection, RUNTIME_REQUEST_TIMEOUT_MS } from './bridge/jsonRpcBridge';
 
 /**
  * Module-level flag: true when running in a WebView2/WKWebView host (desktop),
@@ -119,11 +119,13 @@ export class ParentAccessor {
 
     public async callEvent(name: string, parameter1: string, parameter2: string): Promise<string | null> {
         if (_isDesktop) {
+            // Use longer runtime timeout for event/provider callbacks (may be slow under load)
             return await sendRequestWithTimeout<string | null>(
                 getConnection(), 'parentAccessor/callEvent', {
                     name,
                     parameters: [parameter1, parameter2]
-                }
+                },
+                RUNTIME_REQUEST_TIMEOUT_MS
             );
         }
         return ParentAccessor._managedCallEvent(this._managedOwner, name, [parameter1, parameter2]);

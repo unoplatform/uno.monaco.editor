@@ -163,14 +163,17 @@ export function retainConnection(): void {
 }
 
 /**
- * Decrement the connection reference count. When it reaches zero, the page-global
- * JSON-RPC connection is disposed (rejects pending requests, removes listeners).
+ * Decrement the connection reference count. Only disposes the page-global
+ * JSON-RPC connection on a true 1 -> 0 transition. Unmatched release calls
+ * (when count is already 0) are no-ops and do not dispose.
  * Returns true if the connection was actually disposed.
  */
 export function releaseConnection(): boolean {
-    if (_connectionRefCount > 0) {
-        _connectionRefCount--;
+    if (_connectionRefCount <= 0) {
+        // Already at zero -- no-op to prevent unmatched release from disposing
+        return false;
     }
+    _connectionRefCount--;
     if (_connectionRefCount === 0) {
         const conn = (window as any).__jsonRpc;
         if (conn) {
@@ -183,10 +186,16 @@ export function releaseConnection(): boolean {
 }
 
 /**
- * Default timeout (ms) for init-time JSON-RPC requests.
+ * Default timeout (ms) for init-time JSON-RPC requests (theme, property reads).
  * Prevents indefinite hangs if the C# host is slow or handlers are not yet registered.
  */
 export const INIT_REQUEST_TIMEOUT_MS = 10000;
+
+/**
+ * Default timeout (ms) for runtime JSON-RPC requests (event callbacks, provider calls).
+ * Longer than init timeout because provider callbacks can legitimately be slow under load.
+ */
+export const RUNTIME_REQUEST_TIMEOUT_MS = 30000;
 
 /**
  * Wraps a JSON-RPC sendRequest with a timeout. Rejects with a descriptive error
