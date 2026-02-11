@@ -252,6 +252,7 @@ namespace Monaco
 
             UnregisterPropertyChangedCallback(RequestedThemeProperty, _themeToken);
             _keyboardListener = null;
+            _initializedPresenter = null;
             _model = null;
         }
 
@@ -267,6 +268,7 @@ namespace Monaco
                 _view.Loaded -= WebView_DOMContentLoaded;
                 Debug.WriteLine("Setting initialized - false");
                 _initialized = false;
+                _initializedPresenter = null;
             }
 
             _view = (ICodeEditorPresenter)GetTemplateChild("View");
