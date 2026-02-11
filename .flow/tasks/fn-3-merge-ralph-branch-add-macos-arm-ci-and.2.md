@@ -57,9 +57,8 @@ This collapses the majority of generated/machine-generated file diffs while keep
 - [ ] Changes committed to current branch
 
 ## Done summary
-TBD
-
+Disabled Uno.Resizetizer splash screen generation in test app to fix GenerateWasmSplashAssets CI blocker on ubuntu-latest, and added linguist-generated markers to .gitattributes for generated Monaco typings and machine-generated .flow metadata while excluding hand-authored helpers and specs.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 94ea3d8e2af16724f7006d5d9f71bc2e2e5c7064
+- Tests: dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm -c Release, dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj --no-build -- --filter-not-trait Category=DesktopCDP --filter-not-trait Category=WasmPlaywright
 - PRs:
