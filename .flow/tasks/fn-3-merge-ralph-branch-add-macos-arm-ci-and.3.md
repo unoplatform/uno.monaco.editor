@@ -77,9 +77,8 @@ Use job-qualified artifact names to prevent cross-job collisions:
 - [ ] Changes committed to current branch
 
 ## Done summary
-TBD
-
+Added macOS ARM CI job (`build-macos`) on `macos-15`, cleaned up `desktop-tests` by removing wasm workloads and narrowing build scope, added workflow-scoped concurrency group, gated `sign` on all quality gates, and renamed artifact names to be job-qualified.
 ## Evidence
-- Commits:
+- Commits: eadd0d3
 - Tests:
 - PRs:

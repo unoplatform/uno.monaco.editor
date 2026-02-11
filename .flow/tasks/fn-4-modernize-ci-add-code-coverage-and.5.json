@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-11T22:37:30.402495Z",
+  "depends_on": [
+    "fn-4-modernize-ci-add-code-coverage-and.4"
+  ],
+  "epic": "fn-4-modernize-ci-add-code-coverage-and",
+  "id": "fn-4-modernize-ci-add-code-coverage-and.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-4-modernize-ci-add-code-coverage-and.5.md",
+  "status": "todo",
+  "title": "Create .NET CLI tool for C# type emission from intermediate model",
+  "updated_at": "2026-02-11T22:47:18.549882Z"
+}

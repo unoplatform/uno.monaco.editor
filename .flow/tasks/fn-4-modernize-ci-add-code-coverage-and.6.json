@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-11T22:37:30.556599Z",
+  "depends_on": [
+    "fn-4-modernize-ci-add-code-coverage-and.4",
+    "fn-4-modernize-ci-add-code-coverage-and.5"
+  ],
+  "epic": "fn-4-modernize-ci-add-code-coverage-and",
+  "id": "fn-4-modernize-ci-add-code-coverage-and.6",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-4-modernize-ci-add-code-coverage-and.6.md",
+  "status": "todo",
+  "title": "Add generator pipeline tests and replace old GenerateMonacoTypings scripts",
+  "updated_at": "2026-02-11T22:47:33.938433Z"
+}

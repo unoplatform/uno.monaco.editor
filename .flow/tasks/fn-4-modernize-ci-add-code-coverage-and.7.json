@@ -1,0 +1,18 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-11T22:45:51.096848Z",
+  "depends_on": [
+    "fn-4-modernize-ci-add-code-coverage-and.4",
+    "fn-4-modernize-ci-add-code-coverage-and.5",
+    "fn-4-modernize-ci-add-code-coverage-and.6"
+  ],
+  "epic": "fn-4-modernize-ci-add-code-coverage-and",
+  "id": "fn-4-modernize-ci-add-code-coverage-and.7",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-4-modernize-ci-add-code-coverage-and.7.md",
+  "status": "todo",
+  "title": "Migrate off old GenerateMonacoTypings and clean up",
+  "updated_at": "2026-02-11T22:47:45.301508Z"
+}
