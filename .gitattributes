@@ -61,3 +61,15 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+###############################################################################
+# Mark generated/machine-generated files so GitHub collapses their diffs.
+# Hand-authored helpers (LanguagesHelper.cs, ModelHelper.cs) and .flow specs
+# (.flow/specs/*.md, .flow/tasks/*.md, .flow/memory/*.md) are intentionally
+# excluded — they must remain visible for code review.
+###############################################################################
+MonacoEditorComponent/Monaco/Editor/**/*.cs  linguist-generated=true
+MonacoEditorComponent/Monaco/Helpers/**/*.cs linguist-generated=true
+MonacoEditorComponent/Monaco/Languages/**/*.cs linguist-generated=true
+.flow/**/*.json                              linguist-generated=true
+.flow/usage.md                               linguist-generated=true

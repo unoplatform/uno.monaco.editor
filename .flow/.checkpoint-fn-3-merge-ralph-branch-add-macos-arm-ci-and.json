@@ -1,0 +1,109 @@
+{
+  "created_at": "2026-02-11T20:45:05.215266Z",
+  "epic": {
+    "data": {
+      "branch_name": "ralph-20260211-093916-012f",
+      "completion_review_status": "unknown",
+      "completion_reviewed_at": null,
+      "created_at": "2026-02-11T20:35:45.613548Z",
+      "default_impl": null,
+      "default_review": null,
+      "default_sync": null,
+      "depends_on_epics": [],
+      "id": "fn-3-merge-ralph-branch-add-macos-arm-ci-and",
+      "next_task": 1,
+      "plan_review_status": "unknown",
+      "plan_reviewed_at": null,
+      "spec_path": ".flow/specs/fn-3-merge-ralph-branch-add-macos-arm-ci-and.md",
+      "status": "open",
+      "title": "Merge ralph branch, add macOS ARM CI, and get CI green",
+      "updated_at": "2026-02-11T20:36:17.908114Z"
+    },
+    "spec": "# Merge ralph branch, add macOS ARM CI, and get CI green\n\n## Overview\n\nMerge the ralph branch (102 commits spanning fn-1 Desktop Skia target + fn-2 STJ migration) into `dev/cnov/desktop-head`, push upstream, add multi-platform CI testing (macOS ARM + Windows + Linux), and ensure CI passes on PR #38.\n\n## Scope\n\n- Fast-forward merge ralph \u2192 desktop-head \u2192 push to origin\n- Fix the blocking Uno.Resizetizer `GenerateWasmSplashAssets` CI error\n- Add macOS ARM (`macos-15`) CI job for cross-platform build+test verification\n- Clean up CI workflow (remove unnecessary workloads, add concurrency groups)\n- Add `.gitattributes` linguist-generated markers for reviewable PR diffs\n- Update PR #38 metadata to reflect full scope (fn-1 + fn-2)\n- Monitor CI until all jobs pass\n\n## Key Context\n\n### Branch Topology (all fast-forward, no conflicts)\n```\nmain (fc42320)\n  \u2514\u2500\u2500 9 commits \u2192 dev/cnov/desktop-head (ce90741) [remote exists]\n                     \u2514\u2500\u2500 93 commits \u2192 ralph-20260211-093916-012f (b6ac171) [HEAD, local only]\n```\n\n### Current CI Architecture (`.github/workflows/ci.yml`)\n- `build` job (ubuntu-latest): solution build + WASM test app + non-DesktopCDP tests\n- `desktop-tests` job (windows-latest): desktop build + DesktopCDP Playwright tests\n- `sign/publish` jobs: gated on push to main/release branches\n\n### CI Blocker\nUno.Resizetizer 1.12.1 `GenerateWasmSplashAssets` task fails on ubuntu in the `Build WASM test app` step. This is a transitive dependency from Uno.Sdk 6.5.31, not a code defect.\n\n### Platform Test Constraints\n- **DesktopCDP tests**: Windows-only (WebView2 CDP). macOS uses WKWebView, Linux uses WebKitGTK \u2014 neither supports CDP.\n- **macOS ARM CI**: Can run unit tests, serialization tests, WASM Playwright tests. Skip DesktopCDP.\n- **Uno Skia Desktop on macOS**: Auto-falls back to software rendering when Metal unavailable (GitHub CI VMs).\n\n### Reference Patterns\n- `unoplatform/uno.templates` CI: three parallel OS jobs (macos-15, ubuntu-latest, windows-latest) + test-validation gate\n- `unoplatform/uno.resizetizer` CI: cross-platform matrix with `macos-15`\n- `macos-15` runners are ARM64 (Apple Silicon), .NET 10.0.102 pre-installed\n\n## Quick commands\n```bash\n# Verify branch topology\ngit merge-base --is-ancestor dev/cnov/desktop-head ralph-20260211-093916-012f && echo \"fast-forward safe\"\n\n# Build locally\ndotnet build MonacoEditorComponent.slnx -c Release\n\n# Run non-desktop tests\ndotnet test MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -- --filter-not-trait \"Category=DesktopCDP\"\n\n# Monitor CI after push\ngh pr checks 38 --repo unoplatform/uno.monaco.editor --watch\n```\n\n## Acceptance\n\n- [ ] ralph branch merged into dev/cnov/desktop-head (fast-forward)\n- [ ] dev/cnov/desktop-head pushed to origin\n- [ ] Resizetizer CI blocker resolved (WASM test app builds on ubuntu)\n- [ ] macOS ARM CI job added (`macos-15` runner) running non-DesktopCDP tests\n- [ ] Desktop tests pass on Windows (`desktop-tests` job)\n- [ ] WASM + unit + serialization tests pass on Ubuntu (`build` job)\n- [ ] WASM + unit + serialization tests pass on macOS ARM (new job)\n- [ ] PR #38 title/body updated to reflect fn-1 + fn-2 scope\n- [ ] `.gitattributes` has linguist-generated markers for generated/vendored files\n- [ ] All CI checks green on PR #38\n\n## Known Gaps\n- Linux desktop validation: build-only (no CDP integration tests possible on Linux)\n- macOS desktop CDP tests: not possible (WKWebView has no CDP support)\n\n## Risks\n- Resizetizer fix may require Uno.Sdk version bump (could introduce other changes)\n- macOS ARM Playwright browser install may behave differently than Ubuntu\n- Large PR diff (427 files) may cause GitHub UI performance issues (mitigated by linguist-generated)\n"
+  },
+  "epic_id": "fn-3-merge-ralph-branch-add-macos-arm-ci-and",
+  "schema_version": 2,
+  "tasks": [
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-11T20:36:26.172605Z",
+        "depends_on": [],
+        "epic": "fn-3-merge-ralph-branch-add-macos-arm-ci-and",
+        "id": "fn-3-merge-ralph-branch-add-macos-arm-ci-and.1",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-3-merge-ralph-branch-add-macos-arm-ci-and.1.md",
+        "status": "todo",
+        "title": "Merge ralph into desktop-head and push upstream",
+        "updated_at": "2026-02-11T20:36:38.059801Z"
+      },
+      "id": "fn-3-merge-ralph-branch-add-macos-arm-ci-and.1",
+      "runtime": null,
+      "spec": "# fn-3-merge-ralph-branch-add-macos-arm-ci-and.1 Merge ralph into desktop-head and push upstream\n\n## Description\nFast-forward merge the ralph branch into `dev/cnov/desktop-head` and push the updated branch to origin. This updates PR #38 with all 102 commits from the two completed epics.\n\n**Size:** S\n**Files:** none (git operations only)\n\n## Approach\n\n1. Verify fast-forward is safe: `git merge-base --is-ancestor dev/cnov/desktop-head ralph-20260211-093916-012f`\n2. Fast-forward desktop-head: `git checkout dev/cnov/desktop-head && git merge --ff-only ralph-20260211-093916-012f`\n3. Push to origin: `git push origin dev/cnov/desktop-head`\n4. Verify PR #38 updated: `gh pr view 38 --repo unoplatform/uno.monaco.editor`\n\n## Key context\n\n- Ralph is a strict superset of desktop-head (93 commits ahead, 0 behind). Merge-base = desktop-head tip.\n- Desktop-head is a strict superset of main (9 commits ahead, 0 behind).\n- PR #38 already exists as DRAFT targeting main from dev/cnov/desktop-head.\n- Pushing to desktop-head automatically updates PR #38 and triggers CI.\n## Acceptance\n- [ ] `dev/cnov/desktop-head` tip matches ralph branch tip (b6ac171)\n- [ ] `origin/dev/cnov/desktop-head` updated on remote\n- [ ] PR #38 shows all 102 commits\n- [ ] CI triggered on PR #38\n## Done summary\nTBD\n\n## Evidence\n- Commits:\n- Tests:\n- PRs:\n"
+    },
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-11T20:36:26.269410Z",
+        "depends_on": [],
+        "epic": "fn-3-merge-ralph-branch-add-macos-arm-ci-and",
+        "id": "fn-3-merge-ralph-branch-add-macos-arm-ci-and.2",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-3-merge-ralph-branch-add-macos-arm-ci-and.2.md",
+        "status": "todo",
+        "title": "Fix Resizetizer CI blocker and add .gitattributes markers",
+        "updated_at": "2026-02-11T20:36:50.961964Z"
+      },
+      "id": "fn-3-merge-ralph-branch-add-macos-arm-ci-and.2",
+      "runtime": null,
+      "spec": "# fn-3-merge-ralph-branch-add-macos-arm-ci-and.2 Fix Resizetizer CI blocker and add .gitattributes markers\n\n## Description\nFix the Uno.Resizetizer `GenerateWasmSplashAssets` CI blocker that prevents the WASM test app from building on ubuntu-latest. Also add `linguist-generated` markers to `.gitattributes` so GitHub collapses generated/vendored file diffs in the PR.\n\n**Size:** M\n**Files:** `MonacoEditorTestApp/MonacoEditorTestApp.csproj`, `.gitattributes`\n\n## Approach\n\n### Resizetizer fix\n\nThe error is `MSB4181: The \"GenerateWasmSplashAssets_...\" task returned false` from Uno.Resizetizer 1.12.1 (transitive via Uno.Sdk 6.5.31). Options:\n\n1. **Preferred**: Add `<UnoDisableSplashScreen>true</UnoDisableSplashScreen>` to MonacoEditorTestApp.csproj \u2014 this is a test app, splash screen is irrelevant\n2. **Alternative**: Bump Uno.Sdk version if a fix exists upstream\n3. Verify fix by building: `dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm -c Release`\n\n### .gitattributes markers\n\nAdd `linguist-generated=true` for:\n- `MonacoEditorComponent/Monaco/**/*.cs` (generated from typings)\n- `MonacoEditorComponent/monaco-editor/**` (vendored Monaco distribution)\n- `.flow/**` (task tracking metadata)\n\nThis collapses ~300+ files in the GitHub PR diff, making review feasible.\n\n## Key context\n\n- The Resizetizer error blocks the `Build WASM test app` step (ci.yml:73) before any tests run\n- Uno.Resizetizer is a transitive dependency \u2014 no explicit PackageReference to pin\n- `.gitattributes` currently has no linguist-generated entries\n- PR #38 has 427 files changed / ~100k lines \u2014 GitHub UI is unusable without collapsing generated files\n## Acceptance\n- [ ] `dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm -c Release` succeeds locally\n- [ ] `.gitattributes` has linguist-generated markers for Monaco/**, monaco-editor/**, .flow/**\n- [ ] Changes committed to current branch\n## Done summary\nTBD\n\n## Evidence\n- Commits:\n- Tests:\n- PRs:\n"
+    },
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-11T20:36:26.406817Z",
+        "depends_on": [
+          "fn-3-merge-ralph-branch-add-macos-arm-ci-and.1",
+          "fn-3-merge-ralph-branch-add-macos-arm-ci-and.2"
+        ],
+        "epic": "fn-3-merge-ralph-branch-add-macos-arm-ci-and",
+        "id": "fn-3-merge-ralph-branch-add-macos-arm-ci-and.3",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-3-merge-ralph-branch-add-macos-arm-ci-and.3.md",
+        "status": "todo",
+        "title": "Add macOS ARM CI job and clean up CI workflow",
+        "updated_at": "2026-02-11T20:37:11.498205Z"
+      },
+      "id": "fn-3-merge-ralph-branch-add-macos-arm-ci-and.3",
+      "runtime": null,
+      "spec": "# fn-3-merge-ralph-branch-add-macos-arm-ci-and.3 Add macOS ARM CI job and clean up CI workflow\n\n## Description\nAdd a new `build-macos` job to `.github/workflows/ci.yml` that runs on `macos-15` (ARM64) for cross-platform verification. Also clean up the existing `desktop-tests` job by removing unnecessary workload installs, and add concurrency groups for PR efficiency.\n\n**Size:** M\n**Files:** `.github/workflows/ci.yml`\n\n## Approach\n\n### New macOS ARM job\n\nAdd `build-macos` job following the `unoplatform/uno.templates` pattern (three parallel OS jobs). The macOS job should:\n\n1. Run on `macos-15` (ARM64 Apple Silicon)\n2. Checkout with `fetch-depth: 0` (needed for NBGV)\n3. Setup .NET 10.0.x via `actions/setup-dotnet@v4`\n4. Install `wasm-tools` workload (needed for WASM test app build)\n5. Build solution (`dotnet build MonacoEditorComponent.slnx -c Release`)\n6. Build WASM test app (`-f net10.0-browserwasm`)\n7. Build desktop test app (`-f net10.0-desktop`) \u2014 verifies macOS Skia compilation\n8. Install Playwright Chromium (same pattern as existing build job, ci.yml:75-81)\n9. Run tests with `--filter-not-trait \"Category=DesktopCDP\"` (same filter as ubuntu build job)\n10. Upload test artifacts on failure\n\nThe job should run in parallel with `build` (no `needs` dependency) for faster CI.\n\n### CI cleanup\n\n- **desktop-tests job**: Remove `wasm-tools wasm-tools-net9` from workload install (ci.yml:129) \u2014 this job only builds `net10.0-desktop`\n- **Concurrency**: Add top-level concurrency group to cancel superseded PR runs:\n  ```yaml\n  concurrency:\n    group: ci-${{ github.ref }}\n    cancel-in-progress: true\n  ```\n\n### Desktop-tests gate (optional)\n\nConsider whether `sign` job should `needs: [build, desktop-tests]` instead of just `needs: build`. Currently desktop test failures don't block signing/publishing.\n\n## Key context\n\n- `macos-15` runners: ARM64, 3 cores, 7GB RAM, .NET 10.0.102 pre-installed\n- Uno Skia Desktop on macOS auto-falls back to software rendering in CI (no Metal in VMs) \u2014 this is expected\n- Desktop CDP tests CANNOT run on macOS (WKWebView has no CDP) \u2014 must filter them out\n- Playwright supports ARM64 Chromium on macOS natively (since Playwright 1.40+)\n- Memory pitfall: \"Playwright NuGet build/buildTransitive targets conflict with UseArtifactsOutput+OutputType=Exe on macOS/Linux\"\n- `wasm-tools-net9` workload: verify still needed with .NET 10 SDK, remove if not\n## Acceptance\n- [ ] New `build-macos` job in ci.yml runs on `macos-15`\n- [ ] macOS job builds solution, WASM test app, and desktop test app\n- [ ] macOS job runs non-DesktopCDP tests with Playwright Chromium\n- [ ] macOS job runs in parallel with existing `build` job (no serial dependency)\n- [ ] `desktop-tests` job no longer installs unnecessary wasm-tools workloads\n- [ ] Concurrency group added to cancel superseded PR runs\n- [ ] Changes committed to current branch\n## Done summary\nTBD\n\n## Evidence\n- Commits:\n- Tests:\n- PRs:\n"
+    },
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-11T20:36:26.525850Z",
+        "depends_on": [
+          "fn-3-merge-ralph-branch-add-macos-arm-ci-and.3"
+        ],
+        "epic": "fn-3-merge-ralph-branch-add-macos-arm-ci-and",
+        "id": "fn-3-merge-ralph-branch-add-macos-arm-ci-and.4",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-3-merge-ralph-branch-add-macos-arm-ci-and.4.md",
+        "status": "todo",
+        "title": "Update PR #38 metadata and monitor CI to green",
+        "updated_at": "2026-02-11T20:37:21.741867Z"
+      },
+      "id": "fn-3-merge-ralph-branch-add-macos-arm-ci-and.4",
+      "runtime": null,
+      "spec": "# fn-3-merge-ralph-branch-add-macos-arm-ci-and.4 Update PR #38 metadata and monitor CI to green\n\n## Description\nUpdate PR #38 title and body to reflect the full scope of changes (fn-1 Desktop Skia + fn-2 STJ migration + CI improvements). Push all committed changes, then monitor CI until all jobs pass.\n\n**Size:** S\n**Files:** none (git + gh CLI operations only)\n\n## Approach\n\n1. Push current branch changes to `dev/cnov/desktop-head`:\n   - If still on ralph branch: merge into desktop-head first, then push\n   - If on desktop-head: push directly\n\n2. Update PR #38 title and body via `gh pr edit`:\n   - Title: reflect both epics + CI improvements\n   - Body: structured summary with sections for Desktop Skia support, STJ migration, CI multi-platform testing\n   - Mark PR as ready for review (remove draft status)\n\n3. Monitor CI: `gh pr checks 38 --repo unoplatform/uno.monaco.editor --watch`\n\n4. If any job fails:\n   - Check logs: `gh run view <run-id> --repo unoplatform/uno.monaco.editor --log-failed`\n   - Diagnose and fix\n   - Push fix and re-monitor\n\n## Key context\n\n- PR #38 currently titled \"Add support for Skia Desktop\" with planning-only body \u2014 stale\n- CI triggers on push to PR branch via `pull_request` trigger (ci.yml:8-11)\n- Three CI jobs should run: `build` (ubuntu), `desktop-tests` (windows), `build-macos` (macos-15)\n- `sign`/`publish` jobs only run on push to main/release \u2014 won't trigger on PR\n- `gh pr checks` exit codes: 0=pass, 1=fail, 8=pending\n## Acceptance\n- [ ] PR #38 title updated to reflect fn-1 + fn-2 + CI scope\n- [ ] PR #38 body has structured summary of all changes\n- [ ] All committed changes pushed to origin/dev/cnov/desktop-head\n- [ ] `build` job (ubuntu): passes\n- [ ] `desktop-tests` job (windows): passes\n- [ ] `build-macos` job (macos-15): passes\n- [ ] All CI checks green on PR #38\n## Done summary\nTBD\n\n## Evidence\n- Commits:\n- Tests:\n- PRs:\n"
+    }
+  ]
+}

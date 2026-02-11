@@ -96,3 +96,6 @@ STJ source-gen AOT: always serialize concrete types (not interfaces like IPositi
 
 ## 2026-02-11 manual [pitfall]
 When migrating encoding/decoding logic across layers (e.g., JSExport boundary vs shared accessor), verify decode operations happen at exactly one layer to prevent double-encoding/decoding that corrupts data with escape sequences.
+
+## 2026-02-11 manual [pitfall]
+linguist-generated markers must target only machine-generated/vendored files — never hand-authored specs or docs even if in same directory tree

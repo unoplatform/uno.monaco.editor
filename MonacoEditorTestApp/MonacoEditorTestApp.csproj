@@ -17,6 +17,10 @@
 		<!-- Package Description -->
 		<Description>MonacoEditorTestApp powered by Uno Platform.</Description>
 
+		<!-- Disable splash screen — not needed for a test app, and Uno.Resizetizer
+		     GenerateWasmSplashAssets fails on ubuntu-latest CI runners -->
+		<UnoDisableSplashScreen>true</UnoDisableSplashScreen>
+
 		<!--
       UnoFeatures let's you quickly add and manage implicit package references based on the features you want to use.
       https://aka.platform.uno/singleproject-features
