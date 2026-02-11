@@ -11,7 +11,8 @@ Final validation pass across all platforms. Run automated tests (unit + Playwrig
 Run the appropriate test command based on the platform being validated:
 
 - **Windows**: `dotnet test MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj` (full suite including desktop CDP tests)
-- **macOS/Linux**: `dotnet test MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj --filter "Category!=DesktopCDP"` (excludes Windows-only desktop CDP tests)
+- **macOS/Linux**: `dotnet test MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -- --filter-not-trait "Category=DesktopCDP" --filter-not-trait "Category=WasmPlaywright"` (excludes Windows-only desktop CDP tests and WASM Playwright tests that require Playwright browser install + WASM build output)
+<!-- Updated by plan-sync: fn-1-implement-desktop-skia-target-for.8 uses xUnit v3 MTP2 runner syntax (--filter-not-trait) not MSTest-style --filter; WASM Playwright tests have separate WasmPlaywright trait -->
 
 This runs pure helper tests (Task 6) + applicable Playwright integration tests (Task 8) in one pass.
 
@@ -57,7 +58,8 @@ If automated Playwright tests pass but manual testing reveals edge cases, the Pl
 
 ## Acceptance
 - [ ] `dotnet test` passes on Windows (full suite including desktop CDP)
-- [ ] `dotnet test --filter "Category!=DesktopCDP"` passes on macOS and Linux
+- [ ] `dotnet test MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -- --filter-not-trait "Category=DesktopCDP" --filter-not-trait "Category=WasmPlaywright"` passes on macOS and Linux
+<!-- Updated by plan-sync: fn-1-implement-desktop-skia-target-for.8 uses xUnit v3 MTP2 --filter-not-trait syntax, and added WasmPlaywright filter for local runs without Playwright -->
 - [ ] Text editing works on Windows, macOS, and Linux
 - [ ] Theme switching works on all three platforms
 - [ ] Keyboard shortcuts work on all three platforms
