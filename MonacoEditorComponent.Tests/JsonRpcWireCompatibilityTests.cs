@@ -197,7 +197,10 @@ public sealed class JsonRpcWireCompatibilityTests : IDisposable
         var root = doc.RootElement;
 
         var propertyNames = root.EnumerateObject().Select(p => p.Name).ToHashSet();
-        Assert.Subset(new HashSet<string> { "jsonrpc", "method", "params" }, propertyNames);
+        // Only jsonrpc, method, and optionally params are allowed. No extra fields.
+        var allowed = new HashSet<string> { "jsonrpc", "method", "params" };
+        Assert.True(propertyNames.IsSubsetOf(allowed),
+            $"Unexpected fields in notification: {string.Join(", ", propertyNames.Except(allowed))}");
     }
 
     [Fact]

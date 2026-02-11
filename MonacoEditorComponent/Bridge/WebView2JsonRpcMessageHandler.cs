@@ -21,6 +21,10 @@ internal sealed class WebView2JsonRpcMessageHandler : IJsonRpcMessageHandler, ID
     // 10 MB max payload size per bridge-protocol.md security constraints.
     private const int MaxPayloadSizeBytes = 10 * 1024 * 1024;
 
+    // Max queued inbound messages. Prevents unbounded memory growth from
+    // a hostile or buggy web side sending faster than we can dispatch.
+    private const int MaxQueuedMessages = 256;
+
     // Per-method required params validation. Each entry maps a method name
     // to the set of required param field names (must be present as object properties).
     // Methods with no required params map to an empty array.
@@ -54,10 +58,11 @@ internal sealed class WebView2JsonRpcMessageHandler : IJsonRpcMessageHandler, ID
 
         _presenter = presenter;
         _formatter = formatter;
-        _inboundChannel = Channel.CreateUnbounded<ReadOnlySequence<byte>>(new UnboundedChannelOptions
+        _inboundChannel = Channel.CreateBounded<ReadOnlySequence<byte>>(new BoundedChannelOptions(MaxQueuedMessages)
         {
             SingleReader = true,
             SingleWriter = true,
+            FullMode = BoundedChannelFullMode.DropOldest,
         });
 
         // Subscribe to inbound messages from the presenter.

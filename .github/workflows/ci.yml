@@ -73,7 +73,10 @@ jobs:
         run: dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_DIR }}"
 
       - name: Install Playwright browsers
-        run: pwsh ${{ env.ARTIFACTS_DIR }}/bin/MonacoEditorComponent.Tests/release/playwright.ps1 install --with-deps chromium
+        shell: pwsh
+        run: |
+          $pwScript = Join-Path (dotnet nuget locals global-packages --list | ForEach-Object { ($_ -split '\s+',2)[1].Trim() }) "microsoft.playwright/1.52.0/buildTransitive/playwright.ps1"
+          & $pwScript install --with-deps chromium
 
       - name: Run tests
         run: dotnet test MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_DIR }}" --no-build -- --filter "Category != DesktopCDP" --report-xunit --report-xunit-filename test-results.xml
@@ -86,6 +89,7 @@ jobs:
           path: |
             ${{ env.ARTIFACTS_DIR }}/TestResults
             **/test-results.xml
+            **/test-artifacts/**
           if-no-files-found: ignore
 
       - name: Upload packages

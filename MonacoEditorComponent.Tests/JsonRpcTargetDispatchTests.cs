@@ -65,10 +65,11 @@ public sealed class JsonRpcTargetDispatchTests : IAsyncLifetime
     {
         await _clientRpc!.NotifyAsync("parentAccessor/callAction", new { name = "testAction" });
 
-        // Give time for async dispatch.
-        await Task.Delay(100);
-
-        Assert.Contains("testAction", _target!.CalledActions);
+        // Wait for async dispatch with deterministic signaling.
+        Assert.True(
+            await _target!.ActionCalledSignal.Task.WaitAsync(TimeSpan.FromSeconds(5)),
+            "callAction notification was not dispatched");
+        Assert.Contains("testAction", _target.CalledActions);
     }
 
     [Fact]
@@ -97,14 +98,17 @@ public sealed class JsonRpcTargetDispatchTests : IAsyncLifetime
     {
         await _clientRpc!.NotifyAsync("bridge/ready", new { protocolVersion = 1 });
 
-        await Task.Delay(100);
-
-        Assert.True(_target!.BridgeReadyReceived);
+        // Wait for async dispatch with deterministic signaling.
+        Assert.True(
+            await _target!.BridgeReadySignal.Task.WaitAsync(TimeSpan.FromSeconds(5)),
+            "bridge/ready notification was not dispatched");
+        Assert.True(_target.BridgeReadyReceived);
         Assert.Equal(1, _target.BridgeReadyProtocolVersion);
     }
 
     /// <summary>
     /// Mock bridge target with [JsonRpcMethod] attributes for testing dispatch.
+    /// Uses TaskCompletionSource for deterministic signaling instead of Task.Delay.
     /// </summary>
     private sealed class MockBridgeTarget
     {
@@ -112,10 +116,17 @@ public sealed class JsonRpcTargetDispatchTests : IAsyncLifetime
         public bool BridgeReadyReceived { get; private set; }
         public int BridgeReadyProtocolVersion { get; private set; }
 
+        /// <summary>Signal set when callAction is dispatched.</summary>
+        public TaskCompletionSource<bool> ActionCalledSignal { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        /// <summary>Signal set when bridge/ready is dispatched.</summary>
+        public TaskCompletionSource<bool> BridgeReadySignal { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         [JsonRpcMethod("parentAccessor/callAction")]
         public void OnCallAction(CallActionDto p)
         {
             CalledActions.Add(p.Name);
+            ActionCalledSignal.TrySetResult(true);
         }
 
         [JsonRpcMethod("parentAccessor/getJsonValue")]
@@ -135,6 +146,7 @@ public sealed class JsonRpcTargetDispatchTests : IAsyncLifetime
         {
             BridgeReadyReceived = true;
             BridgeReadyProtocolVersion = p.ProtocolVersion;
+            BridgeReadySignal.TrySetResult(true);
         }
     }
 
