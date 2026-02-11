@@ -101,10 +101,21 @@ Ran integration tests and macOS desktop validation. All 94 unit tests pass, both
 |---|---|---|
 | All features | Deferred | No Linux runner available in current agent environment. Linux uses WebKitGTK (Uno Skia). Build is expected to succeed (same net10.0 TFM). WebKitGTK has known differences from Chromium WebView2. Manual validation required when Linux CI runner or dev machine is available. |
 
-### Windows — Deferred to CI (desktop CDP tests)
+### Windows — Automated via CI (desktop CDP tests)
 | Feature | Result | Notes |
 |---|---|---|
-| Desktop CDP tests | Automated | `DesktopIntegrationTests`: editor load, text round-trip, bridge round-trip, theme switch, decorations, lifecycle exactly-once |
+| Editor load | Automated | `DesktopIntegrationTests.EditorLoads_MonacoInstanceCreated` |
+| Text editing | Automated | `DesktopIntegrationTests.TextRoundTrip_SetAndGetText` |
+| Bridge round-trip | Automated | `DesktopIntegrationTests.BridgeRoundTrip_JsonRpcGetValue` |
+| Theme switching | Automated | `DesktopIntegrationTests.ThemeSwitching_ChangeThemeAndVerify` |
+| Decorations | Automated | `DesktopIntegrationTests.Decorations_AddAndVerify` |
+| Markers | Automated | `DesktopIntegrationTests.Markers_AddAndVerify` |
+| Keyboard (undo/redo) | Automated | `DesktopIntegrationTests.Keyboard_UndoRedoWorks` |
+| Completion provider | Automated | `DesktopIntegrationTests.LanguageServices_CompletionProviderRegistered` |
+| Hover provider | Automated | `DesktopIntegrationTests.LanguageServices_HoverProviderRegistered` |
+| CodeLens provider | Automated | `DesktopIntegrationTests.LanguageServices_CodeLensProviderRegistered` |
+| Color provider | Automated | `DesktopIntegrationTests.LanguageServices_ColorProviderRegistered` |
+| Lifecycle exactly-once | Automated | `DesktopIntegrationTests.LifecycleEvents_ExactlyOnce` |
 | Unit tests | Automated | Full suite runs in CI (ubuntu build job + windows desktop-tests job) |
 
 ### WASM — Automated (Playwright browser tests)

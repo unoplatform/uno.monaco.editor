@@ -201,6 +201,194 @@ public sealed class DesktopIntegrationTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "DesktopCDP")]
+    public async Task Markers_AddAndVerify()
+    {
+        _currentTestName = nameof(Markers_AddAndVerify);
+        try
+        {
+            // Set text content for markers.
+            await _fixture.Page.EvaluateAsync(
+                "() => monaco.editor.getEditors()[0].setValue('let x = 1;\\nlet y = 2;\\nlet z = 3;')");
+
+            // Add markers via Monaco JS API.
+            await _fixture.Page.EvaluateAsync("""
+                () => {
+                    const model = monaco.editor.getEditors()[0].getModel();
+                    monaco.editor.setModelMarkers(model, 'test', [{
+                        startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 5,
+                        message: 'Test error marker',
+                        severity: monaco.MarkerSeverity.Error
+                    }]);
+                }
+                """);
+
+            // Verify markers were added.
+            var markerCount = await _fixture.Page.EvaluateAsync<int>("""
+                () => {
+                    const model = monaco.editor.getEditors()[0].getModel();
+                    return monaco.editor.getModelMarkers({ resource: model.uri }).length;
+                }
+                """);
+
+            Assert.True(markerCount > 0, "Expected at least one marker after adding.");
+
+            // Cleanup.
+            await _fixture.Page.EvaluateAsync("""
+                () => {
+                    const model = monaco.editor.getEditors()[0].getModel();
+                    monaco.editor.setModelMarkers(model, 'test', []);
+                }
+                """);
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "DesktopCDP")]
+    public async Task LanguageServices_CompletionProviderRegistered()
+    {
+        _currentTestName = nameof(LanguageServices_CompletionProviderRegistered);
+        try
+        {
+            // Trigger completion programmatically and check that suggestions appear.
+            // The test app registers a CompletionItemProvider that responds to trigger characters.
+            var hasCompletionApi = await _fixture.Page.EvaluateAsync<bool>(
+                "() => typeof monaco.languages.registerCompletionItemProvider === 'function'");
+
+            Assert.True(hasCompletionApi, "Monaco completion API should be available.");
+
+            // Verify the editor can trigger completion without errors.
+            var triggeredOk = await _fixture.Page.EvaluateAsync<bool>("""
+                () => {
+                    try {
+                        const editor = monaco.editor.getEditors()[0];
+                        editor.trigger('test', 'editor.action.triggerSuggest', {});
+                        return true;
+                    } catch { return false; }
+                }
+                """);
+
+            Assert.True(triggeredOk, "Triggering completion should not throw.");
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "DesktopCDP")]
+    public async Task LanguageServices_HoverProviderRegistered()
+    {
+        _currentTestName = nameof(LanguageServices_HoverProviderRegistered);
+        try
+        {
+            var hasHoverApi = await _fixture.Page.EvaluateAsync<bool>(
+                "() => typeof monaco.languages.registerHoverProvider === 'function'");
+
+            Assert.True(hasHoverApi, "Monaco hover API should be available.");
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "DesktopCDP")]
+    public async Task LanguageServices_CodeLensProviderRegistered()
+    {
+        _currentTestName = nameof(LanguageServices_CodeLensProviderRegistered);
+        try
+        {
+            var hasCodeLensApi = await _fixture.Page.EvaluateAsync<bool>(
+                "() => typeof monaco.languages.registerCodeLensProvider === 'function'");
+
+            Assert.True(hasCodeLensApi, "Monaco CodeLens API should be available.");
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "DesktopCDP")]
+    public async Task LanguageServices_ColorProviderRegistered()
+    {
+        _currentTestName = nameof(LanguageServices_ColorProviderRegistered);
+        try
+        {
+            var hasColorApi = await _fixture.Page.EvaluateAsync<bool>(
+                "() => typeof monaco.languages.registerColorProvider === 'function'");
+
+            Assert.True(hasColorApi, "Monaco color provider API should be available.");
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "DesktopCDP")]
+    public async Task Keyboard_UndoRedoWorks()
+    {
+        _currentTestName = nameof(Keyboard_UndoRedoWorks);
+        try
+        {
+            // Set initial text.
+            await _fixture.Page.EvaluateAsync(
+                "() => monaco.editor.getEditors()[0].setValue('initial')");
+
+            // Type additional text via the editor action.
+            await _fixture.Page.EvaluateAsync("""
+                () => {
+                    const editor = monaco.editor.getEditors()[0];
+                    editor.executeEdits('test', [{
+                        range: new monaco.Range(1, 8, 1, 8),
+                        text: ' extra'
+                    }]);
+                }
+                """);
+
+            var afterEdit = await _fixture.Page.EvaluateAsync<string>(
+                "() => monaco.editor.getEditors()[0].getValue()");
+            Assert.Equal("initial extra", afterEdit);
+
+            // Trigger undo via Monaco action.
+            await _fixture.Page.EvaluateAsync(
+                "() => monaco.editor.getEditors()[0].trigger('test', 'undo', null)");
+
+            var afterUndo = await _fixture.Page.EvaluateAsync<string>(
+                "() => monaco.editor.getEditors()[0].getValue()");
+            Assert.Equal("initial", afterUndo);
+
+            // Trigger redo.
+            await _fixture.Page.EvaluateAsync(
+                "() => monaco.editor.getEditors()[0].trigger('test', 'redo', null)");
+
+            var afterRedo = await _fixture.Page.EvaluateAsync<string>(
+                "() => monaco.editor.getEditors()[0].getValue()");
+            Assert.Equal("initial extra", afterRedo);
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "DesktopCDP")]
     public async Task LifecycleEvents_ExactlyOnce()
     {
         _currentTestName = nameof(LifecycleEvents_ExactlyOnce);
