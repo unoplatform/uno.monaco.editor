@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
 
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -8,7 +9,6 @@ using Microsoft.UI.Xaml.Input;
 using Monaco.Helpers;
 
 using Windows.Foundation;
-using Windows.UI.Core;
 
 namespace Monaco
 {
@@ -49,21 +49,20 @@ namespace Monaco
             Console.WriteLine("WebView_DOMContentLoaded()");
 #endif
 
-#if __WASM__
-            InitialiseWebObjects();
+            if (OperatingSystem.IsBrowser())
+            {
+                InitialiseWebObjects();
 
+                await ((ICodeEditorPresenter)sender).Launch();
 
-            await ((ICodeEditorPresenter)sender).Launch();
-
-
-            Options.Language = CodeLanguage;
-            Options.ReadOnly = ReadOnly;
-#endif
+                Options.Language = CodeLanguage;
+                Options.ReadOnly = ReadOnly;
+            }
         }
 
         private async void WebView_NavigationCompleted(ICodeEditorPresenter? sender, WebViewNavigationCompletedEventArgs? args)
         {
-#if DEBUG && !HAS_UNO_WASM
+#if DEBUG
             Debug.WriteLine($"Navigation completed - {args?.IsSuccess}");
 #endif
             IsEditorLoaded = true;
@@ -156,9 +155,10 @@ namespace Monaco
             EditorLoading?.Invoke(this, new());
             EditorLoaded?.Invoke(this, new());
 
-#if __WASM__
-            _ = Dispatcher.RunAsync(CoreDispatcherPriority.Low, () => WebView_NavigationCompleted(_view, null));
-#endif
+            if (OperatingSystem.IsBrowser())
+            {
+                _queue!.TryEnqueue(DispatcherQueuePriority.Low, () => WebView_NavigationCompleted(_view, null));
+            }
         }
 
         /// <summary>
@@ -225,18 +225,18 @@ namespace Monaco
                     tstr = theme.ToString();
                 }
 
-                await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, async () =>
+                _queue!.TryEnqueue(DispatcherQueuePriority.Normal, async () =>
                 {
                     await InvokeScriptAsync("changeTheme", [tstr ?? "", listener.IsHighContrast.ToString()]);
                 });
             }
         }
 
-        private async void ThemeListener_ThemeChanged(ThemeListener sender)
+        private void ThemeListener_ThemeChanged(ThemeListener sender)
         {
             if (RequestedTheme == ElementTheme.Default)
             {
-                await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, async () =>
+                _queue!.TryEnqueue(DispatcherQueuePriority.Normal, async () =>
                 {
                     await InvokeScriptAsync("changeTheme", args: [sender.CurrentTheme.ToString(), sender.IsHighContrast.ToString()]);
                 });

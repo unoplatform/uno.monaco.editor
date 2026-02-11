@@ -1,23 +1,23 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net9.0;net10.0</TargetFrameworks>
-		<Title>Monaco Editor Component WASM</Title>
+		<TargetFrameworks>net10.0</TargetFrameworks>
+		<Title>Monaco Editor Component</Title>
 		<NoWarn>$(NoWarn);Uno0001;CA1416;CS1998;CS0067</NoWarn>
 		<PackageId>Uno.Monaco.Editor</PackageId>
 		<DebugSymbols>true</DebugSymbols>
 		<DebugType>portable</DebugType>
-		<DefineConstants>$(DefineConstants);__WASM__</DefineConstants>
+
     <GenerateLibraryLayout>true</GenerateLibraryLayout>
 		<MonoRuntimeDebuggerEnabled>true</MonoRuntimeDebuggerEnabled>
 		<Product>Uno.Monaco.Editor</Product>
-		<Description>A WASM wrapper around the web-based Monaco Editor. Designed for use with the Uno Platform</Description>
+		<Description>A cross-platform wrapper around the web-based Monaco Editor for WASM and Desktop (Skia). Designed for use with the Uno Platform</Description>
     <Authors>Uno Platform</Authors>
     <Copyright>Copyright (C) 2015-$([System.DateTime]::UtcNow.Year) Uno Platform inc. - all rights reserved</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>    
 		<RepositoryUrl>https://github.com/unoplatform/uno.monaco.editor</RepositoryUrl>
 		<PackageProjectUrl>https://github.com/unoplatform/uno.monaco.editor</PackageProjectUrl>
-    <PackageTags>wasm monaco editor controls</PackageTags>
+    <PackageTags>wasm desktop skia monaco editor controls</PackageTags>
 		<GeneratePackageOnBuild Condition="'$(Configuration)'=='Release'">true</GeneratePackageOnBuild>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<TypeScriptToolsVersion>Latest</TypeScriptToolsVersion>

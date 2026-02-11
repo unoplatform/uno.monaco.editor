@@ -40,9 +40,10 @@ namespace Monaco.Helpers
             _owner = presenter;
 
             CurrentTheme = Application.Current.RequestedTheme;
-#if !__WASM__
-            IsHighContrast = _accessible.HighContrast;
-#endif
+            if (!OperatingSystem.IsBrowser())
+            {
+                IsHighContrast = _accessible.HighContrast;
+            }
 
             _accessible.HighContrastChanged += Accessible_HighContrastChanged;
             _settings.ColorValuesChanged += Settings_ColorValuesChanged;

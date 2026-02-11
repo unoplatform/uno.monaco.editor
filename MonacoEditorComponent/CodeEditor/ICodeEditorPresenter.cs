@@ -1,4 +1,5 @@
-﻿using Microsoft.UI.Xaml;
+﻿using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Monaco.Helpers;
@@ -8,7 +9,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Windows.Foundation;
 using Windows.UI;
-using Windows.UI.Core;
 
 namespace Monaco
 {
@@ -31,7 +31,7 @@ namespace Monaco
         /// <returns>The Uniform Resource Identifier (URI) source of the HTML content to display in the WebView control.</returns>
         global::System.Uri Source { get; set; }
 
-		CoreDispatcher Dispatcher { get; }
+		DispatcherQueue DispatcherQueue { get; }
 
 		string ElementId { get; }
 

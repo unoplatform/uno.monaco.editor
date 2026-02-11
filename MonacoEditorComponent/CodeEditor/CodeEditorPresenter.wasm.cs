@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices.JavaScript;
 
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Controls;
 
 using Monaco.Helpers;
@@ -10,7 +11,6 @@ using Uno.Logging;
 using Uno.UI.NativeElementHosting;
 
 using Windows.Foundation;
-using Windows.UI.Core;
 
 namespace Monaco
 {
@@ -100,7 +100,7 @@ namespace Monaco
                 NativeMethods.SetSrc(_element.ElementId, target);
 
                 //NavigationStarting?.Invoke(this, new WebViewNavigationStartingEventArgs());
-                _ = Dispatcher.RunAsync(CoreDispatcherPriority.Low, () => NavigationStarting?.Invoke(this, null));
+                DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => NavigationStarting?.Invoke(this, null));
             }
         }
 

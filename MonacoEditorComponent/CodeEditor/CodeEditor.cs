@@ -15,6 +15,18 @@ using Monaco.Helpers;
 namespace Monaco
 {
     /// <summary>
+    /// Indicates the rendering backend used by the CodeEditor.
+    /// </summary>
+    public enum RenderingBackend
+    {
+        /// <summary>WebAssembly browser rendering via BrowserHtmlElement.</summary>
+        Wasm,
+
+        /// <summary>Desktop rendering via WebView2 (Skia).</summary>
+        Desktop
+    }
+
+    /// <summary>
     /// UWP Windows Runtime Component wrapper for the Monaco CodeEditor
     /// https://microsoft.github.io/monaco-editor/
     /// </summary>
@@ -42,7 +54,7 @@ namespace Monaco
 
         public static DependencyProperty IsEditorLoadedProperty { get; } = DependencyProperty.Register(
             nameof(IsEditorLoaded),
-            typeof(string),
+            typeof(bool),
             typeof(CodeEditor),
             new PropertyMetadata(false, OnIsEditorLoadedChanged));
 
@@ -50,6 +62,21 @@ namespace Monaco
         {
 
         }
+
+        /// <summary>
+        /// Gets the rendering backend used by the editor (Wasm or Desktop).
+        /// </summary>
+        public RenderingBackend RenderingBackend
+        {
+            get => (RenderingBackend)GetValue(RenderingBackendProperty);
+            private set => SetValue(RenderingBackendProperty, value);
+        }
+
+        public static DependencyProperty RenderingBackendProperty { get; } = DependencyProperty.Register(
+            nameof(RenderingBackend),
+            typeof(RenderingBackend),
+            typeof(CodeEditor),
+            new PropertyMetadata(OperatingSystem.IsBrowser() ? RenderingBackend.Wasm : RenderingBackend.Desktop));
 
         /// <summary>
         /// Construct a new Stand Alone Code Editor, assumes being constructed on UI Thread.
@@ -142,9 +169,10 @@ namespace Monaco
 
         private void CodeEditor_Loaded(object sender, RoutedEventArgs e)
         {
-#if __WASM__
-            LoadedPartial();
-#endif
+            if (OperatingSystem.IsBrowser())
+            {
+                LoadedPartial();
+            }
 
             // Sync initial pass-thru properties
             if (ReadLocalValue(HasGlyphMarginProperty) == DependencyProperty.UnsetValue && Options.GlyphMargin.HasValue)
@@ -386,19 +414,15 @@ namespace Monaco
             string target;
             if (uri.IsAbsoluteUri)
             {
-#if __WASM__
-                if (uri.Scheme == "file" || uri.Scheme == "ms-appx-web")
+                if (OperatingSystem.IsBrowser() && (uri.Scheme == "file" || uri.Scheme == "ms-appx-web"))
                 {
-                    // Local files are assumed as coming from the remoter server
+                    // Local files are assumed as coming from the remote server
                     target = UNO_BOOTSTRAP_APP_BASE == null ? uri.PathAndQuery : UNO_BOOTSTRAP_WEBAPP_BASE_PATH + UNO_BOOTSTRAP_APP_BASE + uri.PathAndQuery;
                 }
                 else
                 {
                     target = uri.AbsoluteUri;
                 }
-#else
-                target = uri.AbsoluteUri;
-#endif
             }
             else
             {
