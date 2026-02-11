@@ -230,15 +230,13 @@ namespace Monaco
         {
             Unloaded -= CodeEditor_Unloaded;
 
-            if (_view != null)
-            {
-                _view.NavigationStarting -= WebView_NavigationStarting;
-                _view.NavigationCompleted -= WebView_NavigationCompleted;
-                _view.NewWindowRequested -= WebView_NewWindowRequested;
-                _view.Loaded -= WebView_DOMContentLoaded;
-                Debug.WriteLine("Setting initialized - false");
-                _initialized = false;
-            }
+            // Note: Presenter event handlers (NavigationStarting, NavigationCompleted,
+            // NewWindowRequested, Loaded) are NOT detached here. The presenter survives
+            // across unload/load cycles and is only replaced in OnApplyTemplate().
+            // Detaching here without reattaching in CodeEditor_Loaded would leave
+            // the editor non-functional after reload.
+            Debug.WriteLine("Setting initialized - false");
+            _initialized = false;
 
             // Unsubscribe Window.SizeChanged to prevent handler accumulation across load/unload cycles.
             if (Window.Current is not null)

@@ -36,3 +36,6 @@ Window.Current.SizeChanged subscriptions must be unsubscribed in Unloaded handle
 
 ## 2026-02-11 manual [pitfall]
 async void event handlers calling methods that re-throw need try/catch -- unhandled exceptions in async void crash the UI thread instead of propagating to callers
+
+## 2026-02-11 manual [pitfall]
+When init-time code calls helpers gated by an _initialized flag, that flag must be set BEFORE the calls -- otherwise init-time setup silently no-ops
