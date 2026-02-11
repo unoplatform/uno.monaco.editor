@@ -156,10 +156,13 @@ export const callParentActionWithParameters = (element: any, name: string, param
         parameters != null && parameters.length > 1 ? stringifyForMarshalling(parameters[1]) : null as any);
 
 export const createMonacoEditor = async (managedOwner: any, elementId: string, basePath: string) => {
-    var head = document.head || document.getElementsByTagName('head')[0];
-    var style = document.createElement('style');
-    style.id = 'dynamic';
-    head.appendChild(style);
+    // Ensure a single <style id="dynamic"> element exists (editor.html already provides one on desktop)
+    if (!document.getElementById('dynamic')) {
+        var head = document.head || document.getElementsByTagName('head')[0];
+        var style = document.createElement('style');
+        style.id = 'dynamic';
+        head.appendChild(style);
+    }
 
     await DebugLoggerImpl.setup();
     await KeyboardListenerImpl.setup();

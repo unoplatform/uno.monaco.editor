@@ -86,6 +86,21 @@
 		<Error
 			Condition="!Exists('WasmScripts\uno-monaco-helpers.js')"
 			Text="esbuild bundle not found at WasmScripts\uno-monaco-helpers.js. Run 'npm install &amp;&amp; npm run build' from the repository root first." />
+		<Error
+			Condition="!Exists('WasmScripts\workers\editor.worker.js')"
+			Text="Worker bundle not found at WasmScripts\workers\editor.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root first." />
+		<Error
+			Condition="!Exists('WasmScripts\workers\json.worker.js')"
+			Text="Worker bundle not found at WasmScripts\workers\json.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root first." />
+		<Error
+			Condition="!Exists('WasmScripts\workers\css.worker.js')"
+			Text="Worker bundle not found at WasmScripts\workers\css.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root first." />
+		<Error
+			Condition="!Exists('WasmScripts\workers\html.worker.js')"
+			Text="Worker bundle not found at WasmScripts\workers\html.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root first." />
+		<Error
+			Condition="!Exists('WasmScripts\workers\ts.worker.js')"
+			Text="Worker bundle not found at WasmScripts\workers\ts.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root first." />
 	</Target>
 
 </Project>

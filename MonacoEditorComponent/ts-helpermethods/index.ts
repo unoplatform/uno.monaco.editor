@@ -63,23 +63,34 @@ import { createBridgeConnection, isDesktopHost } from './bridge/jsonRpcBridge';
 // WASM serves from the Uno Bootstrap base path.
 const isDesktop = isDesktopHost();
 
+/**
+ * Resolve a worker URL relative to the current document.
+ * On desktop (file:// or virtual-host), absolute paths like "/workers/..."
+ * break on macOS/Linux. Using a URL relative to the document's own location
+ * works across Windows (https://uno-monaco.example/), macOS, and Linux (file://).
+ */
+function resolveWorkerUrl(filename: string): string {
+    // Both WASM and desktop use document-relative paths
+    return `workers/${filename}`;
+}
+
 (self as any).MonacoEnvironment = {
     getWorkerUrl: function (_moduleId: string, label: string) {
         // Map language labels to worker file names
         if (label === 'json') {
-            return isDesktop ? '/workers/json.worker.js' : 'workers/json.worker.js';
+            return resolveWorkerUrl('json.worker.js');
         }
         if (label === 'css' || label === 'scss' || label === 'less') {
-            return isDesktop ? '/workers/css.worker.js' : 'workers/css.worker.js';
+            return resolveWorkerUrl('css.worker.js');
         }
         if (label === 'html' || label === 'handlebars' || label === 'razor') {
-            return isDesktop ? '/workers/html.worker.js' : 'workers/html.worker.js';
+            return resolveWorkerUrl('html.worker.js');
         }
         if (label === 'typescript' || label === 'javascript') {
-            return isDesktop ? '/workers/ts.worker.js' : 'workers/ts.worker.js';
+            return resolveWorkerUrl('ts.worker.js');
         }
         // Default editor worker
-        return isDesktop ? '/workers/editor.worker.js' : 'workers/editor.worker.js';
+        return resolveWorkerUrl('editor.worker.js');
     }
 };
 
@@ -90,7 +101,8 @@ const isDesktop = isDesktopHost();
 if (isDesktop) {
     const connection = createBridgeConnection();
     connection.listen();
-    // Bridge is now ready. After Monaco is loaded, Task 4 will send editor/ready.
+    // Notify the C# host that the bridge is ready and accepting JSON-RPC messages
+    connection.sendNotification('editor/ready', { protocolVersion: 1 });
 }
 
 // ---------------------------------------------------------------------------

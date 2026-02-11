@@ -35,6 +35,49 @@ const isMinify = process.argv.includes('--minify');
 fs.mkdirSync(workersDir, { recursive: true });
 fs.mkdirSync(desktopWorkersDir, { recursive: true });
 
+/**
+ * Copies built files from WasmScripts to DesktopContent.
+ * Used both after single builds and as an onEnd plugin for watch mode.
+ */
+function copyToDesktop() {
+    fs.copyFileSync(
+        path.join(wasmScriptsDir, 'uno-monaco-helpers.js'),
+        path.join(desktopContentDir, 'uno-monaco-helpers.js')
+    );
+
+    const cssSource = path.join(wasmScriptsDir, 'uno-monaco-helpers.css');
+    if (fs.existsSync(cssSource)) {
+        fs.copyFileSync(cssSource, path.join(desktopContentDir, 'uno-monaco-helpers.css'));
+    }
+
+    for (const name of Object.keys(workerEntries)) {
+        const src = path.join(workersDir, `${name}.js`);
+        if (fs.existsSync(src)) {
+            fs.copyFileSync(src, path.join(desktopWorkersDir, `${name}.js`));
+        }
+    }
+}
+
+/**
+ * esbuild plugin that copies output to DesktopContent after each build.
+ * Ensures watch mode keeps both output directories in sync.
+ */
+const copyToDesktopPlugin = {
+    name: 'copy-to-desktop',
+    setup(build) {
+        build.onEnd((result) => {
+            if (result.errors.length === 0) {
+                try {
+                    copyToDesktop();
+                    console.log('[esbuild] Copied to DesktopContent.');
+                } catch (err) {
+                    console.warn('[esbuild] Copy to DesktopContent failed:', err.message);
+                }
+            }
+        });
+    }
+};
+
 // Common build options
 const commonOptions = {
     bundle: true,
@@ -83,8 +126,11 @@ async function build() {
     }));
 
     if (isWatch) {
-        // Watch mode: rebuild on change
-        const mainCtx = await esbuild.context(mainBuildOptions);
+        // Watch mode: rebuild on change, copy to DesktopContent after each rebuild
+        const mainCtx = await esbuild.context({
+            ...mainBuildOptions,
+            plugins: [...(mainBuildOptions.plugins || []), copyToDesktopPlugin],
+        });
         await mainCtx.watch();
         console.log('[esbuild] Watching for changes...');
 
@@ -104,23 +150,7 @@ async function build() {
 
         // Copy files to DesktopContent for desktop packaging
         console.log('[esbuild] Copying bundles to DesktopContent...');
-        fs.copyFileSync(
-            path.join(wasmScriptsDir, 'uno-monaco-helpers.js'),
-            path.join(desktopContentDir, 'uno-monaco-helpers.js')
-        );
-
-        // Copy CSS file (Monaco styles extracted by esbuild)
-        const cssSource = path.join(wasmScriptsDir, 'uno-monaco-helpers.css');
-        if (fs.existsSync(cssSource)) {
-            fs.copyFileSync(cssSource, path.join(desktopContentDir, 'uno-monaco-helpers.css'));
-        }
-
-        for (const name of Object.keys(workerEntries)) {
-            fs.copyFileSync(
-                path.join(workersDir, `${name}.js`),
-                path.join(desktopWorkersDir, `${name}.js`)
-            );
-        }
+        copyToDesktop();
 
         console.log('[esbuild] Build complete.');
     }
