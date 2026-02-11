@@ -78,6 +78,11 @@ namespace Monaco.Helpers
         [JSExport]
         internal static bool NativeKeyDown([JSMarshalAs<JSType.Any>] object managedOwner, int keycode, bool ctrl, bool shift, bool alt, bool meta)
         {
+            if (!OperatingSystem.IsBrowser())
+            {
+                throw new PlatformNotSupportedException("NativeKeyDown is only available on WASM. Desktop uses JSON-RPC keyboard/keyDown.");
+            }
+
             if (_instances.TryGetValue(managedOwner, out var listener))
             {
                 return listener.KeyDown(keycode, ctrl, shift, alt, meta);

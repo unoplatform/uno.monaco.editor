@@ -57,12 +57,22 @@ namespace Monaco
                 case EditorLifecycleState.Loading when _lifecycleState == EditorLifecycleState.Unloaded:
                     _lifecycleState = EditorLifecycleState.Loading;
                     EditorLoading?.Invoke(this, new RoutedEventArgs());
+                    // Emit lifecycle update via JSON-RPC for desktop testability (Task 8).
+                    if (_view is DesktopCodeEditorPresenter loadingPresenter)
+                    {
+                        loadingPresenter.NotifyLifecycleUpdate(isLoading: true, isLoaded: false);
+                    }
                     return true;
 
                 case EditorLifecycleState.Loaded when _lifecycleState == EditorLifecycleState.Loading:
                     _lifecycleState = EditorLifecycleState.Loaded;
                     IsEditorLoaded = true;
                     EditorLoaded?.Invoke(this, new RoutedEventArgs());
+                    // Emit lifecycle update via JSON-RPC for desktop testability (Task 8).
+                    if (_view is DesktopCodeEditorPresenter loadedPresenter)
+                    {
+                        loadedPresenter.NotifyLifecycleUpdate(isLoading: false, isLoaded: true);
+                    }
                     return true;
 
                 case EditorLifecycleState.Unloaded:
@@ -277,13 +287,20 @@ namespace Monaco
                     _keyboardListener = keyboardListener;
                     _debugLogger = debugLogger;
                 }
+                else if (_view is DesktopCodeEditorPresenter desktopPresenter)
+                {
+                    // Desktop bridge helpers created and registered as JSON-RPC targets.
+                    var (parentAccessor, themeListener, keyboardListener, debugLogger) =
+                        desktopPresenter.CreateBridgeTargets(_queue);
+                    _parentAccessor = parentAccessor;
+                    _themeListener = themeListener;
+                    _keyboardListener = keyboardListener;
+                    _debugLogger = debugLogger;
+                }
                 else
                 {
-                    // Desktop bridge helpers are created by Task 5.
-                    // For now, create minimal wiring without bridge factory.
-                    _themeListener = new ThemeListener(_view);
-                    // _parentAccessor, _keyboardListener, _debugLogger remain null
-                    // until Task 5 provides desktop implementations.
+                    throw new PlatformNotSupportedException(
+                        $"Unsupported presenter type: {_view.GetType().Name}");
                 }
 
                 _parentAccessor?.AddAssemblyForTypeLookup(typeof(Range).GetTypeInfo().Assembly);

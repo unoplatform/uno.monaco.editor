@@ -11,7 +11,7 @@ Create the `WebView2JsonRpcMessageHandler`, wire up `JsonRpc` on the desktop pre
 Implements `IJsonRpcMessageHandler` from StreamJsonRpc:
 - **Writer**: Serializes `JsonRpcMessage` to JSON, sends via `ICodeEditorPresenter.PostWebMessage(json)` (presenter-level abstraction, not direct `CoreWebView2`). Uses `SystemTextJsonFormatter` for AOT-compatible serialization (NOT `JsonMessageFormatter`/Newtonsoft).
 - **Security validation** (envelope-type-aware): Before feeding incoming messages to StreamJsonRpc, validate based on message type:
-  - **Requests/notifications** (have `method` field): (1) method name in allowlist of known methods, (2) required params present per method, (3) payload size <= 10MB. Drop unknown methods with warning log.
+  - **Requests/notifications** (have `method` field): (1) method name in allowlist of known methods (including `bridge/ready` — emitted at bundle load by fn-1.4's `index.ts`), (2) required params present per method, (3) payload size <= 10MB. Drop unknown methods with warning log.
   - **Responses** (have `id` + `result`/`error`, no `method`): (1) payload size <= 10MB, (2) `id` field present (StreamJsonRpc handles correlation — only pending IDs are accepted, unknown IDs are safely ignored by the library).
   - This enforces the security constraints from bridge-protocol.md at the transport layer.
 - **Reader**: Receives from `ICodeEditorPresenter.MessageReceived` event, deserializes JSON into `JsonRpcMessage`, feeds into `Channel<JsonRpcMessage>`. The `ChannelReader<JsonRpcMessage>` is returned from `IJsonRpcMessageHandler.Reader`.
@@ -75,6 +75,11 @@ Desktop bridge classes register their methods on the shared `JsonRpc` instance. 
   - `[JsonRpcMethod("keyboard/keyDown")] void OnKeyDown(KeyDownParams p)` — routes key event
   - `[JSExport] NativeKeyDown` at `KeyboardListener.cs:70` guarded with `OperatingSystem.IsBrowser()`
 
+<!-- Updated by plan-sync: fn-1-implement-desktop-skia-target-for.4 emits bridge/ready at bundle load from index.ts, before editor creation -->
+- **bridge/ready handler**: Registered as RPC target. JS emits `bridge/ready` at bundle load (from `index.ts`), before `createMonacoEditor` is called. This signals that the JSON-RPC transport is established:
+  - `[JsonRpcMethod("bridge/ready")] void OnBridgeReady(BridgeReadyParams p)` — validates `p.ProtocolVersion`, logs bridge transport ready
+  - Must be included in the security validation allowlist (known JS→C# notifications)
+
 - **editor/ready handler**: Registered as RPC target:
   - `[JsonRpcMethod("editor/ready")] void OnEditorReady(EditorReadyParams p)` — validates `p.ProtocolVersion`, signals initialization complete
 
@@ -100,6 +105,7 @@ Desktop bridge classes register their methods on the shared `JsonRpc` instance. 
 - [ ] No manual message parsing or type-field routing code — StreamJsonRpc handles all dispatch
 - [ ] Security validation in message handler: envelope-type-aware (requests/notifications: method allowlist + required params; responses: id/result/error schema), 10MB payload limit
 - [ ] C# method signatures use typed param records matching bridge-protocol.md DTO contracts
+- [ ] `bridge/ready` notification handled (validates `protocolVersion`, logs bridge transport ready)
 - [ ] `editor/ready` notification validates `protocolVersion`
 - [ ] ParentAccessorDesktop JSON-RPC methods handle all bridge operations
 - [ ] `parentAccessor/getJsonValue` request round-trip works end-to-end on desktop

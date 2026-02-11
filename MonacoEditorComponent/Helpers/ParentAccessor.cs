@@ -230,7 +230,9 @@ namespace Monaco.Helpers
                     {
                         object? value = newValue;
 
-                        if (value is string valueAsString)
+                        // Desanitize only on WASM -- desktop values arrive as clean JSON
+                        // via JSON-RPC and do not use the sanitize/desanitize encoding.
+                        if (OperatingSystem.IsBrowser() && value is string valueAsString)
                         {
                             value = Desanitize(valueAsString);
                         }

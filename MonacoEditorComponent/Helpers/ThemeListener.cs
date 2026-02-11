@@ -49,7 +49,8 @@ namespace Monaco.Helpers
             _settings.ColorValuesChanged += Settings_ColorValuesChanged;
 
             // Fallback in case either of the above fail, we'll check when we get activated next.
-            if (Window.Current?.CoreWindow is not null)
+            // Window.Current is only available on WASM -- desktop uses ThemeListenerDesktop.
+            if (OperatingSystem.IsBrowser() && Window.Current?.CoreWindow is not null)
             {
                 Window.Current.CoreWindow.Activated += CoreWindow_Activated;
             }
@@ -73,7 +74,7 @@ namespace Monaco.Helpers
             _accessible.HighContrastChanged -= Accessible_HighContrastChanged;
             _settings.ColorValuesChanged -= Settings_ColorValuesChanged;
 
-            if (Window.Current?.CoreWindow is not null)
+            if (OperatingSystem.IsBrowser() && Window.Current?.CoreWindow is not null)
             {
                 Window.Current.CoreWindow.Activated -= CoreWindow_Activated;
             }

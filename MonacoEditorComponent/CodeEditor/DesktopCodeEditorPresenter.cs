@@ -1,11 +1,15 @@
 using System.Diagnostics;
 using System.IO;
+using System.Text.Json;
 
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
+using Monaco.Bridge;
 using Monaco.Helpers;
+
+using StreamJsonRpc;
 
 using Windows.Foundation;
 
@@ -13,12 +17,14 @@ namespace Monaco
 {
     /// <summary>
     /// Desktop (Skia) presenter that wraps WebView2 for hosting Monaco Editor.
-    /// Shell implementation -- full lifecycle wiring in Task 5.
+    /// Hosts the JSON-RPC bridge layer for desktop communication with Monaco.
     /// </summary>
     public sealed class DesktopCodeEditorPresenter : ContentControl, ICodeEditorPresenter
     {
         private readonly WebView2 _webView;
         private bool _isCoreWebView2Initialized;
+        private WebView2JsonRpcMessageHandler? _messageHandler;
+        private JsonRpc? _jsonRpc;
 
         public DesktopCodeEditorPresenter()
         {
@@ -142,7 +148,11 @@ namespace Monaco
                 // Only mark initialized after all setup succeeds
                 _isCoreWebView2Initialized = true;
 
-                Debug.WriteLine("DesktopCodeEditorPresenter: CoreWebView2 initialized with security settings");
+                // Wire up JSON-RPC bridge transport.
+                // MessageReceived event is already wired (above), CoreWebView2 is fully ready.
+                SetupJsonRpc();
+
+                Debug.WriteLine("DesktopCodeEditorPresenter: CoreWebView2 initialized with security settings and JSON-RPC bridge");
 
                 // Apply any buffered Source navigation now that security handlers are attached.
                 if (_pendingSource is { } pending)
@@ -156,6 +166,7 @@ namespace Monaco
                 // Reset state so future Launch() calls can retry
                 _isCoreWebView2Initialized = false;
                 _pendingSource = null;
+                TeardownJsonRpc();
                 DetachCoreWebView2Handlers();
                 Debug.WriteLine($"DesktopCodeEditorPresenter.Launch error: {e}");
 
@@ -322,6 +333,134 @@ namespace Monaco
                 Uri = global::System.Uri.TryCreate(args.Uri, UriKind.Absolute, out var parsed) ? parsed : null
             };
             NewWindowRequested?.Invoke(this, presenterArgs);
+        }
+
+        // ============================================================
+        // JSON-RPC bridge wiring
+        // ============================================================
+
+        private const int ExpectedProtocolVersion = 1;
+
+        /// <summary>
+        /// The <see cref="JsonRpc"/> instance for desktop bridge communication.
+        /// Exposed internally so desktop bridge helpers can send C#-to-JS notifications/requests.
+        /// </summary>
+        internal JsonRpc? Rpc => _jsonRpc;
+
+        /// <summary>
+        /// Creates the bridge targets and returns them for registration on CodeEditor.
+        /// Called from <see cref="CodeEditor.InitialiseWebObjects"/> on the desktop path.
+        /// </summary>
+        internal (IParentAccessor ParentAccessor, IThemeListener ThemeListener, IKeyboardListener KeyboardListener, IDebugLogger DebugLogger)
+            CreateBridgeTargets(DispatcherQueue queue)
+        {
+            var parentAccessor = new ParentAccessorDesktop(this, queue);
+            var themeListener = new ThemeListenerDesktop(queue);
+            var keyboardListener = new KeyboardListenerDesktop(this);
+            var debugLogger = new DebugLoggerDesktop();
+
+            // Register as local RPC targets so StreamJsonRpc routes messages automatically.
+            if (_jsonRpc is not null)
+            {
+                _jsonRpc.AddLocalRpcTarget(parentAccessor);
+                _jsonRpc.AddLocalRpcTarget(themeListener);
+                _jsonRpc.AddLocalRpcTarget(keyboardListener);
+                _jsonRpc.AddLocalRpcTarget(debugLogger);
+            }
+
+            return (parentAccessor, themeListener, keyboardListener, debugLogger);
+        }
+
+        private void SetupJsonRpc()
+        {
+            var formatter = new SystemTextJsonFormatter
+            {
+                JsonSerializerOptions = new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    TypeInfoResolverChain = { BridgeSerializerContext.Default },
+                },
+            };
+
+            _messageHandler = new WebView2JsonRpcMessageHandler(this, formatter);
+            _jsonRpc = new JsonRpc(_messageHandler);
+
+            // Register the initialization handshake targets directly on the presenter.
+            _jsonRpc.AddLocalRpcTarget(new BridgeHandshakeTarget(this));
+
+            _jsonRpc.StartListening();
+
+            Debug.WriteLine("DesktopCodeEditorPresenter: JsonRpc bridge started");
+        }
+
+        private void TeardownJsonRpc()
+        {
+            if (_jsonRpc is not null)
+            {
+                _jsonRpc.Dispose();
+                _jsonRpc = null;
+            }
+
+            if (_messageHandler is not null)
+            {
+                _messageHandler.Dispose();
+                _messageHandler = null;
+            }
+        }
+
+        // Lifecycle event counters for testability (consumed by Task 8 Playwright tests).
+        private int _loadingCount;
+        private int _loadedCount;
+
+        /// <summary>
+        /// Emits an editor/lifecycleUpdate notification via JSON-RPC with current
+        /// EditorLoading/EditorLoaded counts. Called by <see cref="CodeEditor"/>
+        /// when lifecycle events fire.
+        /// </summary>
+        internal void NotifyLifecycleUpdate(bool isLoading, bool isLoaded)
+        {
+            if (isLoading) _loadingCount++;
+            if (isLoaded) _loadedCount++;
+
+            if (_jsonRpc is not null)
+            {
+                _ = _jsonRpc.NotifyAsync("editor/lifecycleUpdate",
+                    new LifecycleUpdateParams(_loadingCount, _loadedCount));
+            }
+        }
+
+        /// <summary>
+        /// JSON-RPC target for bridge/ready and editor/ready handshake notifications.
+        /// </summary>
+        private sealed class BridgeHandshakeTarget
+        {
+            private readonly DesktopCodeEditorPresenter _presenter;
+
+            public BridgeHandshakeTarget(DesktopCodeEditorPresenter presenter) => _presenter = presenter;
+
+            [JsonRpcMethod("bridge/ready")]
+            public void OnBridgeReady(BridgeReadyParams p)
+            {
+                if (p.ProtocolVersion != ExpectedProtocolVersion)
+                {
+                    Debug.WriteLine($"DesktopCodeEditorPresenter: bridge/ready protocol version mismatch (expected={ExpectedProtocolVersion}, got={p.ProtocolVersion})");
+                    return;
+                }
+
+                Debug.WriteLine("DesktopCodeEditorPresenter: bridge/ready received, JSON-RPC transport established");
+            }
+
+            [JsonRpcMethod("editor/ready")]
+            public void OnEditorReady(EditorReadyParams p)
+            {
+                if (p.ProtocolVersion != ExpectedProtocolVersion)
+                {
+                    Debug.WriteLine($"DesktopCodeEditorPresenter: editor/ready protocol version mismatch (expected={ExpectedProtocolVersion}, got={p.ProtocolVersion})");
+                    return;
+                }
+
+                Debug.WriteLine("DesktopCodeEditorPresenter: editor/ready received, Monaco editor initialized");
+            }
         }
     }
 }
