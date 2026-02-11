@@ -50,6 +50,7 @@ namespace Monaco.Serialization;
 // --- Editor types ---
 [JsonSerializable(typeof(Marker))]
 [JsonSerializable(typeof(MarkerData))]
+[JsonSerializable(typeof(IMarkerData))]
 [JsonSerializable(typeof(IModelDeltaDecoration))]
 [JsonSerializable(typeof(IModelDecorationOptions))]
 [JsonSerializable(typeof(IModelDecorationMinimapOptions))]
@@ -88,6 +89,7 @@ namespace Monaco.Serialization;
 [JsonSerializable(typeof(IMarkdownString[]))]
 [JsonSerializable(typeof(Marker[]))]
 [JsonSerializable(typeof(MarkerData[]))]
+[JsonSerializable(typeof(IMarkerData[]))]
 [JsonSerializable(typeof(IModelDeltaDecoration[]))]
 [JsonSerializable(typeof(ISingleEditOperation[]))]
 [JsonSerializable(typeof(IRelatedInformation[]))]
@@ -146,6 +148,7 @@ internal partial class MonacoJsonContext : JsonSerializerContext
         RegisterType<IMarkdownString>(context, map);
         RegisterType<Marker>(context, map);
         RegisterType<MarkerData>(context, map);
+        RegisterType<IMarkerData>(context, map);
         RegisterType<IModelDeltaDecoration>(context, map);
         RegisterType<IModelDecorationOptions>(context, map);
         RegisterType<ISingleEditOperation>(context, map);

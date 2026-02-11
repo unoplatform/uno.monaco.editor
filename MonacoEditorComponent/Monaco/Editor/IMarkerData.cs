@@ -5,6 +5,7 @@ namespace Monaco.Editor
     /// <summary>
     /// A structure defining a problem/warning/etc.
     /// </summary>
+    [JsonConverter(typeof(Monaco.Helpers.InterfaceToClassConverter<IMarkerData, MarkerData>))]
     public interface IMarkerData : IRange
     {
         string? Code { get; set; }
