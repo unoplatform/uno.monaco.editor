@@ -42,7 +42,7 @@ namespace Monaco
         public event TypedEventHandler<ICodeEditorPresenter?, PresenterNewWindowRequestedEventArgs?>? NewWindowRequested;
 
         /// <inheritdoc />
-        public event TypedEventHandler<ICodeEditorPresenter?, WebViewNavigationStartingEventArgs?>? NavigationStarting;
+        public event TypedEventHandler<ICodeEditorPresenter?, PresenterNavigationStartingEventArgs?>? NavigationStarting;
 
         /// <inheritdoc />
         public event TypedEventHandler<ICodeEditorPresenter?, PresenterNavigationCompletedEventArgs?>? NavigationCompleted;
@@ -81,12 +81,22 @@ namespace Monaco
         public bool TriggerKeyDown(WebKeyEventArgs args)
             => ParentCodeEditor?.TriggerKeyDown(args) ?? false;
 
+        private global::System.Uri? _pendingSource;
+
         public global::System.Uri Source
         {
-            get => _webView.Source;
+            get => _isCoreWebView2Initialized ? _webView.Source : (_pendingSource ?? _webView.Source);
             set
             {
                 Debug.WriteLine($"DesktopCodeEditorPresenter.Source = {value}");
+                if (!_isCoreWebView2Initialized)
+                {
+                    // Buffer the URI until Launch() completes and security settings are applied.
+                    // Navigating before CoreWebView2 is initialized would bypass the allowlist.
+                    _pendingSource = value;
+                    return;
+                }
+
                 _webView.Source = value;
             }
         }
@@ -133,13 +143,24 @@ namespace Monaco
                 _isCoreWebView2Initialized = true;
 
                 Debug.WriteLine("DesktopCodeEditorPresenter: CoreWebView2 initialized with security settings");
+
+                // Apply any buffered Source navigation now that security handlers are attached.
+                if (_pendingSource is { } pending)
+                {
+                    _pendingSource = null;
+                    _webView.Source = pending;
+                }
             }
             catch (Exception e)
             {
                 // Reset state so future Launch() calls can retry
                 _isCoreWebView2Initialized = false;
+                _pendingSource = null;
                 DetachCoreWebView2Handlers();
                 Debug.WriteLine($"DesktopCodeEditorPresenter.Launch error: {e}");
+
+                // Re-throw so callers (CodeEditor) can detect failure and abort lifecycle.
+                throw;
             }
         }
 
@@ -266,7 +287,17 @@ namespace Monaco
                 return;
             }
 
-            NavigationStarting?.Invoke(this, null);
+            var presenterArgs = new PresenterNavigationStartingEventArgs
+            {
+                Uri = args.Uri is string navUri && global::System.Uri.TryCreate(navUri, UriKind.Absolute, out var parsed) ? parsed : null
+            };
+            NavigationStarting?.Invoke(this, presenterArgs);
+
+            // Propagate cancel back to the WebView2 args
+            if (presenterArgs.Cancel)
+            {
+                args.Cancel = true;
+            }
         }
 
         private void CoreWebView2_NavigationCompleted(Microsoft.Web.WebView2.Core.CoreWebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs args)

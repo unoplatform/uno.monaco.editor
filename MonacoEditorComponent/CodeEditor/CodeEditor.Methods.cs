@@ -100,7 +100,16 @@ namespace Monaco
 
         public IAsyncAction AddActionAsync(IActionDescriptor action)
         {
-            _parentAccessor = _parentAccessor ?? throw new InvalidOperationException($"_parentAccessor is not available");
+            if (_parentAccessor is null)
+            {
+                if (!OperatingSystem.IsBrowser())
+                {
+                    throw new PlatformNotSupportedException(
+                        "AddActionAsync is not yet supported on desktop. Desktop bridge helpers will be available in a future update.");
+                }
+
+                throw new InvalidOperationException("_parentAccessor is not available");
+            }
 
             var wref = new WeakReference<CodeEditor>(this);
             _parentAccessor.RegisterAction("Action" + action.Id, new Action(() => { if (wref.TryGetTarget(out var editor)) { action?.Run(editor, null); } }));
@@ -136,9 +145,15 @@ namespace Monaco
 
         public async Task<string?> AddCommandAsync(int keybinding, CommandHandler handler, string context)
         {
-            if (_parentAccessor == null)
+            if (_parentAccessor is null)
             {
-                throw new InvalidOperationException($"_parentAccessor is not available");
+                if (!OperatingSystem.IsBrowser())
+                {
+                    throw new PlatformNotSupportedException(
+                        "AddCommandAsync is not yet supported on desktop. Desktop bridge helpers will be available in a future update.");
+                }
+
+                throw new InvalidOperationException("_parentAccessor is not available");
             }
 
             var name = "Command" + Interlocked.Increment(ref _commandIndex);

@@ -239,6 +239,12 @@ namespace Monaco
                 _initialized = false;
             }
 
+            // Unsubscribe Window.SizeChanged to prevent handler accumulation across load/unload cycles.
+            if (Window.Current is not null)
+            {
+                Window.Current.SizeChanged -= OnWindowSizeChanged;
+            }
+
             Decorations.VectorChanged -= Decorations_VectorChanged;
             Markers.VectorChanged -= Markers_VectorChanged;
 
@@ -260,6 +266,12 @@ namespace Monaco
                 _view.Loaded -= WebView_DOMContentLoaded;
                 Debug.WriteLine("Setting initialized - false");
                 _initialized = false;
+
+                if (Window.Current is not null)
+                {
+                    Window.Current.SizeChanged -= OnWindowSizeChanged;
+                }
+
                 TeardownWebObjects();
             }
 

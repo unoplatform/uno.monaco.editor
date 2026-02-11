@@ -133,7 +133,7 @@ namespace Monaco
         private long _themeToken;
         private bool _hasThemeToken;
 
-        private void WebView_NavigationStarting(ICodeEditorPresenter? sender, WebViewNavigationStartingEventArgs? args)
+        private void WebView_NavigationStarting(ICodeEditorPresenter? sender, PresenterNavigationStartingEventArgs? args)
         {
 #if DEBUG
             Debug.WriteLine($"Navigation Starting {args?.Uri?.ToString()}");

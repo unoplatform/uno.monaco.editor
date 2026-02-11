@@ -66,13 +66,27 @@ namespace Monaco
         public bool Handled { get; set; }
     }
 
+    /// <summary>
+    /// Portable event args for navigation starting from the presenter layer.
+    /// Replaces WinRT WebViewNavigationStartingEventArgs which cannot be constructed
+    /// in cross-platform code. Provides the navigation URI and cancel capability.
+    /// </summary>
+    public sealed class PresenterNavigationStartingEventArgs : EventArgs
+    {
+        /// <summary>The URI of the navigation being started.</summary>
+        public global::System.Uri? Uri { get; init; }
+
+        /// <summary>Set to true to cancel the navigation.</summary>
+        public bool Cancel { get; set; }
+    }
+
     public interface ICodeEditorPresenter
 	{
 		/// <summary>Occurs when a user performs an action in a WebView that causes content to be opened in a new window.</summary>
 		event TypedEventHandler<ICodeEditorPresenter?, PresenterNewWindowRequestedEventArgs?>? NewWindowRequested;
 
 		/// <summary>Occurs before the WebView navigates to new content.</summary>
-		event TypedEventHandler<ICodeEditorPresenter?, WebViewNavigationStartingEventArgs?>? NavigationStarting;
+		event TypedEventHandler<ICodeEditorPresenter?, PresenterNavigationStartingEventArgs?>? NavigationStarting;
 
 		/// <summary>Occurs when the WebView has finished loading the current content or if navigation has failed.</summary>
 		event TypedEventHandler<ICodeEditorPresenter?, PresenterNavigationCompletedEventArgs?>? NavigationCompleted;
