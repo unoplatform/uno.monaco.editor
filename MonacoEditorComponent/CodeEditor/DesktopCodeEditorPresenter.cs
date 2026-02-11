@@ -421,13 +421,20 @@ namespace Monaco
         /// Emits an editor/lifecycleUpdate notification via JSON-RPC with current
         /// EditorLoading/EditorLoaded counts. Called by <see cref="CodeEditor"/>
         /// when lifecycle events fire.
+        /// Gated on CoreWebView2 initialization -- early lifecycle transitions
+        /// (e.g., Loading before Launch()) are counted but not sent until the
+        /// transport is ready. The Loaded transition fires after Launch() completes.
         /// </summary>
         internal void NotifyLifecycleUpdate(bool isLoading, bool isLoaded)
         {
             if (isLoading) _loadingCount++;
             if (isLoaded) _loadedCount++;
 
-            if (_jsonRpc is not null)
+            // Only send if CoreWebView2 is initialized and JsonRpc is active.
+            // PostWebMessage throws before CoreWebView2 init, so we must gate here.
+            // Early counts (Loading) are preserved and sent with the next notification
+            // (Loaded) which fires after Launch() completes.
+            if (_isCoreWebView2Initialized && _jsonRpc is not null)
             {
                 _ = _jsonRpc.NotifyAsync("editor/lifecycleUpdate",
                     new LifecycleUpdateParams(_loadingCount, _loadedCount));

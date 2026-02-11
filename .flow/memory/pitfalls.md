@@ -54,3 +54,6 @@ WebView2 on Windows delivers host-to-page messages via chrome.webview 'message' 
 
 ## 2026-02-11 manual [pitfall]
 When multiple init methods can create the same resource (e.g., JsonRpc), ensure single-owner creation -- having two call sites that both call SetupX() will create orphaned instances without disposal
+
+## 2026-02-11 manual [pitfall]
+When JSON-RPC notifications are emitted during initialization, gate them on transport readiness -- early lifecycle events can fire before the underlying transport (WebView2/CoreWebView2) is initialized, causing faulted tasks
