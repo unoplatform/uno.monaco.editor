@@ -35,7 +35,8 @@ partial class ParentAccessor
             json = json.Replace(@"\r\n", Environment.NewLine);
             json = json.Replace(@"\t", "\t");
             System.Diagnostics.Debug.WriteLine($"Trimmed: {json}");
-            _ = parentAccessor.SetValue(name, value);
+            // Pass the desanitized/processed json, not the raw value
+            _ = parentAccessor.SetValue(name, json);
         }
         else
         {

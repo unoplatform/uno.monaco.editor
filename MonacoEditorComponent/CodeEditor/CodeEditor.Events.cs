@@ -313,6 +313,14 @@ namespace Monaco
 
         private async void CodeEditorLoaded()
         {
+            // Guard against late callback after unload. This is invoked via
+            // ParentAccessor.CallAction("Loaded") which can be queued/delayed.
+            if (!IsLoaded || _lifecycleState != EditorLifecycleState.Loading)
+            {
+                Debug.WriteLine($"CodeEditorLoaded: ignoring (IsLoaded={IsLoaded}, state={_lifecycleState})");
+                return;
+            }
+
             _view = _view ?? throw new InvalidOperationException("The view not set");
 
             // Enable script execution before init-time calls. SendScriptAsync and

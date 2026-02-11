@@ -42,3 +42,6 @@ When init-time code calls helpers gated by an _initialized flag, that flag must 
 
 ## 2026-02-11 manual [pitfall]
 In templated controls, child element event handlers must only be detached when the child is replaced (OnApplyTemplate), not on Unloaded -- children survive unload/load cycles and handler detach without reattach leaves the control non-functional
+
+## 2026-02-11 manual [pitfall]
+When keeping event handlers attached across unload/load cycles, add IsLoaded guards in handlers to prevent late callbacks from re-initializing a control that is unloaded

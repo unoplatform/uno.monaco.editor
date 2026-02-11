@@ -235,7 +235,8 @@ namespace Monaco.Helpers
                             value = Desanitize(valueAsString);
                         }
 
-                        propinfo?.SetValue(tobj, newValue);
+                        // Use desanitized value, not the original newValue
+                        propinfo?.SetValue(tobj, value);
                     }
                     finally
                     {
