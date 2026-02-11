@@ -350,23 +350,28 @@ namespace Monaco
         /// <summary>
         /// Creates the bridge targets and returns them for registration on CodeEditor.
         /// Called from <see cref="CodeEditor.InitialiseWebObjects"/> on the desktop path.
+        /// Recreates the JsonRpc instance to ensure a clean target registration --
+        /// prevents stale target accumulation across unload/reload cycles.
         /// </summary>
         internal (IParentAccessor ParentAccessor, IThemeListener ThemeListener, IKeyboardListener KeyboardListener, IDebugLogger DebugLogger)
             CreateBridgeTargets(DispatcherQueue queue)
         {
+            // Tear down and recreate JsonRpc to prevent stale target accumulation.
+            // Each call to CreateBridgeTargets starts with a fresh JsonRpc instance
+            // so AddLocalRpcTarget registrations never duplicate across re-init cycles.
+            TeardownJsonRpc();
+            SetupJsonRpc();
+
             var parentAccessor = new ParentAccessorDesktop(this, queue);
             var themeListener = new ThemeListenerDesktop(queue);
             var keyboardListener = new KeyboardListenerDesktop(this);
             var debugLogger = new DebugLoggerDesktop();
 
             // Register as local RPC targets so StreamJsonRpc routes messages automatically.
-            if (_jsonRpc is not null)
-            {
-                _jsonRpc.AddLocalRpcTarget(parentAccessor);
-                _jsonRpc.AddLocalRpcTarget(themeListener);
-                _jsonRpc.AddLocalRpcTarget(keyboardListener);
-                _jsonRpc.AddLocalRpcTarget(debugLogger);
-            }
+            _jsonRpc!.AddLocalRpcTarget(parentAccessor);
+            _jsonRpc.AddLocalRpcTarget(themeListener);
+            _jsonRpc.AddLocalRpcTarget(keyboardListener);
+            _jsonRpc.AddLocalRpcTarget(debugLogger);
 
             return (parentAccessor, themeListener, keyboardListener, debugLogger);
         }

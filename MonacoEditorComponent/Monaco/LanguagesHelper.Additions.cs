@@ -1,3 +1,5 @@
+using System.IO;
+
 using Monaco.Extensions;
 
 namespace Monaco
@@ -22,14 +24,27 @@ namespace Monaco
         /// <summary>
         /// C#-side mapping from file extension to Monaco language identifier.
         /// Used on desktop where JSImport is not available.
+        /// Accepts bare extensions ("cs", ".cs"), filenames ("test.cs"),
+        /// and full paths ("src/foo/test.cs") for parity with JS behavior.
         /// </summary>
         private static string LanguageIdFromExtensionDesktop(string? extension)
         {
             if (string.IsNullOrEmpty(extension)) return "plaintext";
 
-            // Normalize: strip leading dot, lowercase
-            var ext = extension.StartsWith('.') ? extension[1..] : extension;
-            ext = ext.ToLowerInvariant();
+            // If input looks like a filename or path, extract just the extension.
+            // Path.GetExtension handles ".cs", "test.cs", "foo/bar.cs" uniformly.
+            var extracted = Path.GetExtension(extension);
+            string ext;
+            if (!string.IsNullOrEmpty(extracted))
+            {
+                // Path.GetExtension returns ".cs" -- strip the leading dot.
+                ext = extracted[1..].ToLowerInvariant();
+            }
+            else
+            {
+                // No dot found -- treat the whole input as a bare extension name.
+                ext = extension.ToLowerInvariant();
+            }
 
             return ext switch
             {

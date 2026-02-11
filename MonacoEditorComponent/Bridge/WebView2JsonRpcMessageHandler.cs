@@ -21,20 +21,24 @@ internal sealed class WebView2JsonRpcMessageHandler : IJsonRpcMessageHandler, ID
     // 10 MB max payload size per bridge-protocol.md security constraints.
     private const int MaxPayloadSizeBytes = 10 * 1024 * 1024;
 
-    // Known JS-to-C# methods (from bridge-protocol.md).
-    private static readonly HashSet<string> KnownMethods = new(StringComparer.Ordinal)
+    // Per-method required params validation. Each entry maps a method name
+    // to the set of required param field names (must be present as object properties).
+    // Methods with no required params map to an empty array.
+    private static readonly Dictionary<string, string[]> MethodParamRequirements = new(StringComparer.Ordinal)
     {
-        "bridge/ready",
-        "editor/ready",
-        "parentAccessor/setValue",
-        "parentAccessor/setValueWithType",
-        "parentAccessor/callAction",
-        "parentAccessor/callActionWithParameters",
-        "parentAccessor/callEvent",
-        "parentAccessor/getJsonValue",
-        "debug/log",
-        "keyboard/keyDown",
-        "theme/getProperty",
+        ["bridge/ready"] = ["protocolVersion"],
+        ["editor/ready"] = ["protocolVersion"],
+        ["parentAccessor/setValue"] = ["name", "value"],
+        ["parentAccessor/setValueWithType"] = ["name", "value", "typeName"],
+        ["parentAccessor/callAction"] = ["name"],
+        ["parentAccessor/callActionWithParameters"] = ["name", "parameters"],
+        ["parentAccessor/callEvent"] = ["name", "parameters"],
+        ["parentAccessor/getJsonValue"] = ["name"],
+        ["debug/log"] = ["level", "message"],
+        ["keyboard/keyDown"] = ["keyCode", "ctrlKey", "shiftKey", "altKey", "metaKey"],
+        ["theme/getProperty"] = ["name"],
+        // StreamJsonRpc cancellation support (native JSON-RPC protocol extension).
+        ["$/cancelRequest"] = ["id"],
     };
 
     private readonly ICodeEditorPresenter _presenter;
@@ -112,10 +116,11 @@ internal sealed class WebView2JsonRpcMessageHandler : IJsonRpcMessageHandler, ID
         var json = e.MessageJson;
         if (string.IsNullOrEmpty(json)) return;
 
-        // Security: payload size limit (approximate -- UTF-16 length as proxy for byte size)
-        if (json.Length > MaxPayloadSizeBytes)
+        // Security: payload size limit using actual UTF-8 byte count.
+        var byteCount = Encoding.UTF8.GetByteCount(json);
+        if (byteCount > MaxPayloadSizeBytes)
         {
-            Debug.WriteLine($"WebView2JsonRpcMessageHandler: Dropping message exceeding {MaxPayloadSizeBytes} byte limit (length={json.Length})");
+            Debug.WriteLine($"WebView2JsonRpcMessageHandler: Dropping message exceeding {MaxPayloadSizeBytes} byte limit (size={byteCount})");
             return;
         }
 
@@ -131,10 +136,30 @@ internal sealed class WebView2JsonRpcMessageHandler : IJsonRpcMessageHandler, ID
             {
                 // Request or notification: validate method is in the allowlist.
                 var method = methodElement.GetString();
-                if (method is null || !KnownMethods.Contains(method))
+                if (method is null || !MethodParamRequirements.TryGetValue(method, out var requiredParams))
                 {
                     Debug.WriteLine($"WebView2JsonRpcMessageHandler: Dropping message with unknown method '{method}'");
                     return;
+                }
+
+                // Validate required params are present.
+                if (requiredParams.Length > 0)
+                {
+                    if (!root.TryGetProperty("params", out var paramsElement) ||
+                        paramsElement.ValueKind != JsonValueKind.Object)
+                    {
+                        Debug.WriteLine($"WebView2JsonRpcMessageHandler: Dropping '{method}' -- missing or non-object params");
+                        return;
+                    }
+
+                    foreach (var required in requiredParams)
+                    {
+                        if (!paramsElement.TryGetProperty(required, out _))
+                        {
+                            Debug.WriteLine($"WebView2JsonRpcMessageHandler: Dropping '{method}' -- missing required param '{required}'");
+                            return;
+                        }
+                    }
                 }
             }
             else if (root.TryGetProperty("id", out _))
