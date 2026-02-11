@@ -41,8 +41,12 @@ import {
     keyDown,
     getParentValue,
     getParentJsonValue,
+    getParentValueAsync,
+    getParentJsonValueAsync,
     getThemeIsHighContrast,
-    getThemeCurrentThemeName
+    getThemeCurrentThemeName,
+    getThemeIsHighContrastAsync,
+    getThemeCurrentThemeNameAsync
 } from './otherScriptsToBeOrganized';
 
 import { registerCodeActionProvider } from './registerCodeActionProvider';
@@ -114,7 +118,7 @@ if (isDesktop) {
     connection.listen();
     // Signal that the JSON-RPC bridge transport is ready to accept messages.
     // This fires at bundle load, BEFORE editor creation.
-    // Task 4 will send 'editor/ready' after createMonacoEditor() completes.
+    // editor/ready is sent after createMonacoEditor() completes (see asyncCallbackHelpers.ts).
     connection.sendNotification('bridge/ready', { protocolVersion: 1 });
 }
 
@@ -160,8 +164,12 @@ globalThis.languageIdFromExtension = languageIdFromExtension;
 (globalThis as any).callParentActionWithParameters = callParentActionWithParameters;
 (globalThis as any).getParentValue = getParentValue;
 (globalThis as any).getParentJsonValue = getParentJsonValue;
+(globalThis as any).getParentValueAsync = getParentValueAsync;
+(globalThis as any).getParentJsonValueAsync = getParentJsonValueAsync;
 (globalThis as any).getThemeIsHighContrast = getThemeIsHighContrast;
 (globalThis as any).getThemeCurrentThemeName = getThemeCurrentThemeName;
+(globalThis as any).getThemeIsHighContrastAsync = getThemeIsHighContrastAsync;
+(globalThis as any).getThemeCurrentThemeNameAsync = getThemeCurrentThemeNameAsync;
 
 // Expose Monaco namespace globally (needed by eval-style InvokeScriptAsync calls)
 (globalThis as any).monaco = monaco;

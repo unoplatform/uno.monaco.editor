@@ -31,6 +31,14 @@ export class EditorContext {
         return null;
     }
 
+    /**
+     * Remove an editor context from the map on dispose.
+     * Clears the _editors map entry for the given element.
+     */
+    public static removeEditorForElement(element: any): void {
+        EditorContext._editors.delete(element);
+    }
+
     constructor() {
         this.modifingSelection = false;
         this.contexts = {};
@@ -124,12 +132,16 @@ export const updateStyle = function (innerStyle: string) {
     }
 };
 
+/**
+ * getOptions -- async to support desktop JSON-RPC path.
+ * Uses getParentValueAsync for async property reads.
+ */
 export const getOptions = async function (element: any): Promise<monaco.editor.IEditorOptions> {
     var editorContext = EditorContext.getEditorForElement(element);
 
     let opt = null;
     try {
-        opt = getParentValue(element, "Options");
+        opt = await getParentValueAsync(element, "Options");
     } finally {
         // no-op
     }
@@ -179,15 +191,57 @@ export const keyDown = async function (element: any, event: any) {
     }
 };
 
+/**
+ * Sync getParentValue -- WASM only. Throws on desktop.
+ * Kept for backward compatibility with eval-style InvokeScriptAsync calls on WASM.
+ */
 export const getParentValue = (element: any, name: string): any => {
     return EditorContext.getEditorForElement(element).Accessor.getJsonValue(name);
 };
 
+/**
+ * Async getParentValueAsync -- works on both WASM and desktop.
+ * On desktop, routes through JSON-RPC request.
+ * On WASM, delegates to the sync JSExport path.
+ */
+export const getParentValueAsync = async (element: any, name: string): Promise<any> => {
+    return await EditorContext.getEditorForElement(element).Accessor.getJsonValueAsync(name);
+};
+
+/**
+ * Sync getParentJsonValue -- WASM only. Throws on desktop.
+ */
 export const getParentJsonValue = (element: any, name: string): string =>
     EditorContext.getEditorForElement(element).Accessor.getJsonValue(name);
 
+/**
+ * Async getParentJsonValueAsync -- works on both WASM and desktop.
+ */
+export const getParentJsonValueAsync = async (element: any, name: string): Promise<string> =>
+    await EditorContext.getEditorForElement(element).Accessor.getJsonValueAsync(name);
+
+/**
+ * Sync getThemeIsHighContrast -- WASM only.
+ */
 export const getThemeIsHighContrast = (element: any): boolean =>
     EditorContext.getEditorForElement(element).Theme.getIsHighContrast() == "true";
 
+/**
+ * Async getThemeIsHighContrastAsync -- works on both WASM and desktop.
+ */
+export const getThemeIsHighContrastAsync = async (element: any): Promise<boolean> => {
+    return await EditorContext.getEditorForElement(element).Theme.getIsHighContrastAsync();
+};
+
+/**
+ * Sync getThemeCurrentThemeName -- WASM only.
+ */
 export const getThemeCurrentThemeName = (element: any): string =>
     EditorContext.getEditorForElement(element).Theme.getCurrentThemeName();
+
+/**
+ * Async getThemeCurrentThemeNameAsync -- works on both WASM and desktop.
+ */
+export const getThemeCurrentThemeNameAsync = async (element: any): Promise<string> => {
+    return await EditorContext.getEditorForElement(element).Theme.getCurrentThemeNameAsync();
+};

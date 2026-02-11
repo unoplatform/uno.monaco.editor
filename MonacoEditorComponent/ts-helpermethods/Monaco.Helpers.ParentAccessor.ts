@@ -1,3 +1,20 @@
+import { isDesktopHost } from './bridge/jsonRpcBridge';
+import { MessageConnection } from 'vscode-jsonrpc/browser';
+
+/**
+ * Module-level flag: true when running in a WebView2/WKWebView host (desktop),
+ * false when running under Uno WASM Bootstrap (browser).
+ */
+const _isDesktop: boolean = isDesktopHost();
+
+/**
+ * Returns the JSON-RPC connection from window.__jsonRpc.
+ * Only valid on desktop after the bridge has been initialized (index.ts auto-init).
+ */
+function getConnection(): MessageConnection {
+    return (window as any).__jsonRpc as MessageConnection;
+}
+
 export class ParentAccessor {
     private _managedOwner: any;
     private static _managedGetJsonValue: (managedOwner: any, name: string) => string;
@@ -13,6 +30,11 @@ export class ParentAccessor {
     }
 
     public static async setup() {
+        if (_isDesktop) {
+            // No JSExport setup needed on desktop -- JSON-RPC bridge handles everything
+            return;
+        }
+
         let anyModule = (<any>window).Module;
 
         if (anyModule.getAssemblyExports !== undefined) {
@@ -29,34 +51,85 @@ export class ParentAccessor {
     }
 
     public getJsonValue(name: string): string {
+        if (_isDesktop) {
+            // Sync path should not be called on desktop; callers must use getJsonValueAsync
+            throw new Error('ParentAccessor.getJsonValue is not available on desktop. Use getJsonValueAsync instead.');
+        }
         return ParentAccessor._managedGetJsonValue(this._managedOwner, name);
     }
 
-    public callAction(name: string): boolean {
+    public async getJsonValueAsync(name: string): Promise<string> {
+        if (_isDesktop) {
+            return await getConnection().sendRequest('parentAccessor/getJsonValue', { name });
+        }
+        return ParentAccessor._managedGetJsonValue(this._managedOwner, name);
+    }
+
+    public callAction(name: string): boolean | void {
+        if (_isDesktop) {
+            getConnection().sendNotification('parentAccessor/callAction', { name });
+            return;
+        }
         return ParentAccessor._managedCallAction(this._managedOwner, name);
     }
 
-    public callActionWithParameters(name: string, parameter1: string, parameter2: string): boolean {
+    public callActionWithParameters(name: string, parameter1: string, parameter2: string): boolean | void {
+        if (_isDesktop) {
+            getConnection().sendNotification('parentAccessor/callActionWithParameters', {
+                name,
+                parameters: [parameter1, parameter2]
+            });
+            return;
+        }
         return ParentAccessor._managedCallActionWithParameters(this._managedOwner, name, [parameter1, parameter2]);
     }
 
-    public callActionWithParameters2(name: string, parameters: string[]): boolean {
+    public callActionWithParameters2(name: string, parameters: string[]): boolean | void {
+        if (_isDesktop) {
+            getConnection().sendNotification('parentAccessor/callActionWithParameters', {
+                name,
+                parameters
+            });
+            return;
+        }
         return ParentAccessor._managedCallActionWithParameters(this._managedOwner, name, parameters);
     }
 
     public close(): void {
+        if (_isDesktop) {
+            // Dispose the JSON-RPC connection -- rejects pending requests and removes listeners
+            const conn = getConnection();
+            if (conn) {
+                conn.dispose();
+            }
+            return;
+        }
         ParentAccessor._managedClose(this._managedOwner);
     }
 
     public async setValue(name: string, value: string): Promise<void> {
+        if (_isDesktop) {
+            getConnection().sendNotification('parentAccessor/setValue', { name, value });
+            return;
+        }
         ParentAccessor._managedSetValue(this._managedOwner, name, value);
     }
 
     public setValueWithType(name: string, value: string, type: string) {
+        if (_isDesktop) {
+            getConnection().sendNotification('parentAccessor/setValueWithType', { name, value, typeName: type });
+            return;
+        }
         ParentAccessor._managedSetValueWithType(this._managedOwner, name, value, type);
     }
 
-    public callEvent(name: string, parameter1: string, parameter2: string) {
+    public async callEvent(name: string, parameter1: string, parameter2: string): Promise<string> {
+        if (_isDesktop) {
+            return await getConnection().sendRequest('parentAccessor/callEvent', {
+                name,
+                parameters: [parameter1, parameter2]
+            });
+        }
         return ParentAccessor._managedCallEvent(this._managedOwner, name, [parameter1, parameter2]);
     }
 }
