@@ -111,10 +111,11 @@ Ran integration tests and macOS desktop validation. All 94 unit tests pass, both
 | Decorations | Automated | `DesktopIntegrationTests.Decorations_AddAndVerify` |
 | Markers | Automated | `DesktopIntegrationTests.Markers_AddAndVerify` |
 | Keyboard (undo/redo) | Automated | `DesktopIntegrationTests.Keyboard_UndoRedoWorks` |
-| Completion provider | Automated | `DesktopIntegrationTests.LanguageServices_CompletionProviderRegistered` |
-| Hover provider | Automated | `DesktopIntegrationTests.LanguageServices_HoverProviderRegistered` |
-| CodeLens provider | Automated | `DesktopIntegrationTests.LanguageServices_CodeLensProviderRegistered` |
-| Color provider | Automated | `DesktopIntegrationTests.LanguageServices_ColorProviderRegistered` |
+| Completion provider | Automated | `DesktopIntegrationTests.LanguageServices_CompletionProviderReturnsItems` — verifies "foreach" snippet returned |
+| Hover provider | Automated | `DesktopIntegrationTests.LanguageServices_HoverProviderReturnsContent` — verifies "Hit" hover content |
+| CodeLens provider | Automated | `DesktopIntegrationTests.LanguageServices_CodeLensProviderReturnsLenses` — verifies "Second Line Command" lens |
+| Color provider | Automated | `DesktopIntegrationTests.LanguageServices_ColorProviderDetectsColors` — verifies hex color detection |
+| Multi-instance | Automated | `DesktopIntegrationTests.MultiInstance_EditorsHaveIndependentState` — creates 2nd editor, verifies independent text |
 | Lifecycle exactly-once | Automated | `DesktopIntegrationTests.LifecycleEvents_ExactlyOnce` |
 | Unit tests | Automated | Full suite runs in CI (ubuntu build job + windows desktop-tests job) |
 

@@ -249,30 +249,31 @@ public sealed class DesktopIntegrationTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "DesktopCDP")]
-    public async Task LanguageServices_CompletionProviderRegistered()
+    public async Task LanguageServices_CompletionProviderReturnsItems()
     {
-        _currentTestName = nameof(LanguageServices_CompletionProviderRegistered);
+        _currentTestName = nameof(LanguageServices_CompletionProviderReturnsItems);
         try
         {
-            // Trigger completion programmatically and check that suggestions appear.
-            // The test app registers a CompletionItemProvider that responds to trigger characters.
-            var hasCompletionApi = await _fixture.Page.EvaluateAsync<bool>(
-                "() => typeof monaco.languages.registerCompletionItemProvider === 'function'");
-
-            Assert.True(hasCompletionApi, "Monaco completion API should be available.");
-
-            // Verify the editor can trigger completion without errors.
-            var triggeredOk = await _fixture.Page.EvaluateAsync<bool>("""
-                () => {
-                    try {
-                        const editor = monaco.editor.getEditors()[0];
-                        editor.trigger('test', 'editor.action.triggerSuggest', {});
-                        return true;
-                    } catch { return false; }
+            // The test app registers a CompletionItemProvider that returns a "foreach"
+            // snippet by default. Invoke the provider programmatically and verify output.
+            var completionLabels = await _fixture.Page.EvaluateAsync<string[]>("""
+                async () => {
+                    const editor = monaco.editor.getEditors()[0];
+                    const model = editor.getModel();
+                    const position = { lineNumber: 1, column: 1 };
+                    const context = { triggerKind: 0 };
+                    const token = new monaco.CancellationTokenSource().token;
+                    const providers = monaco.languages.getCompletionItemProvider(model);
+                    if (!providers || providers.length === 0) return [];
+                    const result = await providers[0].provideCompletionItems(model, position, context, token);
+                    if (!result || !result.suggestions) return [];
+                    return result.suggestions.map(s => typeof s.label === 'string' ? s.label : (s.label?.label || ''));
                 }
                 """);
 
-            Assert.True(triggeredOk, "Triggering completion should not throw.");
+            Assert.NotNull(completionLabels);
+            Assert.NotEmpty(completionLabels);
+            Assert.Contains("foreach", completionLabels);
         }
         catch
         {
@@ -283,15 +284,32 @@ public sealed class DesktopIntegrationTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "DesktopCDP")]
-    public async Task LanguageServices_HoverProviderRegistered()
+    public async Task LanguageServices_HoverProviderReturnsContent()
     {
-        _currentTestName = nameof(LanguageServices_HoverProviderRegistered);
+        _currentTestName = nameof(LanguageServices_HoverProviderReturnsContent);
         try
         {
-            var hasHoverApi = await _fixture.Page.EvaluateAsync<bool>(
-                "() => typeof monaco.languages.registerHoverProvider === 'function'");
+            // The test app's HoverProvider returns hover content for words containing "Hit".
+            await _fixture.Page.EvaluateAsync(
+                "() => monaco.editor.getEditors()[0].setValue('HitTest word here')");
 
-            Assert.True(hasHoverApi, "Monaco hover API should be available.");
+            var hoverContents = await _fixture.Page.EvaluateAsync<string[]>("""
+                async () => {
+                    const editor = monaco.editor.getEditors()[0];
+                    const model = editor.getModel();
+                    const position = { lineNumber: 1, column: 2 };
+                    const token = new monaco.CancellationTokenSource().token;
+                    const providers = monaco.languages.getHoverProvider(model);
+                    if (!providers || providers.length === 0) return ['NO_PROVIDERS'];
+                    const result = await providers[0].provideHover(model, position, token);
+                    if (!result || !result.contents) return ['NO_RESULT'];
+                    return result.contents.map(c => typeof c === 'string' ? c : (c.value || ''));
+                }
+                """);
+
+            Assert.NotNull(hoverContents);
+            Assert.NotEmpty(hoverContents);
+            Assert.Contains(hoverContents, c => c.Contains("Hit"));
         }
         catch
         {
@@ -302,15 +320,31 @@ public sealed class DesktopIntegrationTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "DesktopCDP")]
-    public async Task LanguageServices_CodeLensProviderRegistered()
+    public async Task LanguageServices_CodeLensProviderReturnsLenses()
     {
-        _currentTestName = nameof(LanguageServices_CodeLensProviderRegistered);
+        _currentTestName = nameof(LanguageServices_CodeLensProviderReturnsLenses);
         try
         {
-            var hasCodeLensApi = await _fixture.Page.EvaluateAsync<bool>(
-                "() => typeof monaco.languages.registerCodeLensProvider === 'function'");
+            // The test app's CodeLensProvider returns a lens on line 2 titled "Second Line Command".
+            await _fixture.Page.EvaluateAsync(
+                "() => monaco.editor.getEditors()[0].setValue('Line 1\\nLine 2\\nLine 3')");
 
-            Assert.True(hasCodeLensApi, "Monaco CodeLens API should be available.");
+            var codeLensTitles = await _fixture.Page.EvaluateAsync<string[]>("""
+                async () => {
+                    const editor = monaco.editor.getEditors()[0];
+                    const model = editor.getModel();
+                    const token = new monaco.CancellationTokenSource().token;
+                    const providers = monaco.languages.getCodeLensProvider(model);
+                    if (!providers || providers.length === 0) return ['NO_PROVIDERS'];
+                    const result = await providers[0].provideCodeLenses(model, token);
+                    if (!result || !result.lenses) return ['NO_LENSES'];
+                    return result.lenses.map(l => l.command ? l.command.title : '(no command)');
+                }
+                """);
+
+            Assert.NotNull(codeLensTitles);
+            Assert.NotEmpty(codeLensTitles);
+            Assert.Contains("Second Line Command", codeLensTitles);
         }
         catch
         {
@@ -321,15 +355,29 @@ public sealed class DesktopIntegrationTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "DesktopCDP")]
-    public async Task LanguageServices_ColorProviderRegistered()
+    public async Task LanguageServices_ColorProviderDetectsColors()
     {
-        _currentTestName = nameof(LanguageServices_ColorProviderRegistered);
+        _currentTestName = nameof(LanguageServices_ColorProviderDetectsColors);
         try
         {
-            var hasColorApi = await _fixture.Page.EvaluateAsync<bool>(
-                "() => typeof monaco.languages.registerColorProvider === 'function'");
+            // The test app's ColorProvider detects 8-char hex colors (#AARRGGBB).
+            await _fixture.Page.EvaluateAsync(
+                "() => monaco.editor.getEditors()[0].setValue('Color: #FF00FF00')");
 
-            Assert.True(hasColorApi, "Monaco color provider API should be available.");
+            var colorCount = await _fixture.Page.EvaluateAsync<int>("""
+                async () => {
+                    const editor = monaco.editor.getEditors()[0];
+                    const model = editor.getModel();
+                    const token = new monaco.CancellationTokenSource().token;
+                    const providers = monaco.languages.getColorProvider(model);
+                    if (!providers || providers.length === 0) return -1;
+                    const result = await providers[0].provideDocumentColors(model, token);
+                    return result ? result.length : 0;
+                }
+                """);
+
+            Assert.True(colorCount > 0,
+                "Color provider should detect at least one hex color (#FF00FF00) in the text.");
         }
         catch
         {
@@ -379,6 +427,59 @@ public sealed class DesktopIntegrationTests : IAsyncLifetime
             var afterRedo = await _fixture.Page.EvaluateAsync<string>(
                 "() => monaco.editor.getEditors()[0].getValue()");
             Assert.Equal("initial extra", afterRedo);
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "DesktopCDP")]
+    public async Task MultiInstance_EditorsHaveIndependentState()
+    {
+        _currentTestName = nameof(MultiInstance_EditorsHaveIndependentState);
+        try
+        {
+            // Create a second Monaco editor instance in a new container.
+            var editorCount = await _fixture.Page.EvaluateAsync<int>("""
+                () => {
+                    const container = document.createElement('div');
+                    container.id = 'test-editor-2';
+                    container.style.width = '400px';
+                    container.style.height = '200px';
+                    document.body.appendChild(container);
+                    monaco.editor.create(container, { value: 'second editor', language: 'plaintext' });
+                    return monaco.editor.getEditors().length;
+                }
+                """);
+
+            Assert.True(editorCount >= 2, $"Expected at least 2 editors, got {editorCount}.");
+
+            // Verify independent state: first editor has different text from second.
+            var firstText = await _fixture.Page.EvaluateAsync<string>(
+                "() => monaco.editor.getEditors()[0].getValue()");
+            var secondText = await _fixture.Page.EvaluateAsync<string>("""
+                () => {
+                    const editors = monaco.editor.getEditors();
+                    return editors[editors.length - 1].getValue();
+                }
+                """);
+
+            Assert.Equal("second editor", secondText);
+            Assert.NotEqual(firstText, secondText);
+
+            // Cleanup: dispose the second editor and remove its container.
+            await _fixture.Page.EvaluateAsync("""
+                () => {
+                    const editors = monaco.editor.getEditors();
+                    const last = editors[editors.length - 1];
+                    last.dispose();
+                    const el = document.getElementById('test-editor-2');
+                    if (el) el.remove();
+                }
+                """);
         }
         catch
         {
