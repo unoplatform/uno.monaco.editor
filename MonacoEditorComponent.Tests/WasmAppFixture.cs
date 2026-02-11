@@ -61,8 +61,8 @@ public sealed class WasmAppFixture : IAsyncLifetime
         _serverProcess = StartStaticServer(wwwrootPath, _serverPort);
         _ = CaptureProcessOutputAsync(_serverProcess, _processLogPath);
 
-        // 5. Wait for server to be ready.
-        await WaitForServerReady($"http://localhost:{_serverPort}/", timeoutMs: 15_000);
+        // 5. Wait for server to be ready (fail fast if process dies).
+        await WaitForServerReady($"http://localhost:{_serverPort}/", _serverProcess, _processLogPath, timeoutMs: 15_000);
 
         // 6. Launch Playwright Chromium browser (headless).
         _browser = await _playwrightSetup.Instance.Chromium.LaunchAsync(new()
@@ -208,12 +208,25 @@ public sealed class WasmAppFixture : IAsyncLifetime
                 };
 
                 var process = Process.Start(startInfo);
-                if (process is not null)
+                if (process is null)
                 {
-                    return process;
+                    attempted.Add($"{fileName} (returned null)");
+                    continue;
                 }
 
-                attempted.Add($"{fileName} (returned null)");
+                // Wait briefly to verify the process survives startup.
+                // If dotnet-serve is not installed, `dotnet serve` starts then exits
+                // immediately -- we need to detect that and try the next candidate.
+                Thread.Sleep(500);
+                if (process.HasExited)
+                {
+                    var exitCode = process.ExitCode;
+                    process.Dispose();
+                    attempted.Add($"{fileName} (exited immediately with code {exitCode})");
+                    continue;
+                }
+
+                return process;
             }
             catch (Exception ex)
             {
@@ -226,13 +239,23 @@ public sealed class WasmAppFixture : IAsyncLifetime
             string.Join("\n", attempted.Select(a => $"  - {a}")));
     }
 
-    private static async Task WaitForServerReady(string url, int timeoutMs)
+    private static async Task WaitForServerReady(string url, Process serverProcess, string logPath, int timeoutMs)
     {
         using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
 
         while (DateTime.UtcNow < deadline)
         {
+            // Fail fast if the server process has died.
+            if (serverProcess.HasExited)
+            {
+                var exitCode = serverProcess.ExitCode;
+                var logContent = File.Exists(logPath) ? File.ReadAllText(logPath) : "(no log)";
+                throw new InvalidOperationException(
+                    $"Static file server process exited unexpectedly with code {exitCode} before becoming ready.\n" +
+                    $"Process log:\n{logContent}");
+            }
+
             try
             {
                 var response = await httpClient.GetAsync(url);
@@ -247,8 +270,10 @@ public sealed class WasmAppFixture : IAsyncLifetime
             await Task.Delay(500);
         }
 
+        var logOnTimeout = File.Exists(logPath) ? File.ReadAllText(logPath) : "(no log)";
         throw new TimeoutException(
-            $"Static file server at {url} did not become ready within {timeoutMs}ms.");
+            $"Static file server at {url} did not become ready within {timeoutMs}ms.\n" +
+            $"Process log:\n{logOnTimeout}");
     }
 
     private static int GetAvailablePort()

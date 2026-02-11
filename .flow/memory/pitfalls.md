@@ -63,3 +63,9 @@ Use Channel.CreateBounded (not Unbounded) for inbound message queues from untrus
 
 ## 2026-02-11 manual [pitfall]
 Playwright NuGet build/buildTransitive targets conflict with UseArtifactsOutput+OutputType=Exe on macOS/Linux; exclude those assets and install browsers from NuGet cache path instead
+
+## 2026-02-11 manual [pitfall]
+When starting external processes with fallback candidates, verify the process survives briefly (check HasExited after short delay) before returning -- commands like 'dotnet serve' can start then exit immediately if a tool is not installed
+
+## 2026-02-11 manual [pitfall]
+When polling for external service readiness (HTTP server, CDP endpoint), always check whether the backing process has died between polls -- otherwise timeout gives a generic error instead of a fast diagnostic with process exit code and stderr
