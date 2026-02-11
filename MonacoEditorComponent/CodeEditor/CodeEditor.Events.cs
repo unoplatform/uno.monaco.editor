@@ -167,6 +167,10 @@ namespace Monaco
             if (_themeListener != null)
             {
                 _themeListener.ThemeChanged -= ThemeListener_ThemeChanged;
+                if (_themeListener is IDisposable disposableTheme)
+                {
+                    disposableTheme.Dispose();
+                }
                 _themeListener = null;
             }
 

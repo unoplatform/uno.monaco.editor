@@ -33,3 +33,6 @@ WebView2 Source must not be set before EnsureCoreWebView2Async completes -- buff
 
 ## 2026-02-11 manual [pitfall]
 Window.Current.SizeChanged subscriptions must be unsubscribed in Unloaded handlers -- missing unsubscribe causes handler accumulation and control lifetime leaks across load/unload cycles
+
+## 2026-02-11 manual [pitfall]
+async void event handlers calling methods that re-throw need try/catch -- unhandled exceptions in async void crash the UI thread instead of propagating to callers

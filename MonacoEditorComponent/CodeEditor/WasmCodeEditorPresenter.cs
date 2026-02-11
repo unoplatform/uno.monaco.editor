@@ -127,7 +127,8 @@ namespace Monaco
             }
             catch (Exception e)
             {
-                Debug.WriteLine(e);
+                Debug.WriteLine($"WasmCodeEditorPresenter.Launch error: {e}");
+                throw;
             }
         }
 

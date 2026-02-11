@@ -205,8 +205,9 @@ namespace Monaco
                 Markers.VectorChanged -= Markers_VectorChanged;
                 Markers.VectorChanged += Markers_VectorChanged;
 
-                Debug.WriteLine("Setting initialized - true");
-                _initialized = true;
+                // Note: _initialized is NOT set here. It is set only when the
+                // lifecycle reaches Loaded (in CodeEditorLoaded or WebView_NavigationCompleted)
+                // to prevent premature script execution before Monaco is ready.
 
                 Unloaded -= CodeEditor_Unloaded;
                 Unloaded += CodeEditor_Unloaded;

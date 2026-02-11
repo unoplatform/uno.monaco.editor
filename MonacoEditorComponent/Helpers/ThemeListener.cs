@@ -17,7 +17,7 @@ namespace Monaco.Helpers
     /// and Signals an Event when they occur.
     /// </summary>
     [AllowForWeb]
-    public sealed partial class ThemeListener : IThemeListener // This is a copy of the Toolkit ThemeListener, for some reason if we try and use it directly it's not read by the WebView
+    public sealed partial class ThemeListener : IThemeListener, IDisposable // This is a copy of the Toolkit ThemeListener, for some reason if we try and use it directly it's not read by the WebView
     {
         private readonly DispatcherQueue _queue;
         private readonly ICodeEditorPresenter _owner;
@@ -59,8 +59,17 @@ namespace Monaco.Helpers
 
         partial void PartialCtor();
 
-        ~ThemeListener()
+        private bool _disposed;
+
+        /// <summary>
+        /// Deterministically unsubscribes from OS event sources to prevent
+        /// leaked listeners and duplicate callbacks across re-init cycles.
+        /// </summary>
+        public void Dispose()
         {
+            if (_disposed) return;
+            _disposed = true;
+
             _accessible.HighContrastChanged -= Accessible_HighContrastChanged;
             _settings.ColorValuesChanged -= Settings_ColorValuesChanged;
 
@@ -68,6 +77,11 @@ namespace Monaco.Helpers
             {
                 Window.Current.CoreWindow.Activated -= CoreWindow_Activated;
             }
+        }
+
+        ~ThemeListener()
+        {
+            Dispose();
         }
 
         private void Accessible_HighContrastChanged(AccessibilitySettings sender, object args)
