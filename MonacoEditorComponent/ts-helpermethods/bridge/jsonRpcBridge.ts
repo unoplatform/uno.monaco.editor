@@ -131,3 +131,66 @@ export function createBridgeConnection(): MessageConnection {
 
     return connection;
 }
+
+/**
+ * Returns the active JSON-RPC connection from window.__jsonRpc.
+ * Throws a descriptive error if the bridge has not been initialized or has been disposed.
+ * This is the single source of truth for connection acquisition -- all modules must use this
+ * instead of accessing window.__jsonRpc directly.
+ */
+export function getConnection(): MessageConnection {
+    const conn = (window as any).__jsonRpc as MessageConnection | undefined;
+    if (!conn) {
+        throw new Error(
+            '[jsonRpcBridge] JSON-RPC connection is not available. ' +
+            'The bridge has not been initialized or has been disposed.'
+        );
+    }
+    return conn;
+}
+
+/**
+ * Default timeout (ms) for init-time JSON-RPC requests.
+ * Prevents indefinite hangs if the C# host is slow or handlers are not yet registered.
+ */
+export const INIT_REQUEST_TIMEOUT_MS = 10000;
+
+/**
+ * Wraps a JSON-RPC sendRequest with a timeout. Rejects with a descriptive error
+ * if the response is not received within the given duration.
+ */
+export function sendRequestWithTimeout<T>(
+    connection: MessageConnection,
+    method: string,
+    params: any,
+    timeoutMs: number = INIT_REQUEST_TIMEOUT_MS
+): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+            if (!settled) {
+                settled = true;
+                reject(new Error(
+                    `[jsonRpcBridge] JSON-RPC request '${method}' timed out after ${timeoutMs}ms`
+                ));
+            }
+        }, timeoutMs);
+
+        connection.sendRequest<T>(method, params).then(
+            (result) => {
+                if (!settled) {
+                    settled = true;
+                    clearTimeout(timer);
+                    resolve(result);
+                }
+            },
+            (error) => {
+                if (!settled) {
+                    settled = true;
+                    clearTimeout(timer);
+                    reject(error);
+                }
+            }
+        );
+    });
+}

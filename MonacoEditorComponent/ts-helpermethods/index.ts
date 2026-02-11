@@ -14,6 +14,7 @@ import * as monaco from 'monaco-editor';
 // Helper modules
 import {
     createMonacoEditor,
+    disposeEditor,
     InvokeJS,
     refreshLayout,
     languageIdFromExtension,
@@ -56,7 +57,7 @@ import { registerCompletionItemProvider } from './registerCompletionItemProvider
 import { updateSelectedContent } from './updateSelectedContent';
 
 // Bridge module
-import { createBridgeConnection, isDesktopHost } from './bridge/jsonRpcBridge';
+import { createBridgeConnection, isDesktopHost, getConnection } from './bridge/jsonRpcBridge';
 
 // ---------------------------------------------------------------------------
 // Configure Monaco workers
@@ -174,6 +175,10 @@ globalThis.languageIdFromExtension = languageIdFromExtension;
 // Expose Monaco namespace globally (needed by eval-style InvokeScriptAsync calls)
 (globalThis as any).monaco = monaco;
 
+// Dispose/cleanup
+(globalThis as any).disposeEditor = disposeEditor;
+
 // Expose bridge utilities for external use
 (globalThis as any).isDesktopHost = isDesktopHost;
 (globalThis as any).createBridgeConnection = createBridgeConnection;
+(globalThis as any).getConnection = getConnection;

@@ -1,7 +1,7 @@
 import * as monaco from 'monaco-editor';
 import { ParentAccessor } from './Monaco.Helpers.ParentAccessor';
-import { isDesktopHost } from './bridge/jsonRpcBridge';
-import { MessageConnection } from 'vscode-jsonrpc/browser';
+import { isDesktopHost, getConnection, sendRequestWithTimeout } from './bridge/jsonRpcBridge';
+import { Disposable } from 'vscode-jsonrpc/browser';
 import { EditorContext, getParentJsonValueAsync, changeTheme, getThemeCurrentThemeNameAsync, getThemeIsHighContrastAsync } from './otherScriptsToBeOrganized';
 
 type MethodWithReturnId = (parameter: string) => void;
@@ -12,14 +12,6 @@ type NumberCallback = (parameter: any) => void;
  * false when running under Uno WASM Bootstrap (browser).
  */
 const _isDesktop: boolean = isDesktopHost();
-
-/**
- * Returns the JSON-RPC connection from window.__jsonRpc.
- * Only valid on desktop after the bridge has been initialized.
- */
-function getConnection(): MessageConnection {
-    return (window as any).__jsonRpc as MessageConnection;
-}
 
 class DebugLoggerImpl {
     private _managedOwner: any;
@@ -77,7 +69,9 @@ class ThemeListener {
 
     public async getIsHighContrastAsync(): Promise<boolean> {
         if (_isDesktop) {
-            const result = await getConnection().sendRequest<string>('theme/getProperty', { name: 'isHighContrast' });
+            const result = await sendRequestWithTimeout<string>(
+                getConnection(), 'theme/getProperty', { name: 'isHighContrast' }
+            );
             return result === 'true' || result === 'True';
         }
         return ThemeListener._managedGetIsHighContrast(this._managedOwner);
@@ -92,7 +86,9 @@ class ThemeListener {
 
     public async getCurrentThemeNameAsync(): Promise<string> {
         if (_isDesktop) {
-            return await getConnection().sendRequest<string>('theme/getProperty', { name: 'currentThemeName' });
+            return await sendRequestWithTimeout<string>(
+                getConnection(), 'theme/getProperty', { name: 'currentThemeName' }
+            );
         }
         return ThemeListener._managedGetCurrentThemeName(this._managedOwner);
     }
@@ -102,30 +98,42 @@ class ThemeListener {
  * Registers C#->JS JSON-RPC handlers on the connection.
  * Only called on desktop. These handlers allow the C# host to invoke
  * editor operations via JSON-RPC instead of InvokeScriptAsync.
+ * Returns an array of Disposables for deterministic cleanup.
  */
-function registerDesktopHandlers(connection: MessageConnection, editorContext: EditorContext): void {
+function registerDesktopHandlers(editorContext: EditorContext): Disposable[] {
+    const connection = getConnection();
+    const disposables: Disposable[] = [];
+
     // editor/getValue -- returns the current editor text
-    connection.onRequest('editor/getValue', () => {
-        return editorContext.editor.getValue();
-    });
+    disposables.push(
+        connection.onRequest('editor/getValue', () => {
+            return editorContext.editor.getValue();
+        })
+    );
 
     // editor/updateOptions -- push updated editor options to Monaco
-    connection.onNotification('editor/updateOptions', (params: { options: any }) => {
-        if (params && params.options && typeof params.options === 'object') {
-            editorContext.editor.updateOptions(params.options);
-        }
-    });
+    disposables.push(
+        connection.onNotification('editor/updateOptions', (params: { options: any }) => {
+            if (params && params.options && typeof params.options === 'object') {
+                editorContext.editor.updateOptions(params.options);
+            }
+        })
+    );
 
     // editor/lifecycleUpdate -- writes lifecycle counts to document.body.dataset for Playwright testability (Task 8)
-    connection.onNotification('editor/lifecycleUpdate', (params: { loading: number, loaded: number }) => {
-        document.body.dataset.lifecycleLoading = String(params.loading);
-        document.body.dataset.lifecycleLoaded = String(params.loaded);
-    });
+    disposables.push(
+        connection.onNotification('editor/lifecycleUpdate', (params: { loading: number, loaded: number }) => {
+            document.body.dataset.lifecycleLoading = String(params.loading);
+            document.body.dataset.lifecycleLoaded = String(params.loaded);
+        })
+    );
+
+    return disposables;
 }
 
 /**
  * Initialize the Monaco editor instance.
- * On desktop, all property reads and theme queries are async (JSON-RPC).
+ * On desktop, all property reads and theme queries are async (JSON-RPC with timeouts).
  * On WASM, they remain synchronous (JSExport).
  */
 export const initializeMonacoEditor = async (managedOwner: any, element: any) => {
@@ -154,7 +162,7 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any) =>
         }
     });
 
-    // Set theme -- async on desktop (JSON-RPC), sync on WASM (JSExport)
+    // Set theme -- async on desktop (JSON-RPC with timeout), sync on WASM (JSExport)
     let theme: any = await getParentJsonValueAsync(element, "RequestedTheme");
     theme = {
         "0": "Default",
@@ -177,14 +185,41 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any) =>
     // Disable WebView Scrollbar so Monaco Scrollbar can do heavy lifting
     document.body.style.overflow = 'hidden';
 
-    // Register C#->JS JSON-RPC handlers on desktop
+    // Register C#->JS JSON-RPC handlers on desktop; track disposables for cleanup
     if (_isDesktop) {
-        const connection = getConnection();
-        registerDesktopHandlers(connection, editorContext);
+        const handlerDisposables = registerDesktopHandlers(editorContext);
+        // Store disposables on context for deterministic teardown
+        (editorContext as any)._rpcHandlerDisposables = handlerDisposables;
     }
 
     // Callback to Parent that we're loaded
     editorContext.Accessor.callAction("Loaded");
+};
+
+/**
+ * Dispose an editor context: unregisters RPC handlers, removes context map entry,
+ * and optionally disposes the JSON-RPC connection.
+ */
+export const disposeEditor = (element: any) => {
+    const editorContext = EditorContext.getEditorForElement(element);
+    if (!editorContext) return;
+
+    // Dispose tracked RPC handler registrations
+    const disposables = (editorContext as any)._rpcHandlerDisposables as Disposable[] | undefined;
+    if (disposables) {
+        for (const d of disposables) {
+            d.dispose();
+        }
+        (editorContext as any)._rpcHandlerDisposables = undefined;
+    }
+
+    // Remove from context map
+    EditorContext.removeEditorForElement(element);
+
+    // Dispose the JSON-RPC connection on desktop (rejects pending, removes listeners)
+    if (_isDesktop) {
+        editorContext.Accessor.close();
+    }
 };
 
 export const replaceAll = (str: string, find: string, rep: string): string => {
@@ -219,7 +254,7 @@ export const desanitize = (parameter: string): string => {
  * On desktop, values arrive as clean JSON via JSON-RPC -- no sanitize encoding needed.
  * On WASM, apply sanitize encoding for the JSExport marshalling path.
  */
-export const stringifyForMarshalling = (value: any): string => {
+export const stringifyForMarshalling = (value: string): string => {
     if (_isDesktop) {
         return value;
     }
@@ -231,7 +266,7 @@ export const stringifyForMarshalling = (value: any): string => {
  * On desktop, parameters are sent as clean JSON (no sanitize/desanitize).
  * On WASM, parameters are sanitized for JSExport marshalling.
  */
-export const callParentEventAsync = async (element: any, name: string, parameters: string[]): Promise<string> => {
+export const callParentEventAsync = async (element: any, name: string, parameters: string[]): Promise<string | null> => {
     if (_isDesktop) {
         // Desktop: send parameters as clean JSON array via JSON-RPC
         const result = await EditorContext.getEditorForElement(element).Accessor.callEvent(

@@ -1,19 +1,10 @@
-import { isDesktopHost } from './bridge/jsonRpcBridge';
-import { MessageConnection } from 'vscode-jsonrpc/browser';
+import { isDesktopHost, getConnection, sendRequestWithTimeout } from './bridge/jsonRpcBridge';
 
 /**
  * Module-level flag: true when running in a WebView2/WKWebView host (desktop),
  * false when running under Uno WASM Bootstrap (browser).
  */
 const _isDesktop: boolean = isDesktopHost();
-
-/**
- * Returns the JSON-RPC connection from window.__jsonRpc.
- * Only valid on desktop after the bridge has been initialized (index.ts auto-init).
- */
-function getConnection(): MessageConnection {
-    return (window as any).__jsonRpc as MessageConnection;
-}
 
 export class ParentAccessor {
     private _managedOwner: any;
@@ -60,7 +51,9 @@ export class ParentAccessor {
 
     public async getJsonValueAsync(name: string): Promise<string> {
         if (_isDesktop) {
-            return await getConnection().sendRequest('parentAccessor/getJsonValue', { name });
+            return await sendRequestWithTimeout<string>(
+                getConnection(), 'parentAccessor/getJsonValue', { name }
+            );
         }
         return ParentAccessor._managedGetJsonValue(this._managedOwner, name);
     }
@@ -98,9 +91,10 @@ export class ParentAccessor {
     public close(): void {
         if (_isDesktop) {
             // Dispose the JSON-RPC connection -- rejects pending requests and removes listeners
-            const conn = getConnection();
+            const conn = (window as any).__jsonRpc;
             if (conn) {
                 conn.dispose();
+                (window as any).__jsonRpc = undefined;
             }
             return;
         }
@@ -125,10 +119,12 @@ export class ParentAccessor {
 
     public async callEvent(name: string, parameter1: string, parameter2: string): Promise<string> {
         if (_isDesktop) {
-            return await getConnection().sendRequest('parentAccessor/callEvent', {
-                name,
-                parameters: [parameter1, parameter2]
-            });
+            return await sendRequestWithTimeout<string>(
+                getConnection(), 'parentAccessor/callEvent', {
+                    name,
+                    parameters: [parameter1, parameter2]
+                }
+            );
         }
         return ParentAccessor._managedCallEvent(this._managedOwner, name, [parameter1, parameter2]);
     }
