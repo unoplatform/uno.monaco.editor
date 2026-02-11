@@ -18,3 +18,6 @@ WebView2 WebMessageReceived: use WebMessageAsJson (not TryGetWebMessageAsString)
 
 ## 2026-02-11 manual [pitfall]
 URL allowlisting must use parsed URI exact host match (not string.Contains) to prevent subdomain and query-string bypass attacks
+
+## 2026-02-11 manual [pitfall]
+file:// URIs on macOS/Linux have empty host -- navigation allowlists must split validation by scheme (https checks host+port, file checks path prefix or allows all local)

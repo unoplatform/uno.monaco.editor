@@ -185,18 +185,26 @@ namespace Monaco
                 return true;
             }
 
-            // Parse as URI and enforce strict origin check: scheme + host + default port
-            if (global::System.Uri.TryCreate(uri, UriKind.Absolute, out var parsed))
+            if (!global::System.Uri.TryCreate(uri, UriKind.Absolute, out var parsed))
             {
-                // Virtual host mapping uses https scheme on Windows.
-                // On macOS/Linux Uno converts to file:// scheme.
-                // Only allow these two schemes with exact host match and default port.
-                var isAllowedScheme = string.Equals(parsed.Scheme, "https", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(parsed.Scheme, "file", StringComparison.OrdinalIgnoreCase);
-                var isAllowedHost = string.Equals(parsed.Host, AllowedVirtualHost, StringComparison.OrdinalIgnoreCase);
-                var isDefaultPort = parsed.IsDefaultPort;
+                return false;
+            }
 
-                return isAllowedScheme && isAllowedHost && isDefaultPort;
+            // Windows: virtual host mapping serves content over https with a synthetic host.
+            // Enforce exact host + default port.
+            if (string.Equals(parsed.Scheme, "https", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Equals(parsed.Host, AllowedVirtualHost, StringComparison.OrdinalIgnoreCase)
+                    && parsed.IsDefaultPort;
+            }
+
+            // macOS/Linux: Uno converts virtual host URLs to file:// with empty host.
+            // file:// URIs have no host component, so only validate the scheme.
+            // Task 3 will set the actual folder mapping; the path prefix is not
+            // known at this layer yet, so we allow any local file path for now.
+            if (string.Equals(parsed.Scheme, "file", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
             }
 
             return false;
