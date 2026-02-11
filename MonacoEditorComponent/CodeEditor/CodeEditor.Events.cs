@@ -90,11 +90,19 @@ namespace Monaco
             Options.ReadOnly = ReadOnly;
         }
 
-        private async void WebView_NavigationCompleted(ICodeEditorPresenter? sender, WebViewNavigationCompletedEventArgs? args)
+        private async void WebView_NavigationCompleted(ICodeEditorPresenter? sender, PresenterNavigationCompletedEventArgs? args)
         {
 #if DEBUG
             Debug.WriteLine($"Navigation completed - {args?.IsSuccess}");
 #endif
+
+            // Gate on navigation success. A failed or blocked navigation should not
+            // advance the lifecycle to Loaded.
+            if (args is { IsSuccess: false })
+            {
+                Debug.WriteLine("Navigation failed — not advancing lifecycle.");
+                return;
+            }
 
             // Note: On desktop, navigation completion means the host page loaded but
             // Monaco may not be fully ready. Task 5 will add a JSON-RPC "editor/ready"
@@ -314,17 +322,16 @@ namespace Monaco
             }
         }
 
-        private void WebView_NewWindowRequested(ICodeEditorPresenter? sender, WebViewNewWindowRequestedEventArgs? args)
+        private void WebView_NewWindowRequested(ICodeEditorPresenter? sender, PresenterNewWindowRequestedEventArgs? args)
         {
             if (sender is not null)
             {
-                // Map platform-specific args into cross-platform type
                 var linkArgs = new OpenLinkRequestedEventArgs
                 {
                     Uri = args?.Uri
                 };
                 OpenLinkRequested?.Invoke(this, linkArgs);
-                // Propagate handled state back to WASM args if available
+                // Propagate handled state back to presenter args
                 if (args is not null)
                 {
                     args.Handled = linkArgs.Handled;

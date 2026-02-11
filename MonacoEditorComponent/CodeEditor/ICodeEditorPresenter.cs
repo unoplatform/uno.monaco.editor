@@ -43,16 +43,39 @@ namespace Monaco
         public bool Handled { get; set; }
     }
 
+    /// <summary>
+    /// Portable event args for navigation completion.
+    /// Replaces WinRT WebViewNavigationCompletedEventArgs which cannot be constructed.
+    /// </summary>
+    public sealed class PresenterNavigationCompletedEventArgs : EventArgs
+    {
+        /// <summary>Whether the navigation completed successfully.</summary>
+        public bool IsSuccess { get; init; }
+    }
+
+    /// <summary>
+    /// Portable event args for new-window (link open) requests from the presenter layer.
+    /// Replaces WinRT WebViewNewWindowRequestedEventArgs which cannot be constructed.
+    /// </summary>
+    public sealed class PresenterNewWindowRequestedEventArgs : EventArgs
+    {
+        /// <summary>The URI of the requested navigation.</summary>
+        public global::System.Uri? Uri { get; init; }
+
+        /// <summary>Set to true to mark the request as handled.</summary>
+        public bool Handled { get; set; }
+    }
+
     public interface ICodeEditorPresenter
 	{
-		// <summary>Occurs when a user performs an action in a WebView that causes content to be opened in a new window.</summary>
-		event TypedEventHandler<ICodeEditorPresenter?, WebViewNewWindowRequestedEventArgs?>? NewWindowRequested;
+		/// <summary>Occurs when a user performs an action in a WebView that causes content to be opened in a new window.</summary>
+		event TypedEventHandler<ICodeEditorPresenter?, PresenterNewWindowRequestedEventArgs?>? NewWindowRequested;
 
 		/// <summary>Occurs before the WebView navigates to new content.</summary>
 		event TypedEventHandler<ICodeEditorPresenter?, WebViewNavigationStartingEventArgs?>? NavigationStarting;
 
 		/// <summary>Occurs when the WebView has finished loading the current content or if navigation has failed.</summary>
-		event TypedEventHandler<ICodeEditorPresenter?, WebViewNavigationCompletedEventArgs?>? NavigationCompleted;
+		event TypedEventHandler<ICodeEditorPresenter?, PresenterNavigationCompletedEventArgs?>? NavigationCompleted;
 
         /// <summary>
         /// Inbound message event from the web view layer.

@@ -39,13 +39,13 @@ namespace Monaco
         }
 
         /// <inheritdoc />
-        public event TypedEventHandler<ICodeEditorPresenter?, WebViewNewWindowRequestedEventArgs?>? NewWindowRequested;
+        public event TypedEventHandler<ICodeEditorPresenter?, PresenterNewWindowRequestedEventArgs?>? NewWindowRequested;
 
         /// <inheritdoc />
         public event TypedEventHandler<ICodeEditorPresenter?, WebViewNavigationStartingEventArgs?>? NavigationStarting;
 
         /// <inheritdoc />
-        public event TypedEventHandler<ICodeEditorPresenter?, WebViewNavigationCompletedEventArgs?>? NavigationCompleted;
+        public event TypedEventHandler<ICodeEditorPresenter?, PresenterNavigationCompletedEventArgs?>? NavigationCompleted;
 
         /// <inheritdoc />
         public event EventHandler<WebViewMessageEventArgs>? MessageReceived;
@@ -271,18 +271,23 @@ namespace Monaco
 
         private void CoreWebView2_NavigationCompleted(Microsoft.Web.WebView2.Core.CoreWebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs args)
         {
-            // WebViewNavigationCompletedEventArgs cannot be directly constructed.
-            // Pass null and let the handler check IsSuccess through the presenter state.
-            NavigationCompleted?.Invoke(this, null);
+            NavigationCompleted?.Invoke(this, new PresenterNavigationCompletedEventArgs
+            {
+                IsSuccess = args.IsSuccess
+            });
         }
 
         private void CoreWebView2_NewWindowRequested(Microsoft.Web.WebView2.Core.CoreWebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2NewWindowRequestedEventArgs args)
         {
-            // Block external navigation
+            // Block external navigation in WebView2
             args.Handled = true;
-            // Pass null args — WebViewNewWindowRequestedEventArgs is a WinRT type
-            // that cannot be constructed. CodeEditor handler accepts null on desktop.
-            NewWindowRequested?.Invoke(this, null);
+
+            // Map WebView2 args into portable type so CodeEditor receives the URI
+            var presenterArgs = new PresenterNewWindowRequestedEventArgs
+            {
+                Uri = global::System.Uri.TryCreate(args.Uri, UriKind.Absolute, out var parsed) ? parsed : null
+            };
+            NewWindowRequested?.Invoke(this, presenterArgs);
         }
     }
 }

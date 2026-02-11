@@ -42,13 +42,13 @@ namespace Monaco
         public string ElementId => _element.ElementId;
 
         /// <inheritdoc />
-        public event TypedEventHandler<ICodeEditorPresenter?, WebViewNewWindowRequestedEventArgs?>? NewWindowRequested; // ignored for now (external navigation)
+        public event TypedEventHandler<ICodeEditorPresenter?, PresenterNewWindowRequestedEventArgs?>? NewWindowRequested; // ignored for now (external navigation)
 
         /// <inheritdoc />
         public event TypedEventHandler<ICodeEditorPresenter?, WebViewNavigationStartingEventArgs?>? NavigationStarting;
 
         /// <inheritdoc />
-        public event TypedEventHandler<ICodeEditorPresenter?, WebViewNavigationCompletedEventArgs?>? NavigationCompleted; // ignored for now (only focus the editor)
+        public event TypedEventHandler<ICodeEditorPresenter?, PresenterNavigationCompletedEventArgs?>? NavigationCompleted; // ignored for now (only focus the editor)
 
         /// <inheritdoc />
         /// <remarks>WASM presenter never fires this event. JSExport direct calls are used instead.</remarks>
