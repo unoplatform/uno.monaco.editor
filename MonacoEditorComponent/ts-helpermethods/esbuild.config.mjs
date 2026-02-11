@@ -59,24 +59,56 @@ function copyToDesktop() {
 }
 
 /**
- * esbuild plugin that copies output to DesktopContent after each build.
- * Ensures watch mode keeps both output directories in sync.
+ * esbuild plugin that copies main bundle + CSS to DesktopContent after each build.
+ * Attached to the main bundle context in watch mode.
  */
-const copyToDesktopPlugin = {
-    name: 'copy-to-desktop',
+const copyMainToDesktopPlugin = {
+    name: 'copy-main-to-desktop',
     setup(build) {
         build.onEnd((result) => {
             if (result.errors.length === 0) {
                 try {
-                    copyToDesktop();
-                    console.log('[esbuild] Copied to DesktopContent.');
+                    const jsOut = path.join(wasmScriptsDir, 'uno-monaco-helpers.js');
+                    if (fs.existsSync(jsOut)) {
+                        fs.copyFileSync(jsOut, path.join(desktopContentDir, 'uno-monaco-helpers.js'));
+                    }
+                    const cssOut = path.join(wasmScriptsDir, 'uno-monaco-helpers.css');
+                    if (fs.existsSync(cssOut)) {
+                        fs.copyFileSync(cssOut, path.join(desktopContentDir, 'uno-monaco-helpers.css'));
+                    }
+                    console.log('[esbuild] Copied main bundle to DesktopContent.');
                 } catch (err) {
-                    console.warn('[esbuild] Copy to DesktopContent failed:', err.message);
+                    console.warn('[esbuild] Copy main to DesktopContent failed:', err.message);
                 }
             }
         });
     }
 };
+
+/**
+ * Creates an esbuild plugin that copies a specific worker to DesktopContent after rebuild.
+ * Each worker context gets its own plugin so DesktopContent stays in sync during watch.
+ */
+function createCopyWorkerPlugin(workerName) {
+    return {
+        name: `copy-worker-${workerName}`,
+        setup(build) {
+            build.onEnd((result) => {
+                if (result.errors.length === 0) {
+                    try {
+                        const src = path.join(workersDir, `${workerName}.js`);
+                        if (fs.existsSync(src)) {
+                            fs.copyFileSync(src, path.join(desktopWorkersDir, `${workerName}.js`));
+                            console.log(`[esbuild] Copied ${workerName}.js to DesktopContent/workers/.`);
+                        }
+                    } catch (err) {
+                        console.warn(`[esbuild] Copy ${workerName} to DesktopContent failed:`, err.message);
+                    }
+                }
+            });
+        }
+    };
+}
 
 // Common build options
 const commonOptions = {
@@ -126,18 +158,28 @@ async function build() {
     }));
 
     if (isWatch) {
-        // Watch mode: rebuild on change, copy to DesktopContent after each rebuild
+        // Watch mode: rebuild on change, copy to DesktopContent after each rebuild.
+        // Each context gets its own copy plugin so all outputs stay in sync.
         const mainCtx = await esbuild.context({
             ...mainBuildOptions,
-            plugins: [...(mainBuildOptions.plugins || []), copyToDesktopPlugin],
+            plugins: [...(mainBuildOptions.plugins || []), copyMainToDesktopPlugin],
         });
         await mainCtx.watch();
-        console.log('[esbuild] Watching for changes...');
+        console.log('[esbuild] Watching main bundle for changes...');
 
-        for (const opts of workerBuildOptions) {
+        for (const [name, entry] of Object.entries(workerEntries)) {
+            const opts = {
+                ...commonOptions,
+                entryPoints: [entry],
+                outfile: path.join(workersDir, `${name}.js`),
+                sourcemap: false,
+                nodePaths: [path.join(rootDir, 'node_modules')],
+                plugins: [createCopyWorkerPlugin(name)],
+            };
             const ctx = await esbuild.context(opts);
             await ctx.watch();
         }
+        console.log('[esbuild] Watching worker bundles for changes...');
     } else {
         // Single build
         console.log('[esbuild] Building main bundle...');
