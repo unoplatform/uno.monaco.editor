@@ -1,10 +1,12 @@
-﻿///<reference path="../monaco-editor/monaco.d.ts" />
+import * as monaco from 'monaco-editor';
+import { EditorContext } from './otherScriptsToBeOrganized';
+import { callParentEventAsync } from './asyncCallbackHelpers';
 
 function isTextEdit(edit: monaco.languages.IWorkspaceTextEdit | monaco.languages.IWorkspaceFileEdit): edit is monaco.languages.IWorkspaceTextEdit {
     return (edit as monaco.languages.IWorkspaceTextEdit).textEdit !== undefined;
 }
 
-const registerCodeActionProvider = function (unused: any, languageId) {
+export const registerCodeActionProvider = function (unused: any, languageId: string) {
     return monaco.languages.registerCodeActionProvider(languageId, {
         provideCodeActions: function (model, range, context, token) {
             var element = EditorContext.getElementFromModel(model);

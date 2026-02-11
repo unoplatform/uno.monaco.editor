@@ -1,4 +1,4 @@
-﻿class ParentAccessor {
+export class ParentAccessor {
     private _managedOwner: any;
     private static _managedGetJsonValue: (managedOwner: any, name: string) => string;
     private static _managedCallAction: (managedOwner: any, name: string) => boolean;
@@ -48,9 +48,6 @@
         ParentAccessor._managedClose(this._managedOwner);
     }
 
-    //getChildValue(name: string, child: string): Promise<any>;
-    //getJsonValue(name: string): Promise<string>;
-    //getValue(name: string): Promise<any>;
     public async setValue(name: string, value: string): Promise<void> {
         ParentAccessor._managedSetValue(this._managedOwner, name, value);
     }
@@ -59,29 +56,7 @@
         ParentAccessor._managedSetValueWithType(this._managedOwner, name, value, type);
     }
 
-    //callActionWithParameters(name: string, parameter1: string, parameter2: string): boolean;
     public callEvent(name: string, parameter1: string, parameter2: string) {
         return ParentAccessor._managedCallEvent(this._managedOwner, name, [parameter1, parameter2]);
     }
 }
-
-
-
-////namespace Monaco.Helpers {
-//    interface ParentAccessor {
-//        callAction(name: string): boolean;
-//        callActionWithParameters(name: string, parameters: string[]): boolean;
-//        callEvent(name: string, parameters: string[]): Promise<string>
-//        close();
-//        getChildValue(name: string, child: string): Promise<any>;
-//        getJsonValue(name: string): Promise<string>;
-//        getValue(name: string): Promise<any>;
-//        setValue(name: string, value: any): Promise<undefined>;
-//        setValue(name: string, value: string, type: string): Promise<undefined>;
-//        setValueWithType(name: string, value: string, type: string);
-//        callActionWithParameters(name: string, parameter1: string, parameter2: string): boolean;
-//        callEvent(name: string, callbackMethod: string, parameter1: string, parameter2: string);
-//        getJsonValue(name: string, returnId: string);
-//}
-
-////}

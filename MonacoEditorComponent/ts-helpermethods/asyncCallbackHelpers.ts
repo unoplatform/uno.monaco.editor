@@ -1,87 +1,11 @@
-﻿type MethodWithReturnId = (parameter: string) => void;
+import * as monaco from 'monaco-editor';
+import { ParentAccessor } from './Monaco.Helpers.ParentAccessor';
+import { EditorContext, getParentJsonValue, changeTheme, getThemeCurrentThemeName, getThemeIsHighContrast } from './otherScriptsToBeOrganized';
+
+type MethodWithReturnId = (parameter: string) => void;
 type NumberCallback = (parameter: any) => void;
 
-const initializeMonacoEditor = (managedOwner: any, element: any) => {
-    {
-      //  console.debug("Grabbing Monaco Options");
-
-        var opt = {}
-    };
-
-    //console.debug("Getting Host container");
-    //console.debug("Creating Editor");
-    const editor = monaco.editor.create(element, opt);
-    var editorContext = EditorContext.registerEditorForElement(element, editor);
-
-    (<any>editorContext).Debug = new DebugLogger(managedOwner);
-    (<any>editorContext).Keyboard = new KeyboardListener(managedOwner);
-    (<any>editorContext).Accessor = new ParentAccessor(managedOwner);
-    (<any>editorContext).Theme = new ThemeListener(managedOwner);
-
-    //console.debug("Getting Editor model");
-    editorContext.model = editor.getModel();
-
-    // Listen for Content Changes
-    //console.debug("Listening for changes in the editor model - " + (!editorContext.model));
-
-    editorContext.model.onDidChangeContent((event) => {
-        {
-            editorContext.Accessor.setValue("Text", stringifyForMarshalling(editorContext.model.getValue()));
-        }
-    });
-
-    // Listen for Selection Changes
-    //console.debug("Listening for changes in the editor selection");
-    editor.onDidChangeCursorSelection((event) => {
-        {
-            if (!editorContext.modifingSelection) {
-                {
-                    editorContext.Accessor.setValue("SelectedText", stringifyForMarshalling(editorContext.model.getValueInRange(event.selection)));
-                    editorContext.Accessor.setValueWithType("SelectedRange", stringifyForMarshalling(JSON.stringify(event.selection)), "Selection");
-                }
-            }
-        }
-    });
-
-    // Set theme
-    //console.debug("Getting parent theme value");
-    let theme = getParentJsonValue(element, "RequestedTheme");
-    theme = {
-        "0": "Default",
-        "1": "Light",
-        "2": "Dark"
-    }
-    [theme];
-    //console.debug("Current theme value - " + theme);
-    if (theme == "Default") {
-        {
-    //        console.debug("Loading default theme");
-
-            theme = getThemeCurrentThemeName(element);
-        }
-    }
-  //  console.debug("Changing theme");
-    changeTheme(element, theme, getThemeIsHighContrast(element));
-
-    // Update Monaco Size when we receive a window resize event
-//    console.debug("Listen for resize events on the window and resize the editor");
-    window.addEventListener("resize", () => {
-        {
-            editor.layout();
-        }
-    });
-
-    // Disable WebView Scrollbar so Monaco Scrollbar can do heavy lifting
-    document.body.style.overflow = 'hidden';
-
-    // Callback to Parent that we're loaded
- //   console.debug("Loaded Monaco");
-    editorContext.Accessor.callAction("Loaded");
-
-   // console.debug("Ending Monaco Load");
-};
-
-class DebugLogger {
+class DebugLoggerImpl {
     private _managedOwner: any;
 
     constructor(managedOwner: any) {
@@ -92,13 +16,12 @@ class DebugLogger {
     }
 }
 
-class KeyboardListener {
+class KeyboardListenerImpl {
     private _managedOwner: any;
 
     constructor(managedOwner: any) {
         this._managedOwner = managedOwner;
     }
-
 
     public static async setup() {
     }
@@ -133,109 +56,129 @@ class ThemeListener {
     }
 }
 
-globalThis.createMonacoEditor = async (managedOwner: any, elementId: string, basePath: string) => {
-  //  console.debug("Create dynamic style element");
-    var head = document.head || document.getElementsByTagName('head')[0];
-    var style = document.createElement('style');
-    style.id = 'dynamic';
-    head.appendChild(style);
+export const initializeMonacoEditor = (managedOwner: any, element: any) => {
+    var opt = {};
 
-    await DebugLogger.setup();
-    await KeyboardListener.setup();
-    await ParentAccessor.setup();
-    await ThemeListener.setup();
+    const editor = monaco.editor.create(element, opt);
+    var editorContext = EditorContext.registerEditorForElement(element, editor);
 
-//    console.debug("Starting Monaco Load");
+    (<any>editorContext).Debug = new DebugLoggerImpl(managedOwner);
+    (<any>editorContext).Keyboard = new KeyboardListenerImpl(managedOwner);
+    (<any>editorContext).Accessor = new ParentAccessor(managedOwner);
+    (<any>editorContext).Theme = new ThemeListener(managedOwner);
 
-    (<any>window).require.config({ paths: { 'vs': `${basePath}/MonacoEditorComponent/monaco-editor/min/vs` } });
-    (<any>window).require(['vs/editor/editor.main'], function () {
-        initializeMonacoEditor(managedOwner, document.getElementById(elementId));
+    editorContext.model = editor.getModel()!;
+
+    // Listen for Content Changes
+    editorContext.model.onDidChangeContent((event) => {
+        editorContext.Accessor.setValue("Text", stringifyForMarshalling(editorContext.model.getValue()));
     });
-}
 
-const replaceAll = (str: string, find: string, rep: string): string => {
-    if (find == "\\")
-    {
+    // Listen for Selection Changes
+    editor.onDidChangeCursorSelection((event) => {
+        if (!editorContext.modifingSelection) {
+            editorContext.Accessor.setValue("SelectedText", stringifyForMarshalling(editorContext.model.getValueInRange(event.selection)));
+            editorContext.Accessor.setValueWithType("SelectedRange", stringifyForMarshalling(JSON.stringify(event.selection)), "Selection");
+        }
+    });
+
+    // Set theme
+    let theme: any = getParentJsonValue(element, "RequestedTheme");
+    theme = {
+        "0": "Default",
+        "1": "Light",
+        "2": "Dark"
+    }[theme];
+
+    if (theme == "Default") {
+        theme = getThemeCurrentThemeName(element);
+    }
+
+    changeTheme(element, theme, getThemeIsHighContrast(element) as any);
+
+    // Update Monaco Size when we receive a window resize event
+    window.addEventListener("resize", () => {
+        editor.layout();
+    });
+
+    // Disable WebView Scrollbar so Monaco Scrollbar can do heavy lifting
+    document.body.style.overflow = 'hidden';
+
+    // Callback to Parent that we're loaded
+    editorContext.Accessor.callAction("Loaded");
+};
+
+export const replaceAll = (str: string, find: string, rep: string): string => {
+    if (find == "\\") {
         find = "\\\\";
     }
     return (`${str}`).replace(new RegExp(find, "g"), rep);
 }
 
-const sanitize = (jsonString: string): string => {
+export const sanitize = (jsonString: string): string => {
     if (jsonString == null) {
-        //console.log('Sanitized is null');
-        return null;
+        return null as any;
     }
 
     const replacements = "%&\\\"'{}:,";
     for (let i = 0; i < replacements.length; i++) {
         jsonString = replaceAll(jsonString, replacements.charAt(i), `%${replacements.charCodeAt(i)}`);
     }
-    //console.log('Sanitized: ' + jsonString);
     return jsonString;
 }
 
-const desantize = (parameter: string): string => {
-    //System.Diagnostics.Debug.WriteLine($"Encoded String: {parameter}");
+export const desanitize = (parameter: string): string => {
     if (parameter == null) return parameter;
     const replacements = "&\\\"'{}:,%";
-    //System.Diagnostics.Debug.WriteLine($"Replacements: >{replacements}<");
-    for (let i = 0; i < replacements.length; i++)
-    {
-        //console.log("Replacing: >%" + replacements.charCodeAt(i) + "< with >" + replacements.charAt(i) + "< ");
+    for (let i = 0; i < replacements.length; i++) {
         parameter = replaceAll(parameter, "%" + replacements.charCodeAt(i), replacements.charAt(i));
     }
-
-    //console.log("Decoded String: " + parameter );
     return parameter;
 }
 
-const stringifyForMarshalling = (value: any): string => sanitize(value)
+export const stringifyForMarshalling = (value: any): string => sanitize(value)
 
-const getParentValue = (element:any, name: string): any => {
-    return EditorContext.getEditorForElement(element).Accessor.getJsonValue(name);
-}
-
-const getParentJsonValue = (element: any, name: string): string =>
-    EditorContext.getEditorForElement(element).Accessor.getJsonValue(name);
-
-const getThemeIsHighContrast = (element: any): boolean =>
-    EditorContext.getEditorForElement(element).Theme.getIsHighContrast() == "true";
-
-const getThemeCurrentThemeName = (element: any): string =>
-    EditorContext.getEditorForElement(element).Theme.getCurrentThemeName();
-
-const callParentEventAsync = async (element: any, name: string, parameters: string[]): Promise<string> =>
-{
+export const callParentEventAsync = async (element: any, name: string, parameters: string[]): Promise<string> => {
     let result = await EditorContext.getEditorForElement(element).Accessor.callEvent(name,
-        parameters != null && parameters.length > 0 ? stringifyForMarshalling(parameters[0]) : null,
-        parameters != null && parameters.length > 1 ? stringifyForMarshalling(parameters[1]) : null);
+        parameters != null && parameters.length > 0 ? stringifyForMarshalling(parameters[0]) : null as any,
+        parameters != null && parameters.length > 1 ? stringifyForMarshalling(parameters[1]) : null as any);
 
     if (result) {
-        result = desantize(result);
-    } else {
-        // console.debug('No Parent event result for ' + name);
+        result = desanitize(result);
     }
 
     return result;
 }
 
-const callParentActionWithParameters = (element: any, name: string, parameters: string[]): boolean =>
+export const callParentActionWithParameters = (element: any, name: string, parameters: string[]): boolean =>
     EditorContext.getEditorForElement(element).Accessor.callActionWithParameters(name,
-        parameters != null && parameters.length > 0 ? stringifyForMarshalling(parameters[0]) : null,
-        parameters != null && parameters.length > 1 ? stringifyForMarshalling(parameters[1]) : null);
+        parameters != null && parameters.length > 0 ? stringifyForMarshalling(parameters[0]) : null as any,
+        parameters != null && parameters.length > 1 ? stringifyForMarshalling(parameters[1]) : null as any);
 
-globalThis.InvokeJS = (elementId: string, command: string): string => {
-    var r = eval(`var element = globalThis.document.getElementById(\"${elementId}\"); ${command}`) || "";
+export const createMonacoEditor = async (managedOwner: any, elementId: string, basePath: string) => {
+    var head = document.head || document.getElementsByTagName('head')[0];
+    var style = document.createElement('style');
+    style.id = 'dynamic';
+    head.appendChild(style);
+
+    await DebugLoggerImpl.setup();
+    await KeyboardListenerImpl.setup();
+    await ParentAccessor.setup();
+    await ThemeListener.setup();
+
+    initializeMonacoEditor(managedOwner, document.getElementById(elementId));
+}
+
+export const InvokeJS = (elementId: string, command: string): string => {
+    var r = eval(`var element = globalThis.document.getElementById("${elementId}"); ${command}`) || "";
     return JSON.stringify(r);
 }
 
-globalThis.refreshLayout = (elementId: string) => {
+export const refreshLayout = (elementId: string) => {
     EditorContext.getEditorForElement(document.getElementById(elementId)).editor.layout();
 }
 
-globalThis.languageIdFromExtension = (extension: string): string => {
-
+export const languageIdFromExtension = (extension: string): string => {
     if (extension != null) {
         const lower = extension.toLowerCase();
         const langs = monaco.languages.getLanguages();
@@ -243,7 +186,7 @@ globalThis.languageIdFromExtension = (extension: string): string => {
             if (!l.extensions) continue;
             if (l.extensions.some(ext => lower.endsWith(ext))) return l.id;
         }
-    }   
+    }
 
     return 'plaintext';
 }

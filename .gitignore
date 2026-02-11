@@ -15,11 +15,14 @@
 *.js.map
 package-lock.json
 
-# Monaco Dependency (Download from https://microsoft.github.io/monaco-editor/)
-!MonacoEditorComponent/monaco-editor/**/*
+# esbuild config (source file, not build output)
+!MonacoEditorComponent/ts-helpermethods/esbuild.config.mjs
 
-# Webcomponents.js Dependency (Download from https://github.com/webcomponents/polyfills)
-MonacoEditorComponent/webcomponents-js
+# esbuild output (regenerated from source via npm run build)
+MonacoEditorComponent/WasmScripts/uno-monaco-helpers.css
+MonacoEditorComponent/WasmScripts/workers/
+MonacoEditorComponent/DesktopContent/uno-monaco-helpers.css
+MonacoEditorComponent/DesktopContent/workers/
 
 # Build results
 [Dd]ebug/

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFrameworks>net10.0</TargetFrameworks>
@@ -14,31 +14,20 @@
 		<Description>A cross-platform wrapper around the web-based Monaco Editor for WASM and Desktop (Skia). Designed for use with the Uno Platform</Description>
     <Authors>Uno Platform</Authors>
     <Copyright>Copyright (C) 2015-$([System.DateTime]::UtcNow.Year) Uno Platform inc. - all rights reserved</Copyright>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>    
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<RepositoryUrl>https://github.com/unoplatform/uno.monaco.editor</RepositoryUrl>
 		<PackageProjectUrl>https://github.com/unoplatform/uno.monaco.editor</PackageProjectUrl>
     <PackageTags>wasm desktop skia monaco editor controls</PackageTags>
 		<GeneratePackageOnBuild Condition="'$(Configuration)'=='Release'">true</GeneratePackageOnBuild>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<TypeScriptToolsVersion>Latest</TypeScriptToolsVersion>
     <!-- pick the first TFM from TargetFrameworks -->
-    <IncludeContentInPack>false</IncludeContentInPack>    
+    <IncludeContentInPack>false</IncludeContentInPack>
     <_PrimaryTfm>$([System.String]::Copy('$(TargetFrameworks)').Split(';')[0])</_PrimaryTfm>
     <AllowedOutputExtensionsInPackageBuildOutputFolder>
       $(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb
     </AllowedOutputExtensionsInPackageBuildOutputFolder>
 	</PropertyGroup>
 
-	<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
-		<TypeScriptRemoveComments>false</TypeScriptRemoveComments>
-		<TypeScriptSourceMap>true</TypeScriptSourceMap>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(Configuration)' == 'Release'">
-		<TypeScriptRemoveComments>true</TypeScriptRemoveComments>
-		<TypeScriptSourceMap>false</TypeScriptSourceMap>
-	</PropertyGroup>
-		
 	<ItemGroup>
 		<PackageReference Include="Newtonsoft.Json" />
 		<PackageReference Include="Nito.AsyncEx" />
@@ -47,7 +36,6 @@
 		<PackageReference Include="Uno.WinUI" />
 		<PackageReference Include="Uno.Core.Extensions.Logging" />
 		<PackageReference Include="Uno.Core.Extensions.Logging.Singleton" />
-		<PackageReference Include="Microsoft.TypeScript.MSBuild" PrivateAssets="all" />		
 	</ItemGroup>
 
 	<ItemGroup>
@@ -57,18 +45,47 @@
 		</Page>
 	</ItemGroup>
 
-	<ItemGroup>
+	<!-- ============================================================ -->
+	<!-- TypeScript/JavaScript resources                               -->
+	<!-- esbuild replaces tsc; TypeScript MSBuild package removed.     -->
+	<!-- Monaco is bundled from node_modules (no vendored directory).  -->
+	<!-- ============================================================ -->
 
-    <TypeScriptCompile Include="tsconfig.json" />
-		
-		<Content Include="monaco-editor\*.txt" />
-		<Content Include="monaco-editor\LICENSE" PackagePath="monaco-editor\LICENSE.txt" />
-		<Content Include="monaco-editor\min\**\*.*" />
-		
+	<!-- Exclude TypeScript source from compile (esbuild handles it) -->
+	<ItemGroup>
+		<None Remove="ts-helpermethods\**\*.ts" />
+		<None Remove="tsconfig.json" />
+	</ItemGroup>
+
+	<!-- WASM: EmbeddedResource for main bundle + CSS + workers -->
+	<ItemGroup>
 		<EmbeddedResource Include="Properties\MonacoEditorComponent.rd.xml" />
 		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.js" />
-    <EmbeddedResource Include="monaco-editor\min\vs\loader.js" />
-
+		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.css" Condition="Exists('WasmScripts\uno-monaco-helpers.css')" />
+		<EmbeddedResource Include="WasmScripts\workers\editor.worker.js" Condition="Exists('WasmScripts\workers\editor.worker.js')" />
+		<EmbeddedResource Include="WasmScripts\workers\json.worker.js" Condition="Exists('WasmScripts\workers\json.worker.js')" />
+		<EmbeddedResource Include="WasmScripts\workers\css.worker.js" Condition="Exists('WasmScripts\workers\css.worker.js')" />
+		<EmbeddedResource Include="WasmScripts\workers\html.worker.js" Condition="Exists('WasmScripts\workers\html.worker.js')" />
+		<EmbeddedResource Include="WasmScripts\workers\ts.worker.js" Condition="Exists('WasmScripts\workers\ts.worker.js')" />
 	</ItemGroup>
-  
+
+	<!-- Desktop: Content files copied to output directory -->
+	<ItemGroup>
+		<Content Include="DesktopContent\editor.html" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\editor.html" />
+		<Content Include="DesktopContent\uno-monaco-helpers.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\uno-monaco-helpers.js" Condition="Exists('DesktopContent\uno-monaco-helpers.js')" />
+		<Content Include="DesktopContent\uno-monaco-helpers.css" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\uno-monaco-helpers.css" Condition="Exists('DesktopContent\uno-monaco-helpers.css')" />
+		<Content Include="DesktopContent\workers\editor.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\editor.worker.js" Condition="Exists('DesktopContent\workers\editor.worker.js')" />
+		<Content Include="DesktopContent\workers\json.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\json.worker.js" Condition="Exists('DesktopContent\workers\json.worker.js')" />
+		<Content Include="DesktopContent\workers\css.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\css.worker.js" Condition="Exists('DesktopContent\workers\css.worker.js')" />
+		<Content Include="DesktopContent\workers\html.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\html.worker.js" Condition="Exists('DesktopContent\workers\html.worker.js')" />
+		<Content Include="DesktopContent\workers\ts.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\ts.worker.js" Condition="Exists('DesktopContent\workers\ts.worker.js')" />
+	</ItemGroup>
+
+	<!-- Build-time check: Ensure esbuild bundles exist before packaging -->
+	<Target Name="ValidateEsbuildBundles" BeforeTargets="Build">
+		<Error
+			Condition="!Exists('WasmScripts\uno-monaco-helpers.js')"
+			Text="esbuild bundle not found at WasmScripts\uno-monaco-helpers.js. Run 'npm install &amp;&amp; npm run build' from the repository root first." />
+	</Target>
+
 </Project>

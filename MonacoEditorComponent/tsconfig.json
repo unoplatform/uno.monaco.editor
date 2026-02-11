@@ -1,10 +1,20 @@
 {
-  "compileOnSave": true,
   "compilerOptions": {
     "target": "ES2015",
-    "lib": [ "ES2015", "DOM" ],
-    "sourceMap": false,
-    "outFile": "WasmScripts/uno-monaco-helpers.js"
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2015", "DOM"],
+    "noEmit": true,
+    "strict": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "rootDir": "ts-helpermethods",
+    "baseUrl": "..",
+    "paths": {
+      "monaco-editor": ["node_modules/monaco-editor"]
+    }
   },
   "include": [
     "ts-helpermethods/**/*"
