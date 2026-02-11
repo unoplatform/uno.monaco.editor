@@ -14,7 +14,7 @@ Run the appropriate test command based on the platform being validated:
 - **macOS/Linux**: `dotnet test MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -- --filter-not-trait "Category=DesktopCDP" --filter-not-trait "Category=WasmPlaywright"` (excludes Windows-only desktop CDP tests and WASM Playwright tests that require Playwright browser install + WASM build output)
 <!-- Updated by plan-sync: fn-1-implement-desktop-skia-target-for.8 uses xUnit v3 MTP2 runner syntax (--filter-not-trait) not MSTest-style --filter; WASM Playwright tests have separate WasmPlaywright trait -->
 
-This runs pure helper tests (Task 6) + applicable Playwright integration tests (Task 8) in one pass.
+On macOS/Linux this runs pure helper tests (Task 6) only. Playwright integration tests (Task 8) are excluded and run separately on Windows (DesktopCDP) or when Playwright prerequisites are installed (WasmPlaywright).
 
 Review results. Desktop CDP tests cover editor load, text round-trip, theme switch, decorations, lifecycle on Windows. WASM browser tests cover regression on all platforms.
 
