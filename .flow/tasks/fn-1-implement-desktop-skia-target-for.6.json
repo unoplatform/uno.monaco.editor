@@ -1,0 +1,18 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-10T22:36:20.499145Z",
+  "depends_on": [
+    "fn-1-implement-desktop-skia-target-for.1",
+    "fn-1-implement-desktop-skia-target-for.3",
+    "fn-1-implement-desktop-skia-target-for.5"
+  ],
+  "epic": "fn-1-implement-desktop-skia-target-for",
+  "id": "fn-1-implement-desktop-skia-target-for.6",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-1-implement-desktop-skia-target-for.6.md",
+  "status": "todo",
+  "title": "Unit test project with xunit3 and MTP2",
+  "updated_at": "2026-02-11T03:33:38.806301Z"
+}
