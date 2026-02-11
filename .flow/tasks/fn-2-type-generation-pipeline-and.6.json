@@ -1,0 +1,19 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-11T08:38:04.452473Z",
+  "depends_on": [
+    "fn-2-type-generation-pipeline-and.2",
+    "fn-2-type-generation-pipeline-and.3",
+    "fn-2-type-generation-pipeline-and.4",
+    "fn-2-type-generation-pipeline-and.5"
+  ],
+  "epic": "fn-2-type-generation-pipeline-and",
+  "id": "fn-2-type-generation-pipeline-and.6",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-2-type-generation-pipeline-and.6.md",
+  "status": "todo",
+  "title": "Remove Newtonsoft.Json dependency and finalize build",
+  "updated_at": "2026-02-11T08:51:15.484067Z"
+}

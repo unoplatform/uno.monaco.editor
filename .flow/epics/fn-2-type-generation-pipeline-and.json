@@ -1,0 +1,20 @@
+{
+  "branch_name": "fn-2-type-generation-pipeline-and",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-02-11T08:37:05.767709Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [
+    "fn-1-implement-desktop-skia-target-for"
+  ],
+  "id": "fn-2-type-generation-pipeline-and",
+  "next_task": 1,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-02-11T09:07:31.023180Z",
+  "spec_path": ".flow/specs/fn-2-type-generation-pipeline-and.md",
+  "status": "open",
+  "title": "Type generation pipeline and System.Text.Json migration",
+  "updated_at": "2026-02-11T09:07:31.026715Z"
+}

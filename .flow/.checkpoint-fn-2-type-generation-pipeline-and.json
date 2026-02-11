@@ -1,0 +1,179 @@
+{
+  "created_at": "2026-02-11T08:40:47.389919Z",
+  "epic": {
+    "data": {
+      "branch_name": "fn-2-type-generation-pipeline-and",
+      "completion_review_status": "unknown",
+      "completion_reviewed_at": null,
+      "created_at": "2026-02-11T08:37:05.767709Z",
+      "default_impl": null,
+      "default_review": null,
+      "default_sync": null,
+      "depends_on_epics": [
+        "fn-1-implement-desktop-skia-target-for"
+      ],
+      "id": "fn-2-type-generation-pipeline-and",
+      "next_task": 1,
+      "plan_review_status": "unknown",
+      "plan_reviewed_at": null,
+      "spec_path": ".flow/specs/fn-2-type-generation-pipeline-and.md",
+      "status": "open",
+      "title": "Type generation pipeline and System.Text.Json migration",
+      "updated_at": "2026-02-11T08:37:48.980923Z"
+    },
+    "spec": "# Type Generation Pipeline and System.Text.Json Migration\n\n## Overview\n\nMigrate `Uno.Monaco.Editor` from Newtonsoft.Json to System.Text.Json with AOT-compatible source generation, and modernize the dead TypedocConverter-based type generation pipeline to emit STJ-attributed C# from current Monaco typings.\n\n**Current state:**\n- 103 files with `using Newtonsoft.Json`, 512+ `[JsonProperty]` attributes, 22 custom converter classes\n- TypedocConverter is dead/unmaintained, pinned to `monaco-editor@0.21.3` (vendored runtime is v0.54.0)\n- AOT-hostile patterns in `ParentAccessor.cs` (runtime `Type.GetType()` + `DeserializeObject(string, Type)`)\n- No STJ usage in application code (fn-1 will introduce first `[JsonSerializable]` context for bridge DTOs)\n\n**Target state:**\n- Zero Newtonsoft.Json dependency\n- All serialization via STJ source-generated `MonacoJsonContext`\n- String-enum converters replaced by `[JsonStringEnumMemberName]` (.NET 9+)\n- AOT-safe `ParentAccessor` with pre-registered type map\n- Modern type generation pipeline emitting STJ-compatible C#\n\n## Scope\n\n**In scope:** STJ migration of all Monaco model types, domain converter rewrites, call-site migration, ParentAccessor AOT redesign, type generation pipeline replacement.\n\n**Out of scope:** Regenerating all Monaco types from 0.54.0 (deferred \u2014 generator produces correct output, full regeneration is a follow-up). Test app updates beyond build verification.\n\n## Key decisions\n\n1. **Migration-first approach**: Migrate existing files mechanically, then modernize generator. This is lower risk than regenerating everything at once.\n2. **Global CamelCase naming policy** on `MonacoJsonContext` replaces per-property `[JsonPropertyName]` where property names follow PascalCase\u2192camelCase convention. Explicit `[JsonPropertyName]` only for names that don't follow the convention.\n3. **Global `DefaultIgnoreCondition = WhenWritingNull`** replaces per-property `NullValueHandling.Ignore`. Properties that MUST serialize null need explicit `[JsonIgnore(Condition = JsonIgnoreCondition.Never)]`.\n4. **ParentAccessor redesign**: Replace `Type.GetType()` + `DeserializeObject(string, Type)` with a `Dictionary<string, JsonTypeInfo>` lookup against the source-gen context.\n5. **InterfaceToClassConverter replacement**: Custom `JsonConverter<TInterface>` that delegates to `JsonSerializer.Deserialize<TClass>()` (no `Populate()` equivalent in STJ).\n6. **This is a breaking change** \u2014 requires major version bump. Newtonsoft.Json transitive dependency removed; `CommandHandler` receives `JsonElement` instead of `JObject`.\n\n## Key references\n\n- BlazorMonaco (STJ-native Monaco wrapper): `serdarciplak/BlazorMonaco` \u2014 reference for STJ Monaco patterns\n- Telegram.Bot STJ migration: `TelegramBots/Telegram.Bot` \u2014 thorough migration reference with source gen\n- Uno Platform FontManifest pattern: `unoplatform/uno` `src/Uno.UI/UI/Xaml/FontManifest.cs` \u2014 canonical Uno STJ source gen\n- [MS migration guide](https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/migrate-from-newtonsoft)\n- [STJ source generation](https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/source-generation)\n\n## Quick commands\n\n```bash\n# Verify build after migration\ndotnet build MonacoEditorComponent.slnx --no-restore\n\n# Verify both app targets\ndotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm\ndotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-desktop\n\n# Check no Newtonsoft references remain\ngrep -r \"Newtonsoft\" MonacoEditorComponent/ --include=\"*.cs\" --include=\"*.csproj\"\n```\n\n## Acceptance\n\n- [ ] Zero `using Newtonsoft.Json` in MonacoEditorComponent/\n- [ ] Zero `Newtonsoft.Json` in Directory.Packages.props and .csproj\n- [ ] `MonacoJsonContext` source-gen context covers all cross-boundary types\n- [ ] `JsonSerializerIsReflectionEnabledByDefault` set to `false`\n- [ ] All string-enum types use `[JsonStringEnumMemberName]` (no custom converter classes)\n- [ ] `ParentAccessor` is AOT-compatible (no runtime `Type.GetType()`)\n- [ ] Build succeeds for `net10.0-browserwasm` and `net10.0-desktop` targets\n- [ ] Type generation pipeline emits STJ-attributed C# from monaco.d.ts\n- [ ] changelog.md documents breaking change\n"
+  },
+  "epic_id": "fn-2-type-generation-pipeline-and",
+  "schema_version": 2,
+  "tasks": [
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-11T08:37:53.647391Z",
+        "depends_on": [],
+        "epic": "fn-2-type-generation-pipeline-and",
+        "id": "fn-2-type-generation-pipeline-and.1",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-2-type-generation-pipeline-and.1.md",
+        "status": "todo",
+        "title": "Create MonacoJsonContext and STJ serialization infrastructure",
+        "updated_at": "2026-02-11T08:38:24.510752Z"
+      },
+      "id": "fn-2-type-generation-pipeline-and.1",
+      "runtime": null,
+      "spec": "# fn-2-type-generation-pipeline-and.1 Create MonacoJsonContext and STJ serialization infrastructure\n\n## Description\nCreate the foundational STJ source-generation context and shared serialization infrastructure that all subsequent tasks depend on.\n\n**Size:** M\n**Files:** MonacoEditorComponent/Serialization/MonacoJsonContext.cs (new), MonacoEditorComponent/MonacoEditorComponent.csproj\n\n## Approach\n\n- Create `MonacoJsonContext : JsonSerializerContext` with `[JsonSourceGenerationOptions]`:\n  - `PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase`\n  - `DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull`\n  - `UseStringEnumConverter = true`\n- Register all types that cross the JS interop boundary via `[JsonSerializable]`: Position, Range, Selection, CompletionItem, CompletionList, CompletionContext, CodeAction, CodeActionList, CodeActionContext, CodeLens, CodeLensList, Hover, IMarkdownString, ColorInformation, ColorPresentation, IMarkerData, Marker, StandaloneEditorConstructionOptions, IModelDeltaDecoration, IModelDecorationOptions, and collection variants\n- Add to .csproj: `<JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>`\n- Follow Uno Platform pattern from `unoplatform/uno` `FontManifest.cs`\n- Context should be `internal partial class` in new `MonacoEditorComponent/Serialization/` directory\n\n## Key context\n\n- fn-1 task 5 creates a separate `BridgeSerializerContext` for desktop bridge DTOs. This context is for Monaco model types. They can be combined later via `JsonTypeInfoResolver.Combine()`.\n- `UseStringEnumConverter = true` on the context handles most enum serialization, but enums with non-standard wire names (e.g., `\"line-through\"`) need explicit `[JsonStringEnumMemberName]` attributes (handled in task 2).\n- Use `Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping` if code content with `<`, `>`, `&` must pass through \u2014 STJ escapes these by default unlike Newtonsoft.\n## Acceptance\n- [ ] `MonacoJsonContext` partial class exists with `[JsonSourceGenerationOptions]`\n- [ ] All ~25 cross-boundary types registered via `[JsonSerializable]`\n- [ ] `JsonSerializerIsReflectionEnabledByDefault` set to `false` in .csproj\n- [ ] `dotnet build MonacoEditorComponent.slnx` succeeds (existing Newtonsoft code untouched)\n## Done summary\nTBD\n\n## Evidence\n- Commits:\n- Tests:\n- PRs:\n"
+    },
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-11T08:37:58.668968Z",
+        "depends_on": [
+          "fn-2-type-generation-pipeline-and.1"
+        ],
+        "epic": "fn-2-type-generation-pipeline-and",
+        "id": "fn-2-type-generation-pipeline-and.2",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-2-type-generation-pipeline-and.2.md",
+        "status": "todo",
+        "title": "Migrate string-enum types to JsonStringEnumMemberName",
+        "updated_at": "2026-02-11T08:38:40.527694Z"
+      },
+      "id": "fn-2-type-generation-pipeline-and.2",
+      "runtime": null,
+      "spec": "# fn-2-type-generation-pipeline-and.2 Migrate string-enum types to JsonStringEnumMemberName\n\n## Description\nReplace all ~22 custom Newtonsoft string-enum converter classes with `[JsonStringEnumMemberName]` attributes on enum members. Delete the converter classes.\n\n**Size:** M\n**Files:** ~22 enum/converter files in MonacoEditorComponent/Monaco/Editor/ and Monaco/Helpers/\n\n## Approach\n\n- For each string-enum converter (e.g., `CursorBlinkingConverter`):\n  1. Add `[JsonStringEnumMemberName(\"wireValue\")]` to each enum member\n  2. Remove the `[JsonConverter(typeof(XConverter))]` attribute from the enum type (the context's `UseStringEnumConverter = true` handles it)\n  3. Delete the converter class\n- Known enum files: `AcceptSuggestionOnEnter`, `AutoClosingBrackets`, `AutoClosingOvertype`, `AutoClosingQuotes`, `AutoFindInSelection`, `AutoIndent`, `CursorBlinking`, `CursorStyle`, `CursorSurroundingLinesStyle`, `FoldingStrategy`, `LineNumbersType`, `MatchBrackets`, `Multiple`, `RenderLineHighlight`, `Show`, `SnippetSuggestions`, `TabCompletion`, `WordWrap`, `WrappingIndent`, `TextDecoration`\n- Update `using` directives: remove `Newtonsoft.Json` imports, add `System.Text.Json.Serialization`\n- Special case: `TextDecoration` has hyphenated values like `\"line-through\"` \u2014 `[JsonStringEnumMemberName]` handles this correctly\n\n## Key context\n\n- Pattern: enum `CursorBlinking { [JsonStringEnumMemberName(\"blink\")] Blink, ... }` \u2014 no converter class needed\n- The `[JsonConverter(typeof(JsonStringEnumConverter<T>))]` per-enum attribute is NOT needed when `UseStringEnumConverter = true` is set on the context (task 1)\n- `[JsonStringEnumMemberName]` is .NET 9+ \u2014 both target frameworks (net9.0, net10.0) support it\n## Acceptance\n- [ ] All string-enum types have `[JsonStringEnumMemberName]` on each member\n- [ ] All custom enum converter classes deleted (~22 files)\n- [ ] No `[JsonConverter(typeof(XConverter))]` on enum types for string-enum converters\n- [ ] `using Newtonsoft.Json` removed from all modified enum files\n- [ ] Build succeeds\n## Done summary\nTBD\n\n## Evidence\n- Commits:\n- Tests:\n- PRs:\n"
+    },
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-11T08:37:58.779030Z",
+        "depends_on": [
+          "fn-2-type-generation-pipeline-and.1"
+        ],
+        "epic": "fn-2-type-generation-pipeline-and",
+        "id": "fn-2-type-generation-pipeline-and.3",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-2-type-generation-pipeline-and.3.md",
+        "status": "todo",
+        "title": "Migrate Monaco model JsonProperty attributes to STJ",
+        "updated_at": "2026-02-11T08:38:57.769798Z"
+      },
+      "id": "fn-2-type-generation-pipeline-and.3",
+      "runtime": null,
+      "spec": "# fn-2-type-generation-pipeline-and.3 Migrate Monaco model JsonProperty attributes to STJ\n\n## Description\nBulk-migrate `[JsonProperty]` attributes to `[JsonPropertyName]` across all Monaco model type files. Update `using` directives and handle `NullValueHandling` patterns.\n\n**Size:** M (mechanical bulk change across ~40 model files)\n**Files:** MonacoEditorComponent/Monaco/Editor/*.cs, Monaco/Languages/*.cs, Monaco/Helpers/*.cs (~40 files with [JsonProperty])\n\n## Approach\n\n- Replace `[JsonProperty(\"name\")]` with `[JsonPropertyName(\"name\")]`\n- For properties where global CamelCase naming policy produces the correct wire name (PascalCase property \u2192 camelCase JSON), the `[JsonPropertyName]` can be omitted entirely. Only keep explicit `[JsonPropertyName]` for names that don't follow PascalCase\u2192camelCase convention.\n- Remove per-property `NullValueHandling = NullValueHandling.Ignore` \u2014 this is handled globally by `DefaultIgnoreCondition = WhenWritingNull` on `MonacoJsonContext`\n- For the ~40 properties that currently do NOT have `NullValueHandling.Ignore` (e.g., `[JsonProperty(\"model\")]`, `[JsonProperty(\"label\")]`, `[JsonProperty(\"insertText\")]`), verify they should serialize nulls. If so, add `[JsonIgnore(Condition = JsonIgnoreCondition.Never)]` to override the global default.\n- Replace `using Newtonsoft.Json` with `using System.Text.Json.Serialization`\n- Handle `[JsonIgnore]` \u2014 same attribute name, different namespace (`System.Text.Json.Serialization.JsonIgnore`)\n- Handle `private set` on `Range` and `Position` properties \u2014 add `[JsonInclude]` on each property with `private set`\n\n## Key context\n\n- `[JsonProperty]` on interfaces (e.g., `IEditorOptions`) \u2014 STJ respects `[JsonPropertyName]` on interface members only when the concrete class implements the interface explicitly. Verify this works for `IRange`, `IPosition` etc.\n- STJ is case-sensitive by default. The global `CamelCase` naming policy + `PropertyNameCaseInsensitive = true` on options covers most cases.\n- Do NOT touch files that contain enum converters (handled in task 2) or domain converters (handled in task 4).\n## Acceptance\n- [ ] Zero `[JsonProperty]` attributes in MonacoEditorComponent/Monaco/\n- [ ] All model types use `[JsonPropertyName]` (only where needed) or rely on CamelCase naming policy\n- [ ] `private set` properties on Range, Position have `[JsonInclude]`\n- [ ] `using Newtonsoft.Json` removed from all modified model files\n- [ ] Properties requiring null serialization have explicit `[JsonIgnore(Condition = JsonIgnoreCondition.Never)]`\n- [ ] Build succeeds\n## Done summary\nTBD\n\n## Evidence\n- Commits:\n- Tests:\n- PRs:\n"
+    },
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-11T08:37:58.888089Z",
+        "depends_on": [
+          "fn-2-type-generation-pipeline-and.1"
+        ],
+        "epic": "fn-2-type-generation-pipeline-and",
+        "id": "fn-2-type-generation-pipeline-and.4",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-2-type-generation-pipeline-and.4.md",
+        "status": "todo",
+        "title": "Rewrite domain converters for STJ",
+        "updated_at": "2026-02-11T08:39:16.032059Z"
+      },
+      "id": "fn-2-type-generation-pipeline-and.4",
+      "runtime": null,
+      "spec": "# fn-2-type-generation-pipeline-and.4 Rewrite domain converters for STJ\n\n## Description\nRewrite the three non-enum custom Newtonsoft converters for STJ: `InterfaceToClassConverter<TInterface, TClass>`, `CssStyleConverter`, and `ColorConverter`.\n\n**Size:** M\n**Files:** MonacoEditorComponent/Helpers/InterfaceToClassConverter.cs, MonacoEditorComponent/Monaco/Helpers/ICssStyle.cs (contains CssStyleConverter), MonacoEditorComponent/Monaco/Languages/ColorInformation.cs (contains ColorConverter)\n\n## Approach\n\n- **InterfaceToClassConverter**: Rewrite as `JsonConverter<TInterface>` where `Read()` delegates to `JsonSerializer.Deserialize<TClass>(ref reader, options)` and `Write()` delegates to `JsonSerializer.Serialize(writer, value, typeof(TClass), options)`. No `Populate()` equivalent needed \u2014 STJ creates a new instance.\n  - Current usage: `IRange\u2192Range`, `IWordAtPosition\u2192WordAtPosition` on properties in `FindMatch`, `ColorInformation`, `IModelDeltaDecoration`\n  - Reference: BlazorMonaco `WorkspaceEditJsonConverter` for STJ interface deserialization pattern\n\n- **CssStyleConverter**: Write-only converter. `Write()` outputs `ICssStyle.Name` as a JSON string. `Read()` throws `NotSupportedException`. In STJ, implement as `JsonConverter<ICssStyle>` with `CanConvert` override.\n  - Current usage: `[JsonConverter(typeof(CssStyleConverter))]` on `ICssStyle` properties in decoration options\n\n- **ColorConverter**: Rewrite `Windows.UI.Color` \u2194 Monaco `{alpha, red, green, blue}` (0-1 floats) using `Utf8JsonReader`/`Utf8JsonWriter`. Map `reader.GetDouble()` for float values and `writer.WriteNumber()` for output.\n  - Current usage: `ColorInformation.Color` property\n\n## Key context\n\n- Register all three converters in `MonacoJsonContext` via `[JsonSerializable]` on the types they convert, or add them to `Converters` collection on options.\n- STJ custom converters use `ref Utf8JsonReader`/`Utf8JsonWriter` (not `JsonReader`/`JsonWriter`) \u2014 different token navigation API.\n- CssStyleConverter is write-only: STJ source gen requires both Read/Write to compile, but `Read` can throw `NotSupportedException`.\n## Acceptance\n- [ ] InterfaceToClassConverter rewritten as STJ `JsonConverter<TInterface>` with Read/Write\n- [ ] CssStyleConverter rewritten as STJ `JsonConverter<ICssStyle>` (write-only, Read throws)\n- [ ] ColorConverter rewritten as STJ `JsonConverter<Color>` using Utf8JsonReader/Writer\n- [ ] All three converters registered in MonacoJsonContext or via [JsonConverter] attributes\n- [ ] No `serializer.Populate()` calls remain\n- [ ] Build succeeds\n## Done summary\nTBD\n\n## Evidence\n- Commits:\n- Tests:\n- PRs:\n"
+    },
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-11T08:38:04.343000Z",
+        "depends_on": [
+          "fn-2-type-generation-pipeline-and.1",
+          "fn-2-type-generation-pipeline-and.4"
+        ],
+        "epic": "fn-2-type-generation-pipeline-and",
+        "id": "fn-2-type-generation-pipeline-and.5",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-2-type-generation-pipeline-and.5.md",
+        "status": "todo",
+        "title": "Migrate serialization call sites and redesign ParentAccessor for AOT",
+        "updated_at": "2026-02-11T08:39:40.364502Z"
+      },
+      "id": "fn-2-type-generation-pipeline-and.5",
+      "runtime": null,
+      "spec": "# fn-2-type-generation-pipeline-and.5 Migrate serialization call sites and redesign ParentAccessor for AOT\n\n## Description\nMigrate all `JsonConvert.SerializeObject`/`DeserializeObject` call sites to `JsonSerializer` with `MonacoJsonContext`, and redesign `ParentAccessor` to eliminate AOT-hostile runtime type resolution.\n\n**Size:** M\n**Files:** MonacoEditorComponent/Extensions/WebViewExtensions.cs, MonacoEditorComponent/CodeEditor/CodeEditor.Methods.cs, MonacoEditorComponent/Monaco/LanguagesHelper.cs, MonacoEditorComponent/Helpers/ParentAccessor.cs\n\n## Approach\n\n- **WebViewExtensions.cs** (~3 call sites):\n  - Replace `JsonConvert.DeserializeObject<T>(returnstring)` with `JsonSerializer.Deserialize<T>(returnstring, MonacoJsonContext.Default.Options)`\n  - Replace `JsonConvert.ToString(item)` with `JsonSerializer.Serialize(item, MonacoJsonContext.Default.Options)`\n  - Replace `JsonConvert.SerializeObject(item, _settings)` with `JsonSerializer.Serialize(item, MonacoJsonContext.Default.Options)`\n  - Delete `_settings` field (CamelCasePropertyNamesContractResolver + NullValueHandling.Ignore) \u2014 now on context\n\n- **CodeEditor.Methods.cs** (~10 call sites):\n  - Replace inline `JsonConvert.SerializeObject(position)` in JS script strings with `JsonSerializer.Serialize(position, MonacoJsonContext.Default.Position)`\n  - Use typed `MonacoJsonContext.Default.<Type>` overloads where possible for AOT\n  - `AddCommandAsync` line 152: `DeserializeObject<object>` returns `JsonElement` instead of `JObject` \u2014 this is a breaking API change, document it\n\n- **LanguagesHelper.cs** (~16 call sites):\n  - Replace all `JsonConvert.DeserializeObject<T>(args[i])` with `JsonSerializer.Deserialize<T>(args[i], MonacoJsonContext.Default.Options)`\n  - Replace `JsonConvert.SerializeObject(result)` with typed serialize calls\n\n- **ParentAccessor.cs** (hardest \u2014 AOT redesign):\n  - `GetJsonValue()` at line ~177: Replace `JsonConvert.SerializeObject(obj)` with `JsonSerializer.Serialize(obj, obj.GetType(), MonacoJsonContext.Default.Options)`\n  - `SetValue(name, value, type)` at line ~266: Replace `Type.GetType(name)` + `JsonConvert.DeserializeObject(value, typeobj)` with a `Dictionary<string, JsonTypeInfo>` lookup:\n    - Pre-register known type names from `MonacoJsonContext` at initialization\n    - Lookup: `if (typeInfoMap.TryGetValue(typeName, out var typeInfo)) JsonSerializer.Deserialize(value, typeInfo)`\n  - Delete `LookForTypeByName` method (assembly scanning) \u2014 replaced by static type map\n  - The type map can be populated from `MonacoJsonContext.Default.GetTypeInfo(type)` for all registered types\n\n## Key context\n\n- `JsonConvert.ToString(string)` produces a JSON-quoted string (e.g., `\"hello\"` \u2192 `\"\\\"hello\\\"\"`). STJ equivalent: `JsonSerializer.Serialize(\"hello\")` produces same output.\n- The JS interop pattern `\"JSON.parse('\" + serialize(obj) + \"')\"` is sensitive to escaping. Use `JavaScriptEncoder.UnsafeRelaxedJsonEscaping` on the context to avoid over-escaping `<`, `>`, `&`.\n- `ParentAccessor.SetValue` runtime type dispatch is the single hardest migration point. The type registry pattern from `a2aproject/a2a-dotnet` `A2AJsonUtilities.cs` is a good reference.\n## Acceptance\n- [ ] Zero `JsonConvert.SerializeObject` / `DeserializeObject` calls in codebase\n- [ ] Zero `Newtonsoft.Json.JsonSerializerSettings` usage\n- [ ] `ParentAccessor.SetValue` uses type info lookup (no `Type.GetType()`)\n- [ ] `ParentAccessor.LookForTypeByName` method deleted\n- [ ] All serialization uses `MonacoJsonContext.Default.Options` or typed overloads\n- [ ] Build succeeds for both TFMs\n## Done summary\nTBD\n\n## Evidence\n- Commits:\n- Tests:\n- PRs:\n"
+    },
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-11T08:38:04.452473Z",
+        "depends_on": [
+          "fn-2-type-generation-pipeline-and.2",
+          "fn-2-type-generation-pipeline-and.3",
+          "fn-2-type-generation-pipeline-and.4",
+          "fn-2-type-generation-pipeline-and.5"
+        ],
+        "epic": "fn-2-type-generation-pipeline-and",
+        "id": "fn-2-type-generation-pipeline-and.6",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-2-type-generation-pipeline-and.6.md",
+        "status": "todo",
+        "title": "Remove Newtonsoft.Json dependency and finalize build",
+        "updated_at": "2026-02-11T08:39:52.776030Z"
+      },
+      "id": "fn-2-type-generation-pipeline-and.6",
+      "runtime": null,
+      "spec": "# fn-2-type-generation-pipeline-and.6 Remove Newtonsoft.Json dependency and finalize build\n\n## Description\nRemove Newtonsoft.Json package dependency entirely, update build artifacts, and verify clean build across all targets.\n\n**Size:** S\n**Files:** Directory.Packages.props, MonacoEditorComponent/MonacoEditorComponent.csproj, MonacoEditorComponent/Properties/MonacoEditorComponent.rd.xml, changelog.md\n\n## Approach\n\n- Remove `<PackageVersion Include=\"Newtonsoft.Json\" Version=\"13.0.4\" />` from `Directory.Packages.props:9`\n- Remove `<PackageReference Include=\"Newtonsoft.Json\" />` from `MonacoEditorComponent.csproj:43`\n- Update `MonacoEditorComponent.rd.xml` to remove Newtonsoft type directives (lines 15-19) \u2014 replace with STJ source-gen trimming hints if needed\n- Verify: `grep -r \"Newtonsoft\" MonacoEditorComponent/ --include=\"*.cs\" --include=\"*.csproj\" --include=\"*.props\"` returns zero results\n- Build both targets: `dotnet build MonacoEditorTestApp -f net10.0-browserwasm` and `-f net10.0-desktop`\n- Update `changelog.md` with breaking change entry documenting Newtonsoft removal and STJ migration\n\n## Key context\n\n- This is a breaking change for NuGet consumers who depend on the transitive Newtonsoft.Json dependency.\n- The `rd.xml` runtime directives file at `MonacoEditorComponent/Properties/MonacoEditorComponent.rd.xml` explicitly references `Newtonsoft.Json.JsonConvert` \u2014 these directives are no longer needed with STJ source gen.\n## Acceptance\n- [ ] Zero `Newtonsoft.Json` references in any .cs, .csproj, or .props file\n- [ ] `rd.xml` updated (Newtonsoft directives removed)\n- [ ] `changelog.md` documents the breaking change\n- [ ] `dotnet build MonacoEditorTestApp -f net10.0-browserwasm` succeeds\n- [ ] `dotnet build MonacoEditorTestApp -f net10.0-desktop` succeeds\n## Done summary\nTBD\n\n## Evidence\n- Commits:\n- Tests:\n- PRs:\n"
+    },
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-11T08:38:04.562773Z",
+        "depends_on": [
+          "fn-2-type-generation-pipeline-and.1"
+        ],
+        "epic": "fn-2-type-generation-pipeline-and",
+        "id": "fn-2-type-generation-pipeline-and.7",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-2-type-generation-pipeline-and.7.md",
+        "status": "todo",
+        "title": "Modernize type generation pipeline for STJ output",
+        "updated_at": "2026-02-11T08:40:15.383630Z"
+      },
+      "id": "fn-2-type-generation-pipeline-and.7",
+      "runtime": null,
+      "spec": "# fn-2-type-generation-pipeline-and.7 Modernize type generation pipeline for STJ output\n\n## Description\nReplace the dead TypedocConverter-based type generation pipeline with a modern approach that emits STJ-attributed C# from Monaco TypeScript definitions.\n\n**Size:** M\n**Files:** GenerateMonacoTypings/* (rewrite), GenerateMonacoTypings/README.md\n\n## Approach\n\n- Evaluate and select replacement strategy:\n  - **Option A**: Fork/patch TypedocConverter to emit STJ attributes instead of Newtonsoft (it has partial STJ support per README)\n  - **Option B**: Build a post-processing step that transforms TypedocConverter output (replace `[JsonProperty]` \u2192 `[JsonPropertyName]`, etc.)\n  - **Option C**: Custom generator using TypeScript compiler API (ts-morph) to read `monaco.d.ts` and emit C# directly\n  - **Option D**: Use existing tool like NTypewriter with custom templates\n\n- Update `GenerateMonacoTypings/package.json` to reference `monaco-editor@0.54.0` (match vendored runtime) instead of `@0.21.3`\n- Define generated vs. hand-tuned file separation strategy:\n  - Generated files get a `// <auto-generated />` header\n  - Hand-tuned files (e.g., `StandaloneEditorConstructionOptions` with `INotifyPropertyChanged` + dictionary backing) are NOT overwritten by the generator\n  - Use `.generated.cs` suffix or a separate output directory for generated files\n- Ensure generated output includes:\n  - `[JsonPropertyName]` or relies on CamelCase naming policy\n  - `[JsonStringEnumMemberName]` on enum members\n  - Nullable reference types enabled (replace `--nrt-disabled true`)\n  - No Newtonsoft imports\n- Update `GenerateMonacoTypings/README.md` with new pipeline documentation\n- Test: run pipeline and verify output compiles against `MonacoJsonContext`\n\n## Key context\n\n- TypedocConverter (hez2010/TypedocConverter) last updated 2023-03-29. Supports TS 3.9-4.2. Modern Monaco uses TS 5.x features.\n- Current pipeline: `monaco.d.ts` \u2192 typedoc \u2192 `monaco.json` \u2192 TypedocConverter \u2192 C# with Newtonsoft attributes\n- The version gap (0.21.3 \u2192 0.54.0) means regeneration will produce a different type surface. New types added, some removed/renamed. This is expected.\n- `StandaloneEditorConstructionOptions` is heavily hand-tuned with `INotifyPropertyChanged` and `Dictionary<string,object?>` backing \u2014 the generator must NOT overwrite it.\n- Full regeneration from 0.54.0 is a follow-up task outside this epic \u2014 this task sets up the pipeline to be READY for that.\n## Acceptance\n- [ ] Generation pipeline runs against `monaco-editor@0.54.0` typings\n- [ ] Generated C# uses STJ attributes (zero Newtonsoft references)\n- [ ] Generated C# enables nullable reference types\n- [ ] Generated files marked with `// <auto-generated />` header\n- [ ] Hand-tuned files protected from overwrite (separation strategy documented)\n- [ ] `GenerateMonacoTypings/README.md` updated with new pipeline docs\n- [ ] Pipeline output compiles successfully\n## Done summary\nTBD\n\n## Evidence\n- Commits:\n- Tests:\n- PRs:\n"
+    }
+  ]
+}
