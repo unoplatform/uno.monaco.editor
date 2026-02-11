@@ -645,6 +645,38 @@ public class SerializationContractTests
         Assert.Equal(10u, rangeElement.GetProperty("startColumn").GetUInt32());
         Assert.Equal(15u, rangeElement.GetProperty("endLineNumber").GetUInt32());
         Assert.Equal(20u, rangeElement.GetProperty("endColumn").GetUInt32());
+
+        // Full round-trip: deserialize and verify IRange -> Range via InterfaceToClassConverter
+        var restored = JsonSerializer.Deserialize(json, MonacoJsonContext.Default.IModelDeltaDecoration);
+        Assert.NotNull(restored);
+        Assert.NotNull(restored.Range);
+        Assert.IsType<Range>(restored.Range);
+
+        var restoredRange = (Range)restored.Range;
+        Assert.Equal(5u, restoredRange.StartLineNumber);
+        Assert.Equal(10u, restoredRange.StartColumn);
+        Assert.Equal(15u, restoredRange.EndLineNumber);
+        Assert.Equal(20u, restoredRange.EndColumn);
+    }
+
+    [Fact]
+    public void IPosition_RoundTrip_ViaConcretePosition()
+    {
+        // IPosition is used at method boundaries (not as a property type with
+        // InterfaceToClassConverter), so we verify that Position (the concrete
+        // IPosition implementor) round-trips correctly with [JsonInclude] on
+        // internal setters, ensuring the full IPosition contract is deserializable.
+        var json = """{"lineNumber":42,"column":7}""";
+        var restored = JsonSerializer.Deserialize(json, MonacoJsonContext.Default.Position);
+        Assert.NotNull(restored);
+        Assert.Equal(42u, restored.LineNumber);
+        Assert.Equal(7u, restored.Column);
+
+        // Verify full round-trip: serialize back and verify values via JSON DOM
+        var reserialized = JsonSerializer.Serialize(restored, MonacoJsonContext.Default.Position);
+        var doc = JsonDocument.Parse(reserialized);
+        Assert.Equal(42u, doc.RootElement.GetProperty("lineNumber").GetUInt32());
+        Assert.Equal(7u, doc.RootElement.GetProperty("column").GetUInt32());
     }
 
     [Fact]

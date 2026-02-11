@@ -725,6 +725,11 @@ namespace Monaco.Editor
         /// <summary>
         /// The initial model associated with this code editor.
         /// </summary>
+        /// <remarks>
+        /// Uses <see cref="JsonIgnoreCondition.Never"/> to allow serializing explicit null,
+        /// which tells Monaco to not auto-create a model (<c>model: null</c>).
+        /// </remarks>
+        [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
         public IModel? Model { get => GetPropertyValue<IModel>(); set => SetPropertyValue(value); }
         /// <summary>
         /// The initial value of the auto created model in the editor.
