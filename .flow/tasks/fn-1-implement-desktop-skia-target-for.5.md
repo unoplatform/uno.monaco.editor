@@ -19,11 +19,13 @@ Implements `IJsonRpcMessageHandler` from StreamJsonRpc:
 
 ### JsonRpc wiring
 <!-- Updated by plan-sync: fn-1-implement-desktop-skia-target-for.2 already wires CoreWebView2 events in Launch() -->
-- In `DesktopCodeEditorPresenter` (after `EnsureCoreWebView2Async` -- note: `Launch()` already calls `EnsureCoreWebView2Async`, sets `_isCoreWebView2Initialized = true`, configures security settings, and wires `CoreWebView2.WebMessageReceived` to fire `MessageReceived` event):
+<!-- Updated by plan-sync: fn-1-implement-desktop-skia-target-for.2 Launch() re-throws on failure, resets state, uses _pendingSource buffering -->
+- In `DesktopCodeEditorPresenter` (after `EnsureCoreWebView2Async` -- note: `Launch()` already calls `EnsureCoreWebView2Async`, configures security settings, wires `CoreWebView2.WebMessageReceived`/`NavigationStarting`/`NavigationCompleted`/`NewWindowRequested` handlers, sets `_isCoreWebView2Initialized = true` only AFTER all setup succeeds, then replays any `_pendingSource` navigation. On failure, `Launch()` resets `_isCoreWebView2Initialized = false`, detaches handlers via `DetachCoreWebView2Handlers()`, and re-throws the exception so the caller can abort):
   1. Create `WebView2JsonRpcMessageHandler` (consuming the existing `MessageReceived` event for Reader, and `PostWebMessage` for Writer)
   2. Create `JsonRpc(handler)` instance
   3. Attach bridge targets (see below) via `JsonRpc.AddLocalRpcTarget()`
   4. Call `JsonRpc.StartListening()`
+  5. **Insertion point**: JsonRpc wiring should be added in `Launch()` between the `_isCoreWebView2Initialized = true` assignment and the `_pendingSource` replay block. This ensures the MessageReceived event is already wired (step happens earlier) and CoreWebView2 is fully ready.
 - `JsonRpc` instance exposed to bridge classes (not publicly — internal or via constructor injection)
 - The internal `WebView` property exposes the underlying `WebView2` instance. The internal `IsCoreWebView2Initialized` property indicates readiness.
 
@@ -79,11 +81,16 @@ Desktop bridge classes register their methods on the shared `JsonRpc` instance. 
 - **Lifecycle event push** (C#→JS): When `EditorLoading`/`EditorLoaded` fire (via Task 2's lifecycle state machine), emit `JsonRpc.NotifyAsync("editor/lifecycleUpdate", new { loading = N, loaded = N })` with current event counts. This enables Task 8's Playwright tests to verify exactly-once semantics from within the WebView2 DOM.
 
 ### Remaining platform fixes
+<!-- Updated by plan-sync: fn-1-implement-desktop-skia-target-for.2 introduced portable event args replacing WinRT types -->
+- **Portable event args**: `ICodeEditorPresenter` navigation events now use portable types (`PresenterNavigationStartingEventArgs`, `PresenterNavigationCompletedEventArgs`, `PresenterNewWindowRequestedEventArgs`) defined in `ICodeEditorPresenter.cs`. These replace WinRT `WebViewNavigationStartingEventArgs`/`WebViewNavigationCompletedEventArgs`/`WebViewNewWindowRequestedEventArgs` which could not be constructed in cross-platform code. Desktop presenter now constructs these with actual data (URI, IsSuccess, etc.). `OpenLinkRequested` event on `CodeEditor` changed to `TypedEventHandler<CodeEditor, OpenLinkRequestedEventArgs>` (sender is `CodeEditor`, not `ICodeEditorPresenter`; args is `OpenLinkRequestedEventArgs` with `Uri` and `Handled` properties).
+- **Late callback guards**: `WebView_DOMContentLoaded`, `WebView_NavigationStarting`, `WebView_NavigationCompleted`, and `CodeEditorLoaded` all now guard against `!IsLoaded` to prevent processing after unload. `CodeEditorLoaded` also checks `_lifecycleState == EditorLifecycleState.Loading`.
+- **`_initialized` flag timing**: Set BEFORE `ApplyInitialPropertyValues()` in both `WebView_NavigationCompleted` and `CodeEditorLoaded` (scripts are gated by `_initialized`).
 - **LanguageIdFromExtension**: Currently `[JSImport]` — throws on desktop. Provide C#-side mapping dictionary or async JSON-RPC call. Public API change allowed if needed.
 - **Window.Current**: Replace at `CodeEditor.cs:186-189` and `ThemeListener.cs:51-53,66-68`.
 - **InitialiseWebObjects convergence**: Create correct helper variants based on `OperatingSystem.IsBrowser()`. Desktop path wires up `JsonRpc` targets. WASM path unchanged.
   <!-- Updated by plan-sync: fn-1-implement-desktop-skia-target-for.2 desktop path bypasses BridgeFactory -->
-  **Current state (from Task 2 implementation)**: `InitialiseWebObjects()` in `CodeEditor.Events.cs` already has an `if/else` on `OperatingSystem.IsBrowser()`. The WASM branch calls `BridgeFactory.Create(_view, _queue)` to get all four helpers. The desktop branch currently creates `new ThemeListener(_view)` directly (single-arg constructor, no `DispatcherQueue`) and leaves `_parentAccessor`, `_keyboardListener`, and `_debugLogger` as null. `BridgeFactory.Create()` desktop branch throws `PlatformNotSupportedException`. Task 5 should either: (a) update the inline desktop branch in `InitialiseWebObjects` to create all four desktop bridge helpers (recommended -- keeps symmetry with existing pattern), or (b) update `BridgeFactory.Create()` to return desktop variants and switch `InitialiseWebObjects` to call it. Either way, the existing `new ThemeListener(_view)` must be replaced with `ThemeListenerDesktop`.
+  <!-- Updated by plan-sync: fn-1-implement-desktop-skia-target-for.2 InitialiseWebObjects now returns bool (false=failure, caller aborts) -->
+  **Current state (from Task 2 implementation)**: `InitialiseWebObjects()` in `CodeEditor.Events.cs` now returns `bool` -- `true` on success (or already initialized), `false` on failure (caller aborts, error surfaced via `InternalException`). It already has an `if/else` on `OperatingSystem.IsBrowser()`. The WASM branch calls `BridgeFactory.Create(_view, _queue)` to get all four helpers. The desktop branch currently creates `new ThemeListener(_view)` directly (single-arg constructor, no `DispatcherQueue`) and leaves `_parentAccessor`, `_keyboardListener`, and `_debugLogger` as null. `BridgeFactory.Create()` desktop branch throws `PlatformNotSupportedException`. Task 5 should either: (a) update the inline desktop branch in `InitialiseWebObjects` to create all four desktop bridge helpers (recommended -- keeps symmetry with existing pattern), or (b) update `BridgeFactory.Create()` to return desktop variants and switch `InitialiseWebObjects` to call it. Either way, the existing `new ThemeListener(_view)` must be replaced with `ThemeListenerDesktop`.
 
 ## Acceptance
 
