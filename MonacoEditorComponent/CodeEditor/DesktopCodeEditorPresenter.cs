@@ -228,8 +228,11 @@ namespace Monaco
 
         internal static bool IsNavigationAllowed(string uri, string? allowedFileContentRoot)
         {
-            // Always allow about:blank (initial WebView2 state)
-            if (uri.StartsWith("about:blank", StringComparison.OrdinalIgnoreCase))
+            // Allow only exact about:blank (initial WebView2 state) or about:blank with fragment.
+            // Using parsed URI comparison to prevent prefix-based bypass (e.g., about:blankevil).
+            if (global::System.Uri.TryCreate(uri, UriKind.Absolute, out var aboutCheck)
+                && string.Equals(aboutCheck.Scheme, "about", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(aboutCheck.AbsolutePath, "blank", StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }

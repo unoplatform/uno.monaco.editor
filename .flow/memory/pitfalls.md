@@ -27,3 +27,9 @@ Set idempotency guards (_isInitialized) AFTER all setup steps complete, not befo
 
 ## 2026-02-11 manual [pitfall]
 WinRT event args types (WebViewNavigationCompletedEventArgs, WebViewNewWindowRequestedEventArgs) cannot be constructed - use portable wrapper types in cross-platform interfaces
+
+## 2026-02-11 manual [pitfall]
+WebView2 Source must not be set before EnsureCoreWebView2Async completes -- buffer the URI and apply after security settings/handlers are attached to prevent allowlist bypass
+
+## 2026-02-11 manual [pitfall]
+Window.Current.SizeChanged subscriptions must be unsubscribed in Unloaded handlers -- missing unsubscribe causes handler accumulation and control lifetime leaks across load/unload cycles

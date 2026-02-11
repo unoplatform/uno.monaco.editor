@@ -82,9 +82,23 @@ namespace Monaco
             Console.WriteLine("WebView_DOMContentLoaded()");
 #endif
 
-            InitialiseWebObjects();
+            if (!InitialiseWebObjects())
+            {
+                // Helper initialization failed -- abort. Error already surfaced via InternalException.
+                return;
+            }
 
-            await ((ICodeEditorPresenter)sender).Launch();
+            try
+            {
+                await ((ICodeEditorPresenter)sender).Launch();
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine($"WebView_DOMContentLoaded: Launch failed: {e}");
+                TeardownWebObjects();
+                InternalException?.Invoke(this, e);
+                return;
+            }
 
             Options.Language = CodeLanguage;
             Options.ReadOnly = ReadOnly;
@@ -196,7 +210,13 @@ namespace Monaco
             TransitionLifecycle(EditorLifecycleState.Unloaded);
         }
 
-        private void InitialiseWebObjects()
+        /// <summary>
+        /// Initializes web object wiring (bridge helpers, theme listener, etc.).
+        /// Returns true on success or if already initialized for the current presenter.
+        /// Returns false on failure -- caller should abort initialization.
+        /// Failures are surfaced via <see cref="InternalException"/>.
+        /// </summary>
+        private bool InitialiseWebObjects()
         {
             try
             {
@@ -210,7 +230,7 @@ namespace Monaco
                 // Skip if already initialized for this presenter instance.
                 if (ReferenceEquals(_initializedPresenter, _view))
                 {
-                    return;
+                    return true;
                 }
 
                 // Teardown old or partial objects before reinitializing
@@ -247,12 +267,15 @@ namespace Monaco
                 TransitionLifecycle(EditorLifecycleState.Loading);
 
                 Debug.WriteLine($"InitialiseWebObjects - Completed");
+                return true;
             }
             catch (Exception ex)
             {
                 // Roll back partial setup to prevent leaked registrations
                 TeardownWebObjects();
                 Debug.WriteLine($"InitialiseWebObjects Error {ex.Message} {ex.StackTrace}");
+                InternalException?.Invoke(this, ex);
+                return false;
             }
         }
 
