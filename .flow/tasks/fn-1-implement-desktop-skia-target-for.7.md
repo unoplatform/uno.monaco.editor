@@ -75,7 +75,8 @@ If automated Playwright tests pass but manual testing reveals edge cases, the Pl
 - [ ] Bug fixes (if any) are root-cause-only — no refactoring or unrelated changes
 
 ## Done summary
-
-
+Ran integration tests and macOS desktop validation. All 94 unit tests pass, both TFMs build cleanly, desktop app launches and functions correctly on macOS (arm64) with DesktopCodeEditorPresenter + WebView2/WKWebView. All test app features (text editing, decorations, markers, language switching, hide/show, multi-instance tabs) work without exceptions. Task spec updated with correct xUnit v3 MTP2 filter syntax.
 ## Evidence
-
+- Commits: c92a8ab, 950dac7
+- Tests: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -- --filter-not-trait Category=DesktopCDP --filter-not-trait Category=WasmPlaywright (94 passed), dotnet build MonacoEditorComponent.slnx --no-restore (0 warnings, 0 errors), dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-desktop (0 warnings, 0 errors), dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm (0 warnings, 0 errors), Desktop app launched on macOS via Uno App MCP - all button actions passed without exceptions, Multi-instance tab switching verified, Hide/Show lifecycle verified, Set Selected Text round-trip confirmed via XAML visual tree inspection
+- PRs:
