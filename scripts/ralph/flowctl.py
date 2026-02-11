@@ -290,6 +290,7 @@ def get_default_config() -> dict:
         "memory": {"enabled": True},
         "planSync": {"enabled": True, "crossEpic": False},
         "review": {"backend": None},
+        "scouts": {"github": False},
     }
 
 
