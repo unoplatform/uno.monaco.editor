@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -7,47 +6,14 @@ namespace Monaco.Editor
     /// <summary>
     /// The history mode for suggestions.
     /// </summary>
-    [JsonConverter(typeof(SuggestSelectionConverter))]
-    public enum SuggestSelection { First, RecentlyUsed, RecentlyUsedByPrefix };
-
-    internal class SuggestSelectionConverter : JsonConverter
+    [JsonConverter(typeof(JsonStringEnumConverter<SuggestSelection>))]
+    public enum SuggestSelection
     {
-        public override bool CanConvert(Type t) => t == typeof(SuggestSelection) || t == typeof(SuggestSelection?);
-
-        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
-        {
-            if (reader.TokenType == JsonToken.Null) return null;
-            var value = serializer.Deserialize<string>(reader);
-            return value switch
-            {
-                "first" => SuggestSelection.First,
-                "recentlyUsed" => SuggestSelection.RecentlyUsed,
-                "recentlyUsedByPrefix" => SuggestSelection.RecentlyUsedByPrefix,
-                _ => throw new Exception("Cannot unmarshal type SuggestSelection"),
-            };
-        }
-
-        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
-        {
-            if (untypedValue == null)
-            {
-                serializer.Serialize(writer, null);
-                return;
-            }
-            var value = (SuggestSelection)untypedValue;
-            switch (value)
-            {
-                case SuggestSelection.First:
-                    serializer.Serialize(writer, "first");
-                    return;
-                case SuggestSelection.RecentlyUsed:
-                    serializer.Serialize(writer, "recentlyUsed");
-                    return;
-                case SuggestSelection.RecentlyUsedByPrefix:
-                    serializer.Serialize(writer, "recentlyUsedByPrefix");
-                    return;
-            }
-            throw new Exception("Cannot marshal type SuggestSelection");
-        }
-    }
+        [JsonStringEnumMemberName("first")]
+        First,
+        [JsonStringEnumMemberName("recentlyUsed")]
+        RecentlyUsed,
+        [JsonStringEnumMemberName("recentlyUsedByPrefix")]
+        RecentlyUsedByPrefix,
+    };
 }

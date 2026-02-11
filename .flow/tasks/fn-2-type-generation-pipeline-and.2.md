@@ -50,9 +50,8 @@ Preliminary numeric enums (to be verified from code):
 - [ ] Build succeeds
 
 ## Done summary
-TBD
-
+Migrated all 30 string-backed enum types from custom Newtonsoft `JsonConverter` classes to `[JsonStringEnumMemberName]` attributes with `[JsonConverter(typeof(JsonStringEnumConverter<T>))]` on each enum type. Deleted all 30 custom converter classes. Removed property-level `[JsonConverter]` references from `StandaloneEditorConstructionOptions`. Numeric enums (7) remain untouched. Added 7 contract tests covering round-trip serialization for representative enums (CursorBlinking, TextDecoration with hyphens, AutoIndent with multiple values, CursorStyle hyphens, camelCase values, and numeric enum integrity). All 40 serialization tests pass. Build succeeds with 0 warnings, 0 errors.
 ## Evidence
 - Commits:
-- Tests:
+- Tests: 40 serialization tests pass (including 7 new string enum contract tests)
 - PRs:

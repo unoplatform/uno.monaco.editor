@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Monaco;
 using Monaco.Editor;
+using Monaco.Helpers;
 using Monaco.Languages;
 using Monaco.Serialization;
 using Newtonsoft.Json;
@@ -425,6 +426,96 @@ public class SerializationContractTests
         var markerDoc = JsonDocument.Parse(markerJson);
         Assert.Equal("file", markerDoc.RootElement.GetProperty("resource").GetProperty("scheme").GetString());
         Assert.Equal("/src/main.ts", markerDoc.RootElement.GetProperty("resource").GetProperty("path").GetString());
+    }
+
+    #endregion
+
+    #region String enum serialization — JsonStringEnumMemberName contract tests
+
+    [Theory]
+    [InlineData(CursorBlinking.Blink, "blink")]
+    [InlineData(CursorBlinking.Expand, "expand")]
+    [InlineData(CursorBlinking.Phase, "phase")]
+    [InlineData(CursorBlinking.Smooth, "smooth")]
+    [InlineData(CursorBlinking.Solid, "solid")]
+    public void StringEnum_CursorBlinking_RoundTrip(CursorBlinking value, string expected)
+    {
+        var json = JsonSerializer.Serialize(value);
+        Assert.Equal($"\"{expected}\"", json);
+
+        var deserialized = JsonSerializer.Deserialize<CursorBlinking>(json);
+        Assert.Equal(value, deserialized);
+    }
+
+    [Theory]
+    [InlineData(TextDecoration.None, "none")]
+    [InlineData(TextDecoration.Underline, "underline")]
+    [InlineData(TextDecoration.Overline, "overline")]
+    [InlineData(TextDecoration.LineThrough, "line-through")]
+    [InlineData(TextDecoration.Initial, "initial")]
+    [InlineData(TextDecoration.Inherit, "inherit")]
+    public void StringEnum_TextDecoration_HyphenatedValues(TextDecoration value, string expected)
+    {
+        var json = JsonSerializer.Serialize(value);
+        Assert.Equal($"\"{expected}\"", json);
+
+        var deserialized = JsonSerializer.Deserialize<TextDecoration>(json);
+        Assert.Equal(value, deserialized);
+    }
+
+    [Theory]
+    [InlineData(AutoIndent.Advanced, "advanced")]
+    [InlineData(AutoIndent.Brackets, "brackets")]
+    [InlineData(AutoIndent.Full, "full")]
+    [InlineData(AutoIndent.Keep, "keep")]
+    [InlineData(AutoIndent.None, "none")]
+    public void StringEnum_AutoIndent_MultipleValues(AutoIndent value, string expected)
+    {
+        var json = JsonSerializer.Serialize(value);
+        Assert.Equal($"\"{expected}\"", json);
+
+        var deserialized = JsonSerializer.Deserialize<AutoIndent>(json);
+        Assert.Equal(value, deserialized);
+    }
+
+    [Fact]
+    public void StringEnum_CursorStyle_HyphenatedValues()
+    {
+        // CursorStyle has multiple hyphenated values — verify all round-trip correctly
+        Assert.Equal("\"block\"", JsonSerializer.Serialize(CursorStyle.Block));
+        Assert.Equal("\"block-outline\"", JsonSerializer.Serialize(CursorStyle.BlockOutline));
+        Assert.Equal("\"line\"", JsonSerializer.Serialize(CursorStyle.Line));
+        Assert.Equal("\"line-thin\"", JsonSerializer.Serialize(CursorStyle.LineThin));
+        Assert.Equal("\"underline\"", JsonSerializer.Serialize(CursorStyle.Underline));
+        Assert.Equal("\"underline-thin\"", JsonSerializer.Serialize(CursorStyle.UnderlineThin));
+
+        Assert.Equal(CursorStyle.BlockOutline, JsonSerializer.Deserialize<CursorStyle>("\"block-outline\""));
+        Assert.Equal(CursorStyle.LineThin, JsonSerializer.Deserialize<CursorStyle>("\"line-thin\""));
+        Assert.Equal(CursorStyle.UnderlineThin, JsonSerializer.Deserialize<CursorStyle>("\"underline-thin\""));
+    }
+
+    [Fact]
+    public void StringEnum_CamelCaseValues_PreservedExactly()
+    {
+        // Verify camelCase wire values are not affected by any naming policy
+        Assert.Equal("\"beforeWhitespace\"", JsonSerializer.Serialize(AutoClosingBrackets.BeforeWhitespace));
+        Assert.Equal("\"languageDefined\"", JsonSerializer.Serialize(AutoClosingBrackets.LanguageDefined));
+        Assert.Equal("\"ctrlCmd\"", JsonSerializer.Serialize(MultiCursorModifier.CtrlCmd));
+        Assert.Equal("\"gotoAndPeek\"", JsonSerializer.Serialize(Multiple.GotoAndPeek));
+        Assert.Equal("\"recentlyUsedByPrefix\"", JsonSerializer.Serialize(SuggestSelection.RecentlyUsedByPrefix));
+        Assert.Equal("\"onlySnippets\"", JsonSerializer.Serialize(TabCompletion.OnlySnippets));
+        Assert.Equal("\"wordWrapColumn\"", JsonSerializer.Serialize(WordWrap.WordWrapColumn));
+        Assert.Equal("\"deepIndent\"", JsonSerializer.Serialize(WrappingIndent.DeepIndent));
+    }
+
+    [Fact]
+    public void NumericEnum_StillSerializesAsInteger()
+    {
+        // Verify numeric enums were NOT affected by string enum migration
+        Assert.Equal("8", JsonSerializer.Serialize(MarkerSeverity.Error));
+        Assert.Equal("4", JsonSerializer.Serialize(MarkerSeverity.Warning));
+        Assert.Equal("1", JsonSerializer.Serialize(CompletionItemKind.Function));
+        Assert.Equal("0", JsonSerializer.Serialize(CompletionItemKind.Method));
     }
 
     #endregion

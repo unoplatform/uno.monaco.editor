@@ -35,9 +35,8 @@ Create the foundational STJ source-generation context and shared serialization i
 - [ ] `dotnet build MonacoEditorComponent.slnx` succeeds (existing Newtonsoft code untouched)
 
 ## Done summary
-TBD
-
+Created MonacoJsonContext STJ source-gen context registering ~25 cross-boundary Monaco types with CamelCase naming, WhenWritingNull, and UnsafeRelaxedJsonEscaping. Added JsonSerializerIsReflectionEnabledByDefault=false to .csproj. Created 21 serialization contract tests covering golden Newtonsoft baselines (exact JSON match), STJ round-trip per type category, numeric enum preservation, camelCase naming, null omission, relaxed encoder behavior, and Uri collision safety.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 4bc5c768622b1cf25dcddc58eaf4f3b1e208e70b, 08f62e0e0bab19cbd481182931afb2ffb39867a9
+- Tests: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj --filter-trait Category=Serialization, dotnet build MonacoEditorComponent.slnx --no-restore
 - PRs:

@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -9,43 +8,12 @@ namespace Monaco.Editor
     /// document, 'indentation' uses the indentation based folding strategy.
     /// Defaults to 'auto'.
     /// </summary>
-    [JsonConverter(typeof(FoldingStrategyConverter))]
-    public enum FoldingStrategy { Auto, Indentation };
-
-    internal class FoldingStrategyConverter : JsonConverter
+    [JsonConverter(typeof(JsonStringEnumConverter<FoldingStrategy>))]
+    public enum FoldingStrategy
     {
-        public override bool CanConvert(Type t) => t == typeof(FoldingStrategy) || t == typeof(FoldingStrategy?);
-
-        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
-        {
-            if (reader.TokenType == JsonToken.Null) return null;
-            var value = serializer.Deserialize<string>(reader);
-            return value switch
-            {
-                "auto" => FoldingStrategy.Auto,
-                "indentation" => FoldingStrategy.Indentation,
-                _ => throw new Exception("Cannot unmarshal type FoldingStrategy"),
-            };
-        }
-
-        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
-        {
-            if (untypedValue == null)
-            {
-                serializer.Serialize(writer, null);
-                return;
-            }
-            var value = (FoldingStrategy)untypedValue;
-            switch (value)
-            {
-                case FoldingStrategy.Auto:
-                    serializer.Serialize(writer, "auto");
-                    return;
-                case FoldingStrategy.Indentation:
-                    serializer.Serialize(writer, "indentation");
-                    return;
-            }
-            throw new Exception("Cannot marshal type FoldingStrategy");
-        }
-    }
+        [JsonStringEnumMemberName("auto")]
+        Auto,
+        [JsonStringEnumMemberName("indentation")]
+        Indentation,
+    };
 }

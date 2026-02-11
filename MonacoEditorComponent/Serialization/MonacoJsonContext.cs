@@ -19,8 +19,9 @@ namespace Monaco.Serialization;
 /// </para>
 /// <para>
 /// Numeric enums (MarkerSeverity, CompletionItemKind, TrackedRangeStickiness, etc.)
-/// are intentionally kept as integers. String-backed enums are handled per-enum in
-/// a later task (fn-2.2) via <c>[JsonConverter]</c> on the enum type.
+/// are intentionally kept as integers. String-backed enums use per-enum
+/// <c>[JsonConverter(typeof(JsonStringEnumConverter&lt;T&gt;))]</c> with
+/// <c>[JsonStringEnumMemberName]</c> attributes on each member.
 /// </para>
 /// <para>
 /// <b>Do NOT set <c>UseStringEnumConverter = true</c></b> — that would break numeric
