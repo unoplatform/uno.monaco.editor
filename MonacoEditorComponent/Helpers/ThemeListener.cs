@@ -17,7 +17,7 @@ namespace Monaco.Helpers
     /// and Signals an Event when they occur.
     /// </summary>
     [AllowForWeb]
-    public sealed partial class ThemeListener // This is a copy of the Toolkit ThemeListener, for some reason if we try and use it directly it's not read by the WebView
+    public sealed partial class ThemeListener : IThemeListener // This is a copy of the Toolkit ThemeListener, for some reason if we try and use it directly it's not read by the WebView
     {
         private readonly DispatcherQueue _queue;
         private readonly ICodeEditorPresenter _owner;

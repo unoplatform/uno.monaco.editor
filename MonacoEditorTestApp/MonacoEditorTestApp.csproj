@@ -23,6 +23,7 @@
     -->
 		<UnoFeatures>
 			SkiaRenderer;
+			WebView;
 		</UnoFeatures>
 
 		<!--<UnoDisableHotDesign>true</UnoDisableHotDesign>-->

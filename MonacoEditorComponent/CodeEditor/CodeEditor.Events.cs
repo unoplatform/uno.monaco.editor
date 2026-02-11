@@ -41,7 +41,40 @@ namespace Monaco
         /// </summary>
         public new event WebKeyEventHandler? KeyDown;
 
-        private ThemeListener? _themeListener;
+        private IThemeListener? _themeListener;
+        private EditorLifecycleState _lifecycleState = EditorLifecycleState.Unloaded;
+
+        /// <summary>
+        /// Transitions the editor lifecycle to the specified state,
+        /// firing EditorLoading/EditorLoaded exactly once per transition.
+        /// Returns true if the transition was valid and executed.
+        /// </summary>
+        private bool TransitionLifecycle(EditorLifecycleState targetState)
+        {
+            // Only allow valid forward transitions
+            switch (targetState)
+            {
+                case EditorLifecycleState.Loading when _lifecycleState == EditorLifecycleState.Unloaded:
+                    _lifecycleState = EditorLifecycleState.Loading;
+                    EditorLoading?.Invoke(this, new RoutedEventArgs());
+                    return true;
+
+                case EditorLifecycleState.Loaded when _lifecycleState == EditorLifecycleState.Loading:
+                    _lifecycleState = EditorLifecycleState.Loaded;
+                    IsEditorLoaded = true;
+                    EditorLoaded?.Invoke(this, new RoutedEventArgs());
+                    return true;
+
+                case EditorLifecycleState.Unloaded:
+                    _lifecycleState = EditorLifecycleState.Unloaded;
+                    IsEditorLoaded = false;
+                    return true;
+
+                default:
+                    Debug.WriteLine($"Invalid lifecycle transition: {_lifecycleState} -> {targetState}");
+                    return false;
+            }
+        }
 
         private async void WebView_DOMContentLoaded(object sender, RoutedEventArgs args)
         {
@@ -65,7 +98,6 @@ namespace Monaco
 #if DEBUG
             Debug.WriteLine($"Navigation completed - {args?.IsSuccess}");
 #endif
-            IsEditorLoaded = true;
 
             // Make sure inner editor is focused
             await SendScriptAsync("EditorContext.getEditorForElement(element).editor.focus();");
@@ -80,12 +112,14 @@ namespace Monaco
 
             await ApplyInitialPropertyValues();
 
-            EditorLoaded?.Invoke(this, new RoutedEventArgs());
+            // Use lifecycle state machine for exactly-once semantics
+            _initialized = true;
+            TransitionLifecycle(EditorLifecycleState.Loaded);
         }
 
-        internal ParentAccessor? _parentAccessor;
-        private KeyboardListener? _keyboardListener;
-        private DebugLogger? _debugLogger;
+        internal IParentAccessor? _parentAccessor;
+        private IKeyboardListener? _keyboardListener;
+        private IDebugLogger? _debugLogger;
         private long _themeToken;
         private bool _hasThemeToken;
 
@@ -129,11 +163,17 @@ namespace Monaco
                 KeyboardListener.RemoveInstance(_view);
             }
 
-            _parentAccessor?.Dispose();
+            if (_parentAccessor is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
             _parentAccessor = null;
             _keyboardListener = null;
             _debugLogger = null;
             _initializedPresenter = null;
+
+            // Reset lifecycle state on teardown
+            _lifecycleState = EditorLifecycleState.Unloaded;
         }
 
         private void InitialiseWebObjects()
@@ -156,19 +196,36 @@ namespace Monaco
                 // Teardown old or partial objects before reinitializing
                 TeardownWebObjects();
 
-                _parentAccessor = new ParentAccessor(_view, _queue);
-                _parentAccessor.AddAssemblyForTypeLookup(typeof(Range).GetTypeInfo().Assembly);
-                _parentAccessor.RegisterAction("Loaded", CodeEditorLoaded);
+                if (OperatingSystem.IsBrowser())
+                {
+                    var (parentAccessor, themeListener, keyboardListener, debugLogger) =
+                        BridgeFactory.Create(_view, _queue);
+                    _parentAccessor = parentAccessor;
+                    _themeListener = themeListener;
+                    _keyboardListener = keyboardListener;
+                    _debugLogger = debugLogger;
+                }
+                else
+                {
+                    // Desktop bridge helpers are created by Task 5.
+                    // For now, create minimal wiring without bridge factory.
+                    _themeListener = new ThemeListener(_view);
+                    // _parentAccessor, _keyboardListener, _debugLogger remain null
+                    // until Task 5 provides desktop implementations.
+                }
 
-                _themeListener = new ThemeListener(_view);
+                _parentAccessor?.AddAssemblyForTypeLookup(typeof(Range).GetTypeInfo().Assembly);
+                _parentAccessor?.RegisterAction("Loaded", CodeEditorLoaded);
+
                 _themeListener.ThemeChanged += ThemeListener_ThemeChanged;
                 _themeToken = RegisterPropertyChangedCallback(RequestedThemeProperty, RequestedTheme_PropertyChanged);
                 _hasThemeToken = true;
 
-                _keyboardListener = new KeyboardListener(_view, _queue);
-                _debugLogger = new DebugLogger(_view);
-
                 _initializedPresenter = _view;
+
+                // Transition to Loading state
+                TransitionLifecycle(EditorLifecycleState.Loading);
+
                 Debug.WriteLine($"InitialiseWebObjects - Completed");
             }
             catch (Exception ex)
@@ -192,9 +249,8 @@ namespace Monaco
             // This ensures properties set before IsEditorLoaded=true take effect
             await ApplyInitialPropertyValues();
 
-            // Now mark as initialized and loaded
+            // Now mark as initialized
             _initialized = true;
-            IsEditorLoaded = true;
 
             // If we're supposed to have focus, make sure we try and refocus on our now loaded webview.
 #pragma warning disable CS0618 // Type or member is obsolete
@@ -204,9 +260,8 @@ namespace Monaco
             }
 #pragma warning restore CS0618 // Type or member is obsolete
 
-            // Fire events after initialization so properties set in event handlers work immediately
-            EditorLoading?.Invoke(this, new());
-            EditorLoaded?.Invoke(this, new());
+            // Use lifecycle state machine for exactly-once semantics
+            TransitionLifecycle(EditorLifecycleState.Loaded);
         }
 
         /// <summary>
@@ -278,7 +333,7 @@ namespace Monaco
                     await InvokeScriptAsync("changeTheme", [tstr ?? "", listener.IsHighContrast.ToString()]);
                 }))
                 {
-                    Debug.WriteLine("Failed to enqueue theme change — dispatcher queue unavailable");
+                    Debug.WriteLine("Failed to enqueue theme change -- dispatcher queue unavailable");
                 }
             }
         }
@@ -292,7 +347,7 @@ namespace Monaco
                     await InvokeScriptAsync("changeTheme", args: [sender.CurrentTheme.ToString(), sender.IsHighContrast.ToString()]);
                 }))
                 {
-                    Debug.WriteLine("Failed to enqueue theme change — dispatcher queue unavailable");
+                    Debug.WriteLine("Failed to enqueue theme change -- dispatcher queue unavailable");
                 }
             }
         }

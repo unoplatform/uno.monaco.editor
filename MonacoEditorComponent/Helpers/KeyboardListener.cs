@@ -23,7 +23,7 @@ namespace Monaco.Helpers
     }
 
     [AllowForWeb]
-    public sealed partial class KeyboardListener
+    public sealed partial class KeyboardListener : IKeyboardListener
     {
         private static readonly ConditionalWeakTable<object, KeyboardListener> _instances = [];
         private readonly WeakReference<ICodeEditorPresenter> parent;

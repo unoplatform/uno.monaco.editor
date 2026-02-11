@@ -263,10 +263,23 @@ namespace Monaco
                 TeardownWebObjects();
             }
 
-            _view = (ICodeEditorPresenter)GetTemplateChild("View");
+            // Create the correct presenter at runtime via OperatingSystem.IsBrowser()
+            var viewHost = (ContentPresenter)GetTemplateChild("View");
 
-            if (_view != null)
+            if (viewHost != null)
             {
+                ICodeEditorPresenter presenter;
+                if (OperatingSystem.IsBrowser())
+                {
+                    presenter = new WasmCodeEditorPresenter();
+                }
+                else
+                {
+                    presenter = new DesktopCodeEditorPresenter();
+                }
+
+                viewHost.Content = presenter;
+                _view = presenter;
                 _view.ParentCodeEditor = this;
 
                 _view.NavigationStarting -= WebView_NavigationStarting;
@@ -282,7 +295,6 @@ namespace Monaco
                 {
                     _view.Loaded += WebView_DOMContentLoaded;
                 }
-
             }
 
             base.OnApplyTemplate();
@@ -393,7 +405,10 @@ namespace Monaco
         {
             _cssBroker?.Dispose();
             _cssBroker = null;
-            _parentAccessor?.Dispose();
+            if (_parentAccessor is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
             _parentAccessor = null;
         }
     }

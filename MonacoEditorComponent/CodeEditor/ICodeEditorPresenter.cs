@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Dispatching;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -12,6 +12,19 @@ using Windows.UI;
 
 namespace Monaco
 {
+    /// <summary>
+    /// Event args for inbound messages from the web view layer.
+    /// Desktop presenter fires this from WebMessageReceived.
+    /// WASM presenter never fires it (uses JSExport direct calls).
+    /// </summary>
+    public sealed class WebViewMessageEventArgs : EventArgs
+    {
+        /// <summary>
+        /// The raw JSON string of the inbound message.
+        /// </summary>
+        public required string MessageJson { get; init; }
+    }
+
     public interface ICodeEditorPresenter
 	{
 		// <summary>Occurs when a user performs an action in a WebView that causes content to be opened in a new window.</summary>
@@ -22,6 +35,14 @@ namespace Monaco
 
 		/// <summary>Occurs when the WebView has finished loading the current content or if navigation has failed.</summary>
 		event TypedEventHandler<ICodeEditorPresenter?, WebViewNavigationCompletedEventArgs?>? NavigationCompleted;
+
+        /// <summary>
+        /// Inbound message event from the web view layer.
+        /// Desktop presenter fires this from WebMessageReceived.
+        /// WASM presenter never fires it (uses JSExport direct calls).
+        /// Task 5 consumes this for all desktop bridge routing.
+        /// </summary>
+        event EventHandler<WebViewMessageEventArgs>? MessageReceived;
 
         public CodeEditor? ParentCodeEditor { get; set; }
 
@@ -44,5 +65,19 @@ namespace Monaco
 		bool Focus(FocusState state);
 
 		Task Launch();
+
+        /// <summary>
+        /// Executes a script in the web view and returns the result as a raw JSON token string.
+        /// WASM wraps NativeMethods.InvokeJS(). Desktop wraps CoreWebView2.ExecuteScriptAsync().
+        /// Return contract: always returns raw JSON token (string, number, object, null).
+        /// </summary>
+        Task<string> InvokeScriptAsync(string script);
+
+        /// <summary>
+        /// Posts a JSON message to the web view.
+        /// Desktop wraps CoreWebView2.PostWebMessageAsJson().
+        /// WASM throws PlatformNotSupportedException (not used on WASM).
+        /// </summary>
+        void PostWebMessage(string json);
 	}
 }

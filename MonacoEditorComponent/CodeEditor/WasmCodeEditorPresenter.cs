@@ -14,15 +14,20 @@ using Windows.Foundation;
 
 namespace Monaco
 {
-    public partial class CodeEditorPresenter : ContentControl, ICodeEditorPresenter
+    public partial class WasmCodeEditorPresenter : ContentControl, ICodeEditorPresenter
     {
         private static readonly string UNO_BOOTSTRAP_APP_BASE = global::System.Environment.GetEnvironmentVariable(nameof(UNO_BOOTSTRAP_APP_BASE)) ?? "";
         private static readonly string UNO_BOOTSTRAP_WEBAPP_BASE_PATH = Environment.GetEnvironmentVariable(nameof(UNO_BOOTSTRAP_WEBAPP_BASE_PATH)) ?? "";
         private readonly BrowserHtmlElement _element;
 
-        public CodeEditorPresenter()
+        public WasmCodeEditorPresenter()
         {
-            Debug.WriteLine("CodeEditorPresenter()");
+            if (!OperatingSystem.IsBrowser())
+            {
+                throw new PlatformNotSupportedException("WasmCodeEditorPresenter can only be used on WASM.");
+            }
+
+            Debug.WriteLine("WasmCodeEditorPresenter()");
             Content = _element = BrowserHtmlElement.CreateHtmlElement("monaco-" + this.GetHashCode(), "div");
 
             LayoutUpdated += (s, e) =>
@@ -45,6 +50,10 @@ namespace Monaco
         /// <inheritdoc />
         public event TypedEventHandler<ICodeEditorPresenter?, WebViewNavigationCompletedEventArgs?>? NavigationCompleted; // ignored for now (only focus the editor)
 
+        /// <inheritdoc />
+        /// <remarks>WASM presenter never fires this event. JSExport direct calls are used instead.</remarks>
+        public event EventHandler<WebViewMessageEventArgs>? MessageReceived;
+
         public CodeEditor? ParentCodeEditor { get; set; }
 
         public bool IsSettingValue
@@ -52,7 +61,10 @@ namespace Monaco
             get => ParentCodeEditor?.IsSettingValue ?? false;
             set
             {
-                ParentCodeEditor?.IsSettingValue = value;
+                if (ParentCodeEditor is not null)
+                {
+                    ParentCodeEditor.IsSettingValue = value;
+                }
             }
         }
 
@@ -65,24 +77,17 @@ namespace Monaco
             get => new(NativeMethods.GetSrc(_element.ElementId));
             set
             {
-                //var path = Environment.GetEnvironmentVariable("UNO_BOOTSTRAP_APP_BASE");
-                //var target = $"/{path}/MonacoCodeEditor.html";
-                //var target = (value.IsAbsoluteUri && value.IsFile)
-                //	? value.PathAndQuery 
-                //	: value.ToString();
-
                 string target;
                 if (value.IsAbsoluteUri)
                 {
                     if (value.Scheme == "file")
                     {
-                        // Local files are assumed as coming from the remoter server
+                        // Local files are assumed as coming from the remote server
                         target = UNO_BOOTSTRAP_APP_BASE == null ? value.PathAndQuery : UNO_BOOTSTRAP_WEBAPP_BASE_PATH + UNO_BOOTSTRAP_APP_BASE + value.PathAndQuery;
                     }
                     else
                     {
                         target = value.AbsoluteUri;
-
                     }
                 }
                 else
@@ -99,10 +104,9 @@ namespace Monaco
 
                 NativeMethods.SetSrc(_element.ElementId, target);
 
-                //NavigationStarting?.Invoke(this, new WebViewNavigationStartingEventArgs());
                 if (!DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => NavigationStarting?.Invoke(this, null)))
                 {
-                    Debug.WriteLine("Failed to enqueue NavigationStarting — dispatcher queue unavailable");
+                    Debug.WriteLine("Failed to enqueue NavigationStarting -- dispatcher queue unavailable");
                 }
             }
         }
@@ -125,6 +129,20 @@ namespace Monaco
             {
                 Debug.WriteLine(e);
             }
+        }
+
+        /// <inheritdoc />
+        public Task<string> InvokeScriptAsync(string script)
+        {
+            var result = Extensions.NativeMethods.InvokeJS(_element.ElementId, script);
+            return Task.FromResult(result);
+        }
+
+        /// <inheritdoc />
+        /// <remarks>Not used on WASM. JSExport direct calls are used instead.</remarks>
+        public void PostWebMessage(string json)
+        {
+            throw new PlatformNotSupportedException("PostWebMessage is not supported on WASM. Use JSExport direct calls instead.");
         }
 
         static partial class NativeMethods

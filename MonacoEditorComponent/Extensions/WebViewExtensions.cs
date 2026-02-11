@@ -39,7 +39,7 @@ namespace Monaco.Extensions
 
         private static async Task<T?> RunScriptHelperAsync<T>(ICodeEditorPresenter _view, string script)
         {
-            var returnstring = NativeMethods.InvokeJS(_view.ElementId, script);
+            var returnstring = await _view.InvokeScriptAsync(script);
 
             // TODO: Need to decode the error correctly
             if (returnstring.Contains("wv_internal_error"))

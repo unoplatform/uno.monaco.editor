@@ -42,6 +42,7 @@
 	<ItemGroup>
 		<PackageReference Include="Newtonsoft.Json" />
 		<PackageReference Include="Nito.AsyncEx" />
+		<PackageReference Include="StreamJsonRpc" />
 		<PackageReference Include="Uno.CommunityToolkit.WinUI" />
 		<PackageReference Include="Uno.WinUI" />
 		<PackageReference Include="Uno.Core.Extensions.Logging" />

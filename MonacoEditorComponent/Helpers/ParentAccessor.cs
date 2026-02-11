@@ -15,7 +15,7 @@ namespace Monaco.Helpers
     /// Not Thread Safe.
     /// </summary>
     [AllowForWeb]
-    public sealed partial class ParentAccessor : IDisposable
+    public sealed partial class ParentAccessor : IParentAccessor
     {
         private readonly WeakReference<ICodeEditorPresenter> parent;
         private readonly Type typeinfo;
@@ -50,12 +50,12 @@ namespace Monaco.Helpers
         /// </summary>
         /// <param name="name">String Key.</param>
         /// <param name="action">Action to perform.</param>
-        internal void RegisterAction(string name, Action action)
+        public void RegisterAction(string name, Action action)
         {
             actions?[name] = action;
         }
 
-        internal void RegisterActionWithParameters(string name, Action<string[]> action)
+        public void RegisterActionWithParameters(string name, Action<string[]> action)
         {
             action_parameters[name] = action;
         }
@@ -65,7 +65,7 @@ namespace Monaco.Helpers
         /// </summary>
         /// <param name="name">String Key.</param>
         /// <param name="function">Event to call.</param>
-        internal void RegisterEvent(string name, Func<string[], Task<string>?> function)
+        public void RegisterEvent(string name, Func<string[], Task<string>?> function)
         {
             events?[name] = function;
         }
@@ -100,7 +100,7 @@ namespace Monaco.Helpers
         /// Adds an Assembly to use for looking up types by name for <see cref="SetValue(string, string, string)"/>.
         /// </summary>
         /// <param name="assembly">Assembly to add.</param>
-        internal void AddAssemblyForTypeLookup(Assembly assembly)
+        public void AddAssemblyForTypeLookup(Assembly assembly)
         {
             Assemblies.Add(assembly);
         }
