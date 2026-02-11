@@ -3,7 +3,7 @@
 	<PropertyGroup>
 		<TargetFrameworks>net10.0</TargetFrameworks>
 		<Title>Monaco Editor Component</Title>
-		<NoWarn>$(NoWarn);Uno0001;CA1416;CS1998;CS0067</NoWarn>
+		<NoWarn>$(NoWarn);Uno0001;CA1416;CS1998;CS0067;SYSLIB1031</NoWarn>
 		<PackageId>Uno.Monaco.Editor</PackageId>
 		<DebugSymbols>true</DebugSymbols>
 		<DebugType>portable</DebugType>
@@ -20,6 +20,7 @@
     <PackageTags>wasm desktop skia monaco editor controls</PackageTags>
 		<GeneratePackageOnBuild Condition="'$(Configuration)'=='Release'">true</GeneratePackageOnBuild>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
     <!-- pick the first TFM from TargetFrameworks -->
     <IncludeContentInPack>false</IncludeContentInPack>
     <_PrimaryTfm>$([System.String]::Copy('$(TargetFrameworks)').Split(';')[0])</_PrimaryTfm>

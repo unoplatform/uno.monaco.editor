@@ -69,3 +69,6 @@ When starting external processes with fallback candidates, verify the process su
 
 ## 2026-02-11 manual [pitfall]
 When polling for external service readiness (HTTP server, CDP endpoint), always check whether the backing process has died between polls -- otherwise timeout gives a generic error instead of a fast diagnostic with process exit code and stderr
+
+## 2026-02-11 manual [pitfall]
+RP epic completion reviewer blocks on platform-evidence gaps that are environment constraints (e.g. no Linux machine) — pre-emptively mark these as Known Gaps in the epic spec acceptance criteria to avoid review loops
