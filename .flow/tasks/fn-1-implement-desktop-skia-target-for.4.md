@@ -69,3 +69,5 @@ Modify JS/TS helpers for dual-mode operation (WASM JSExport + desktop JSON-RPC).
 - [ ] No custom `requestId`/`resolveRequest` pattern — JSON-RPC handles correlation
 - [ ] `editor/lifecycleUpdate` notification handler registered — writes lifecycle counts to `document.body.dataset` (consumed by Task 8 tests)
 - [ ] TypeScript compiles successfully
+
+## Done summary
