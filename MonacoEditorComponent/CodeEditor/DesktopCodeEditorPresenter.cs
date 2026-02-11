@@ -175,16 +175,30 @@ namespace Monaco
         /// The allowed virtual host name for content served via SetVirtualHostNameToFolderMapping.
         /// Task 3 will configure the actual mapping; this constant ensures navigation is restricted.
         /// </summary>
-        private const string AllowedVirtualHost = "uno-monaco.example";
+        internal const string AllowedVirtualHost = "uno-monaco.example";
+
+        private static bool IsNavigationAllowed(string uri)
+        {
+            // Always allow about: (initial blank state) and data: URIs
+            if (uri.StartsWith("about:", StringComparison.OrdinalIgnoreCase)
+                || uri.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            // Parse as URI and enforce strict origin check
+            if (global::System.Uri.TryCreate(uri, UriKind.Absolute, out var parsed))
+            {
+                // Exact host match only -- prevents subdomain/query bypass attacks
+                return string.Equals(parsed.Host, AllowedVirtualHost, StringComparison.OrdinalIgnoreCase);
+            }
+
+            return false;
+        }
 
         private void CoreWebView2_NavigationStarting(Microsoft.Web.WebView2.Core.CoreWebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationStartingEventArgs args)
         {
-            // Block navigation to untrusted origins.
-            // Allow about:blank (initial state), data: URIs, and the virtual host.
-            if (args.Uri is string uri
-                && !uri.StartsWith("about:", StringComparison.OrdinalIgnoreCase)
-                && !uri.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
-                && !uri.Contains(AllowedVirtualHost, StringComparison.OrdinalIgnoreCase))
+            if (args.Uri is string uri && !IsNavigationAllowed(uri))
             {
                 Debug.WriteLine($"DesktopCodeEditorPresenter: Blocked navigation to {uri}");
                 args.Cancel = true;
