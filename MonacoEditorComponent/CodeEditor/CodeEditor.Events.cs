@@ -82,6 +82,14 @@ namespace Monaco
             Console.WriteLine("WebView_DOMContentLoaded()");
 #endif
 
+            // Guard against late callbacks after unload. Presenter handlers stay
+            // attached for the presenter's lifetime, so this can fire after unload.
+            if (!IsLoaded)
+            {
+                Debug.WriteLine("WebView_DOMContentLoaded: control not loaded, ignoring.");
+                return;
+            }
+
             if (!InitialiseWebObjects())
             {
                 // Helper initialization failed -- abort. Error already surfaced via InternalException.
@@ -109,6 +117,13 @@ namespace Monaco
 #if DEBUG
             Debug.WriteLine($"Navigation completed - {args?.IsSuccess}");
 #endif
+
+            // Guard against late callbacks after unload.
+            if (!IsLoaded)
+            {
+                Debug.WriteLine("WebView_NavigationCompleted: control not loaded, ignoring.");
+                return;
+            }
 
             // Gate on navigation success. A failed or blocked navigation should not
             // advance the lifecycle to Loaded.
@@ -157,6 +172,14 @@ namespace Monaco
 #if DEBUG
             Debug.WriteLine($"Navigation Starting {args?.Uri?.ToString()}");
 #endif
+
+            // Guard against late callbacks after unload.
+            if (!IsLoaded)
+            {
+                Debug.WriteLine("WebView_NavigationStarting: control not loaded, ignoring.");
+                return;
+            }
+
             InitialiseWebObjects();
         }
 
@@ -333,16 +356,11 @@ namespace Monaco
 
             await InvokeScriptAsync("updateOptions", Options);
 
-            // 2. Apply content after language is configured
-            if (!string.IsNullOrEmpty(Text))
-            {
-                await InvokeScriptAsync("updateContent", Text);
-            }
-
-            if (!string.IsNullOrEmpty(SelectedText))
-            {
-                await InvokeScriptAsync("updateSelectedContent", SelectedText);
-            }
+            // 2. Apply content after language is configured.
+            // Always send values (including empty string) so Monaco state is
+            // synchronized on reload -- skipping empty would leave stale content.
+            await InvokeScriptAsync("updateContent", Text ?? string.Empty);
+            await InvokeScriptAsync("updateSelectedContent", SelectedText ?? string.Empty);
 
             // 3. Apply decorations and markers last
             if (Decorations != null && Decorations.Count > 0)

@@ -39,3 +39,6 @@ async void event handlers calling methods that re-throw need try/catch -- unhand
 
 ## 2026-02-11 manual [pitfall]
 When init-time code calls helpers gated by an _initialized flag, that flag must be set BEFORE the calls -- otherwise init-time setup silently no-ops
+
+## 2026-02-11 manual [pitfall]
+In templated controls, child element event handlers must only be detached when the child is replaced (OnApplyTemplate), not on Unloaded -- children survive unload/load cycles and handler detach without reattach leaves the control non-functional
