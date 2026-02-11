@@ -129,11 +129,8 @@ Desktop bridge classes register their methods on the shared `JsonRpc` instance. 
 - [ ] No WASM regression
 
 ## Done summary
-
 Implemented desktop C# bridge classes (ParentAccessorDesktop, ThemeListenerDesktop, DebugLoggerDesktop, KeyboardListenerDesktop) as JSON-RPC targets, WebView2JsonRpcMessageHandler with security validation, BridgeContracts with AOT-friendly serialization, and platform guards for Sanitize/Desanitize, KeyboardListener JSExport, LanguageIdFromExtension, Window.Current, and InitialiseWebObjects desktop path.
-
 ## Evidence
-
-```json
-{"commits": ["f5400d6da65ed2fe8af9619b44e9ea7114a0874d"], "tests": ["dotnet build MonacoEditorComponent.slnx --no-restore"], "prs": []}
-```
+- Commits: f5400d6da65ed2fe8af9619b44e9ea7114a0874d, d429fc6, 7a06ce0, c6949b0
+- Tests: dotnet build MonacoEditorComponent.slnx --no-restore
+- PRs:

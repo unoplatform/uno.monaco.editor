@@ -234,7 +234,7 @@ namespace Monaco.Helpers
                         // via JSON-RPC and do not use the sanitize/desanitize encoding.
                         if (OperatingSystem.IsBrowser() && value is string valueAsString)
                         {
-                            value = Desanitize(valueAsString);
+                            value = BridgeEncoding.Desanitize(valueAsString);
                         }
 
                         // Use desanitized value, not the original newValue

@@ -63,17 +63,7 @@ partial class ParentAccessor
         }
     }
 
-    public static string? Santize(string? jsonString)
-    {
-        if (jsonString == null) return null;
-
-        var replacements = @"%&\""'{}:,";
-        for (var i = 0; i < replacements.Length; i++)
-        {
-            jsonString = jsonString.Replace(replacements[i] + "", "%" + (int)replacements[i]);
-        }
-        return jsonString;
-    }
+    public static string? Santize(string? jsonString) => BridgeEncoding.Sanitize(jsonString);
 
     [JSExport]
     internal static string ManagedGetJsonValue([JSMarshalAs<JSType.Any>] object managedOwner, string name)
@@ -122,23 +112,7 @@ partial class ParentAccessor
         }
     }
 
-    private static string? Desanitize(string? parameter)
-    {
-        // System.Diagnostics.Debug.WriteLine($"Encoded String: {parameter}");
-        if (parameter == null) return parameter;
-        var replacements = @"&\""'{}:,%";
-        // System.Diagnostics.Debug.WriteLine($"Replacements: >{replacements}<");
-        for (int i = 0; i < replacements.Length; i++)
-        {
-            //   System.Diagnostics.Debug.WriteLine($"Replacing: >%{(int)replacements[i]}< with >{(char)replacements[i] + "" }< ");
-            parameter = parameter.Replace($"%{(int)replacements[i]}", (char)replacements[i] + "");
-        }
-
-        parameter = parameter.Replace(@"\\""", @"""");
-
-        // System.Diagnostics.Debug.WriteLine($"Decoded String: {parameter}");
-        return parameter;
-    }
+    private static string? Desanitize(string? parameter) => BridgeEncoding.Desanitize(parameter);
 
     [JSExport]
     public static async Task<string?> ManagedCallEvent([JSMarshalAs<JSType.Any>] object managedOwner, string name, string[] parameters)

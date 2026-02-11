@@ -69,6 +69,25 @@ jobs:
       - name: Build solution
         run: dotnet build MonacoEditorComponent.slnx -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_DIR }}" /bl:"${{ env.ARTIFACTS_DIR }}/log/build.binlog"
 
+      - name: Build WASM test app
+        run: dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_DIR }}"
+
+      - name: Install Playwright browsers
+        run: pwsh ${{ env.ARTIFACTS_DIR }}/bin/MonacoEditorComponent.Tests/release/playwright.ps1 install --with-deps chromium
+
+      - name: Run tests
+        run: dotnet test MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_DIR }}" --no-build -- --filter "Category != DesktopCDP" --report-xunit --report-xunit-filename test-results.xml
+
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts
+          path: |
+            ${{ env.ARTIFACTS_DIR }}/TestResults
+            **/test-results.xml
+          if-no-files-found: ignore
+
       - name: Upload packages
         if: always()
         uses: actions/upload-artifact@v4

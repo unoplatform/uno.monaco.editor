@@ -298,7 +298,7 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
     /// Extracts a string value from a <see cref="JsonElement"/>.
     /// Desktop JSON-RPC delivers values as clean JSON -- no sanitization needed.
     /// </summary>
-    private static string ExtractStringValue(JsonElement element)
+    internal static string ExtractStringValue(JsonElement element)
     {
         return element.ValueKind switch
         {
@@ -313,7 +313,7 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
     /// Array: element-wise GetRawText(), String: single-element, Null/Undefined: empty,
     /// other: single-element GetRawText().
     /// </summary>
-    private static string[] ConvertJsonElementToStringArray(JsonElement element)
+    internal static string[] ConvertJsonElementToStringArray(JsonElement element)
     {
         return element.ValueKind switch
         {
