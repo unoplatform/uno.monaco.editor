@@ -24,3 +24,6 @@ file:// URIs on macOS/Linux have empty host -- navigation allowlists must split 
 
 ## 2026-02-11 manual [pitfall]
 Set idempotency guards (_isInitialized) AFTER all setup steps complete, not before — otherwise failure leaves permanently half-initialized state
+
+## 2026-02-11 manual [pitfall]
+WinRT event args types (WebViewNavigationCompletedEventArgs, WebViewNewWindowRequestedEventArgs) cannot be constructed - use portable wrapper types in cross-platform interfaces
