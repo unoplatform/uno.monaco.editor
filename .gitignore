@@ -279,3 +279,6 @@ __pycache__/
 
 !.flow/bin/
 scripts/ralph/run/
+
+# Playwright integration test artifacts (screenshots, traces, process logs)
+test-artifacts/

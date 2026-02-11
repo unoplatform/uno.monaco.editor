@@ -79,7 +79,7 @@ jobs:
           & $pwScript install --with-deps chromium
 
       - name: Run tests
-        run: dotnet test MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_DIR }}" --no-build -- --filter "Category != DesktopCDP" --report-xunit --report-xunit-filename test-results.xml
+        run: dotnet test MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_DIR }}" --no-build -- --filter-not-trait "Category=DesktopCDP" --report-xunit --report-xunit-filename test-results.xml
 
       - name: Upload test artifacts
         if: failure()
