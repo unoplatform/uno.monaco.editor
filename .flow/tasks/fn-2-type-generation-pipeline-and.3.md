@@ -63,9 +63,8 @@ Execution order: task 1 → tasks 2, 4, 7 (parallel) → task 3 → task 5 → t
 - [ ] Build succeeds
 
 ## Done summary
-TBD
-
+Bulk-migrated [JsonProperty] attributes from Newtonsoft.Json to System.Text.Json across 64 Monaco model files, added [JsonInclude] with internal setters for deserialization, dual-stack [JsonIgnore] on Selection.Direction, [JsonIgnore(Condition=Never)] on Model for explicit null, and comprehensive round-trip tests for IRange and IPosition.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 23625ce, 9b6e9b8
+- Tests: dotnet build MonacoEditorComponent.slnx --no-restore, dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj --no-build -- --filter-class MonacoEditorComponent.Tests.Serialization.SerializationContractTests
 - PRs:
