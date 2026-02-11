@@ -87,6 +87,7 @@ namespace Monaco
         private KeyboardListener? _keyboardListener;
         private DebugLogger? _debugLogger;
         private long _themeToken;
+        private bool _hasThemeToken;
 
         private void WebView_NavigationStarting(ICodeEditorPresenter? sender, WebViewNavigationStartingEventArgs? args)
         {
@@ -100,7 +101,8 @@ namespace Monaco
 
         /// <summary>
         /// Tears down web object wiring based on actual field state.
-        /// Cleans up any partially or fully initialized objects, safe to call at any point.
+        /// Every cleanup action is guarded by its own field, so partial
+        /// initialization is always fully rolled back.
         /// </summary>
         private void TeardownWebObjects()
         {
@@ -110,10 +112,21 @@ namespace Monaco
                 _themeListener = null;
             }
 
-            if (_initializedPresenter != null)
+            if (_hasThemeToken)
             {
                 UnregisterPropertyChangedCallback(RequestedThemeProperty, _themeToken);
+                _hasThemeToken = false;
+            }
+
+            if (_initializedPresenter != null)
+            {
                 KeyboardListener.RemoveInstance(_initializedPresenter);
+            }
+            else if (_view != null && _keyboardListener != null)
+            {
+                // Partial init: keyboard was registered against _view but
+                // _initializedPresenter was never assigned
+                KeyboardListener.RemoveInstance(_view);
             }
 
             _parentAccessor?.Dispose();
@@ -150,6 +163,7 @@ namespace Monaco
                 _themeListener = new ThemeListener(_view);
                 _themeListener.ThemeChanged += ThemeListener_ThemeChanged;
                 _themeToken = RegisterPropertyChangedCallback(RequestedThemeProperty, RequestedTheme_PropertyChanged);
+                _hasThemeToken = true;
 
                 _keyboardListener = new KeyboardListener(_view, _queue);
                 _debugLogger = new DebugLogger(_view);
