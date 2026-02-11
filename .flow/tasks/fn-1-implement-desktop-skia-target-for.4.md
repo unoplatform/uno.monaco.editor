@@ -71,3 +71,5 @@ Modify JS/TS helpers for dual-mode operation (WASM JSExport + desktop JSON-RPC).
 - [ ] TypeScript compiles successfully
 
 ## Done summary
+
+## Evidence
