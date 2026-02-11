@@ -237,7 +237,7 @@ namespace MonacoEditorTestApp
             // Ready for Display
         }
 
-        private void Editor_OpenLinkRequest(ICodeEditorPresenter sender, WebViewNewWindowRequestedEventArgs args)
+        private void Editor_OpenLinkRequest(CodeEditor sender, OpenLinkRequestedEventArgs args)
         {
             if (this.AllowWeb.IsChecked == false)
             {

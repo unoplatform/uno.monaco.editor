@@ -29,7 +29,7 @@ namespace Monaco
         /// <summary>
         /// Called when a link is Ctrl+Clicked on in the editor, set Handled to true to prevent opening.
         /// </summary>
-        public event TypedEventHandler<ICodeEditorPresenter, WebViewNewWindowRequestedEventArgs>? OpenLinkRequested;
+        public event TypedEventHandler<CodeEditor, OpenLinkRequestedEventArgs>? OpenLinkRequested;
 
         /// <summary>
         /// Called when an internal exception is encountered while executing a command. (for testing/reporting issues)
@@ -96,18 +96,10 @@ namespace Monaco
             Debug.WriteLine($"Navigation completed - {args?.IsSuccess}");
 #endif
 
-            // On desktop, navigation completion means the host page has loaded but
-            // Monaco may not be ready yet. Task 5 adds a JSON-RPC "editor/ready"
-            // signal that gates the Loaded transition on actual Monaco readiness.
-            // Until then, desktop relies on the WASM path through CodeEditorLoaded()
-            // (called by ParentAccessor) which only fires after Monaco is initialized.
-            // This NavigationCompleted handler is the WASM fallback path.
-            if (!OperatingSystem.IsBrowser())
-            {
-                // Desktop: skip this handler — lifecycle is driven by CodeEditorLoaded()
-                // which fires when Monaco calls the "Loaded" parent accessor action.
-                return;
-            }
+            // Note: On desktop, navigation completion means the host page loaded but
+            // Monaco may not be fully ready. Task 5 will add a JSON-RPC "editor/ready"
+            // signal for a more precise Loaded transition. Until then, both WASM and
+            // desktop use this handler as the lifecycle trigger.
 
             // Make sure inner editor is focused
             await SendScriptAsync("EditorContext.getEditorForElement(element).editor.focus();");
@@ -171,6 +163,16 @@ namespace Monaco
                 // Partial init: keyboard was registered against _view but
                 // _initializedPresenter was never assigned
                 KeyboardListener.RemoveInstance(_view);
+            }
+
+            // Remove static ConditionalWeakTable entries to prevent duplicate-key
+            // issues on re-initialization with the same presenter instance.
+            var presenterToClean = _initializedPresenter ?? _view;
+            if (presenterToClean != null)
+            {
+                ParentAccessor.RemoveInstance(presenterToClean);
+                ThemeListener.RemoveInstance(presenterToClean);
+                DebugLogger.RemoveInstance(presenterToClean);
             }
 
             if (_parentAccessor is IDisposable disposable)
@@ -316,10 +318,17 @@ namespace Monaco
         {
             if (sender is not null)
             {
-                // On desktop, args is null because WebViewNewWindowRequestedEventArgs is a WinRT
-                // type that cannot be constructed. The desktop presenter already blocks the navigation
-                // (args.Handled = true). On WASM, args comes from the framework with Uri/Referrer.
-                OpenLinkRequested?.Invoke(sender, args!);
+                // Map platform-specific args into cross-platform type
+                var linkArgs = new OpenLinkRequestedEventArgs
+                {
+                    Uri = args?.Uri
+                };
+                OpenLinkRequested?.Invoke(this, linkArgs);
+                // Propagate handled state back to WASM args if available
+                if (args is not null)
+                {
+                    args.Handled = linkArgs.Handled;
+                }
             }
         }
 

@@ -238,8 +238,8 @@ namespace Monaco
                 }
 
                 // Canonicalize paths to prevent traversal attacks and normalize separators.
-                // Use OS-appropriate case sensitivity: OrdinalIgnoreCase on Windows/macOS,
-                // Ordinal on Linux (case-sensitive filesystem).
+                // Use case-insensitive comparison only on Windows (NTFS is case-insensitive).
+                // macOS (APFS) and Linux (ext4) default to case-sensitive.
                 var localPath = Path.GetFullPath(parsed.LocalPath);
                 var canonicalRoot = Path.GetFullPath(allowedFileContentRoot);
                 if (!canonicalRoot.EndsWith(Path.DirectorySeparatorChar))
@@ -247,9 +247,9 @@ namespace Monaco
                     canonicalRoot += Path.DirectorySeparatorChar;
                 }
 
-                var comparison = OperatingSystem.IsLinux()
-                    ? StringComparison.Ordinal
-                    : StringComparison.OrdinalIgnoreCase;
+                var comparison = OperatingSystem.IsWindows()
+                    ? StringComparison.OrdinalIgnoreCase
+                    : StringComparison.Ordinal;
 
                 return localPath.StartsWith(canonicalRoot, comparison);
             }

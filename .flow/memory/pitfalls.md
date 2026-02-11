@@ -21,3 +21,6 @@ URL allowlisting must use parsed URI exact host match (not string.Contains) to p
 
 ## 2026-02-11 manual [pitfall]
 file:// URIs on macOS/Linux have empty host -- navigation allowlists must split validation by scheme (https checks host+port, file checks path prefix or allows all local)
+
+## 2026-02-11 manual [pitfall]
+Set idempotency guards (_isInitialized) AFTER all setup steps complete, not before — otherwise failure leaves permanently half-initialized state

@@ -11,9 +11,17 @@ partial class ParentAccessor
 
     partial void PartialCtor(ICodeEditorPresenter parent)
     {
-        _instances.Add(parent, this);
+        _instances.AddOrUpdate(parent, this);
 
         Console.WriteLine($"ParentAccessor ctor {parent.GetType()}/{parent.GetHashCode():X8}");
+    }
+
+    /// <summary>
+    /// Removes the registration for the given presenter, allowing safe re-initialization.
+    /// </summary>
+    internal static void RemoveInstance(ICodeEditorPresenter presenter)
+    {
+        _instances.Remove(presenter);
     }
 
     [JSExport]

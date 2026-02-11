@@ -9,9 +9,17 @@ namespace Monaco.Helpers
 
         public DebugLogger(ICodeEditorPresenter codeEditor)
         {
-            _instances.Add(codeEditor, this);
+            _instances.AddOrUpdate(codeEditor, this);
 
             Log("created");
+        }
+
+        /// <summary>
+        /// Removes the registration for the given presenter, allowing safe re-initialization.
+        /// </summary>
+        internal static void RemoveInstance(ICodeEditorPresenter presenter)
+        {
+            _instances.Remove(presenter);
         }
 
         [JSExport]

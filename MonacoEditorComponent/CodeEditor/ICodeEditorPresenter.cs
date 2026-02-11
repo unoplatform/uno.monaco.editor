@@ -25,6 +25,24 @@ namespace Monaco
         public required string MessageJson { get; init; }
     }
 
+    /// <summary>
+    /// Cross-platform event args for link open requests.
+    /// Wraps platform-specific WebView args into a portable type.
+    /// </summary>
+    public sealed class OpenLinkRequestedEventArgs : EventArgs
+    {
+        /// <summary>
+        /// The URI of the link that was requested to be opened.
+        /// May be null if the platform does not provide the URI.
+        /// </summary>
+        public global::System.Uri? Uri { get; init; }
+
+        /// <summary>
+        /// Set to true to prevent the default navigation behavior.
+        /// </summary>
+        public bool Handled { get; set; }
+    }
+
     public interface ICodeEditorPresenter
 	{
 		// <summary>Occurs when a user performs an action in a WebView that causes content to be opened in a new window.</summary>
