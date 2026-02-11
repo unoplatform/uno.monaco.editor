@@ -61,9 +61,8 @@ The chosen approach is **post-processing**: run TypedocConverter as-is (it still
 - [ ] Pipeline output compiles successfully (standalone verification)
 
 ## Done summary
-TBD
-
+Modernized the type generation pipeline with an STJ post-processor script (postprocess-stj.ps1) that transforms Newtonsoft.Json attributes to System.Text.Json, a .generator-ignore manifest to protect hand-tuned files, isolated output to GenerateMonacoTypings/output/, updated package.json to Monaco 0.54.0, and comprehensive pipeline documentation in README.md. Zero Newtonsoft code references remain repo-wide.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 19c78a7, d5099a1
+- Tests: dotnet build MonacoEditorComponent.slnx --no-restore, pwsh postprocess-stj.ps1 idempotency (run twice, second reports 0 modified), pwsh postprocess-stj.ps1 -Standalone -WhatIf (dry-run against source tree)
 - PRs:
