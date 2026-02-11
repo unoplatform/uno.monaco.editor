@@ -177,7 +177,14 @@ namespace Monaco
         /// </summary>
         internal const string AllowedVirtualHost = "uno-monaco.example";
 
-        private static bool IsNavigationAllowed(string uri)
+        /// <summary>
+        /// The allowed local content root path for file:// navigation on macOS/Linux.
+        /// Set by Task 3 when configuring the folder mapping. If null, file:// navigation
+        /// is blocked entirely (safe default).
+        /// </summary>
+        internal string? AllowedFileContentRoot { get; set; }
+
+        internal static bool IsNavigationAllowed(string uri, string? allowedFileContentRoot)
         {
             // Always allow about:blank (initial WebView2 state)
             if (uri.StartsWith("about:blank", StringComparison.OrdinalIgnoreCase))
@@ -199,12 +206,25 @@ namespace Monaco
             }
 
             // macOS/Linux: Uno converts virtual host URLs to file:// with empty host.
-            // file:// URIs have no host component, so only validate the scheme.
-            // Task 3 will set the actual folder mapping; the path prefix is not
-            // known at this layer yet, so we allow any local file path for now.
+            // Only allow navigation under the configured content root path.
             if (string.Equals(parsed.Scheme, "file", StringComparison.OrdinalIgnoreCase))
             {
-                return true;
+                if (string.IsNullOrEmpty(allowedFileContentRoot))
+                {
+                    // No content root configured -- block all file navigation.
+                    // Task 3 sets this when folder mapping is established.
+                    return false;
+                }
+
+                // Normalize to forward slashes and ensure path stays under content root.
+                var localPath = parsed.LocalPath.Replace('\\', '/');
+                var normalizedRoot = allowedFileContentRoot.Replace('\\', '/');
+                if (!normalizedRoot.EndsWith('/'))
+                {
+                    normalizedRoot += '/';
+                }
+
+                return localPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase);
             }
 
             return false;
@@ -212,7 +232,7 @@ namespace Monaco
 
         private void CoreWebView2_NavigationStarting(Microsoft.Web.WebView2.Core.CoreWebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationStartingEventArgs args)
         {
-            if (args.Uri is string uri && !IsNavigationAllowed(uri))
+            if (args.Uri is string uri && !IsNavigationAllowed(uri, AllowedFileContentRoot))
             {
                 Debug.WriteLine($"DesktopCodeEditorPresenter: Blocked navigation to {uri}");
                 args.Cancel = true;
