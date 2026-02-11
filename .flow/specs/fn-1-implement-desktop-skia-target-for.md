@@ -120,10 +120,10 @@ dotnet run --project MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-d
 - [ ] No `#if __WASM__` or `#if __DESKTOP__` preprocessor directives in `MonacoEditorComponent/` (verified by grep)
 - [ ] Monaco editor renders and is interactive on Windows desktop (Skia)
 - [ ] Monaco editor renders and is interactive on macOS desktop (Skia)
-- [ ] Monaco editor renders and is interactive on Linux desktop (Skia/X11)
-- [ ] Core features pass on all three platforms: text editing, themes, keyboard, decorations, markers
+- [ ] Monaco editor renders and is interactive on Linux desktop (Skia/X11) — **deferred: no Linux env available (see Known Gaps)**
+- [ ] Core features pass on Windows and macOS: text editing, themes, keyboard, decorations, markers (Linux deferred)
 - [ ] All language services work on Windows: CodeLens, Hover, Completion, Color providers
-- [ ] Language services verified on macOS and Linux (failures documented)
+- [ ] Language services verified on macOS (failures documented); Linux deferred
 - [ ] Multiple editor instances work (TabView or equivalent)
 - [ ] WASM functionality not regressed
 - [ ] `RenderingBackend` property exposed
@@ -138,6 +138,7 @@ dotnet run --project MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-d
 
 ### Known Gaps (future epics)
 
+- **Linux desktop validation**: No Linux runner or dev machine available during this epic. Linux uses WebKitGTK (Uno Skia) — same `net10.0` TFM builds, but WebKitGTK has known differences from Chromium WebView2. The architecture supports Linux (single TFM, runtime detection, no preprocessor directives), but manual validation is deferred until a Linux environment is available. Acceptance criteria referencing "all three platforms" and "Linux" are deferred to the first session with Linux access.
 - **C# typings pipeline**: Generated C# types in `Monaco/` were produced by TypedocConverter (now dead) from `monaco-editor@0.21.3` — 33 major versions behind the v0.54.0 runtime. Types use `Newtonsoft.Json` `[JsonProperty]` attributes. A future epic should: find/build a replacement generator, regenerate from current `.d.ts`, and migrate to `System.Text.Json` `[JsonPropertyName]` / source generators. This epic uses existing types as-is.
 
 ## References
