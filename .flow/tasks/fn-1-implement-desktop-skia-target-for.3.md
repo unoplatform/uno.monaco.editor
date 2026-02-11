@@ -122,6 +122,14 @@ Create `ts-helpermethods/bridge/jsonRpcBridge.ts`:
 - Bridge auto-inits on desktop (environment detection)
 - After Monaco loads: `connection.sendNotification("editor/ready", { protocolVersion: 1 })`
 
+### Desktop content root and navigation allowlist integration
+<!-- Updated by plan-sync: fn-1-implement-desktop-skia-target-for.2 added AllowedVirtualHost, AllowedFileContentRoot, and IsNavigationAllowed -->
+Task 2 implemented a scheme-aware navigation allowlist on `DesktopCodeEditorPresenter`:
+- `internal const string AllowedVirtualHost = "uno-monaco.example"` — the synthetic host for `SetVirtualHostNameToFolderMapping` on Windows.
+- `internal string? AllowedFileContentRoot { get; set; }` — on macOS/Linux, Uno's `SetVirtualHostNameToFolderMapping` falls back to `file://` URLs. When this property is set, only `file://` navigation under the configured path is allowed. If null, all `file://` navigation is blocked (safe default).
+- `internal static bool IsNavigationAllowed(string uri, string? allowedFileContentRoot)` — enforces per-scheme policy (https checks `AllowedVirtualHost` host+port, file checks path prefix under `AllowedFileContentRoot`).
+- **When configuring `SetVirtualHostNameToFolderMapping`**: Use `DesktopCodeEditorPresenter.AllowedVirtualHost` as the host name. After setting the folder mapping, set `AllowedFileContentRoot` to the local folder path used in the mapping (so macOS/Linux `file://` fallback navigation is permitted under that path).
+
 ### Resource packaging (explicit MSBuild targets)
 - `<EmbeddedResource>` for WASM: `WasmScripts/uno-monaco-helpers.js` + `WasmScripts/workers/*.worker.js`
 - `<Content CopyToOutputDirectory="PreserveNewest" />` for desktop: `DesktopContent/editor.html`, all JS bundles
@@ -157,3 +165,5 @@ Create `ts-helpermethods/bridge/jsonRpcBridge.ts`:
 - [ ] WASM EmbeddedResource items not broken (main bundle + workers)
 - [ ] `dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-desktop` verified
 - [ ] `dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm` verified
+- [ ] Desktop content folder mapping uses `DesktopCodeEditorPresenter.AllowedVirtualHost` (`"uno-monaco.example"`) as virtual host name
+- [ ] `DesktopCodeEditorPresenter.AllowedFileContentRoot` set to local content folder path after mapping (enables macOS/Linux file:// navigation)

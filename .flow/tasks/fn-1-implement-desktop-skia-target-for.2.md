@@ -44,9 +44,8 @@ Refactor the presenter architecture from a single partial class to two separate 
 - [ ] Desktop presenter security settings configured
 
 ## Done summary
-
-(pending)
-
+Refactored presenter architecture: renamed CodeEditorPresenter to WasmCodeEditorPresenter with platform guard, added DesktopCodeEditorPresenter shell wrapping WebView2 with security hardening (navigation allowlist, disabled script dialogs/context menus/host objects), expanded ICodeEditorPresenter with InvokeScriptAsync/PostWebMessage/MessageReceived contracts, extracted helper interfaces (IParentAccessor, IThemeListener, IKeyboardListener, IDebugLogger), created BridgeFactory for platform-specific helper creation, added EditorLifecycleState for exactly-once event semantics, replaced CodeEditorPresenter in Generic.xaml with ContentPresenter placeholder, updated OnApplyTemplate to create correct presenter via OperatingSystem.IsBrowser(), refactored WebViewExtensions to use presenter's InvokeScriptAsync, and added StreamJsonRpc NuGet dependency.
 ## Evidence
-
-(pending)
+- Commits: d0f69720414acf7b07c82b0d28527310a138fb9f
+- Tests: dotnet build MonacoEditorComponent.slnx --no-restore
+- PRs:

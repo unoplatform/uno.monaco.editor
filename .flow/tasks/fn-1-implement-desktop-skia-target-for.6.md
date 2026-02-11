@@ -16,6 +16,8 @@ Create an xUnit v3 + MTP2 unit test project, extract testable pure helper logic 
   - **JSON-RPC target dispatch**: Construct `JsonRpc` over in-process pipe (`Nerdbank.FullDuplexStream`), attach a mock bridge target with `[JsonRpcMethod]` attributes, send JSON-RPC messages, verify method dispatch and return values. Tests the wiring without any UI or WebView2.
   - **`vscode-jsonrpc` wire compatibility**: Write a test that constructs sample JSON-RPC 2.0 messages matching the `vscode-jsonrpc` output format (standard JSON-RPC 2.0), feeds them through `WebView2JsonRpcMessageHandler.Reader`, and verifies StreamJsonRpc (with `SystemTextJsonFormatter`) dispatches them correctly. This validates wire compatibility without running Node.js. Also verify that `SystemTextJsonFormatter` serialization is consistent with `vscode-jsonrpc` expectations (camelCase, no extra fields).
   - **URI normalization**: Extract `UriHelper.AbsoluteUriString` logic into testable static method.
+  - **Navigation allowlist**: Test `DesktopCodeEditorPresenter.IsNavigationAllowed(string uri, string? allowedFileContentRoot)` — this is an `internal static` pure function added by Task 2. Test cases: `about:blank` allowed, `https://uno-monaco.example/...` allowed, `https://evil.com/...` blocked, `file://` blocked when `allowedFileContentRoot` is null, `file:///path/to/content/foo.html` allowed when `allowedFileContentRoot` is `/path/to/content`, `file:///other/path` blocked, non-default ports blocked.
+  <!-- Updated by plan-sync: fn-1-implement-desktop-skia-target-for.2 added IsNavigationAllowed as internal static testable seam -->
   - **Language-extension mapping**: If C#-side dictionary implemented in Task 5, test it here.
   - **RenderingBackend**: Verify enum values.
 
@@ -57,6 +59,7 @@ Create an xUnit v3 + MTP2 unit test project, extract testable pure helper logic 
 - [ ] JSON-RPC target dispatch tested via in-process pipe (method routing, return values)
 - [ ] StreamJsonRpc + `SystemTextJsonFormatter` wire compatibility verified (sample JSON-RPC 2.0 messages in `vscode-jsonrpc` format fed through handler → method dispatch verified)
 - [ ] `JsonElement` → `string[]` conversion edge cases tested (array, string, null, object inputs)
+- [ ] `IsNavigationAllowed` edge cases tested (about:blank, allowed virtual host, blocked external https, file:// with/without content root, path traversal)
 - [ ] Tests cover extracted seams with edge cases
 - [ ] Project added to solution file
 - [ ] CI workflow: WASM test app build step added (`-f net10.0-browserwasm -c Release`)

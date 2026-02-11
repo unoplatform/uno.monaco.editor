@@ -18,12 +18,14 @@ Implements `IJsonRpcMessageHandler` from StreamJsonRpc:
 - **Lifecycle**: Created after `CoreWebView2InitializationCompleted`. Disposed when presenter disposes (which disposes `JsonRpc`, which rejects all pending requests).
 
 ### JsonRpc wiring
-- In `DesktopCodeEditorPresenter` (after `EnsureCoreWebView2Async`):
-  1. Create `WebView2JsonRpcMessageHandler`
+<!-- Updated by plan-sync: fn-1-implement-desktop-skia-target-for.2 already wires CoreWebView2 events in Launch() -->
+- In `DesktopCodeEditorPresenter` (after `EnsureCoreWebView2Async` -- note: `Launch()` already calls `EnsureCoreWebView2Async`, sets `_isCoreWebView2Initialized = true`, configures security settings, and wires `CoreWebView2.WebMessageReceived` to fire `MessageReceived` event):
+  1. Create `WebView2JsonRpcMessageHandler` (consuming the existing `MessageReceived` event for Reader, and `PostWebMessage` for Writer)
   2. Create `JsonRpc(handler)` instance
   3. Attach bridge targets (see below) via `JsonRpc.AddLocalRpcTarget()`
   4. Call `JsonRpc.StartListening()`
 - `JsonRpc` instance exposed to bridge classes (not publicly — internal or via constructor injection)
+- The internal `WebView` property exposes the underlying `WebView2` instance. The internal `IsCoreWebView2Initialized` property indicates readiness.
 
 ### Bridge classes as JSON-RPC targets
 Desktop bridge classes register their methods on the shared `JsonRpc` instance. StreamJsonRpc routes incoming JSON-RPC messages to the correct method automatically — **no manual message parsing or routing code needed**.
@@ -80,6 +82,8 @@ Desktop bridge classes register their methods on the shared `JsonRpc` instance. 
 - **LanguageIdFromExtension**: Currently `[JSImport]` — throws on desktop. Provide C#-side mapping dictionary or async JSON-RPC call. Public API change allowed if needed.
 - **Window.Current**: Replace at `CodeEditor.cs:186-189` and `ThemeListener.cs:51-53,66-68`.
 - **InitialiseWebObjects convergence**: Create correct helper variants based on `OperatingSystem.IsBrowser()`. Desktop path wires up `JsonRpc` targets. WASM path unchanged.
+  <!-- Updated by plan-sync: fn-1-implement-desktop-skia-target-for.2 desktop path bypasses BridgeFactory -->
+  **Current state (from Task 2 implementation)**: `InitialiseWebObjects()` in `CodeEditor.Events.cs` already has an `if/else` on `OperatingSystem.IsBrowser()`. The WASM branch calls `BridgeFactory.Create(_view, _queue)` to get all four helpers. The desktop branch currently creates `new ThemeListener(_view)` directly (single-arg constructor, no `DispatcherQueue`) and leaves `_parentAccessor`, `_keyboardListener`, and `_debugLogger` as null. `BridgeFactory.Create()` desktop branch throws `PlatformNotSupportedException`. Task 5 should either: (a) update the inline desktop branch in `InitialiseWebObjects` to create all four desktop bridge helpers (recommended -- keeps symmetry with existing pattern), or (b) update `BridgeFactory.Create()` to return desktop variants and switch `InitialiseWebObjects` to call it. Either way, the existing `new ThemeListener(_view)` must be replaced with `ThemeListenerDesktop`.
 
 ## Acceptance
 
