@@ -10,7 +10,7 @@ using Windows.UI.ViewManagement;
 
 namespace Monaco.Helpers
 {
-    public delegate void ThemeChangedEvent(ThemeListener sender);
+    public delegate void ThemeChangedEvent(IThemeListener sender);
 
     /// <summary>
     /// Class which listens for changes to Application Theme or High Contrast Modes 

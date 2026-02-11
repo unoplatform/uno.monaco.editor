@@ -82,15 +82,12 @@ namespace Monaco
             Console.WriteLine("WebView_DOMContentLoaded()");
 #endif
 
-            if (OperatingSystem.IsBrowser())
-            {
-                InitialiseWebObjects();
+            InitialiseWebObjects();
 
-                await ((ICodeEditorPresenter)sender).Launch();
+            await ((ICodeEditorPresenter)sender).Launch();
 
-                Options.Language = CodeLanguage;
-                Options.ReadOnly = ReadOnly;
-            }
+            Options.Language = CodeLanguage;
+            Options.ReadOnly = ReadOnly;
         }
 
         private async void WebView_NavigationCompleted(ICodeEditorPresenter? sender, WebViewNavigationCompletedEventArgs? args)
@@ -172,8 +169,8 @@ namespace Monaco
             _debugLogger = null;
             _initializedPresenter = null;
 
-            // Reset lifecycle state on teardown
-            _lifecycleState = EditorLifecycleState.Unloaded;
+            // Reset lifecycle state on teardown via transition method
+            TransitionLifecycle(EditorLifecycleState.Unloaded);
         }
 
         private void InitialiseWebObjects()
@@ -338,7 +335,7 @@ namespace Monaco
             }
         }
 
-        private void ThemeListener_ThemeChanged(ThemeListener sender)
+        private void ThemeListener_ThemeChanged(IThemeListener sender)
         {
             if (RequestedTheme == ElementTheme.Default)
             {

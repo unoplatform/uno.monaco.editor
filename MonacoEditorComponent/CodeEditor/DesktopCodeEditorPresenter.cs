@@ -99,6 +99,13 @@ namespace Monaco
                     throw new InvalidOperationException("The ParentCodeEditor property must be set");
                 }
 
+                // Idempotency guard: skip if already initialized
+                if (_isCoreWebView2Initialized)
+                {
+                    Debug.WriteLine("DesktopCodeEditorPresenter.Launch: already initialized, skipping");
+                    return;
+                }
+
                 Debug.WriteLine($"DesktopCodeEditorPresenter.Launch({GetHashCode():X8})");
 
                 await _webView.EnsureCoreWebView2Async();
@@ -154,15 +161,36 @@ namespace Monaco
 
         private void CoreWebView2_WebMessageReceived(Microsoft.Web.WebView2.Core.CoreWebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs args)
         {
-            var json = args.TryGetWebMessageAsString();
-            if (json is not null)
+            // Use WebMessageAsJson to handle both string and object payloads.
+            // TryGetWebMessageAsString() would fail for JSON object messages
+            // which is the primary format for JSON-RPC bridge traffic.
+            var json = args.WebMessageAsJson;
+            if (!string.IsNullOrEmpty(json))
             {
                 MessageReceived?.Invoke(this, new WebViewMessageEventArgs { MessageJson = json });
             }
         }
 
+        /// <summary>
+        /// The allowed virtual host name for content served via SetVirtualHostNameToFolderMapping.
+        /// Task 3 will configure the actual mapping; this constant ensures navigation is restricted.
+        /// </summary>
+        private const string AllowedVirtualHost = "uno-monaco.example";
+
         private void CoreWebView2_NavigationStarting(Microsoft.Web.WebView2.Core.CoreWebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationStartingEventArgs args)
         {
+            // Block navigation to untrusted origins.
+            // Allow about:blank (initial state), data: URIs, and the virtual host.
+            if (args.Uri is string uri
+                && !uri.StartsWith("about:", StringComparison.OrdinalIgnoreCase)
+                && !uri.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
+                && !uri.Contains(AllowedVirtualHost, StringComparison.OrdinalIgnoreCase))
+            {
+                Debug.WriteLine($"DesktopCodeEditorPresenter: Blocked navigation to {uri}");
+                args.Cancel = true;
+                return;
+            }
+
             NavigationStarting?.Invoke(this, null);
         }
 

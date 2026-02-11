@@ -7,7 +7,7 @@ namespace Monaco.Helpers
     /// WASM uses the concrete ThemeListener with JSExport.
     /// Desktop will use a JsonRpc-based variant (Task 5).
     /// </summary>
-    internal interface IThemeListener
+    public interface IThemeListener
     {
         /// <summary>
         /// Gets the current theme name as a string.
