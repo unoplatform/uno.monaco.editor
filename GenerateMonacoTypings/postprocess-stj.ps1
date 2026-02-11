@@ -34,6 +34,10 @@ $scriptDir = Get-ScriptDirectory
 # Determine input directory
 if ($Standalone) {
     $targetDir = Join-Path $scriptDir '..' 'MonacoEditorComponent' 'Monaco'
+    if (-not (Test-Path $targetDir)) {
+        Write-Error "Standalone target directory not found: $targetDir"
+        exit 1
+    }
     $targetDir = (Resolve-Path $targetDir).Path
     Write-Host "Standalone mode: processing files in $targetDir"
 } elseif ($InputDir) {
@@ -132,36 +136,45 @@ foreach ($file in $csFiles) {
             $content = $content -replace '\[JsonConverter\(typeof\(StringEnumConverter\)\)\]', "[JsonConverter(typeof(JsonStringEnumConverter<$enumName>))]"
 
             # Add [JsonStringEnumMemberName] attributes to members that have [EnumMember(Value = "...")]
-            # Pattern: [EnumMember(Value = "value")] -> [JsonStringEnumMemberName("value")] [EnumMember(Value = "value")]
-            # Use a lookahead-style replacement to insert the STJ attribute before the EnumMember line.
+            # Idempotent: only insert if the preceding line is not already a JsonStringEnumMemberName attribute.
             $lines = $content -split "`n"
             $newLines = [System.Collections.Generic.List[string]]::new()
-            foreach ($line in $lines) {
+            for ($i = 0; $i -lt $lines.Count; $i++) {
+                $line = $lines[$i]
                 if ($line -match '^\s+\[EnumMember\(Value\s*=\s*"([^"]+)"\)\]') {
                     $enumValue = $Matches[1]
                     $indent = $line -replace '(\s+)\[EnumMember.*', '$1'
-                    $newLines.Add("${indent}[JsonStringEnumMemberName(`"$enumValue`")]")
+                    # Idempotency: check if previous line already has the attribute
+                    $prevLine = if ($newLines.Count -gt 0) { $newLines[$newLines.Count - 1] } else { '' }
+                    if ($prevLine -notmatch "JsonStringEnumMemberName\(`"$([regex]::Escape($enumValue))`"\)") {
+                        $newLines.Add("${indent}[JsonStringEnumMemberName(`"$enumValue`")]")
+                    }
                 }
                 $newLines.Add($line)
             }
             $content = $newLines -join "`n"
 
             # If no [EnumMember] attributes exist but it's a string enum, add [JsonStringEnumMemberName]
-            # based on the member names (lowercased, matching Monaco convention)
+            # based on the member names (lowercased, matching Monaco convention).
+            # Only operates on lines inside the enum body to avoid matching non-member tokens.
             if ($content -notmatch 'EnumMember' -and $content -notmatch 'JsonStringEnumMemberName') {
-                # Parse enum members and add attributes
-                $enumBodyMatch = [regex]::Match($content, '(?s)enum\s+\w+\s*\{([^}]+)\}')
+                $enumBodyMatch = [regex]::Match($content, '(?s)(enum\s+\w+\s*\{)([^}]+)(\})')
                 if ($enumBodyMatch.Success) {
-                    $enumBody = $enumBodyMatch.Groups[1].Value
-                    $members = [regex]::Matches($enumBody, '(\s+)(\w+)')
-                    foreach ($member in $members) {
-                        $indent = $member.Groups[1].Value
-                        $memberName = $member.Groups[2].Value
+                    $enumPrefix = $enumBodyMatch.Groups[1].Value
+                    $enumBody = $enumBodyMatch.Groups[2].Value
+                    $enumSuffix = $enumBodyMatch.Groups[3].Value
+
+                    # Match only actual enum member declarations (identifier optionally followed by = value and/or comma)
+                    $enumBody = [regex]::Replace($enumBody, '(?m)^(\s+)(\w+)(\s*(?:=\s*\d+)?\s*,?\s*)$', {
+                        param($m)
+                        $indent = $m.Groups[1].Value
+                        $memberName = $m.Groups[2].Value
+                        $rest = $m.Groups[3].Value
                         $lowerName = $memberName.Substring(0, 1).ToLower() + $memberName.Substring(1)
-                        $oldText = "$indent$memberName"
-                        $newText = "${indent}[JsonStringEnumMemberName(`"$lowerName`")]`n${indent}$memberName"
-                        $content = $content.Replace($oldText, $newText)
-                    }
+                        "${indent}[JsonStringEnumMemberName(`"$lowerName`")]`n${indent}${memberName}${rest}"
+                    })
+
+                    $content = $content.Substring(0, $enumBodyMatch.Index) + $enumPrefix + $enumBody + $enumSuffix + $content.Substring($enumBodyMatch.Index + $enumBodyMatch.Length)
                 }
             }
         }
@@ -195,7 +208,7 @@ foreach ($file in $csFiles) {
 
     if ($modified) {
         if ($PSCmdlet.ShouldProcess($file.FullName, 'Transform Newtonsoft -> STJ attributes')) {
-            Set-Content -Path $file.FullName -Value $content -NoNewline
+            Set-Content -Path $file.FullName -Value $content
             Write-Host "  Modified: $($file.FullName)"
             $filesModified++
         }

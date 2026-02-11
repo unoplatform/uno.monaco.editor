@@ -286,3 +286,6 @@ test-artifacts/
 # Type generation pipeline output (generated, not checked in)
 GenerateMonacoTypings/output/
 GenerateMonacoTypings/.temp/
+
+# Claude Code local settings
+.claude/

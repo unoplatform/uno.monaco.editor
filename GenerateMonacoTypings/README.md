@@ -41,10 +41,19 @@ Key protected files include:
 
 ### Full Pipeline (TypedocConverter + Post-Processor)
 
+The `generate` script runs TypedocConverter and then automatically chains the
+STJ post-processor on the output:
+
 ```bash
 cd GenerateMonacoTypings
 npm install
 npm run generate
+```
+
+To run only the post-processor on already-generated output (without re-running
+TypedocConverter):
+
+```bash
 npm run postprocess
 ```
 
@@ -117,7 +126,7 @@ Generated output must match the patterns established in `MonacoJsonContext`:
 
 After generating output:
 
-1. Run `npm run generate && npm run postprocess` (or standalone mode)
+1. Run `npm run generate` (or standalone mode)
 2. Review files in `output/` against `MonacoEditorComponent/Monaco/`
 3. Diff selectively: `diff -r output/Monaco/ ../MonacoEditorComponent/Monaco/`
 4. Copy updated files, skipping hand-tuned files in `.generator-ignore`

@@ -85,7 +85,7 @@ Expand-Archive "TypedocConverter.zip" -DestinationPath .
 # Output goes to isolated output directory (not MonacoEditorComponent/)
 Write-Host "Running TypedocConverter..."
 $converterOutput = "../$outdir"
-Invoke-Expression ".\TypedocConverter.exe --inputfile monaco.json --splitfiles true --outputdir `"$converterOutput`" --promise-type WinRT --nrt-disabled true"
+& .\TypedocConverter.exe --inputfile monaco.json --splitfiles true --outputdir $converterOutput --promise-type WinRT --nrt-disabled true
 
 Pop-Location
 
