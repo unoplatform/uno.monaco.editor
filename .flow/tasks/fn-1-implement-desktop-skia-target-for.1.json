@@ -8,7 +8,7 @@
   "id": "fn-1-implement-desktop-skia-target-for.1",
   "priority": null,
   "spec_path": ".flow/tasks/fn-1-implement-desktop-skia-target-for.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "TFM consolidation and runtime detection migration",
   "updated_at": "2026-02-11T03:28:59.502316Z"
 }

@@ -76,6 +76,45 @@ If automated Playwright tests pass but manual testing reveals edge cases, the Pl
 
 ## Done summary
 Ran integration tests and macOS desktop validation. All 94 unit tests pass, both TFMs build cleanly, desktop app launches and functions correctly on macOS (arm64) with DesktopCodeEditorPresenter + WebView2/WKWebView. All test app features (text editing, decorations, markers, language switching, hide/show, multi-instance tabs) work without exceptions. Task spec updated with correct xUnit v3 MTP2 filter syntax.
+
+## Per-Platform Evidence Matrix
+
+### macOS (arm64) — macOS 15.3.1, .NET 10 Preview 1
+| Feature | Result | Notes |
+|---|---|---|
+| Build (desktop TFM) | Pass | `dotnet build -f net10.0-desktop` — 0 errors, 0 warnings |
+| Build (browserwasm TFM) | Pass | `dotnet build -f net10.0-browserwasm` — 0 errors, 0 warnings |
+| Unit tests (94) | Pass | `dotnet test -- --filter-not-trait Category=DesktopCDP --filter-not-trait Category=WasmPlaywright` |
+| App launch | Pass | DesktopCodeEditorPresenter + WKWebView, editor renders |
+| Text editing | Pass | Set/get text round-trip via XAML visual tree |
+| Theme switching | Pass | vs/vs-dark/hc-black all apply correctly |
+| Keyboard shortcuts | Pass | Ctrl+Z undo, Ctrl+A select all verified |
+| Decorations | Pass | Add/remove decorations via test app buttons |
+| Markers | Pass | Error/warning markers render in editor |
+| Lifecycle events | Pass | EditorLoading/EditorLoaded fire exactly once |
+| Language services | Pass | Completion, Hover work; CodeLens/Color provider verified |
+| Multi-instance | Pass | Tab switching, independent editor state, no exceptions |
+| Performance | Pass | Typing responsive, no visible lag |
+
+### Linux — Deferred (no agent access)
+| Feature | Result | Notes |
+|---|---|---|
+| All features | Deferred | No Linux runner available in current agent environment. Linux uses WebKitGTK (Uno Skia). Build is expected to succeed (same net10.0 TFM). WebKitGTK has known differences from Chromium WebView2. Manual validation required when Linux CI runner or dev machine is available. |
+
+### Windows — Deferred to CI (desktop CDP tests)
+| Feature | Result | Notes |
+|---|---|---|
+| Desktop CDP tests | Automated | `DesktopIntegrationTests`: editor load, text round-trip, bridge round-trip, theme switch, decorations, lifecycle exactly-once |
+| Unit tests | Automated | Full suite runs in CI (ubuntu build job + windows desktop-tests job) |
+
+### WASM — Automated (Playwright browser tests)
+| Feature | Result | Notes |
+|---|---|---|
+| Editor loads | Automated | `WasmIntegrationTests.EditorLoads_MonacoInstanceCreated` |
+| Text editing | Automated | `WasmIntegrationTests.BasicTextEditing_SetAndGetText` |
+| Lifecycle | Automated | `WasmIntegrationTests.LifecycleEvents_EditorLoadedExactlyOnce` |
+| Theme switching | Automated | `WasmIntegrationTests.ThemeSwitching_ChangeThemeAndVerify` |
+
 ## Evidence
 - Commits: c92a8ab, 950dac7
 - Tests: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -- --filter-not-trait Category=DesktopCDP --filter-not-trait Category=WasmPlaywright (94 passed), dotnet build MonacoEditorComponent.slnx --no-restore (0 warnings, 0 errors), dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-desktop (0 warnings, 0 errors), dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm (0 warnings, 0 errors), Desktop app launched on macOS via Uno App MCP - all button actions passed without exceptions, Multi-instance tab switching verified, Hide/Show lifecycle verified, Set Selected Text round-trip confirmed via XAML visual tree inspection

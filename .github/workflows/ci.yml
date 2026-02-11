@@ -110,6 +110,51 @@ jobs:
           path: ${{ env.ARTIFACTS_DIR }}/log
           if-no-files-found: warn
 
+  desktop-tests:
+    name: Desktop Tests (Windows)
+    runs-on: windows-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install workloads
+        run: dotnet workload install wasm-tools wasm-tools-net9
+
+      - name: Build solution
+        run: dotnet build MonacoEditorComponent.slnx -c Release
+
+      - name: Build desktop test app
+        run: dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-desktop -c Release
+
+      - name: Install Playwright browsers
+        shell: pwsh
+        run: |
+          $globalPkgs = dotnet nuget locals global-packages --list | ForEach-Object { ($_ -split '\s+',2)[1].Trim() }
+          $pwScript = Get-ChildItem -Path (Join-Path $globalPkgs "microsoft.playwright") -Filter "playwright.ps1" -Recurse | Sort-Object -Property FullName -Descending | Select-Object -First 1
+          if (-not $pwScript) { throw "Playwright install script not found in NuGet cache" }
+          & $pwScript.FullName install --with-deps chromium
+
+      - name: Run desktop CDP tests
+        run: dotnet test MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release --no-build -- --filter-trait "Category=DesktopCDP" --report-xunit --report-xunit-filename desktop-test-results.xml
+
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-test-artifacts
+          path: |
+            **/desktop-test-results.xml
+            **/test-artifacts/**
+          if-no-files-found: ignore
+
   sign:
     name: Sign
     runs-on: windows-latest

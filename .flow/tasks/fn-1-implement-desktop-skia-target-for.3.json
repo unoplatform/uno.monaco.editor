@@ -10,7 +10,7 @@
   "id": "fn-1-implement-desktop-skia-target-for.3",
   "priority": null,
   "spec_path": ".flow/tasks/fn-1-implement-desktop-skia-target-for.3.md",
-  "status": "todo",
+  "status": "done",
   "title": "HTML host page, bridge protocol, and resource pipeline",
   "updated_at": "2026-02-11T07:54:04.607108Z"
 }

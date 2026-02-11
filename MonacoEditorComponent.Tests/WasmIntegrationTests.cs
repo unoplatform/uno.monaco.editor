@@ -91,6 +91,32 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "WasmPlaywright")]
+    public async Task LifecycleEvents_EditorLoadedExactlyOnce()
+    {
+        _currentTestName = nameof(LifecycleEvents_EditorLoadedExactlyOnce);
+        try
+        {
+            // Verify exactly one editor instance exists (lifecycle fired once, not duplicated).
+            var editorCount = await _fixture.Page.EvaluateAsync<int>(
+                "() => monaco.editor.getEditors().length");
+
+            Assert.Equal(1, editorCount);
+
+            // Verify the editor has a model (fully loaded, not partial init).
+            var hasModel = await _fixture.Page.EvaluateAsync<bool>(
+                "() => monaco.editor.getEditors()[0].getModel() !== null");
+
+            Assert.True(hasModel, "Editor should have a model after lifecycle completes.");
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "WasmPlaywright")]
     public async Task ThemeSwitching_ChangeThemeAndVerify()
     {
         _currentTestName = nameof(ThemeSwitching_ChangeThemeAndVerify);

@@ -11,7 +11,7 @@
   "id": "fn-1-implement-desktop-skia-target-for.4",
   "priority": null,
   "spec_path": ".flow/tasks/fn-1-implement-desktop-skia-target-for.4.md",
-  "status": "todo",
+  "status": "done",
   "title": "JS bridge dual-mode communication layer",
   "updated_at": "2026-02-11T07:54:07.799303Z"
 }

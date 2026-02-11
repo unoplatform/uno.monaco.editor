@@ -11,7 +11,7 @@
   "id": "fn-1-implement-desktop-skia-target-for.5",
   "priority": null,
   "spec_path": ".flow/tasks/fn-1-implement-desktop-skia-target-for.5.md",
-  "status": "todo",
+  "status": "done",
   "title": "Desktop C# bridge classes and CodeEditor platform guards",
   "updated_at": "2026-02-11T05:22:39.176806Z"
 }

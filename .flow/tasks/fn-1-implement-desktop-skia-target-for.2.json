@@ -7,7 +7,7 @@
   "id": "fn-1-implement-desktop-skia-target-for.2",
   "priority": null,
   "spec_path": ".flow/tasks/fn-1-implement-desktop-skia-target-for.2.md",
-  "status": "todo",
+  "status": "done",
   "title": "Presenter architecture and Generic.xaml refactor",
   "updated_at": "2026-02-11T11:30:10.600434Z"
 }
