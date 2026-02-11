@@ -966,6 +966,39 @@ public class SerializationContractTests
     }
 
     /// <summary>
+    /// Verifies that IMarkerData[] (interface array) serializes and deserializes correctly,
+    /// matching the SetModelMarkersAsync call site which takes IMarkerData[].
+    /// </summary>
+    [Fact]
+    public void RoundTrip_IMarkerData_InterfaceArray()
+    {
+        IMarkerData[] markers = new IMarkerData[]
+        {
+            new MarkerData
+            {
+                Severity = MarkerSeverity.Error,
+                Message = "Syntax error",
+                StartLineNumber = 1,
+                StartColumn = 1,
+                EndLineNumber = 1,
+                EndColumn = 10,
+            },
+        };
+
+        var json = JsonSerializer.Serialize(markers, MonacoJsonContext.Default.IMarkerDataArray);
+        Assert.Contains("\"severity\":", json);
+        Assert.Contains("\"message\":\"Syntax error\"", json);
+
+        // Deserialize back as IMarkerData[]
+        var restored = JsonSerializer.Deserialize(json, MonacoJsonContext.Default.IMarkerDataArray);
+        Assert.NotNull(restored);
+        Assert.Single(restored);
+        Assert.IsType<MarkerData>(restored[0]);
+        Assert.Equal(MarkerSeverity.Error, restored[0].Severity);
+        Assert.Equal("Syntax error", restored[0].Message);
+    }
+
+    /// <summary>
     /// Verifies that List&lt;T&gt; returned from providers is correctly materialized to T[]
     /// before serialization, matching the LanguagesHelper pattern (items.ToArray()).
     /// This guards against AOT failures when providers return List&lt;T&gt; instead of T[].

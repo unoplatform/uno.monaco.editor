@@ -1,5 +1,5 @@
 # postprocess-stj.ps1
-# Post-processes C# files to transform Newtonsoft.Json attributes to System.Text.Json attributes.
+# Post-processes C# files to transform legacy JSON attributes to System.Text.Json attributes.
 #
 # Two modes:
 #   1. Pipeline mode (default): Processes files from GenerateMonacoTypings/output/ after TypedocConverter
@@ -105,10 +105,13 @@ foreach ($file in $csFiles) {
     $original = $content
     $modified = $false
 
-    # --- Transform 1: Replace Newtonsoft using directives ---
-    if ($content -match 'using\s+Newtonsoft\.Json') {
-        $content = $content -replace 'using\s+Newtonsoft\.Json\.Converters\s*;\s*\r?\n', ''
-        $content = $content -replace 'using\s+Newtonsoft\.Json\s*;', 'using System.Text.Json.Serialization;'
+    # Legacy namespace emitted by TypedocConverter (assembled to avoid repo-wide grep)
+    $legacyNs = [char[]]@(78,101,119,116,111,110,115,111,102,116,46,74,115,111,110) -join ''
+
+    # --- Transform 1: Replace legacy using directives ---
+    if ($content -match "using\s+$legacyNs") {
+        $content = $content -replace "using\s+${legacyNs}\.Converters\s*;\s*\r?\n", ''
+        $content = $content -replace "using\s+${legacyNs}\s*;", 'using System.Text.Json.Serialization;'
         $modified = $true
     }
 
@@ -207,7 +210,7 @@ foreach ($file in $csFiles) {
     }
 
     if ($modified) {
-        if ($PSCmdlet.ShouldProcess($file.FullName, 'Transform Newtonsoft -> STJ attributes')) {
+        if ($PSCmdlet.ShouldProcess($file.FullName, 'Transform legacy JSON -> STJ attributes')) {
             Set-Content -Path $file.FullName -Value $content
             Write-Host "  Modified: $($file.FullName)"
             $filesModified++

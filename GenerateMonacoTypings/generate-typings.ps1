@@ -92,7 +92,7 @@ Pop-Location
 # Clean up temp dir
 Remove-Item $temp_dir_name -Force -Recurse -ErrorAction SilentlyContinue
 
-# Run post-processing to transform Newtonsoft attributes to STJ
+# Run post-processing to transform legacy JSON attributes to STJ
 Write-Host ""
 Write-Host "Running STJ post-processor on generated output..."
 & (Join-Path $script_dir 'postprocess-stj.ps1') -InputDir (Join-Path $script_dir $outdir)

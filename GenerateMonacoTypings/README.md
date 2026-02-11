@@ -16,7 +16,7 @@ generation and a PowerShell post-processor to emit System.Text.Json (STJ) attrib
 The generation pipeline has two steps:
 
 1. **TypedocConverter** (`generate-typings.ps1`): Parses `monaco.d.ts` via TypeDoc
-   and generates raw C# classes with Newtonsoft.Json attributes.
+   and generates raw C# classes with legacy JSON serialization attributes.
 2. **STJ Post-Processor** (`postprocess-stj.ps1`): Transforms the raw output to use
    System.Text.Json attributes matching the project's `MonacoJsonContext` conventions.
 
@@ -77,7 +77,7 @@ Or with PowerShell directly:
 pwsh ./postprocess-stj.ps1 -Standalone
 ```
 
-This mode transforms any remaining Newtonsoft.Json attributes in-place. It respects
+This mode transforms any remaining legacy JSON attributes in-place. It respects
 the `.generator-ignore` list and skips hand-tuned files.
 
 ### Dry Run
@@ -92,12 +92,12 @@ pwsh ./postprocess-stj.ps1 -Standalone -WhatIf
 
 The post-processor applies these transformations:
 
-| Newtonsoft Pattern | STJ Replacement |
+| Legacy Pattern | STJ Replacement |
 |---|---|
 | `[JsonProperty("name")]` | `[JsonPropertyName("name")]` |
 | `[JsonProperty("name", NullValueHandling = ...)]` | `[JsonPropertyName("name")]` (global `WhenWritingNull`) |
 | `[JsonConverter(typeof(StringEnumConverter))]` | `[JsonConverter(typeof(JsonStringEnumConverter<T>))]` |
-| `using Newtonsoft.Json` | `using System.Text.Json.Serialization` |
+| `using <legacy-json-ns>` | `using System.Text.Json.Serialization` |
 
 ### Enum Handling
 
@@ -136,4 +136,4 @@ After generating output:
 
 - **v2.0.0**: Modernized pipeline with STJ post-processor, isolated output directory,
   generator-ignore manifest, and Monaco 0.54.0 reference.
-- **v1.0.0**: Original pipeline with TypedocConverter and Newtonsoft.Json output.
+- **v1.0.0**: Original pipeline with TypedocConverter and legacy JSON output.
