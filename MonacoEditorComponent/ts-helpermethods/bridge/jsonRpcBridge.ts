@@ -150,6 +150,39 @@ export function getConnection(): MessageConnection {
 }
 
 /**
+ * Reference count for editors using the page-global JSON-RPC connection.
+ * The connection is only disposed when the last editor releases it.
+ */
+let _connectionRefCount = 0;
+
+/**
+ * Increment the connection reference count. Called when an editor is created on desktop.
+ */
+export function retainConnection(): void {
+    _connectionRefCount++;
+}
+
+/**
+ * Decrement the connection reference count. When it reaches zero, the page-global
+ * JSON-RPC connection is disposed (rejects pending requests, removes listeners).
+ * Returns true if the connection was actually disposed.
+ */
+export function releaseConnection(): boolean {
+    if (_connectionRefCount > 0) {
+        _connectionRefCount--;
+    }
+    if (_connectionRefCount === 0) {
+        const conn = (window as any).__jsonRpc;
+        if (conn) {
+            conn.dispose();
+            (window as any).__jsonRpc = undefined;
+        }
+        return true;
+    }
+    return false;
+}
+
+/**
  * Default timeout (ms) for init-time JSON-RPC requests.
  * Prevents indefinite hangs if the C# host is slow or handlers are not yet registered.
  */

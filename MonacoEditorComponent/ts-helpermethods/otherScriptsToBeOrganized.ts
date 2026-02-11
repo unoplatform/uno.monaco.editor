@@ -22,6 +22,14 @@ export class EditorContext {
         return context;
     }
 
+    /**
+     * Non-creating lookup. Returns undefined if no context exists for the element.
+     * Use for safe cleanup paths where creating a new context would be incorrect.
+     */
+    public static tryGetEditorForElement(element: any): EditorContext | undefined {
+        return EditorContext._editors.get(element);
+    }
+
     public static getElementFromModel(model: monaco.editor.ITextModel): any {
         for (let [key, value] of EditorContext._editors) {
             if (value.model === model) {

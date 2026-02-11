@@ -1,6 +1,6 @@
 import * as monaco from 'monaco-editor';
 import { ParentAccessor } from './Monaco.Helpers.ParentAccessor';
-import { isDesktopHost, getConnection, sendRequestWithTimeout } from './bridge/jsonRpcBridge';
+import { isDesktopHost, getConnection, sendRequestWithTimeout, retainConnection } from './bridge/jsonRpcBridge';
 import { Disposable } from 'vscode-jsonrpc/browser';
 import { EditorContext, getParentJsonValueAsync, changeTheme, getThemeCurrentThemeNameAsync, getThemeIsHighContrastAsync } from './otherScriptsToBeOrganized';
 
@@ -177,16 +177,17 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any) =>
     const isHighContrast = await getThemeIsHighContrastAsync(element);
     changeTheme(element, theme, isHighContrast as any);
 
-    // Update Monaco Size when we receive a window resize event
-    window.addEventListener("resize", () => {
-        editor.layout();
-    });
+    // Track resize handler for deterministic cleanup
+    const resizeHandler = () => { editor.layout(); };
+    window.addEventListener("resize", resizeHandler);
+    (editorContext as any)._resizeHandler = resizeHandler;
 
     // Disable WebView Scrollbar so Monaco Scrollbar can do heavy lifting
     document.body.style.overflow = 'hidden';
 
     // Register C#->JS JSON-RPC handlers on desktop; track disposables for cleanup
     if (_isDesktop) {
+        retainConnection();
         const handlerDisposables = registerDesktopHandlers(editorContext);
         // Store disposables on context for deterministic teardown
         (editorContext as any)._rpcHandlerDisposables = handlerDisposables;
@@ -197,12 +198,19 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any) =>
 };
 
 /**
- * Dispose an editor context: unregisters RPC handlers, removes context map entry,
- * and optionally disposes the JSON-RPC connection.
+ * Dispose an editor context: unregisters RPC handlers, removes resize listener,
+ * disposes Monaco editor, removes context map entry, and releases the connection reference.
  */
 export const disposeEditor = (element: any) => {
-    const editorContext = EditorContext.getEditorForElement(element);
+    const editorContext = EditorContext.tryGetEditorForElement(element);
     if (!editorContext) return;
+
+    // Remove the resize handler
+    const resizeHandler = (editorContext as any)._resizeHandler as (() => void) | undefined;
+    if (resizeHandler) {
+        window.removeEventListener("resize", resizeHandler);
+        (editorContext as any)._resizeHandler = undefined;
+    }
 
     // Dispose tracked RPC handler registrations
     const disposables = (editorContext as any)._rpcHandlerDisposables as Disposable[] | undefined;
@@ -213,11 +221,16 @@ export const disposeEditor = (element: any) => {
         (editorContext as any)._rpcHandlerDisposables = undefined;
     }
 
+    // Dispose the Monaco editor instance (releases DOM, workers, etc.)
+    if (editorContext.editor) {
+        editorContext.editor.dispose();
+    }
+
     // Remove from context map
     EditorContext.removeEditorForElement(element);
 
-    // Dispose the JSON-RPC connection on desktop (rejects pending, removes listeners)
-    if (_isDesktop) {
+    // Release the connection reference on desktop (disposes only when last editor releases)
+    if (_isDesktop && editorContext.Accessor) {
         editorContext.Accessor.close();
     }
 };

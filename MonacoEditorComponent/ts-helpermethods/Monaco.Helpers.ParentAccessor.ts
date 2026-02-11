@@ -1,4 +1,4 @@
-import { isDesktopHost, getConnection, sendRequestWithTimeout } from './bridge/jsonRpcBridge';
+import { isDesktopHost, getConnection, sendRequestWithTimeout, releaseConnection } from './bridge/jsonRpcBridge';
 
 /**
  * Module-level flag: true when running in a WebView2/WKWebView host (desktop),
@@ -88,14 +88,14 @@ export class ParentAccessor {
         return ParentAccessor._managedCallActionWithParameters(this._managedOwner, name, parameters);
     }
 
+    /**
+     * Release this accessor's reference to the page-global JSON-RPC connection.
+     * On desktop, decrements the connection reference count. The connection is only
+     * disposed when the last editor releases it.
+     */
     public close(): void {
         if (_isDesktop) {
-            // Dispose the JSON-RPC connection -- rejects pending requests and removes listeners
-            const conn = (window as any).__jsonRpc;
-            if (conn) {
-                conn.dispose();
-                (window as any).__jsonRpc = undefined;
-            }
+            releaseConnection();
             return;
         }
         ParentAccessor._managedClose(this._managedOwner);
@@ -117,9 +117,9 @@ export class ParentAccessor {
         ParentAccessor._managedSetValueWithType(this._managedOwner, name, value, type);
     }
 
-    public async callEvent(name: string, parameter1: string, parameter2: string): Promise<string> {
+    public async callEvent(name: string, parameter1: string, parameter2: string): Promise<string | null> {
         if (_isDesktop) {
-            return await sendRequestWithTimeout<string>(
+            return await sendRequestWithTimeout<string | null>(
                 getConnection(), 'parentAccessor/callEvent', {
                     name,
                     parameters: [parameter1, parameter2]
