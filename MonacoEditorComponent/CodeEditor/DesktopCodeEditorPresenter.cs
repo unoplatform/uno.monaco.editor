@@ -179,18 +179,24 @@ namespace Monaco
 
         private static bool IsNavigationAllowed(string uri)
         {
-            // Always allow about: (initial blank state) and data: URIs
-            if (uri.StartsWith("about:", StringComparison.OrdinalIgnoreCase)
-                || uri.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+            // Always allow about:blank (initial WebView2 state)
+            if (uri.StartsWith("about:blank", StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
 
-            // Parse as URI and enforce strict origin check
+            // Parse as URI and enforce strict origin check: scheme + host + default port
             if (global::System.Uri.TryCreate(uri, UriKind.Absolute, out var parsed))
             {
-                // Exact host match only -- prevents subdomain/query bypass attacks
-                return string.Equals(parsed.Host, AllowedVirtualHost, StringComparison.OrdinalIgnoreCase);
+                // Virtual host mapping uses https scheme on Windows.
+                // On macOS/Linux Uno converts to file:// scheme.
+                // Only allow these two schemes with exact host match and default port.
+                var isAllowedScheme = string.Equals(parsed.Scheme, "https", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(parsed.Scheme, "file", StringComparison.OrdinalIgnoreCase);
+                var isAllowedHost = string.Equals(parsed.Host, AllowedVirtualHost, StringComparison.OrdinalIgnoreCase);
+                var isDefaultPort = parsed.IsDefaultPort;
+
+                return isAllowedScheme && isAllowedHost && isDefaultPort;
             }
 
             return false;
