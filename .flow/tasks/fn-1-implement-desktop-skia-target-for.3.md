@@ -138,6 +138,12 @@ Task 2 implemented a scheme-aware navigation allowlist on `DesktopCodeEditorPres
 - Build-time existence check for all bundled JS files
 - **Removed**: Vendored `monaco-editor/min/vs/**` tree. Monaco is now bundled into `uno-monaco-helpers.js`.
 
+## Done summary
+Migrated Monaco Editor from vendored AMD to npm ESM via esbuild, created JSON-RPC bridge with vscode-jsonrpc, built desktop HTML host page, documented bridge protocol, and updated MSBuild for dual WASM/desktop resource packaging.
+## Evidence
+- Commits: 13c7aeb9fc94ade0505117ef6dd6a9bc613ed36d
+- Tests: npm run build, dotnet build MonacoEditorComponent.slnx --no-restore
+- PRs:
 ## Acceptance
 
 - [ ] `bridge-protocol.md` documents JSON-RPC 2.0 method names, param schemas, transport binding, timeout, cleanup
