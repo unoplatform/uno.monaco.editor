@@ -48,3 +48,6 @@ When keeping event handlers attached across unload/load cycles, add IsLoaded gua
 
 ## 2026-02-11 manual [pitfall]
 When a method computes a transformed value into a local variable but then writes the original parameter, this silently persists untransformed data -- always verify the correct variable is used in the final assignment
+
+## 2026-02-11 manual [pitfall]
+WebView2 on Windows delivers host-to-page messages via chrome.webview 'message' events, NOT window 'message'. Must subscribe to chrome.webview.addEventListener when available.
