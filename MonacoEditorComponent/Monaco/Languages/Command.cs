@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Languages
 {
@@ -7,16 +7,12 @@ namespace Monaco.Languages
     /// </summary>
     public sealed class Command
     {
-        [JsonProperty("arguments", NullValueHandling = NullValueHandling.Ignore)]
         public object[]? Arguments { get; set; }
 
-        [JsonProperty("id")]
         public string? Id { get; set; }
 
-        [JsonProperty("title")]
         public string? Title { get; set; }
 
-        [JsonProperty("tooltip", NullValueHandling = NullValueHandling.Ignore)]
         public string? Tooltip { get; set; }
     }
 }

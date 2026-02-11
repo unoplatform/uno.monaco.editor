@@ -1,5 +1,4 @@
 using Monaco.Helpers;
-using Newtonsoft.Json;
 using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
@@ -14,41 +13,33 @@ namespace Monaco.Editor
         /// <summary>
         /// If set, the decoration will be rendered after the text with this CSS class name.
         /// </summary>
-        [JsonProperty("afterContentClassName")]
         public string? AfterContentClassName { get; set; }
 
         /// <summary>
         /// If set, the decoration will be rendered before the text with this CSS class name.
         /// </summary>
-        [JsonProperty("beforeContentClassName")]
         public string? BeforeContentClassName { get; set; }
 
         /// <summary>
         /// CSS class name describing the decoration.
         /// </summary>
-        [JsonProperty("className")]
-        [System.Text.Json.Serialization.JsonConverter(typeof(CssLineStyleConverter))]
-        [Newtonsoft.Json.JsonConverter(typeof(NewtonsoftCssStyleConverter))]
+        [JsonConverter(typeof(CssLineStyleConverter))]
         public CssLineStyle? ClassName { get; set; }
 
         /// <summary>
         /// If set, the decoration will be rendered in the glyph margin with this CSS class name.
         /// </summary>
-        [JsonProperty("glyphMarginClassName")]
-        [System.Text.Json.Serialization.JsonConverter(typeof(CssGlyphStyleConverter))]
-        [Newtonsoft.Json.JsonConverter(typeof(NewtonsoftCssStyleConverter))]
+        [JsonConverter(typeof(CssGlyphStyleConverter))]
         public CssGlyphStyle? GlyphMarginClassName { get; set; }
 
         /// <summary>
         /// Message to be rendered when hovering over the glyph margin decoration.
         /// </summary>
-        [JsonProperty("glyphMarginHoverMessage")]
         public IMarkdownString[]? GlyphMarginHoverMessage { get; set; }
 
         /// <summary>
         /// Array of MarkdownString to render as the decoration message.
         /// </summary>
-        [JsonProperty("hoverMessage")]
         public IMarkdownString[]? HoverMessage { get; set; }
 
         /// <summary>
@@ -57,46 +48,38 @@ namespace Monaco.Editor
         /// `className`
         /// to have a background color decoration.
         /// </summary>
-        [JsonProperty("inlineClassName")]
-        [System.Text.Json.Serialization.JsonConverter(typeof(CssInlineStyleConverter))]
-        [Newtonsoft.Json.JsonConverter(typeof(NewtonsoftCssStyleConverter))]
+        [JsonConverter(typeof(CssInlineStyleConverter))]
         public CssInlineStyle? InlineClassName { get; set; }
 
         /// <summary>
         /// If there is an `inlineClassName` which affects letter spacing.
         /// </summary>
-        [JsonProperty("inlineClassNameAffectsLetterSpacing", NullValueHandling = NullValueHandling.Ignore)]
         public bool? InlineClassNameAffectsLetterSpacing { get; set; }
 
         /// <summary>
         /// Should the decoration expand to encompass a whole line.
         /// </summary>
-        [JsonProperty("isWholeLine", NullValueHandling = NullValueHandling.Ignore)]
         public bool? IsWholeLine { get; set; }
 
         /// <summary>
         /// If set, the decoration will be rendered in the lines decorations with this CSS class name.
         /// </summary>
-        [JsonProperty("linesDecorationsClassName")]
         public string? LinesDecorationsClassName { get; set; }
 
         /// <summary>
         /// If set, the decoration will be rendered in the margin (covering its full width) with this
         /// CSS class name.
         /// </summary>
-        [JsonProperty("marginClassName")]
         public string? MarginClassName { get; set; }
 
         /// <summary>
         /// If set, render this decoration in the minimap.
         /// </summary>
-        [JsonProperty("minimap")]
         public IModelDecorationMinimapOptions? Minimap { get; set; }
 
         /// <summary>
         /// If set, render this decoration in the overview ruler.
         /// </summary>
-        [JsonProperty("overviewRuler")]
         public IModelDecorationOverviewRulerOptions? OverviewRuler { get; set; }
 
         /// <summary>
@@ -104,7 +87,6 @@ namespace Monaco.Editor
         /// decoration.
         /// Defaults to TrackedRangeStickiness.AlwaysGrowsWhenTypingAtEdges
         /// </summary>
-        [JsonProperty("stickiness", NullValueHandling = NullValueHandling.Ignore)]
         public TrackedRangeStickiness? Stickiness { get; set; }
 
         /// <summary>
@@ -112,7 +94,6 @@ namespace Monaco.Editor
         /// A decoration with greater stack order is always in front of a decoration with a lower
         /// stack order.
         /// </summary>
-        [JsonProperty("zIndex", NullValueHandling = NullValueHandling.Ignore)]
         public int? ZIndex { get; set; }
     }
 }

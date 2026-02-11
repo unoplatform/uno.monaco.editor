@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -13,7 +13,6 @@ namespace Monaco.Editor
         /// You can create custom themes via `monaco.editor.defineTheme`.
         /// To switch a theme, use `monaco.editor.setTheme`
         /// </summary>
-        [JsonProperty("theme", NullValueHandling = NullValueHandling.Ignore)]
         string Theme { get; set; }
     }
 }

@@ -42,9 +42,8 @@ Rewrite the three non-enum custom Newtonsoft converters for STJ AND migrate `[Js
 - [ ] Build succeeds
 
 ## Done summary
-TBD
-
+Rewrote InterfaceToClassConverter, CssStyleConverter, and ColorConverter as STJ JsonConverter<T> implementations with Newtonsoft dual-stack compatibility converters. Migrated [JsonProperty] to [JsonPropertyName] in ColorInformation.cs, added dual-stack [JsonConverter] attributes on all usage sites, and added 10 contract tests covering round-trip, golden parity, and write-only behavior.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: efa1bcde7d9e22ab1bbc0f2e4cef36e64fe64786, e1830415629ddc709d3469976023d33a8c5fb41e
+- Tests: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj (151 passed, 34 pre-existing Playwright failures), dotnet build MonacoEditorComponent.slnx --no-restore
 - PRs:

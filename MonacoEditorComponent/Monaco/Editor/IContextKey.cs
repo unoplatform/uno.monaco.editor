@@ -1,6 +1,4 @@
-﻿using Monaco.Helpers;
-
-namespace Monaco.Editor
+﻿namespace Monaco.Editor
 {
     /// <summary>
     /// https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.icontextkey.html

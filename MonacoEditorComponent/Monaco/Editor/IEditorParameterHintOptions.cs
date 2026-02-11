@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -11,14 +11,12 @@ namespace Monaco.Editor
         /// Enable cycling of parameter hints.
         /// Defaults to false.
         /// </summary>
-        [JsonProperty("cycle", NullValueHandling = NullValueHandling.Ignore)]
         public bool? Cycle { get; set; }
 
         /// <summary>
         /// Enable parameter hints.
         /// Defaults to true.
         /// </summary>
-        [JsonProperty("enabled", NullValueHandling = NullValueHandling.Ignore)]
         public bool? Enabled { get; set; }
     }
 

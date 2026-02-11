@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -13,19 +13,16 @@ namespace Monaco.Editor
         /// i.e. forceMoveMarkers = true => if `range` is collapsed, all markers at the position will
         /// be moved.
         /// </summary>
-        [JsonProperty("forceMoveMarkers", NullValueHandling = NullValueHandling.Ignore)]
         public bool? ForceMoveMarkers { get; set; }
 
         /// <summary>
         /// The range to replace. This can be empty to emulate a simple insert.
         /// </summary>
-        [JsonProperty("range")]
         public IRange? Range { get; set; }
 
         /// <summary>
         /// The text to replace with. This can be null to emulate a simple delete.
         /// </summary>
-        [JsonProperty("text")]
         public string? Text { get; set; }
     }
 }

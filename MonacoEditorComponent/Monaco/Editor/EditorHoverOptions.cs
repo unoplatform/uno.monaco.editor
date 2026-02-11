@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -13,21 +13,18 @@ namespace Monaco.Editor
         /// Delay for showing the hover.
         /// Defaults to 300.
         /// </summary>
-        [JsonProperty("delay", NullValueHandling = NullValueHandling.Ignore)]
         public int? Delay { get; set; }
 
         /// <summary>
         /// Enable the hover.
         /// Defaults to true.
         /// </summary>
-        [JsonProperty("enabled", NullValueHandling = NullValueHandling.Ignore)]
         public bool? Enabled { get; set; }
 
         /// <summary>
         /// Is the hover sticky such that it can be clicked and its contents selected?
         /// Defaults to true.
         /// </summary>
-        [JsonProperty("sticky", NullValueHandling = NullValueHandling.Ignore)]
         public bool? Sticky { get; set; }
     }
 

@@ -1,8 +1,8 @@
-﻿using Newtonsoft.Json;
 
 #if !NETSTANDARD2_0
 #else
 using ReadOnlyArrayAttribute = Monaco.Helpers.Stubs.ReadOnlyArrayAttribute;
+using System.Text.Json.Serialization;
 #endif
 
 namespace Monaco.Languages
@@ -16,7 +16,6 @@ namespace Monaco.Languages
         /// <summary>
         /// The contents of this hover.
         /// </summary>
-        [JsonProperty("contents")]
         public IMarkdownString[] Contents { get; set; } = contents.ToMarkdownString(isTrusted);
 
         /// <summary>
@@ -24,7 +23,6 @@ namespace Monaco.Languages
         /// editor will use the range at the current position or the
         /// current position itself.
         /// </summary>
-        [JsonProperty("range", NullValueHandling = NullValueHandling.Ignore)]
         public IRange Range { get; set; } = range;
 
         public Hover(string[] contents, IRange range) : this(contents, range, false) { }

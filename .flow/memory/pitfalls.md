@@ -75,3 +75,9 @@ RP epic completion reviewer blocks on platform-evidence gaps that are environmen
 
 ## 2026-02-11 manual [pitfall]
 STJ source generator SYSLIB1031 diagnostics cannot be suppressed via #pragma in user code -- they are emitted on generated files. Must use project-level NoWarn with documented rationale and a safety test.
+
+## 2026-02-11 manual [pitfall]
+Expression-bodied ReadJson that returns 'new NotSupportedException()' instead of 'throw new' silently returns the exception as data -- always use throw for unsupported operations
+
+## 2026-02-11 manual [pitfall]
+When converting float channel values (0-1) to byte (0-255), always clamp and round before casting to byte -- raw cast of out-of-range values wraps/truncates silently

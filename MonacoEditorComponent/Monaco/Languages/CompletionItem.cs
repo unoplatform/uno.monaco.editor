@@ -1,6 +1,6 @@
-﻿using Monaco.Editor;
+using Monaco.Editor;
+using System.Text.Json.Serialization;
 
-using Newtonsoft.Json;
 
 namespace Monaco.Languages
 {
@@ -15,13 +15,11 @@ namespace Monaco.Languages
         /// selecting this completion. Edits must not overlap with the main edit
         /// nor with themselves.
         /// </summary>
-        [JsonProperty("additionalTextEdits", NullValueHandling = NullValueHandling.Ignore)]
         public ISingleEditOperation[]? AdditionalTextEdits { get; set; }
 
         /// <summary>
         /// A command that should be run upon acceptance of this item.
         /// </summary>
-        [JsonProperty("command", NullValueHandling = NullValueHandling.Ignore)]
         public Command? Command { get; set; }
 
         /// <summary>
@@ -31,20 +29,17 @@ namespace Monaco.Languages
         /// that superfluous
         /// characters will be ignored.
         /// </summary>
-        [JsonProperty("commitCharacters", NullValueHandling = NullValueHandling.Ignore)]
         public string[]? CommitCharacters { get; set; }
 
         /// <summary>
         /// A human-readable string with additional information
         /// about this item, like type or symbol information.
         /// </summary>
-        [JsonProperty("detail", NullValueHandling = NullValueHandling.Ignore)]
         public string? Detail { get; set; }
 
         /// <summary>
         /// A human-readable string that represents a doc-comment.
         /// </summary>
-        [JsonProperty("documentation", NullValueHandling = NullValueHandling.Ignore)]
         public IMarkdownString? Documentation { get; set; }
 
         /// <summary>
@@ -52,7 +47,6 @@ namespace Monaco.Languages
         /// completion items. When `falsy` the [label](#CompletionItem.label)
         /// is used.
         /// </summary>
-        [JsonProperty("filterText", NullValueHandling = NullValueHandling.Ignore)]
         public string? FilterText { get; set; }
 
         /// <summary>
@@ -60,21 +54,18 @@ namespace Monaco.Languages
         /// this completion. When `falsy` the [label](#CompletionItem.label)
         /// is used.
         /// </summary>
-        [JsonProperty("insertText")]
         public string? InsertText { get; set; } = insertText;
 
         /// <summary>
         /// Addition rules (as bitmask) that should be applied when inserting
         /// this completion.
         /// </summary>
-        [JsonProperty("insertTextRules", NullValueHandling = NullValueHandling.Ignore)]
         public CompletionItemInsertTextRule? InsertTextRules { get; set; }
 
         /// <summary>
         /// The kind of this completion item. Based on the kind
         /// an icon is chosen by the editor.
         /// </summary>
-        [JsonProperty("kind")]
         public CompletionItemKind Kind { get; set; } = kind;
 
         /// <summary>
@@ -82,7 +73,6 @@ namespace Monaco.Languages
         /// this is also the text that is inserted when selecting
         /// this completion.
         /// </summary>
-        [JsonProperty("label")]
         public string? Label { get; set; } = label;
 
         /// <summary>
@@ -90,7 +80,6 @@ namespace Monaco.Languages
         /// that the editor decides which item that is. The rule is that the *first* item of those
         /// that match best is selected.
         /// </summary>
-        [JsonProperty("preselect", NullValueHandling = NullValueHandling.Ignore)]
         public bool? Preselect { get; set; }
 
         /// <summary>
@@ -104,7 +93,6 @@ namespace Monaco.Languages
         /// [contain](#Range.contains) the position at which completion has been
         /// [requested](#CompletionItemProvider.provideCompletionItems).
         /// </summary>
-        [JsonProperty("range")]
         public Range? Range { get; set; }
 
         /// <summary>
@@ -112,14 +100,12 @@ namespace Monaco.Languages
         /// with other items. When `falsy` the [label](#CompletionItem.label)
         /// is used.
         /// </summary>
-        [JsonProperty("sortText", NullValueHandling = NullValueHandling.Ignore)]
         public string? SortText { get; set; }
 
         /// <summary>
         /// A modifier to the `kind` which affect how the item
         /// is rendered, e.g. Deprecated is rendered with a strikeout
         /// </summary>
-        [JsonProperty("tags", NullValueHandling = NullValueHandling.Ignore)]
         public MarkerTag[]? Tags { get; set; }
     }
 }

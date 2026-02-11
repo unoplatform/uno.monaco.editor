@@ -1,5 +1,4 @@
-﻿using Monaco.Editor;
-using Newtonsoft.Json;
+using Monaco.Editor;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Windows.Foundation;

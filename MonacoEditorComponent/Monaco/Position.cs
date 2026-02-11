@@ -1,7 +1,7 @@
-﻿using Newtonsoft.Json;
 using System;
 using Windows.Foundation;
 using Windows.Foundation.Metadata;
+using System.Text.Json.Serialization;
 
 namespace Monaco
 {
@@ -13,14 +13,14 @@ namespace Monaco
         /// <summary>
         /// column (the first character in a line is between column 1 and column 2)
         /// </summary>
-        [JsonProperty("column")]
-        public uint Column { get; private set; } = column;
+        [JsonInclude]
+        public uint Column { get; internal set; } = column;
 
         /// <summary>
         /// line number (starts at 1)
         /// </summary>
-        [JsonProperty("lineNumber")]
-        public uint LineNumber { get; private set; } = lineNumber;
+        [JsonInclude]
+        public uint LineNumber { get; internal set; } = lineNumber;
 
         public Position Clone()
         {

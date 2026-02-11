@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -7,10 +7,8 @@ namespace Monaco.Editor
     /// </summary>
     public interface IDimension
     {
-        [JsonProperty("height", NullValueHandling = NullValueHandling.Ignore)]
         uint Height { get; set; }
 
-        [JsonProperty("width", NullValueHandling = NullValueHandling.Ignore)]
         uint Width { get; set; }
     }
 }

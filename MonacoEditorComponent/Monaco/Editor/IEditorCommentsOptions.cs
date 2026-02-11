@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -11,7 +11,6 @@ namespace Monaco.Editor
         /// Insert a space after the line comment token and inside the block comments tokens.
         /// Defaults to true.
         /// </summary>
-        [JsonProperty("insertSpace", NullValueHandling = NullValueHandling.Ignore)]
         public bool? InsertSpace { get; set; }
     }
 }

@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -7,10 +7,8 @@ namespace Monaco.Editor
     /// </summary>
     public interface IMarker : IMarkerData
     {
-        [JsonProperty("owner")]
         string? Owner { get; set; }
 
-        [JsonProperty("resource")]
         Uri? Resource { get; set; }
     }
 }

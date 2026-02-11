@@ -1,5 +1,4 @@
-﻿using Monaco.Helpers;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -8,9 +7,7 @@ namespace Monaco.Editor
     /// </summary>
     public sealed class IEditorFindOptions
     {
-        [JsonProperty("autoFindInSelection")]
         public bool AutoFindInSelection { get; set; }
-        [JsonProperty("seedSearchStringFromSelection")]
         public bool SeedSearchStringFromSelection { get; set; } //= true;
     }
 }

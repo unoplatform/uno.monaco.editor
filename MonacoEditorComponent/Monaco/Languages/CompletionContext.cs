@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Languages
 {
@@ -13,13 +13,11 @@ namespace Monaco.Languages
         ///
         /// `undefined` if provider was not triggered by a character.
         /// </summary>
-        [JsonProperty("triggerCharacter", NullValueHandling = NullValueHandling.Ignore)]
         public string? TriggerCharacter { get; set; }
 
         /// <summary>
         /// How the completion was triggered.
         /// </summary>
-        [JsonProperty("triggerKind")]
         public CompletionTriggerKind TriggerKind { get; set; }
     }
 }

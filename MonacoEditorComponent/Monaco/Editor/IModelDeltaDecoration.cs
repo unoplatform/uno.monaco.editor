@@ -1,5 +1,4 @@
 using Monaco.Helpers;
-using Newtonsoft.Json;
 using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
@@ -9,12 +8,11 @@ namespace Monaco.Editor
     /// </summary>
     public sealed class IModelDeltaDecoration(IRange range, IModelDecorationOptions options)
     {
-        [JsonProperty("options")]
-        public IModelDecorationOptions Options { get; private set; } = options;
+        [JsonInclude]
+        public IModelDecorationOptions Options { get; internal set; } = options;
 
-        [JsonProperty("range")]
-        [System.Text.Json.Serialization.JsonConverter(typeof(InterfaceToClassConverter<IRange, Range>))]
-        [Newtonsoft.Json.JsonConverter(typeof(NewtonsoftInterfaceToClassConverter<IRange, Range>))]
-        public IRange Range { get; private set; } = range;
+        [JsonInclude]
+        [JsonConverter(typeof(InterfaceToClassConverter<IRange, Range>))]
+        public IRange Range { get; internal set; } = range;
     }
 }

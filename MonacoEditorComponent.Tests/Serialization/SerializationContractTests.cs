@@ -27,10 +27,14 @@ namespace MonacoEditorComponent.Tests.Serialization;
 [Trait("Category", "Serialization")]
 public class SerializationContractTests
 {
-    // Newtonsoft settings matching the project's current default configuration
+    // Newtonsoft settings matching the project's current default configuration.
+    // CamelCasePropertyNamesContractResolver is needed because [JsonProperty] attributes
+    // were removed from model types during STJ migration (fn-2.3). The contract resolver
+    // ensures Newtonsoft still produces camelCase output matching the Monaco JS wire format.
     private static readonly JsonSerializerSettings NewtonsoftSettings = new()
     {
         NullValueHandling = NullValueHandling.Ignore,
+        ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver(),
     };
 
     #region Golden Baselines — Newtonsoft reference output
@@ -175,17 +179,52 @@ public class SerializationContractTests
     }
 
     [Fact]
-    public void Deserialize_Primitive_Range_RequiresPublicSetters()
+    public void Deserialize_Primitive_Range_RoundTrip()
     {
-        // Range currently has private setters, so STJ deserialization creates
-        // a default instance via the parameterless constructor but cannot populate
-        // properties. Full round-trip will work after fn-2.3 migrates Range to
-        // use [JsonInclude] or public setters.
+        // Range has internal setters with [JsonInclude], so STJ deserialization
+        // correctly populates properties via the source-generated context.
         var json = """{"startLineNumber":1,"startColumn":2,"endLineNumber":3,"endColumn":4}""";
         var restored = JsonSerializer.Deserialize(json, MonacoJsonContext.Default.Range);
         Assert.NotNull(restored);
-        // Properties remain at default (0) until Range migration in fn-2.3
-        Assert.Equal(0u, restored.StartLineNumber);
+        Assert.Equal(1u, restored.StartLineNumber);
+        Assert.Equal(2u, restored.StartColumn);
+        Assert.Equal(3u, restored.EndLineNumber);
+        Assert.Equal(4u, restored.EndColumn);
+    }
+
+    [Fact]
+    public void RoundTrip_Primitive_Range()
+    {
+        var original = new Range(10, 3, 20, 7);
+        var json = JsonSerializer.Serialize(original, MonacoJsonContext.Default.Range);
+        var restored = JsonSerializer.Deserialize(json, MonacoJsonContext.Default.Range);
+        Assert.NotNull(restored);
+        Assert.Equal(original.StartLineNumber, restored.StartLineNumber);
+        Assert.Equal(original.StartColumn, restored.StartColumn);
+        Assert.Equal(original.EndLineNumber, restored.EndLineNumber);
+        Assert.Equal(original.EndColumn, restored.EndColumn);
+    }
+
+    [Fact]
+    public void RoundTrip_Primitive_Selection()
+    {
+        var original = new Selection(2, 5, 8, 12);
+        var json = JsonSerializer.Serialize(original, MonacoJsonContext.Default.Selection);
+
+        // Direction should be excluded from JSON (JsonIgnore on both STJ and Newtonsoft)
+        var doc = JsonDocument.Parse(json);
+        Assert.False(doc.RootElement.TryGetProperty("direction", out _));
+
+        var restored = JsonSerializer.Deserialize(json, MonacoJsonContext.Default.Selection);
+        Assert.NotNull(restored);
+        Assert.Equal(original.SelectionStartLineNumber, restored.SelectionStartLineNumber);
+        Assert.Equal(original.SelectionStartColumn, restored.SelectionStartColumn);
+        Assert.Equal(original.PositionLineNumber, restored.PositionLineNumber);
+        Assert.Equal(original.PositionColumn, restored.PositionColumn);
+        Assert.Equal(original.StartLineNumber, restored.StartLineNumber);
+        Assert.Equal(original.StartColumn, restored.StartColumn);
+        Assert.Equal(original.EndLineNumber, restored.EndLineNumber);
+        Assert.Equal(original.EndColumn, restored.EndColumn);
     }
 
     [Fact]
@@ -562,6 +601,50 @@ public class SerializationContractTests
         Assert.NotNull(restored);
         Assert.NotNull(restored.Range);
         Assert.IsType<Range>(restored.Range);
+    }
+
+    [Fact]
+    public void InterfaceToClassConverter_RoundTrip_IRange_VerifyValues()
+    {
+        // Verify that interface-typed property (IRange) round-trips with correct
+        // property values through InterfaceToClassConverter + [JsonInclude] on internal setters.
+        var colorInfo = new ColorInformation(
+            Windows.UI.Color.FromArgb(255, 0, 0, 0),
+            new Range(10, 20, 30, 40));
+
+        var json = JsonSerializer.Serialize(colorInfo, MonacoJsonContext.Default.ColorInformation);
+        var restored = JsonSerializer.Deserialize(json, MonacoJsonContext.Default.ColorInformation);
+
+        Assert.NotNull(restored);
+        Assert.NotNull(restored.Range);
+        Assert.IsType<Range>(restored.Range);
+
+        // Verify the deserialized Range has correct property values via [JsonInclude]
+        var range = (Range)restored.Range;
+        Assert.Equal(10u, range.StartLineNumber);
+        Assert.Equal(20u, range.StartColumn);
+        Assert.Equal(30u, range.EndLineNumber);
+        Assert.Equal(40u, range.EndColumn);
+    }
+
+    [Fact]
+    public void InterfaceToClassConverter_RoundTrip_IModelDeltaDecoration_IRange()
+    {
+        // Verify that IModelDeltaDecoration.Range (typed as IRange) round-trips correctly
+        // through [JsonInclude] on internal setter + InterfaceToClassConverter.
+        var decoration = new IModelDeltaDecoration(
+            new Range(5, 10, 15, 20),
+            new IModelDecorationOptions());
+
+        var json = JsonSerializer.Serialize(decoration, MonacoJsonContext.Default.IModelDeltaDecoration);
+        var doc = JsonDocument.Parse(json);
+
+        // Verify range serialized as object (not null)
+        var rangeElement = doc.RootElement.GetProperty("range");
+        Assert.Equal(5u, rangeElement.GetProperty("startLineNumber").GetUInt32());
+        Assert.Equal(10u, rangeElement.GetProperty("startColumn").GetUInt32());
+        Assert.Equal(15u, rangeElement.GetProperty("endLineNumber").GetUInt32());
+        Assert.Equal(20u, rangeElement.GetProperty("endColumn").GetUInt32());
     }
 
     [Fact]

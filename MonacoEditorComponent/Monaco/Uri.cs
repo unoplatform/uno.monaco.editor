@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Monaco
 {
@@ -22,28 +22,23 @@ namespace Monaco
         /// authority is the 'www.msft.com' part of 'http://www.msft.com/some/path?query#fragment'.
         /// The part between the first double slashes and the next slash.
         /// </summary>
-        [JsonProperty("authority", NullValueHandling = NullValueHandling.Ignore)]
         public string? Authority { get; set; }
         /// <summary>
         /// fragment is the 'fragment' part of 'http://www.msft.com/some/path?query#fragment'.
         /// </summary>
-        [JsonProperty("fragment", NullValueHandling = NullValueHandling.Ignore)]
         public string? Fragment { get; set; }
         /// <summary>
         /// path is the '/some/path' part of 'http://www.msft.com/some/path?query#fragment'.
         /// </summary>
-        [JsonProperty("path", NullValueHandling = NullValueHandling.Ignore)]
         public string? Path { get; set; }
         /// <summary>
         /// query is the 'query' part of 'http://www.msft.com/some/path?query#fragment'.
         /// </summary>
-        [JsonProperty("query", NullValueHandling = NullValueHandling.Ignore)]
         public string? Query { get; set; }
         /// <summary>
         /// scheme is the 'http' part of 'http://www.msft.com/some/path?query#fragment'.
         /// The part before the first colon.
         /// </summary>
-        [JsonProperty("scheme", NullValueHandling = NullValueHandling.Ignore)]
         public string? Scheme { get; set; }
     }
 }

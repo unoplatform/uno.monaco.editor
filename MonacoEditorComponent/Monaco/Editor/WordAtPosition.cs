@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -10,19 +10,19 @@ namespace Monaco.Editor
         /// <summary>
         /// Column where the word ends.
         /// </summary>
-        [JsonProperty("endColumn")]
-        public uint EndColumn { get; private set; }
+        [JsonInclude]
+        public uint EndColumn { get; internal set; }
 
         /// <summary>
         /// Column where the word starts.
         /// </summary>
-        [JsonProperty("startColumn")]
-        public uint StartColumn { get; private set; }
+        [JsonInclude]
+        public uint StartColumn { get; internal set; }
 
         /// <summary>
         /// The word.
         /// </summary>
-        [JsonProperty("word")]
-        public string? Word { get; private set; }
+        [JsonInclude]
+        public string? Word { get; internal set; }
     }
 }

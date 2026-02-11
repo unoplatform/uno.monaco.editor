@@ -1,7 +1,7 @@
-﻿using Newtonsoft.Json;
 using System.Collections.Generic;
 using Windows.Foundation;
 using Windows.Foundation.Metadata;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor;
 
@@ -12,9 +12,7 @@ public interface IModel
 {
     // TODO: Events
 
-    [JsonProperty("id", NullValueHandling = NullValueHandling.Ignore)]
     string Id { get; }
-    [JsonProperty("uri", NullValueHandling = NullValueHandling.Ignore)]
     Uri Uri { get; }
 
     //IIdentifiedSingleEditOperation[] ApplyEditsAsync(IIdentifiedSingleEditOperation[] operations)

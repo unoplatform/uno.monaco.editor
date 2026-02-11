@@ -11,7 +11,6 @@ namespace Monaco.Languages
         /// <summary>
         /// Gets or sets the array of code actions.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("actions", NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public CodeAction[]? Actions { get; set; }
 
     }

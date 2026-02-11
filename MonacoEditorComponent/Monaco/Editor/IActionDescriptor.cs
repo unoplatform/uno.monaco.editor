@@ -1,9 +1,9 @@
-﻿using Newtonsoft.Json;
 
 #if !NETSTANDARD2_0
 using System.Runtime.InteropServices.WindowsRuntime;
 #else
 using ReadOnlyArrayAttribute = Monaco.Helpers.Stubs.ReadOnlyArrayAttribute;
+using System.Text.Json.Serialization;
 #endif
 
 namespace Monaco.Editor
@@ -23,34 +23,27 @@ namespace Monaco.Editor
 		 * You can also create your own group.
 		 * Defaults to null (don't show in context menu).
 		 */
-        [JsonProperty("contextMenuGroupId", NullValueHandling = NullValueHandling.Ignore)]
         string? ContextMenuGroupId { get; }
 
-        [JsonProperty("contextMenuOrder", NullValueHandling = NullValueHandling.Ignore)]
         float ContextMenuOrder { get; }
 
-        [JsonProperty("id")]
         string? Id { get; }
 
         /// <summary>
         /// <see cref="IContextKey"/>
         /// </summary>
-        [JsonProperty("keybindingContext", NullValueHandling = NullValueHandling.Ignore)]
         string? KeybindingContext { get; }
 
         /// <summary>
         /// <see cref="KeyMod"/>, <see cref="KeyCode"/>, and <see cref="KeyMod.Chord(int, int)"/>
         /// </summary>
-        [JsonProperty("keybindings")]
         int[] Keybindings { get; }
 
-        [JsonProperty("label")]
         string? Label { get; }
 
         /// <summary>
         /// <see cref="IContextKey"/>
         /// </summary>
-        [JsonProperty("precondition", NullValueHandling = NullValueHandling.Ignore)]
         string? Precondition { get; }
 
         void Run(CodeEditor editor, object[]? args);

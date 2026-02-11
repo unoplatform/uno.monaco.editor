@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Monaco
 {
@@ -10,23 +10,23 @@ namespace Monaco
         /// <summary>
         /// Column on which the range ends in line `endLineNumber`.
         /// </summary>
-        [JsonProperty("endColumn")]
-        public uint EndColumn { get; private set; }
+        [JsonInclude]
+        public uint EndColumn { get; internal set; }
         /// <summary>
         /// Line number on which the range ends.
         /// </summary>
-        [JsonProperty("endLineNumber")]
-        public uint EndLineNumber { get; private set; }
+        [JsonInclude]
+        public uint EndLineNumber { get; internal set; }
         /// <summary>
         /// Column on which the range starts in line `startLineNumber` (starts at 1).
         /// </summary>
-        [JsonProperty("startColumn")]
-        public uint StartColumn { get; private set; }
+        [JsonInclude]
+        public uint StartColumn { get; internal set; }
         /// <summary>
         /// Line number on which the range starts (starts at 1).
         /// </summary>
-        [JsonProperty("startLineNumber")]
-        public uint StartLineNumber { get; private set; }
+        [JsonInclude]
+        public uint StartLineNumber { get; internal set; }
 
         public Range() // For Serialization
         {

@@ -1,6 +1,5 @@
-﻿using Monaco.Editor;
-using Monaco.Helpers;
-using Newtonsoft.Json;
+using Monaco.Editor;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -9,10 +8,8 @@ namespace Monaco.Editor
     /// </summary>
     public sealed class Dimension : IDimension
     {
-        [JsonProperty("height", NullValueHandling = NullValueHandling.Ignore)]
         public uint Height { get; set; }
 
-        [JsonProperty("width", NullValueHandling = NullValueHandling.Ignore)]
         public uint Width { get; set; }
     }
 }

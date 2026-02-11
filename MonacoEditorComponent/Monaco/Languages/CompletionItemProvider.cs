@@ -1,5 +1,4 @@
-﻿using Monaco.Editor;
-using Newtonsoft.Json;
+using Monaco.Editor;
 using System.Threading.Tasks;
 using Windows.Foundation;
 
@@ -17,7 +16,6 @@ namespace Monaco.Languages
     /// </summary>
     public interface CompletionItemProvider
     {
-        [JsonProperty("triggerCharacters", NullValueHandling = NullValueHandling.Ignore)]
         string[] TriggerCharacters { get; }
         /// <summary>
         /// Provide completion items for the given position and document.
