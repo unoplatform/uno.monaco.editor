@@ -12,8 +12,8 @@ using Range = Monaco.Range;
 namespace MonacoEditorComponent.Tests.Serialization;
 
 /// <summary>
-/// Serialization contract tests that verify STJ source-generated output matches
-/// Newtonsoft golden baselines for all major cross-boundary Monaco types.
+/// Serialization contract tests that verify STJ source-generated output produces
+/// the correct wire format for all major cross-boundary Monaco types.
 /// </summary>
 /// <remarks>
 /// These tests verify STJ source-generated output matches expected wire format
