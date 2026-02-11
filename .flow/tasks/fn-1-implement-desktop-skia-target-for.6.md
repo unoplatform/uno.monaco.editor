@@ -70,8 +70,7 @@ Create an xUnit v3 + MTP2 unit test project, extract testable pure helper logic 
 
 ## Done summary
 Created xUnit v3 + MTP2 test project with 94 unit tests covering BridgeEncoding, WebView2JsonRpcMessageHandler, JsonRpc target dispatch, vscode-jsonrpc wire compatibility, IsNavigationAllowed, JsonElement conversion, RenderingBackend, and UriHelper. Updated CI with WASM build, Playwright install, test execution, and artifact upload steps.
-
 ## Evidence
-```json
-{"commits": ["b8355f7", "4bd2281"], "tests": ["dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj (94 passed, 0 failed)"], "prs": []}
-```
+- Commits: b8355f7, 4bd2281
+- Tests: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj (94 passed, 0 failed)
+- PRs:
