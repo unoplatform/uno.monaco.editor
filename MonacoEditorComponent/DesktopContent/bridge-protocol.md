@@ -33,17 +33,27 @@ This presenter-level abstraction decouples the transport from `CoreWebView2` int
 
 ### Message Reception
 
-- **JS receives**: `window.addEventListener('message', handler)` processes incoming JSON-RPC messages
+- **JS receives**: On Windows, `chrome.webview.addEventListener('message', handler)` receives host messages. On macOS/Linux (WKWebView/WebKitGTK), `window.addEventListener('message', handler)` is used instead.
 - **C# receives**: `ICodeEditorPresenter.MessageReceived` event fires with raw JSON from `WebMessageReceived`
 
 ## Initialization Handshake
 
-After Monaco loads, JS sends:
+Initialization occurs in two phases:
+
+### Phase 1: Bridge Ready (bundle load)
+When the IIFE bundle executes, the JSON-RPC transport is established and JS sends:
+```json
+{ "jsonrpc": "2.0", "method": "bridge/ready", "params": { "protocolVersion": 1 } }
+```
+C# validates the protocol version. If mismatched, logs an error and rejects.
+At this point the bridge can receive commands, but no Monaco editor instance exists yet.
+
+### Phase 2: Editor Ready (after createMonacoEditor)
+After `createMonacoEditor()` completes (Task 4 wires this), JS sends:
 ```json
 { "jsonrpc": "2.0", "method": "editor/ready", "params": { "protocolVersion": 1 } }
 ```
-
-C# validates the protocol version. If mismatched, logs an error and rejects.
+C# can now safely invoke editor methods (getValue, updateOptions, etc.).
 
 ## JS to C# Methods
 
@@ -51,7 +61,8 @@ C# validates the protocol version. If mismatched, logs an error and rejects.
 
 | Method | Params | Description |
 |--------|--------|-------------|
-| `editor/ready` | `EditorReadyParams` | Monaco initialization complete |
+| `bridge/ready` | `BridgeReadyParams` | JSON-RPC transport initialized (bundle load) |
+| `editor/ready` | `EditorReadyParams` | Monaco editor instance created and ready |
 | `parentAccessor/setValue` | `SetValueParams` | Property change from JS |
 | `parentAccessor/setValueWithType` | `SetValueWithTypeParams` | Typed property change |
 | `parentAccessor/callAction` | `CallActionParams` | Invoke named action |
@@ -89,6 +100,10 @@ Most C# to JS calls continue to use `InvokeScriptAsync` (eval-style) for WASM co
 
 ```typescript
 // JS to C# parameter types
+interface BridgeReadyParams {
+    protocolVersion: number;  // Must be 1
+}
+
 interface EditorReadyParams {
     protocolVersion: number;  // Must be 1
 }
@@ -158,12 +173,14 @@ interface KeyDownParams {
 
 ## Security Constraints
 
-### Message Validation
+> **Note**: These constraints are the contract specification. Enforcement is implemented in Task 5 (`WebView2JsonRpcMessageHandler`). The JS bridge in Task 3 does not enforce these -- it trusts the C# host.
+
+### Message Validation (implemented in Task 5)
 
 - **Requests/notifications** (messages with `method` field): Validate method name against known allowlist; validate required params per method; drop unknown methods with warning log
 - **Responses** (messages with `id` + `result`/`error`, no `method`): Validate payload structure (must have `id`); StreamJsonRpc handles correlation (unknown IDs safely ignored)
 
-### Limits
+### Limits (implemented in Task 5)
 
 - Maximum payload size: 10MB per message (all envelope types)
 

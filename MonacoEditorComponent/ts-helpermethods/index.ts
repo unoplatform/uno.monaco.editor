@@ -63,14 +63,26 @@ import { createBridgeConnection, isDesktopHost } from './bridge/jsonRpcBridge';
 const isDesktop = isDesktopHost();
 
 /**
- * Resolve a worker URL relative to the current document.
- * On desktop (file:// or virtual-host), absolute paths like "/workers/..."
- * break on macOS/Linux. Using a URL relative to the document's own location
- * works across Windows (https://uno-monaco.example/), macOS, and Linux (file://).
+ * Resolve a worker URL relative to the main bundle script's location.
+ *
+ * Using the script's own URL as base (via document.currentScript.src) ensures
+ * workers resolve correctly in both:
+ * - Desktop: file:// or https://uno-monaco.example/ (relative to editor.html)
+ * - WASM: subpath deployments where WasmScripts/ may be at a non-root path
+ *
+ * Falls back to document.baseURI if currentScript is unavailable (deferred scripts).
  */
+const _scriptBase: string = (() => {
+    const cs = (document as any).currentScript;
+    if (cs && cs.src) {
+        // Strip filename to get the directory: ".../uno-monaco-helpers.js" -> ".../"
+        return cs.src.substring(0, cs.src.lastIndexOf('/') + 1);
+    }
+    return document.baseURI || '';
+})();
+
 function resolveWorkerUrl(filename: string): string {
-    // Both WASM and desktop use document-relative paths
-    return `workers/${filename}`;
+    return _scriptBase + `workers/${filename}`;
 }
 
 (self as any).MonacoEnvironment = {
@@ -100,8 +112,10 @@ function resolveWorkerUrl(filename: string): string {
 if (isDesktop) {
     const connection = createBridgeConnection();
     connection.listen();
-    // Notify the C# host that the bridge is ready and accepting JSON-RPC messages
-    connection.sendNotification('editor/ready', { protocolVersion: 1 });
+    // Signal that the JSON-RPC bridge transport is ready to accept messages.
+    // This fires at bundle load, BEFORE editor creation.
+    // Task 4 will send 'editor/ready' after createMonacoEditor() completes.
+    connection.sendNotification('bridge/ready', { protocolVersion: 1 });
 }
 
 // ---------------------------------------------------------------------------

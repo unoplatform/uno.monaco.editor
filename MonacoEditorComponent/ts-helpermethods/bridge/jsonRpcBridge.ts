@@ -34,12 +34,13 @@ function postWebViewMessage(message: any): void {
 
 /**
  * Reads JSON-RPC messages from the WebView host.
- * The host sends messages via CoreWebView2.PostWebMessageAsJson(),
- * which fires the 'message' event on the window.
+ * On Windows, CoreWebView2.PostWebMessageAsJson() fires 'message' on chrome.webview.
+ * On macOS/Linux (WKWebView/WebKitGTK), messages arrive via window 'message'.
  */
 class WebViewMessageReader extends AbstractMessageReader implements MessageReader {
     private _callback: DataCallback | null = null;
     private _messageListener: ((event: MessageEvent) => void) | null = null;
+    private _eventTarget: EventTarget | null = null;
 
     constructor() {
         super();
@@ -58,13 +59,23 @@ class WebViewMessageReader extends AbstractMessageReader implements MessageReade
             }
         };
 
-        window.addEventListener('message', this._messageListener);
+        // On Windows, WebView2 delivers host-to-page messages via chrome.webview 'message' events,
+        // NOT window 'message'. Subscribe to the correct target per platform.
+        // On macOS/Linux (WKWebView/WebKitGTK), messages arrive via window 'message'.
+        const chromeWebview = (window as any).chrome?.webview;
+        if (chromeWebview && typeof chromeWebview.addEventListener === 'function') {
+            chromeWebview.addEventListener('message', this._messageListener);
+        } else {
+            window.addEventListener('message', this._messageListener);
+        }
+        this._eventTarget = chromeWebview || window;
 
         return {
             dispose: () => {
-                if (this._messageListener) {
-                    window.removeEventListener('message', this._messageListener);
+                if (this._messageListener && this._eventTarget) {
+                    this._eventTarget.removeEventListener('message', this._messageListener);
                     this._messageListener = null;
+                    this._eventTarget = null;
                 }
                 this._callback = null;
             }
