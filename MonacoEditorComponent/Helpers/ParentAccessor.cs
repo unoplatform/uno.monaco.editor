@@ -194,14 +194,14 @@ namespace Monaco.Helpers
 
                 if (obj is null)
                 {
-                    return "{}";
+                    return "null";
                 }
 
                 try
                 {
                     return JsonSerializer.Serialize(obj, obj.GetType(), MonacoJsonContext.Relaxed.Options);
                 }
-                catch (InvalidOperationException ex) when (ex.Message.Contains("not supported"))
+                catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException)
                 {
                     throw new InvalidOperationException(
                         $"Type '{obj.GetType().FullName}' is not registered in MonacoJsonContext. " +
@@ -209,7 +209,7 @@ namespace Monaco.Helpers
                         ex);
                 }
             }
-            return "{}";
+            return "null";
         }
 
         /// <summary>

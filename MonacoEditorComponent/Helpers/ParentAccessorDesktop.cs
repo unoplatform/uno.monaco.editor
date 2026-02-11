@@ -113,14 +113,14 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
 
             if (obj is null)
             {
-                return "{}";
+                return "null";
             }
 
             try
             {
                 return JsonSerializer.Serialize(obj, obj.GetType(), MonacoJsonContext.Relaxed.Options);
             }
-            catch (InvalidOperationException ex) when (ex.Message.Contains("not supported"))
+            catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException)
             {
                 throw new InvalidOperationException(
                     $"Type '{obj.GetType().FullName}' is not registered in MonacoJsonContext. " +
@@ -129,7 +129,7 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
             }
         }
 
-        return "{}";
+        return "null";
     }
 
     public async Task<object?> GetChildValue(string name, string child)
