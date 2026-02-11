@@ -34,9 +34,17 @@ namespace Monaco.Helpers
             this.parent = new WeakReference<ICodeEditorPresenter>(parent);
             _queue = queue;
 
-            _instances.Add(parent, this);
+            _instances.AddOrUpdate(parent, this);
 
             PartialCtor(parent);
+        }
+
+        /// <summary>
+        /// Removes the registration for the given presenter, allowing safe re-initialization.
+        /// </summary>
+        internal static void RemoveInstance(ICodeEditorPresenter presenter)
+        {
+            _instances.Remove(presenter);
         }
 
         partial void PartialCtor(ICodeEditorPresenter parent);

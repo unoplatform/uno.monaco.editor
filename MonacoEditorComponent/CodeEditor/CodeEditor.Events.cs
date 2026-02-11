@@ -124,6 +124,8 @@ namespace Monaco
                         _themeListener.ThemeChanged -= ThemeListener_ThemeChanged;
                     }
                     UnregisterPropertyChangedCallback(RequestedThemeProperty, _themeToken);
+                    KeyboardListener.RemoveInstance(_initializedPresenter);
+                    _parentAccessor?.Dispose();
                 }
 
                 _parentAccessor = new ParentAccessor(_view, _queue);
