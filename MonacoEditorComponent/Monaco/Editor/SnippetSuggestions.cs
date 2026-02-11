@@ -8,7 +8,6 @@ namespace Monaco.Editor
     /// Enable snippet suggestions. Default to 'true'.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<SnippetSuggestions>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum SnippetSuggestions
     {
         [JsonStringEnumMemberName("bottom")]

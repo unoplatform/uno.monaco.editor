@@ -1,4 +1,3 @@
-using Newtonsoft.Json;
 using System.Text;
 using System.Text.Json.Serialization;
 using Windows.UI;
@@ -11,7 +10,6 @@ namespace Monaco.Helpers
     /// Inline styles modify the text style itself and are useful for manipulating the colors and styles of text to indicate conditions.
     /// </summary>
     [System.Text.Json.Serialization.JsonConverter(typeof(CssInlineStyleConverter))]
-    [Newtonsoft.Json.JsonConverter(typeof(NewtonsoftCssStyleConverter))]
     public sealed class CssInlineStyle : ICssStyle
     {
         public TextDecoration TextDecoration { get; set; }

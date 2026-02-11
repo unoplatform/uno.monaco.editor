@@ -8,7 +8,6 @@ namespace Monaco.Editor
     /// Enable tab completion.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<TabCompletion>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum TabCompletion
     {
         [JsonStringEnumMemberName("off")]

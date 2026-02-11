@@ -9,7 +9,6 @@ namespace Monaco.Editor
     /// Defaults to all.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<RenderLineHighlight>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum RenderLineHighlight
     {
         [JsonStringEnumMemberName("all")]

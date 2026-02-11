@@ -9,7 +9,6 @@ namespace Monaco.Editor
     /// Defaults to 'always'.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<MatchBrackets>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum MatchBrackets
     {
         [JsonStringEnumMemberName("always")]

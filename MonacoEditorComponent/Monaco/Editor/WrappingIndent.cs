@@ -9,7 +9,6 @@ namespace Monaco.Editor
     /// Defaults to 'same' in vscode and to 'none' in monaco-editor.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<WrappingIndent>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum WrappingIndent
     {
         [JsonStringEnumMemberName("deepIndent")]

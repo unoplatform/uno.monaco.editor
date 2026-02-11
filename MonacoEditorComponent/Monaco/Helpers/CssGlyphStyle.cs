@@ -1,4 +1,3 @@
-using Newtonsoft.Json;
 using System.Text.Json.Serialization;
 
 namespace Monaco.Helpers
@@ -7,14 +6,12 @@ namespace Monaco.Helpers
     /// Represents a CSS style for a glyph decoration in the editor's glyph margin.
     /// </summary>
     [System.Text.Json.Serialization.JsonConverter(typeof(CssGlyphStyleConverter))]
-    [Newtonsoft.Json.JsonConverter(typeof(NewtonsoftCssStyleConverter))]
     public sealed class CssGlyphStyle : ICssStyle
     {
         /// <summary>
         /// Gets or sets the URI of the image to display as the glyph.
         /// </summary>
         [System.Text.Json.Serialization.JsonIgnore]
-        [Newtonsoft.Json.JsonIgnore]
         public System.Uri? GlyphImage { get; set; }
 
         /// <summary>

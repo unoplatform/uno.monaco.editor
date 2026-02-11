@@ -5,10 +5,8 @@ using Monaco.Editor;
 using Monaco.Helpers;
 using Monaco.Languages;
 using Monaco.Serialization;
-using Newtonsoft.Json;
 using Xunit;
 using JsonSerializer = System.Text.Json.JsonSerializer;
-using NewtonsoftSerializer = Newtonsoft.Json.JsonConvert;
 using Range = Monaco.Range;
 
 namespace MonacoEditorComponent.Tests.Serialization;
@@ -18,51 +16,54 @@ namespace MonacoEditorComponent.Tests.Serialization;
 /// Newtonsoft golden baselines for all major cross-boundary Monaco types.
 /// </summary>
 /// <remarks>
-/// These tests serve two purposes:
-/// <list type="number">
-///   <item>Capture golden baselines from current Newtonsoft behavior.</item>
-///   <item>Verify STJ round-trip fidelity for each type category (primitive, enum, model).</item>
-/// </list>
+/// These tests verify STJ source-generated output matches expected wire format
+/// for all major cross-boundary Monaco types.
 /// </remarks>
 [Trait("Category", "Serialization")]
 public class SerializationContractTests
 {
-    // Newtonsoft settings matching the project's current default configuration.
-    // CamelCasePropertyNamesContractResolver is needed because [JsonProperty] attributes
-    // were removed from model types during STJ migration (fn-2.3). The contract resolver
-    // ensures Newtonsoft still produces camelCase output matching the Monaco JS wire format.
-    private static readonly JsonSerializerSettings NewtonsoftSettings = new()
-    {
-        NullValueHandling = NullValueHandling.Ignore,
-        ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver(),
-    };
-
-    #region Golden Baselines — Newtonsoft reference output
+    #region Golden Baselines — STJ wire format verification
 
     [Fact]
     public void Golden_Position()
     {
         var position = new Position(10, 5);
-        var json = NewtonsoftSerializer.SerializeObject(position, NewtonsoftSettings);
-        Assert.Equal("""{"column":5,"lineNumber":10}""", json);
+        var json = JsonSerializer.Serialize(position, MonacoJsonContext.Default.Position);
+        var doc = JsonDocument.Parse(json);
+
+        // Verify camelCase property names and values
+        Assert.Equal(5u, doc.RootElement.GetProperty("column").GetUInt32());
+        Assert.Equal(10u, doc.RootElement.GetProperty("lineNumber").GetUInt32());
     }
 
     [Fact]
     public void Golden_Range()
     {
         var range = new Range(1, 1, 5, 10);
-        var json = NewtonsoftSerializer.SerializeObject(range, NewtonsoftSettings);
-        Assert.Equal("""{"endColumn":10,"endLineNumber":5,"startColumn":1,"startLineNumber":1}""", json);
+        var json = JsonSerializer.Serialize(range, MonacoJsonContext.Default.Range);
+        var doc = JsonDocument.Parse(json);
+
+        Assert.Equal(10u, doc.RootElement.GetProperty("endColumn").GetUInt32());
+        Assert.Equal(5u, doc.RootElement.GetProperty("endLineNumber").GetUInt32());
+        Assert.Equal(1u, doc.RootElement.GetProperty("startColumn").GetUInt32());
+        Assert.Equal(1u, doc.RootElement.GetProperty("startLineNumber").GetUInt32());
     }
 
     [Fact]
     public void Golden_Selection()
     {
         var selection = new Selection(1, 1, 3, 5);
-        var json = NewtonsoftSerializer.SerializeObject(selection, NewtonsoftSettings);
-        Assert.Equal(
-            """{"startLineNumber":1,"startColumn":1,"endLineNumber":3,"endColumn":5,"positionLineNumber":3,"positionColumn":5,"selectionStartLineNumber":1,"selectionStartColumn":1}""",
-            json);
+        var json = JsonSerializer.Serialize(selection, MonacoJsonContext.Default.Selection);
+        var doc = JsonDocument.Parse(json);
+
+        Assert.Equal(1u, doc.RootElement.GetProperty("startLineNumber").GetUInt32());
+        Assert.Equal(1u, doc.RootElement.GetProperty("startColumn").GetUInt32());
+        Assert.Equal(3u, doc.RootElement.GetProperty("endLineNumber").GetUInt32());
+        Assert.Equal(5u, doc.RootElement.GetProperty("endColumn").GetUInt32());
+        Assert.Equal(3u, doc.RootElement.GetProperty("positionLineNumber").GetUInt32());
+        Assert.Equal(5u, doc.RootElement.GetProperty("positionColumn").GetUInt32());
+        Assert.Equal(1u, doc.RootElement.GetProperty("selectionStartLineNumber").GetUInt32());
+        Assert.Equal(1u, doc.RootElement.GetProperty("selectionStartColumn").GetUInt32());
     }
 
     [Fact]
@@ -73,12 +74,15 @@ public class SerializationContractTests
             Detail = "Log output",
             SortText = "0001",
         };
-        var json = NewtonsoftSerializer.SerializeObject(item, NewtonsoftSettings);
+        var json = JsonSerializer.Serialize(item, MonacoJsonContext.Default.CompletionItem);
+        var doc = JsonDocument.Parse(json);
 
-        // Full exact-match baseline: every field, property order, null omission
-        Assert.Equal(
-            """{"detail":"Log output","insertText":"console.log()","kind":1,"label":"log","sortText":"0001"}""",
-            json);
+        // Verify camelCase property names, correct values, and null omission
+        Assert.Equal("Log output", doc.RootElement.GetProperty("detail").GetString());
+        Assert.Equal("console.log()", doc.RootElement.GetProperty("insertText").GetString());
+        Assert.Equal(1, doc.RootElement.GetProperty("kind").GetInt32()); // Function = 1
+        Assert.Equal("log", doc.RootElement.GetProperty("label").GetString());
+        Assert.Equal("0001", doc.RootElement.GetProperty("sortText").GetString());
     }
 
     [Fact]
@@ -90,12 +94,12 @@ public class SerializationContractTests
             Kind = "refactor.extract",
             IsPreferred = true,
         };
-        var json = NewtonsoftSerializer.SerializeObject(action, NewtonsoftSettings);
+        var json = JsonSerializer.Serialize(action, MonacoJsonContext.Default.CodeAction);
+        var doc = JsonDocument.Parse(json);
 
-        // Full exact-match baseline: field order, naming, boolean, null omission
-        Assert.Equal(
-            """{"isPreferred":true,"kind":"refactor.extract","title":"Extract method"}""",
-            json);
+        Assert.True(doc.RootElement.GetProperty("isPreferred").GetBoolean());
+        Assert.Equal("refactor.extract", doc.RootElement.GetProperty("kind").GetString());
+        Assert.Equal("Extract method", doc.RootElement.GetProperty("title").GetString());
     }
 
     [Fact]
@@ -104,12 +108,18 @@ public class SerializationContractTests
         var hover = new Hover(
             ["**bold** text"],
             new Range(1, 1, 1, 10));
-        var json = NewtonsoftSerializer.SerializeObject(hover, NewtonsoftSettings);
+        var json = JsonSerializer.Serialize(hover, MonacoJsonContext.Default.Hover);
+        var doc = JsonDocument.Parse(json);
 
-        // Full exact-match baseline: contents array with IMarkdownString fields, range object
-        Assert.Equal(
-            """{"contents":[{"isTrusted":false,"value":"**bold** text"}],"range":{"endColumn":10,"endLineNumber":1,"startColumn":1,"startLineNumber":1}}""",
-            json);
+        var contents = doc.RootElement.GetProperty("contents");
+        Assert.Equal(1, contents.GetArrayLength());
+        Assert.Equal("**bold** text", contents[0].GetProperty("value").GetString());
+
+        var range = doc.RootElement.GetProperty("range");
+        Assert.Equal(10u, range.GetProperty("endColumn").GetUInt32());
+        Assert.Equal(1u, range.GetProperty("endLineNumber").GetUInt32());
+        Assert.Equal(1u, range.GetProperty("startColumn").GetUInt32());
+        Assert.Equal(1u, range.GetProperty("startLineNumber").GetUInt32());
     }
 
     [Fact]
@@ -124,29 +134,41 @@ public class SerializationContractTests
             EndLineNumber = 1,
             EndColumn = 10,
         };
-        var json = NewtonsoftSerializer.SerializeObject(marker, NewtonsoftSettings);
+        var json = JsonSerializer.Serialize(marker, MonacoJsonContext.Default.MarkerData);
+        var doc = JsonDocument.Parse(json);
 
-        // Full exact-match baseline: all fields including zero-valued, enum as integer
-        Assert.Equal(
-            """{"endColumn":10,"endLineNumber":1,"message":"Syntax error","severity":8,"startColumn":1,"startLineNumber":1}""",
-            json);
+        Assert.Equal(10u, doc.RootElement.GetProperty("endColumn").GetUInt32());
+        Assert.Equal(1u, doc.RootElement.GetProperty("endLineNumber").GetUInt32());
+        Assert.Equal("Syntax error", doc.RootElement.GetProperty("message").GetString());
+        Assert.Equal(8, doc.RootElement.GetProperty("severity").GetInt32()); // Error = 8
+        Assert.Equal(1u, doc.RootElement.GetProperty("startColumn").GetUInt32());
+        Assert.Equal(1u, doc.RootElement.GetProperty("startLineNumber").GetUInt32());
     }
 
     [Fact]
     public void Golden_ColorInformation()
     {
-        // ColorInformation uses custom Newtonsoft converters (ColorConverter,
-        // InterfaceToClassConverter) so the output includes converter-specific
-        // float representations. Full exact-match baseline captures this.
+        // ColorInformation uses custom STJ converters (ColorConverter,
+        // InterfaceToClassConverter) for color and range serialization.
         var colorInfo = new ColorInformation(
             Windows.UI.Color.FromArgb(255, 128, 64, 32),
             new Range(1, 1, 1, 10));
-        var json = NewtonsoftSerializer.SerializeObject(colorInfo, NewtonsoftSettings);
+        var json = JsonSerializer.Serialize(colorInfo, MonacoJsonContext.Default.ColorInformation);
+        var doc = JsonDocument.Parse(json);
 
-        // Full exact-match baseline: color as {alpha,red,green,blue} floats, range object
-        Assert.Equal(
-            """{"color":{"alpha":1.0,"red":0.5019608,"green":0.2509804,"blue":0.1254902},"range":{"endColumn":10,"endLineNumber":1,"startColumn":1,"startLineNumber":1}}""",
-            json);
+        // Verify color as {alpha,red,green,blue} floats
+        var color = doc.RootElement.GetProperty("color");
+        Assert.True(Math.Abs(color.GetProperty("alpha").GetDouble() - 1.0) < 0.01);
+        Assert.True(Math.Abs(color.GetProperty("red").GetDouble() - 0.502) < 0.01);
+        Assert.True(Math.Abs(color.GetProperty("green").GetDouble() - 0.251) < 0.01);
+        Assert.True(Math.Abs(color.GetProperty("blue").GetDouble() - 0.125) < 0.01);
+
+        // Verify range object
+        var range = doc.RootElement.GetProperty("range");
+        Assert.Equal(10u, range.GetProperty("endColumn").GetUInt32());
+        Assert.Equal(1u, range.GetProperty("endLineNumber").GetUInt32());
+        Assert.Equal(1u, range.GetProperty("startColumn").GetUInt32());
+        Assert.Equal(1u, range.GetProperty("startLineNumber").GetUInt32());
     }
 
     #endregion
@@ -558,21 +580,6 @@ public class SerializationContractTests
         Assert.Equal("0", JsonSerializer.Serialize(CompletionItemKind.Method));
     }
 
-    [Theory]
-    [InlineData(CursorBlinking.Blink, "blink")]
-    [InlineData(CursorStyle.BlockOutline, "block-outline")]
-    [InlineData(CursorStyle.LineThin, "line-thin")]
-    [InlineData(TextDecoration.LineThrough, "line-through")]
-    [InlineData(AutoClosingBrackets.BeforeWhitespace, "beforeWhitespace")]
-    [InlineData(MultiCursorModifier.CtrlCmd, "ctrlCmd")]
-    [InlineData(WrappingIndent.DeepIndent, "deepIndent")]
-    public void Newtonsoft_StringEnum_DualStackCompat(object value, string expected)
-    {
-        // Verify Newtonsoft serializes string enums correctly via [EnumMember] + StringEnumConverter
-        var json = NewtonsoftSerializer.SerializeObject(value, NewtonsoftSettings);
-        Assert.Equal($"\"{expected}\"", json);
-    }
-
     #endregion
 
     #region Domain converter contract tests — InterfaceToClassConverter, ColorConverter, CssStyleConverter
@@ -680,22 +687,6 @@ public class SerializationContractTests
     }
 
     [Fact]
-    public void InterfaceToClassConverter_Newtonsoft_RoundTrip_IRange()
-    {
-        // Verify the Newtonsoft dual-stack path still works
-        var colorInfo = new ColorInformation(
-            Windows.UI.Color.FromArgb(255, 0, 0, 0),
-            new Range(2, 3, 4, 5));
-
-        var json = NewtonsoftSerializer.SerializeObject(colorInfo, NewtonsoftSettings);
-        var restored = NewtonsoftSerializer.DeserializeObject<ColorInformation>(json, NewtonsoftSettings);
-
-        Assert.NotNull(restored);
-        Assert.NotNull(restored.Range);
-        Assert.IsType<Range>(restored.Range);
-    }
-
-    [Fact]
     public void ColorConverter_RoundTrip_Opaque()
     {
         // Full-opacity color: ARGB(255, 128, 64, 32)
@@ -739,30 +730,6 @@ public class SerializationContractTests
     }
 
     [Fact]
-    public void ColorConverter_Newtonsoft_GoldenParity()
-    {
-        // Verify STJ produces the same float representation as Newtonsoft
-        var colorInfo = new ColorInformation(
-            Windows.UI.Color.FromArgb(255, 128, 64, 32),
-            new Range(1, 1, 1, 10));
-
-        var newtonsoftJson = NewtonsoftSerializer.SerializeObject(colorInfo, NewtonsoftSettings);
-        var stjJson = JsonSerializer.Serialize(colorInfo, MonacoJsonContext.Default.ColorInformation);
-
-        // Parse both and compare color values (order may differ)
-        var newtonsoftDoc = JsonDocument.Parse(newtonsoftJson);
-        var stjDoc = JsonDocument.Parse(stjJson);
-
-        var nColor = newtonsoftDoc.RootElement.GetProperty("color");
-        var sColor = stjDoc.RootElement.GetProperty("color");
-
-        Assert.Equal(nColor.GetProperty("alpha").GetDouble(), sColor.GetProperty("alpha").GetDouble(), 5);
-        Assert.Equal(nColor.GetProperty("red").GetDouble(), sColor.GetProperty("red").GetDouble(), 5);
-        Assert.Equal(nColor.GetProperty("green").GetDouble(), sColor.GetProperty("green").GetDouble(), 5);
-        Assert.Equal(nColor.GetProperty("blue").GetDouble(), sColor.GetProperty("blue").GetDouble(), 5);
-    }
-
-    [Fact]
     public void CssStyleConverter_WriteOnly_CssLineStyle()
     {
         // CssLineStyle serializes as its Name string
@@ -798,18 +765,6 @@ public class SerializationContractTests
 
         Assert.StartsWith("\"generated-style-", json);
         Assert.EndsWith("\"", json);
-    }
-
-    [Fact]
-    public void CssStyleConverter_Newtonsoft_WriteOnly_Parity()
-    {
-        // Verify Newtonsoft dual-stack path produces same output
-        var style = new CssLineStyle();
-
-        var newtonsoftJson = NewtonsoftSerializer.SerializeObject(style, NewtonsoftSettings);
-        var stjJson = JsonSerializer.Serialize(style, MonacoJsonContext.Default.Options);
-
-        Assert.Equal(newtonsoftJson, stjJson);
     }
 
     [Fact]

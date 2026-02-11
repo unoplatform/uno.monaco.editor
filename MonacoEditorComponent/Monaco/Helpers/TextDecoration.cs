@@ -4,7 +4,6 @@ using System.Text.Json.Serialization;
 namespace Monaco.Helpers
 {
     [JsonConverter(typeof(JsonStringEnumConverter<TextDecoration>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum TextDecoration
     {
         [JsonStringEnumMemberName("none")]

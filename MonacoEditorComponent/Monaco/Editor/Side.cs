@@ -9,7 +9,6 @@ namespace Monaco.Editor
     /// Defaults to 'right'.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<Side>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum Side
     {
         [JsonStringEnumMemberName("left")]

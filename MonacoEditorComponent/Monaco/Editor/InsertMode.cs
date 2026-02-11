@@ -8,7 +8,6 @@ namespace Monaco.Editor
     /// Overwrite word ends on accept. Default to false.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<InsertMode>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum InsertMode
     {
         [JsonStringEnumMemberName("insert")]

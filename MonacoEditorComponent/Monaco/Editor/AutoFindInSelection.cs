@@ -8,7 +8,6 @@ namespace Monaco.Editor
     /// Controls if Find in Selection flag is turned on in the editor.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<AutoFindInSelection>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum AutoFindInSelection
     {
         [JsonStringEnumMemberName("always")]

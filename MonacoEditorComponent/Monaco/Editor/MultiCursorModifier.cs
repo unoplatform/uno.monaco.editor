@@ -9,7 +9,6 @@ namespace Monaco.Editor
     /// Defaults to 'alt'
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<MultiCursorModifier>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum MultiCursorModifier
     {
         [JsonStringEnumMemberName("alt")]

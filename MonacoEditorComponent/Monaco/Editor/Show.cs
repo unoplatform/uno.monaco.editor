@@ -13,7 +13,6 @@ namespace Monaco.Editor
     /// Defaults to 'mouseover'.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<Show>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum Show
     {
         [JsonStringEnumMemberName("always")]

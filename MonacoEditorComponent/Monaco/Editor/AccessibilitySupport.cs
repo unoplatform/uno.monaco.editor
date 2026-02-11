@@ -9,7 +9,6 @@ namespace Monaco.Editor
     /// Defaults to 'auto'. It is best to leave this to 'auto'.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<AccessibilitySupport>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum AccessibilitySupport
     {
         [JsonStringEnumMemberName("auto")]

@@ -13,7 +13,6 @@ namespace Monaco.Editor
     /// Defaults to "off".
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<WordWrap>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum WordWrap
     {
         [JsonStringEnumMemberName("bounded")]

@@ -1,10 +1,8 @@
 using Monaco.Helpers;
-using Newtonsoft.Json;
 using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Windows.UI;
-using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace Monaco.Languages
 {
@@ -14,15 +12,11 @@ namespace Monaco.Languages
     public sealed class ColorInformation(Color color, IRange? range)
     {
         [JsonPropertyName("color")]
-        [JsonProperty("color")]
         [System.Text.Json.Serialization.JsonConverter(typeof(ColorConverter))]
-        [Newtonsoft.Json.JsonConverter(typeof(NewtonsoftColorConverter))]
         public Color Color { get; set; } = color;
 
         [JsonPropertyName("range")]
-        [JsonProperty("range")]
         [System.Text.Json.Serialization.JsonConverter(typeof(InterfaceToClassConverter<IRange, Range>))]
-        [Newtonsoft.Json.JsonConverter(typeof(NewtonsoftInterfaceToClassConverter<IRange, Range>))]
         public IRange? Range { get; set; } = range;
     }
 
@@ -97,64 +91,4 @@ namespace Monaco.Languages
         }
     }
 
-    /// <summary>
-    /// Newtonsoft converter between <see cref="Windows.UI.Color"/> and Monaco IColor.
-    /// Retained for dual-stack compatibility until Newtonsoft is removed.
-    /// </summary>
-    internal class NewtonsoftColorConverter : Newtonsoft.Json.JsonConverter
-    {
-        public override bool CanConvert(Type t) => t == typeof(Color) || t == typeof(Color?);
-
-        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, Newtonsoft.Json.JsonSerializer serializer)
-        {
-            Color color = new();
-
-            if (reader.Read())
-            {
-                while (reader.TokenType != JsonToken.EndObject)
-                {
-                    switch (reader.Value)
-                    {
-                        case "alpha":
-                            color.A = (byte)((reader.ReadAsDouble() ?? 0) * 255);
-                            break;
-                        case "red":
-                            color.R = (byte)((reader.ReadAsDouble() ?? 0) * 255);
-                            break;
-                        case "green":
-                            color.G = (byte)((reader.ReadAsDouble() ?? 0) * 255);
-                            break;
-                        case "blue":
-                            color.B = (byte)((reader.ReadAsDouble() ?? 0) * 255);
-                            break;
-                    }
-
-                    reader.Read(); // Advance past Number Token read above to next property
-                }
-            }
-
-            return color;
-        }
-
-        public override void WriteJson(JsonWriter writer, object? untypedValue, Newtonsoft.Json.JsonSerializer serializer)
-        {
-            if (untypedValue == null)
-            {
-                serializer.Serialize(writer, null);
-                return;
-            }
-            var value = (Color)untypedValue;
-
-            writer.WriteStartObject();
-            writer.WritePropertyName("alpha");
-            writer.WriteValue(value.A / 255F);
-            writer.WritePropertyName("red");
-            writer.WriteValue(value.R / 255F);
-            writer.WritePropertyName("green");
-            writer.WriteValue(value.G / 255F);
-            writer.WritePropertyName("blue");
-            writer.WriteValue(value.B / 255F);
-            writer.WriteEndObject();
-        }
-    }
 }

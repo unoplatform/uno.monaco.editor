@@ -9,7 +9,6 @@ namespace Monaco.Editor
     /// Defaults to false.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<AutoIndent>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum AutoIndent
     {
         [JsonStringEnumMemberName("advanced")]

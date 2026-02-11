@@ -10,7 +10,6 @@ namespace Monaco.Editor
     /// by mouse.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<CursorSurroundingLinesStyle>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum CursorSurroundingLinesStyle
     {
         [JsonStringEnumMemberName("all")]

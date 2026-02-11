@@ -9,7 +9,6 @@ namespace Monaco.Editor
     /// Defaults to 'blink'.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<CursorBlinking>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum CursorBlinking
     {
         [JsonStringEnumMemberName("blink")]

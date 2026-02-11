@@ -9,7 +9,6 @@ namespace Monaco.Editor
     /// Defaults to 'auto'.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<ScrollbarBehavior>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum ScrollbarBehavior
     {
         [JsonStringEnumMemberName("auto")]

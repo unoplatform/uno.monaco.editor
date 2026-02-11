@@ -1,4 +1,3 @@
-using Newtonsoft.Json;
 using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -95,22 +94,4 @@ namespace Monaco.Helpers
         }
     }
 
-    /// <summary>
-    /// Newtonsoft write-only converter for <see cref="ICssStyle"/>.
-    /// Retained for dual-stack compatibility until Newtonsoft is removed.
-    /// </summary>
-    internal class NewtonsoftCssStyleConverter : Newtonsoft.Json.JsonConverter
-    {
-        public override bool CanConvert(Type objectType) => typeof(ICssStyle).IsAssignableFrom(objectType);
-
-        public override object? ReadJson(JsonReader reader, Type objectType, object? existingValue, Newtonsoft.Json.JsonSerializer serializer) => throw new NotSupportedException("CssStyleConverter is write-only.");
-
-        public override void WriteJson(JsonWriter writer, object? value, Newtonsoft.Json.JsonSerializer serializer)
-        {
-            if (value is ICssStyle style)
-            {
-                writer.WriteValue(style.Name);
-            }
-        }
-    }
 }

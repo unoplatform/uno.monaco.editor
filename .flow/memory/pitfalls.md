@@ -90,3 +90,9 @@ When building runtime type registries (Dictionary<string, T>) that are written v
 
 ## 2026-02-11 manual [pitfall]
 Catch-all exception handlers in interop/bridge code should exclude STJ metadata exceptions (InvalidOperationException, NotSupportedException) so AOT registration failures surface immediately instead of being silently swallowed.
+
+## 2026-02-11 manual [pitfall]
+STJ source-gen AOT: always serialize concrete types (not interfaces like IPosition/IRange) - use Lift() pattern to convert. IEnumerable<T> also needs typed array overloads.
+
+## 2026-02-11 manual [pitfall]
+When migrating encoding/decoding logic across layers (e.g., JSExport boundary vs shared accessor), verify decode operations happen at exactly one layer to prevent double-encoding/decoding that corrupts data with escape sequences.

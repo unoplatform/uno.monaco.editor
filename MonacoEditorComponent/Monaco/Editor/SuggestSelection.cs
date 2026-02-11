@@ -8,7 +8,6 @@ namespace Monaco.Editor
     /// The history mode for suggestions.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<SuggestSelection>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum SuggestSelection
     {
         [JsonStringEnumMemberName("first")]

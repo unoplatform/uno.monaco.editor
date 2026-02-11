@@ -64,8 +64,8 @@ Migrate all `JsonConvert.SerializeObject`/`DeserializeObject` call sites to `Jso
 - [ ] Build succeeds for both TFMs
 
 ## Done summary
-Migrated all JsonConvert.SerializeObject/DeserializeObject call sites in WebViewExtensions, CodeEditor.Methods, LanguagesHelper, ModelHelper, and ParentAccessor to System.Text.Json with MonacoJsonContext. Redesigned ParentAccessor for AOT by replacing runtime Type.GetType() assembly scanning with FQN-keyed Dictionary<string, JsonTypeInfo> type map, added RegisterTypeInfo extensibility API, and added 15 new tests covering callback round-trips and type registry behavior.
+Migrated all JsonConvert.SerializeObject/DeserializeObject call sites in WebViewExtensions, CodeEditor.Methods, LanguagesHelper, ModelHelper, and ParentAccessor to System.Text.Json with MonacoJsonContext. Redesigned ParentAccessor for AOT by replacing runtime Type.GetType() assembly scanning with ConcurrentDictionary<string, JsonTypeInfo> type map, added RegisterTypeInfo extensibility API, fixed double-desanitize bug in WASM SetValue path, and added 17 new tests covering callback round-trips, List<T> materialization, and type registry behavior.
 ## Evidence
-- Commits: 3c782eb, e434648
-- Tests: ./artifacts/bin/MonacoEditorComponent.Tests/debug/MonacoEditorComponent.Tests -trait Category=Serialization (77 passed), dotnet build MonacoEditorComponent.slnx --no-restore (0 errors, 0 warnings)
+- Commits: 3c782eb, e434648, bf2b2ec, de39c19, 7a421c5
+- Tests: dotnet test --filter-class *SerializationContractTests (79 passed), dotnet build MonacoEditorComponent.slnx --no-restore (0 errors, 0 warnings)
 - PRs:

@@ -9,7 +9,6 @@ namespace Monaco.Editor
     /// Defaults to language defined behavior.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<AutoClosingQuotes>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum AutoClosingQuotes
     {
         [JsonStringEnumMemberName("always")]

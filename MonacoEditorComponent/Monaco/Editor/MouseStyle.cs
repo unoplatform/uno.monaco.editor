@@ -9,7 +9,6 @@ namespace Monaco.Editor
     /// Defaults to 'text'
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<MouseStyle>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum MouseStyle
     {
         [JsonStringEnumMemberName("copy")]

@@ -8,7 +8,6 @@ namespace Monaco.Editor
     /// Defaults to always allowing auto surrounding.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<AutoSurround>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum AutoSurround
     {
         [JsonStringEnumMemberName("brackets")]

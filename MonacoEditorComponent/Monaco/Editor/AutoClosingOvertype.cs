@@ -8,7 +8,6 @@ namespace Monaco.Editor
     /// Options for typing over closing quotes or brackets.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<AutoClosingOvertype>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum AutoClosingOvertype
     {
         [JsonStringEnumMemberName("always")]

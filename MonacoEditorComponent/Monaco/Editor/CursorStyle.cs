@@ -8,7 +8,6 @@ namespace Monaco.Editor
     /// Defaults to 'line'.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<CursorStyle>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum CursorStyle
     {
         [JsonStringEnumMemberName("block")]

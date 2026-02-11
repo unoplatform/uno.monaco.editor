@@ -9,7 +9,6 @@ namespace Monaco.Editor
     /// Defaults to none.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<RenderWhitespace>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum RenderWhitespace
     {
         [JsonStringEnumMemberName("all")]

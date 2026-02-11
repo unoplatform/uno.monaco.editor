@@ -10,7 +10,6 @@ namespace Monaco.Editor
     /// Defaults to 'auto'.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<FoldingStrategy>))]
-    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum FoldingStrategy
     {
         [JsonStringEnumMemberName("auto")]

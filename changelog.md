@@ -1,3 +1,18 @@
+v1.0 (unreleased)
+-----------------
+- Migrated all serialization from Newtonsoft.Json to System.Text.Json with AOT-compatible source generation
+- Removed `Newtonsoft.Json` package dependency from the library
+
+**Breaking Changes**:
+- The `Newtonsoft.Json` transitive NuGet dependency has been removed. Consumers that relied on it being provided transitively must add their own package reference.
+- `CommandHandler` delegate now receives `System.Text.Json.JsonElement` instead of `Newtonsoft.Json.Linq.JObject`. Use `JsonElement` APIs (`.GetProperty()`, `.GetString()`, etc.) to inspect command arguments.
+- All JSON serialization is now handled by `System.Text.Json` source generators. Custom converters that previously extended Newtonsoft converter types must be rewritten for `System.Text.Json`.
+
+**Migration guidance**:
+1. If your project uses `JObject`/`JToken` from command handler callbacks, replace with `JsonElement` and its accessor methods.
+2. If you depended on `Newtonsoft.Json` being provided transitively, add `<PackageReference Include="Newtonsoft.Json" />` to your project directly.
+3. Custom `Newtonsoft.Json.JsonConverter` subclasses for Monaco types should be replaced with `System.Text.Json.Serialization.JsonConverter<T>` implementations.
+
 v0.9 - 10/27/2021
 -----------------
 - Updated Monaco Reference to v0.21.3

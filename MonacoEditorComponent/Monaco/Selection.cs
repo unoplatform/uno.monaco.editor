@@ -58,7 +58,6 @@ namespace Monaco
         public uint SelectionStartColumn { get; internal set; }
 
         [JsonIgnore]
-        [Newtonsoft.Json.JsonIgnore]
         public SelectionDirection Direction { get; internal set; }
 
         public Selection(uint selectionStartLineNumber, uint selectionStartColumn, uint positionLineNumber, uint positionColumn)
