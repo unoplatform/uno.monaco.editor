@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -12,11 +13,14 @@ namespace Monaco.Editor
     /// Defaults to 'mouseover'.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<Show>))]
+    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum Show
     {
         [JsonStringEnumMemberName("always")]
+        [EnumMember(Value = "always")]
         Always,
         [JsonStringEnumMemberName("mouseover")]
+        [EnumMember(Value = "mouseover")]
         Mouseover,
     };
 }

@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -8,11 +9,14 @@ namespace Monaco.Editor
     /// Defaults to 'alt'
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<MultiCursorModifier>))]
+    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum MultiCursorModifier
     {
         [JsonStringEnumMemberName("alt")]
+        [EnumMember(Value = "alt")]
         Alt,
         [JsonStringEnumMemberName("ctrlCmd")]
+        [EnumMember(Value = "ctrlCmd")]
         CtrlCmd,
     };
 }

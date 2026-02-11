@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -8,15 +9,20 @@ namespace Monaco.Editor
     /// Defaults to language defined behavior.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<AutoClosingQuotes>))]
+    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum AutoClosingQuotes
     {
         [JsonStringEnumMemberName("always")]
+        [EnumMember(Value = "always")]
         Always,
         [JsonStringEnumMemberName("beforeWhitespace")]
+        [EnumMember(Value = "beforeWhitespace")]
         BeforeWhitespace,
         [JsonStringEnumMemberName("languageDefined")]
+        [EnumMember(Value = "languageDefined")]
         LanguageDefined,
         [JsonStringEnumMemberName("never")]
+        [EnumMember(Value = "never")]
         Never,
     };
 }

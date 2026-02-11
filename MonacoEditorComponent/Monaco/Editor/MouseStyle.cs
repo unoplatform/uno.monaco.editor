@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -8,13 +9,17 @@ namespace Monaco.Editor
     /// Defaults to 'text'
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<MouseStyle>))]
+    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum MouseStyle
     {
         [JsonStringEnumMemberName("copy")]
+        [EnumMember(Value = "copy")]
         Copy,
         [JsonStringEnumMemberName("default")]
+        [EnumMember(Value = "default")]
         Default,
         [JsonStringEnumMemberName("text")]
+        [EnumMember(Value = "text")]
         Text,
     };
 }

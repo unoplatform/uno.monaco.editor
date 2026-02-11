@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -9,11 +10,14 @@ namespace Monaco.Editor
     /// Defaults to 'auto'.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<FoldingStrategy>))]
+    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum FoldingStrategy
     {
         [JsonStringEnumMemberName("auto")]
+        [EnumMember(Value = "auto")]
         Auto,
         [JsonStringEnumMemberName("indentation")]
+        [EnumMember(Value = "indentation")]
         Indentation,
     };
 }

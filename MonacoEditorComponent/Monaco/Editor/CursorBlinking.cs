@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -8,17 +9,23 @@ namespace Monaco.Editor
     /// Defaults to 'blink'.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<CursorBlinking>))]
+    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum CursorBlinking
     {
         [JsonStringEnumMemberName("blink")]
+        [EnumMember(Value = "blink")]
         Blink,
         [JsonStringEnumMemberName("expand")]
+        [EnumMember(Value = "expand")]
         Expand,
         [JsonStringEnumMemberName("phase")]
+        [EnumMember(Value = "phase")]
         Phase,
         [JsonStringEnumMemberName("smooth")]
+        [EnumMember(Value = "smooth")]
         Smooth,
         [JsonStringEnumMemberName("solid")]
+        [EnumMember(Value = "solid")]
         Solid,
     };
 }

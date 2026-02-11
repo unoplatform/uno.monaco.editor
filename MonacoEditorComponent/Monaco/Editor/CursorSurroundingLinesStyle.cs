@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -9,11 +10,14 @@ namespace Monaco.Editor
     /// by mouse.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<CursorSurroundingLinesStyle>))]
+    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum CursorSurroundingLinesStyle
     {
         [JsonStringEnumMemberName("all")]
+        [EnumMember(Value = "all")]
         All,
         [JsonStringEnumMemberName("default")]
+        [EnumMember(Value = "default")]
         Default,
     };
 }

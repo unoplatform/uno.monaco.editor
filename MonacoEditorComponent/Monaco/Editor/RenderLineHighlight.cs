@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -8,15 +9,20 @@ namespace Monaco.Editor
     /// Defaults to all.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<RenderLineHighlight>))]
+    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum RenderLineHighlight
     {
         [JsonStringEnumMemberName("all")]
+        [EnumMember(Value = "all")]
         All,
         [JsonStringEnumMemberName("gutter")]
+        [EnumMember(Value = "gutter")]
         Gutter,
         [JsonStringEnumMemberName("line")]
+        [EnumMember(Value = "line")]
         Line,
         [JsonStringEnumMemberName("none")]
+        [EnumMember(Value = "none")]
         None,
     };
 }

@@ -518,5 +518,20 @@ public class SerializationContractTests
         Assert.Equal("0", JsonSerializer.Serialize(CompletionItemKind.Method));
     }
 
+    [Theory]
+    [InlineData(CursorBlinking.Blink, "blink")]
+    [InlineData(CursorStyle.BlockOutline, "block-outline")]
+    [InlineData(CursorStyle.LineThin, "line-thin")]
+    [InlineData(TextDecoration.LineThrough, "line-through")]
+    [InlineData(AutoClosingBrackets.BeforeWhitespace, "beforeWhitespace")]
+    [InlineData(MultiCursorModifier.CtrlCmd, "ctrlCmd")]
+    [InlineData(WrappingIndent.DeepIndent, "deepIndent")]
+    public void Newtonsoft_StringEnum_DualStackCompat(object value, string expected)
+    {
+        // Verify Newtonsoft serializes string enums correctly via [EnumMember] + StringEnumConverter
+        var json = NewtonsoftSerializer.SerializeObject(value, NewtonsoftSettings);
+        Assert.Equal($"\"{expected}\"", json);
+    }
+
     #endregion
 }

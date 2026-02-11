@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -12,15 +13,20 @@ namespace Monaco.Editor
     /// Defaults to "off".
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<WordWrap>))]
+    [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public enum WordWrap
     {
         [JsonStringEnumMemberName("bounded")]
+        [EnumMember(Value = "bounded")]
         Bounded,
         [JsonStringEnumMemberName("off")]
+        [EnumMember(Value = "off")]
         Off,
         [JsonStringEnumMemberName("on")]
+        [EnumMember(Value = "on")]
         On,
         [JsonStringEnumMemberName("wordWrapColumn")]
+        [EnumMember(Value = "wordWrapColumn")]
         WordWrapColumn,
     };
 }
