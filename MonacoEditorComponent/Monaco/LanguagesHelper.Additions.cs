@@ -42,8 +42,9 @@ namespace Monaco
             }
             else
             {
-                // No dot found -- treat the whole input as a bare extension name.
-                ext = extension.ToLowerInvariant();
+                // No extension extracted -- handle bare dotted extensions like ".cs"
+                // (Path.GetExtension(".cs") returns empty) and bare names like "cs".
+                ext = extension.TrimStart('.').ToLowerInvariant();
             }
 
             return ext switch

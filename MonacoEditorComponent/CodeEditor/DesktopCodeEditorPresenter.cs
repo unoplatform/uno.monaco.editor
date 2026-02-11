@@ -148,11 +148,11 @@ namespace Monaco
                 // Only mark initialized after all setup succeeds
                 _isCoreWebView2Initialized = true;
 
-                // Wire up JSON-RPC bridge transport.
-                // MessageReceived event is already wired (above), CoreWebView2 is fully ready.
-                SetupJsonRpc();
+                // Note: JsonRpc bridge is created in CreateBridgeTargets() (called from
+                // InitialiseWebObjects), not here. Launch() only initializes CoreWebView2.
+                // CreateBridgeTargets() is the single owner of JsonRpc lifecycle.
 
-                Debug.WriteLine("DesktopCodeEditorPresenter: CoreWebView2 initialized with security settings and JSON-RPC bridge");
+                Debug.WriteLine("DesktopCodeEditorPresenter: CoreWebView2 initialized with security settings");
 
                 // Apply any buffered Source navigation now that security handlers are attached.
                 if (_pendingSource is { } pending)

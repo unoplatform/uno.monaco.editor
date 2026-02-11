@@ -51,3 +51,6 @@ When a method computes a transformed value into a local variable but then writes
 
 ## 2026-02-11 manual [pitfall]
 WebView2 on Windows delivers host-to-page messages via chrome.webview 'message' events, NOT window 'message'. Must subscribe to chrome.webview.addEventListener when available.
+
+## 2026-02-11 manual [pitfall]
+When multiple init methods can create the same resource (e.g., JsonRpc), ensure single-owner creation -- having two call sites that both call SetupX() will create orphaned instances without disposal
