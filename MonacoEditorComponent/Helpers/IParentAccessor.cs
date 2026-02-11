@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json.Serialization.Metadata;
 
 namespace Monaco.Helpers
 {
@@ -6,7 +7,7 @@ namespace Monaco.Helpers
     /// Interface for parent accessor implementations.
     /// Provides property access and action/event registration for the bridge layer.
     /// WASM uses the concrete ParentAccessor with JSExport.
-    /// Desktop will use a JsonRpc-based variant (Task 5).
+    /// Desktop uses a JsonRpc-based variant.
     /// </summary>
     internal interface IParentAccessor : IDisposable
     {
@@ -26,8 +27,14 @@ namespace Monaco.Helpers
         void RegisterEvent(string name, Func<string[], Task<string>?> function);
 
         /// <summary>
-        /// Adds an Assembly to use for looking up types by name.
+        /// Registers a <see cref="JsonTypeInfo"/> for AOT-safe deserialization in SetValue.
         /// </summary>
+        void RegisterTypeInfo(string name, JsonTypeInfo info);
+
+        /// <summary>
+        /// Obsolete: Assembly scanning is no longer used. Use <see cref="RegisterTypeInfo"/> instead.
+        /// </summary>
+        [Obsolete("Use RegisterTypeInfo instead. Assembly scanning is not AOT-compatible.")]
         void AddAssemblyForTypeLookup(Assembly assembly);
 
         /// <summary>

@@ -838,4 +838,245 @@ public class SerializationContractTests
     }
 
     #endregion
+
+    #region Callback round-trip contract tests — simulating JS->C#->JS serialization paths
+
+    /// <summary>
+    /// Simulates the completion provider callback round-trip:
+    /// JS sends Position+CompletionContext JSON -> C# deserializes -> processes -> serializes CompletionList back to JS.
+    /// </summary>
+    [Fact]
+    public void CallbackRoundTrip_Completion()
+    {
+        // JS sends these args to the CompletionItemProvider callback
+        var positionJson = """{"lineNumber":10,"column":5}""";
+        var contextJson = """{"triggerKind":1}""";
+
+        // C# deserializes (Default context for deserialization)
+        var position = JsonSerializer.Deserialize(positionJson, MonacoJsonContext.Default.Position);
+        var context = JsonSerializer.Deserialize(contextJson, MonacoJsonContext.Default.CompletionContext);
+
+        Assert.NotNull(position);
+        Assert.NotNull(context);
+        Assert.Equal(10u, position.LineNumber);
+        Assert.Equal(5u, position.Column);
+
+        // C# builds a CompletionList result
+        var result = new CompletionList
+        {
+            Suggestions =
+            [
+                new CompletionItem("log", "console.log()", CompletionItemKind.Function)
+                {
+                    Detail = "Log output",
+                },
+            ],
+        };
+
+        // Serialize back with Relaxed encoder for JS interop
+        var resultJson = JsonSerializer.Serialize(result, MonacoJsonContext.Relaxed.CompletionList);
+        var doc = JsonDocument.Parse(resultJson);
+
+        Assert.True(doc.RootElement.TryGetProperty("suggestions", out var suggestionsEl));
+        Assert.Equal(1, suggestionsEl.GetArrayLength());
+        Assert.Equal("log", suggestionsEl[0].GetProperty("label").GetString());
+        Assert.Equal(1, suggestionsEl[0].GetProperty("kind").GetInt32()); // Function = 1
+    }
+
+    /// <summary>
+    /// Simulates the code action provider callback round-trip:
+    /// JS sends Range+CodeActionContext JSON -> C# deserializes -> processes -> serializes CodeActionList back to JS.
+    /// </summary>
+    [Fact]
+    public void CallbackRoundTrip_CodeAction()
+    {
+        var rangeJson = """{"startLineNumber":1,"startColumn":1,"endLineNumber":1,"endColumn":10}""";
+        var contextJson = """{"diagnostics":[]}""";
+
+        var range = JsonSerializer.Deserialize(rangeJson, MonacoJsonContext.Default.Range);
+        var context = JsonSerializer.Deserialize(contextJson, MonacoJsonContext.Default.CodeActionContext);
+
+        Assert.NotNull(range);
+        Assert.NotNull(context);
+        Assert.Equal(1u, range.StartLineNumber);
+        Assert.Equal(10u, range.EndColumn);
+
+        var result = new CodeActionList
+        {
+            Actions =
+            [
+                new CodeAction
+                {
+                    Title = "Extract method",
+                    Kind = "refactor.extract",
+                    IsPreferred = true,
+                },
+            ],
+        };
+
+        var resultJson = JsonSerializer.Serialize(result, MonacoJsonContext.Relaxed.CodeActionList);
+        var doc = JsonDocument.Parse(resultJson);
+
+        Assert.True(doc.RootElement.TryGetProperty("actions", out var actionsEl));
+        Assert.Equal(1, actionsEl.GetArrayLength());
+        Assert.Equal("Extract method", actionsEl[0].GetProperty("title").GetString());
+    }
+
+    /// <summary>
+    /// Simulates the hover provider callback round-trip:
+    /// JS sends Position JSON -> C# deserializes -> processes -> serializes Hover back to JS.
+    /// </summary>
+    [Fact]
+    public void CallbackRoundTrip_Hover()
+    {
+        var positionJson = """{"lineNumber":5,"column":12}""";
+
+        var position = JsonSerializer.Deserialize(positionJson, MonacoJsonContext.Default.Position);
+        Assert.NotNull(position);
+        Assert.Equal(5u, position.LineNumber);
+        Assert.Equal(12u, position.Column);
+
+        var result = new Hover(
+            ["**bold** text with <html> & symbols"],
+            new Range(5, 1, 5, 20));
+
+        // Relaxed encoder preserves <, >, & as-is
+        var resultJson = JsonSerializer.Serialize(result, MonacoJsonContext.Relaxed.Hover);
+        Assert.Contains("<html>", resultJson);
+        Assert.Contains("& symbols", resultJson);
+
+        var doc = JsonDocument.Parse(resultJson);
+        Assert.True(doc.RootElement.TryGetProperty("contents", out var contentsEl));
+        Assert.Equal(1, contentsEl.GetArrayLength());
+        Assert.True(doc.RootElement.TryGetProperty("range", out var rangeEl));
+        Assert.Equal(5u, rangeEl.GetProperty("startLineNumber").GetUInt32());
+    }
+
+    /// <summary>
+    /// Simulates the color provider callback round-trip:
+    /// JS sends ColorInformation JSON -> C# deserializes -> processes -> serializes ColorPresentation[] back to JS.
+    /// </summary>
+    [Fact]
+    public void CallbackRoundTrip_Color()
+    {
+        var colorInfoJson = """{"color":{"red":0.5,"green":0.25,"blue":0.125,"alpha":1.0},"range":{"startLineNumber":1,"startColumn":1,"endLineNumber":1,"endColumn":10}}""";
+
+        var colorInfo = JsonSerializer.Deserialize(colorInfoJson, MonacoJsonContext.Default.ColorInformation);
+        Assert.NotNull(colorInfo);
+        Assert.True(Math.Abs(colorInfo.Color.R / 255.0 - 0.5) < 0.01);
+
+        var presentations = new[]
+        {
+            new ColorPresentation("rgb(128, 64, 32)"),
+        };
+
+        var resultJson = JsonSerializer.Serialize(presentations, MonacoJsonContext.Relaxed.Options);
+        var doc = JsonDocument.Parse(resultJson);
+        Assert.Equal(JsonValueKind.Array, doc.RootElement.ValueKind);
+        Assert.Equal(1, doc.RootElement.GetArrayLength());
+        Assert.Equal("rgb(128, 64, 32)", doc.RootElement[0].GetProperty("label").GetString());
+    }
+
+    /// <summary>
+    /// Simulates the markers round-trip:
+    /// C# serializes MarkerData[] for JS -> JS can parse -> C# can deserialize back.
+    /// </summary>
+    [Fact]
+    public void CallbackRoundTrip_Markers()
+    {
+        var markers = new[]
+        {
+            new MarkerData
+            {
+                Severity = MarkerSeverity.Error,
+                Message = "Expected <string> but got &none",
+                StartLineNumber = 1,
+                StartColumn = 1,
+                EndLineNumber = 1,
+                EndColumn = 10,
+            },
+        };
+
+        // Serialize with Relaxed for JS interop (preserves <, >, &)
+        var json = JsonSerializer.Serialize(markers, MonacoJsonContext.Relaxed.Options);
+        Assert.Contains("<string>", json);
+        Assert.Contains("&none", json);
+
+        // Verify round-trip deserialization
+        var restored = JsonSerializer.Deserialize<MarkerData[]>(json, MonacoJsonContext.Default.Options);
+        Assert.NotNull(restored);
+        Assert.Single(restored);
+        Assert.Equal(MarkerSeverity.Error, restored[0].Severity);
+        Assert.Equal("Expected <string> but got &none", restored[0].Message);
+    }
+
+    #endregion
+
+    #region ParentAccessor type registry tests
+
+    [Fact]
+    public void TypeInfoMap_ContainsKnownTypes()
+    {
+        var map = MonacoJsonContext.BuildTypeInfoMap();
+
+        // Verify key types are registered by both FQN and short name
+        Assert.True(map.ContainsKey("Monaco.Selection"));
+        Assert.True(map.ContainsKey("Selection"));
+        Assert.True(map.ContainsKey("Monaco.Position"));
+        Assert.True(map.ContainsKey("Position"));
+        Assert.True(map.ContainsKey("Monaco.Range"));
+        Assert.True(map.ContainsKey("Range"));
+    }
+
+    [Fact]
+    public void TypeInfoMap_DeserializesKnownType()
+    {
+        var map = MonacoJsonContext.BuildTypeInfoMap();
+        var json = """{"selectionStartLineNumber":1,"selectionStartColumn":1,"positionLineNumber":3,"positionColumn":5,"startLineNumber":1,"startColumn":1,"endLineNumber":3,"endColumn":5}""";
+
+        // Simulate SetValue with type name "Selection" (as sent by JS)
+        Assert.True(map.TryGetValue("Selection", out var typeInfo));
+        var obj = JsonSerializer.Deserialize(json, typeInfo);
+        Assert.IsType<Selection>(obj);
+
+        var selection = (Selection)obj!;
+        Assert.Equal(1u, selection.SelectionStartLineNumber);
+        Assert.Equal(5u, selection.PositionColumn);
+    }
+
+    [Fact]
+    public void TypeInfoMap_UnknownType_ThrowsFast()
+    {
+        var map = MonacoJsonContext.BuildTypeInfoMap();
+
+        // Attempting to look up an unregistered type name should return false
+        Assert.False(map.TryGetValue("NonExistentType", out _));
+    }
+
+    [Fact]
+    public void TypeInfoMap_FQNLookup()
+    {
+        var map = MonacoJsonContext.BuildTypeInfoMap();
+
+        // FQN lookup should work for all registered types
+        Assert.True(map.TryGetValue("Monaco.Editor.MarkerData", out var markerTypeInfo));
+        var json = """{"severity":8,"message":"test","startLineNumber":1,"startColumn":1,"endLineNumber":1,"endColumn":5}""";
+        var marker = JsonSerializer.Deserialize(json, markerTypeInfo);
+        Assert.IsType<MarkerData>(marker);
+    }
+
+    [Fact]
+    public void GetJsonValue_RegisteredType_SerializesCorrectly()
+    {
+        // Verify that serializing via MonacoJsonContext.Relaxed.Options works for
+        // the GetJsonValue path (which uses obj.GetType() + Relaxed.Options)
+        var options = new StandaloneEditorConstructionOptions();
+        var json = JsonSerializer.Serialize(options, options.GetType(), MonacoJsonContext.Relaxed.Options);
+
+        // Should be valid JSON (even if most fields are null/omitted due to WhenWritingNull)
+        var doc = JsonDocument.Parse(json);
+        Assert.NotNull(doc);
+    }
+
+    #endregion
 }

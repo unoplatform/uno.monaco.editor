@@ -1,8 +1,8 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices.JavaScript;
+using System.Text.Json;
 
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
+using Monaco.Serialization;
 
 namespace Monaco.Extensions
 {
@@ -49,17 +49,12 @@ namespace Monaco.Extensions
 
             if (!string.IsNullOrEmpty(returnstring) && returnstring != "\"\"" && returnstring != "null")
             {
-                return JsonConvert.DeserializeObject<T>(returnstring);
+                return JsonSerializer.Deserialize<T>(returnstring, MonacoJsonContext.Default.Options);
             }
 
             return default;
         }
 
-        private static readonly JsonSerializerSettings _settings = new()
-        {
-            NullValueHandling = NullValueHandling.Ignore,
-            ContractResolver = new CamelCasePropertyNamesContractResolver()
-        };
 
         public static async Task InvokeScriptAsync(
             this ICodeEditorPresenter _view,
@@ -119,14 +114,14 @@ namespace Monaco.Extensions
                         {
                             return item.ToString();
                         }
-                        else if (item is string)
+                        else if (item is string s)
                         {
-                            return JsonConvert.ToString(item);
+                            return JsonSerializer.Serialize(s, MonacoJsonContext.Relaxed.Options);
                         }
                         else
                         {
                             // TODO: Need JSON.parse?
-                            return JsonConvert.SerializeObject(item, _settings);
+                            return JsonSerializer.Serialize(item, item?.GetType() ?? typeof(object), MonacoJsonContext.Relaxed.Options);
                         }
                     })];
                 }

@@ -1,6 +1,7 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using Monaco.Editor;
 using Monaco.Languages;
 
@@ -55,6 +56,9 @@ namespace Monaco.Serialization;
 [JsonSerializable(typeof(ISingleEditOperation))]
 [JsonSerializable(typeof(IRelatedInformation))]
 [JsonSerializable(typeof(StandaloneEditorConstructionOptions))]
+[JsonSerializable(typeof(ContextKey))]
+[JsonSerializable(typeof(FindMatch))]
+[JsonSerializable(typeof(WordAtPosition))]
 // --- Language types ---
 [JsonSerializable(typeof(CompletionItem))]
 [JsonSerializable(typeof(CompletionList))]
@@ -71,6 +75,11 @@ namespace Monaco.Serialization;
 [JsonSerializable(typeof(TextEdit))]
 [JsonSerializable(typeof(WorkspaceEdit))]
 [JsonSerializable(typeof(WorkspaceTextEdit))]
+[JsonSerializable(typeof(ILanguageExtensionPoint))]
+// --- Deserialization helper types ---
+[JsonSerializable(typeof(object))]
+[JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(bool))]
 // --- Collection variants for array/list interop ---
 [JsonSerializable(typeof(Position[]))]
 [JsonSerializable(typeof(Range[]))]
@@ -88,6 +97,12 @@ namespace Monaco.Serialization;
 [JsonSerializable(typeof(ColorPresentation[]))]
 [JsonSerializable(typeof(WorkspaceTextEdit[]))]
 [JsonSerializable(typeof(TextEdit[]))]
+[JsonSerializable(typeof(FindMatch[]))]
+[JsonSerializable(typeof(ILanguageExtensionPoint[]))]
+[JsonSerializable(typeof(IList<ILanguageExtensionPoint>))]
+[JsonSerializable(typeof(IEnumerable<Marker>))]
+[JsonSerializable(typeof(IEnumerable<FindMatch>))]
+[JsonSerializable(typeof(IEnumerable<string>))]
 internal partial class MonacoJsonContext : JsonSerializerContext
 {
     private static MonacoJsonContext? _relaxedInstance;
@@ -108,5 +123,69 @@ internal partial class MonacoJsonContext : JsonSerializerContext
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         };
         return options;
+    }
+
+    /// <summary>
+    /// Builds a type info lookup dictionary keyed by both fully-qualified name and short name.
+    /// Used by <see cref="Monaco.Helpers.ParentAccessor"/> and <see cref="Monaco.Helpers.ParentAccessorDesktop"/>
+    /// for AOT-safe deserialization in SetValue.
+    /// </summary>
+    internal static Dictionary<string, JsonTypeInfo> BuildTypeInfoMap()
+    {
+        var context = Default;
+        var map = new Dictionary<string, JsonTypeInfo>(StringComparer.Ordinal);
+
+        // Register all concrete types that may arrive from JS via setValueWithType.
+        // Primary key: FullName; compatibility alias: Name (short name for JS callers).
+        RegisterType<Position>(context, map);
+        RegisterType<Range>(context, map);
+        RegisterType<Selection>(context, map);
+        RegisterType<IMarkdownString>(context, map);
+        RegisterType<Marker>(context, map);
+        RegisterType<MarkerData>(context, map);
+        RegisterType<IModelDeltaDecoration>(context, map);
+        RegisterType<IModelDecorationOptions>(context, map);
+        RegisterType<ISingleEditOperation>(context, map);
+        RegisterType<StandaloneEditorConstructionOptions>(context, map);
+        RegisterType<ContextKey>(context, map);
+        RegisterType<FindMatch>(context, map);
+        RegisterType<WordAtPosition>(context, map);
+        RegisterType<CompletionItem>(context, map);
+        RegisterType<CompletionList>(context, map);
+        RegisterType<CompletionContext>(context, map);
+        RegisterType<CodeAction>(context, map);
+        RegisterType<CodeActionList>(context, map);
+        RegisterType<CodeActionContext>(context, map);
+        RegisterType<CodeLens>(context, map);
+        RegisterType<CodeLensList>(context, map);
+        RegisterType<Hover>(context, map);
+        RegisterType<ColorInformation>(context, map);
+        RegisterType<ColorPresentation>(context, map);
+        RegisterType<Command>(context, map);
+        RegisterType<TextEdit>(context, map);
+        RegisterType<WorkspaceEdit>(context, map);
+        RegisterType<WorkspaceTextEdit>(context, map);
+        RegisterType<ILanguageExtensionPoint>(context, map);
+
+        return map;
+    }
+
+    private static void RegisterType<T>(MonacoJsonContext context, Dictionary<string, JsonTypeInfo> map)
+    {
+        var typeInfo = context.GetTypeInfo(typeof(T));
+        if (typeInfo is null) return;
+
+        var type = typeof(T);
+        if (type.FullName is not null)
+        {
+            map[type.FullName] = typeInfo;
+        }
+
+        // Short name alias for backward compatibility with JS callers
+        // that use unqualified type names (e.g., "Selection" instead of "Monaco.Selection").
+        if (!map.ContainsKey(type.Name))
+        {
+            map[type.Name] = typeInfo;
+        }
     }
 }

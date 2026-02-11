@@ -1,9 +1,10 @@
+using System.Text.Json;
+
 using CommunityToolkit.WinUI;
 
 using Monaco.Editor;
 using Monaco.Extensions;
-
-using Newtonsoft.Json;
+using Monaco.Serialization;
 
 using Windows.Foundation;
 
@@ -64,37 +65,37 @@ namespace Monaco
 
         public IAsyncAction RevealPositionAsync(IPosition position, bool revealVerticalInCenter, bool revealHorizontal)
         {
-            return SendScriptAsync("editor.revealPosition(JSON.parse('" + JsonConvert.SerializeObject(position) + "'), " + JsonConvert.ToString(revealVerticalInCenter) + ", " + JsonConvert.ToString(revealHorizontal) + ")").AsAsyncAction();
+            return SendScriptAsync("editor.revealPosition(JSON.parse('" + JsonSerializer.Serialize(position, MonacoJsonContext.Relaxed.Options) + "'), " + JsonSerializer.Serialize(revealVerticalInCenter) + ", " + JsonSerializer.Serialize(revealHorizontal) + ")").AsAsyncAction();
         }
 
         public IAsyncAction RevealPositionInCenterAsync(IPosition position)
         {
-            return SendScriptAsync("editor.revealPositionInCenter(JSON.parse('" + JsonConvert.SerializeObject(position) + "'))").AsAsyncAction();
+            return SendScriptAsync("editor.revealPositionInCenter(JSON.parse('" + JsonSerializer.Serialize(position, MonacoJsonContext.Relaxed.Options) + "'))").AsAsyncAction();
         }
 
         public IAsyncAction RevealPositionInCenterIfOutsideViewportAsync(IPosition position)
         {
-            return SendScriptAsync("editor.revealPositionInCenterIfOutsideViewport(JSON.parse('" + JsonConvert.SerializeObject(position) + "'))").AsAsyncAction();
+            return SendScriptAsync("editor.revealPositionInCenterIfOutsideViewport(JSON.parse('" + JsonSerializer.Serialize(position, MonacoJsonContext.Relaxed.Options) + "'))").AsAsyncAction();
         }
 
         public IAsyncAction RevealRangeAsync(IRange range)
         {
-            return SendScriptAsync("editor.revealRange(JSON.parse('" + JsonConvert.SerializeObject(range) + "'))").AsAsyncAction();
+            return SendScriptAsync("editor.revealRange(JSON.parse('" + JsonSerializer.Serialize(range, MonacoJsonContext.Relaxed.Options) + "'))").AsAsyncAction();
         }
 
         public IAsyncAction RevealRangeAtTopAsync(IRange range)
         {
-            return SendScriptAsync("editor.revealRangeAtTop(JSON.parse('" + JsonConvert.SerializeObject(range) + "'))").AsAsyncAction();
+            return SendScriptAsync("editor.revealRangeAtTop(JSON.parse('" + JsonSerializer.Serialize(range, MonacoJsonContext.Relaxed.Options) + "'))").AsAsyncAction();
         }
 
         public IAsyncAction RevealRangeInCenterAsync(IRange range)
         {
-            return SendScriptAsync("editor.revealRangeInCenter(JSON.parse('" + JsonConvert.SerializeObject(range) + "'))").AsAsyncAction();
+            return SendScriptAsync("editor.revealRangeInCenter(JSON.parse('" + JsonSerializer.Serialize(range, MonacoJsonContext.Relaxed.Options) + "'))").AsAsyncAction();
         }
 
         public IAsyncAction RevealRangeInCenterIfOutsideViewportAsync(IRange range)
         {
-            return SendScriptAsync("editor.revealRangeInCenterIfOutsideViewport(JSON.parse('" + JsonConvert.SerializeObject(range) + "'))").AsAsyncAction();
+            return SendScriptAsync("editor.revealRangeInCenterIfOutsideViewport(JSON.parse('" + JsonSerializer.Serialize(range, MonacoJsonContext.Relaxed.Options) + "'))").AsAsyncAction();
         }
         #endregion
 
@@ -161,10 +162,13 @@ namespace Monaco
             {
                 if (parameters != null && parameters.Length > 0)
                 {
+                    // Breaking change: returns JsonElement instead of Newtonsoft JObject.
+                    // Consumers should use JsonElement API (GetProperty, GetString, etc.)
+                    // instead of JObject indexers.
                     object?[] args = new object[parameters.Length];
                     for (int i = 0; i < parameters.Length; i++)
                     {
-                        args[i] = JsonConvert.DeserializeObject<object>(parameters[i]);
+                        args[i] = JsonSerializer.Deserialize<object>(parameters[i], MonacoJsonContext.Default.Options);
                     }
 
                     handler?.Invoke(args);
@@ -198,7 +202,7 @@ namespace Monaco
 
         public async Task SetModelMarkersAsync(string owner, IMarkerData[] markers)
         {
-            await SendScriptAsync("monaco.editor.setModelMarkers(EditorContext.getEditorForElement(element).model, " + JsonConvert.ToString(owner) + ", " + JsonConvert.SerializeObject(markers) + ");").AsAsyncAction();
+            await SendScriptAsync("monaco.editor.setModelMarkers(EditorContext.getEditorForElement(element).model, " + JsonSerializer.Serialize(owner, MonacoJsonContext.Relaxed.Options) + ", " + JsonSerializer.Serialize(markers, MonacoJsonContext.Relaxed.Options) + ");").AsAsyncAction();
         }
 
         public async Task<Position?> GetPositionAsync()
@@ -208,7 +212,7 @@ namespace Monaco
 
         public IAsyncAction SetPositionAsync(IPosition position)
         {
-            return SendScriptAsync("EditorContext.getEditorForElement(element).editor.setPosition(" + JsonConvert.SerializeObject(position) + ");").AsAsyncAction();
+            return SendScriptAsync("EditorContext.getEditorForElement(element).editor.setPosition(" + JsonSerializer.Serialize(position, MonacoJsonContext.Relaxed.Options) + ");").AsAsyncAction();
         }
 
         /// <summary>

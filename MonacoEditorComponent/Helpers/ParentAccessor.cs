@@ -1,10 +1,12 @@
-﻿using CommunityToolkit.WinUI;
+using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
+
+using CommunityToolkit.WinUI;
 
 using Microsoft.UI.Dispatching;
 
-using Newtonsoft.Json;
-
-using System.Reflection;
+using Monaco.Serialization;
 
 using Windows.Foundation.Metadata;
 
@@ -24,7 +26,11 @@ namespace Monaco.Helpers
         private readonly Dictionary<string, Action<string[]>> action_parameters;
         private Dictionary<string, Func<string[], Task<string>?>>? events;
 
-        private List<Assembly> Assemblies { get; set; } = [];
+        /// <summary>
+        /// AOT-safe type info lookup for <see cref="SetValue(string, string, string)"/>.
+        /// Keyed by both fully-qualified name and short name for backward compatibility.
+        /// </summary>
+        private readonly Dictionary<string, JsonTypeInfo> _typeInfoMap;
 
         /// <summary>
         /// Constructs a new reflective parent Accessor for the provided object.
@@ -39,6 +45,7 @@ namespace Monaco.Helpers
             actions = [];
             action_parameters = [];
             events = [];
+            _typeInfoMap = MonacoJsonContext.BuildTypeInfoMap();
 
             PartialCtor(parent);
         }
@@ -97,12 +104,23 @@ namespace Monaco.Helpers
         }
 
         /// <summary>
-        /// Adds an Assembly to use for looking up types by name for <see cref="SetValue(string, string, string)"/>.
+        /// Registers a <see cref="JsonTypeInfo"/> for AOT-safe deserialization in
+        /// <see cref="SetValue(string, string, string)"/>.
         /// </summary>
-        /// <param name="assembly">Assembly to add.</param>
+        /// <param name="name">Type name key (fully-qualified or short name).</param>
+        /// <param name="info">The <see cref="JsonTypeInfo"/> to register.</param>
+        public void RegisterTypeInfo(string name, JsonTypeInfo info)
+        {
+            _typeInfoMap[name] = info;
+        }
+
+        /// <summary>
+        /// Obsolete: Assembly scanning is no longer used. Use <see cref="RegisterTypeInfo"/> instead.
+        /// </summary>
+        [Obsolete("Use RegisterTypeInfo instead. Assembly scanning is not AOT-compatible.")]
         public void AddAssemblyForTypeLookup(Assembly assembly)
         {
-            Assemblies.Add(assembly);
+            // No-op: retained for API compatibility during migration.
         }
 
         /// <summary>
@@ -174,10 +192,22 @@ namespace Monaco.Helpers
                 var propinfo = typeinfo.GetProperty(name);
                 var obj = propinfo?.GetValue(tobj);
 
-                return JsonConvert.SerializeObject(obj, new JsonSerializerSettings()
+                if (obj is null)
                 {
-                    NullValueHandling = NullValueHandling.Ignore
-                });
+                    return "{}";
+                }
+
+                try
+                {
+                    return JsonSerializer.Serialize(obj, obj.GetType(), MonacoJsonContext.Relaxed.Options);
+                }
+                catch (InvalidOperationException ex) when (ex.Message.Contains("not supported"))
+                {
+                    throw new InvalidOperationException(
+                        $"Type '{obj.GetType().FullName}' is not registered in MonacoJsonContext. " +
+                        "Register it as a [JsonSerializable] attribute on MonacoJsonContext to enable AOT-safe serialization.",
+                        ex);
+                }
             }
             return "{}";
         }
@@ -250,10 +280,11 @@ namespace Monaco.Helpers
 
         /// <summary>
         /// Sets the value for the specified Property after deserializing the value as the given type name.
+        /// Uses AOT-safe FQN-keyed type info lookup instead of runtime <see cref="Type.GetType(string)"/>.
         /// </summary>
-        /// <param name="name"></param>
-        /// <param name="value"></param>
-        /// <param name="type"></param>
+        /// <param name="name">Property name on the parent object.</param>
+        /// <param name="newValue">JSON string to deserialize.</param>
+        /// <param name="type">Type name (fully-qualified or short name).</param>
         public async Task SetValue(string name, string newValue, string type)
         {
             await _queue.EnqueueAsync(() =>
@@ -261,50 +292,27 @@ namespace Monaco.Helpers
                 if (parent.TryGetTarget(out var tobj))
                 {
                     var propinfo = typeinfo.GetProperty(name);
-                    var typeobj = LookForTypeByName(type);
 
-                    if (typeobj is not null)
+                    if (!_typeInfoMap.TryGetValue(type, out var jsonTypeInfo))
                     {
+                        throw new InvalidOperationException(
+                            $"Type '{type}' is not registered for deserialization. " +
+                            "Register it in MonacoJsonContext or call RegisterTypeInfo.");
+                    }
 
-                        var obj = JsonConvert.DeserializeObject(newValue, typeobj);
+                    var obj = JsonSerializer.Deserialize(newValue, jsonTypeInfo);
 
-                        tobj.IsSettingValue = true;
-                        try
-                        {
-                            propinfo?.SetValue(tobj, obj);
-                        }
-                        finally
-                        {
-                            tobj.IsSettingValue = false;
-                        }
+                    tobj.IsSettingValue = true;
+                    try
+                    {
+                        propinfo?.SetValue(tobj, obj);
+                    }
+                    finally
+                    {
+                        tobj.IsSettingValue = false;
                     }
                 }
             });
-        }
-
-        private Type? LookForTypeByName(string name)
-        {
-            // First search locally
-            var result = Type.GetType(name);
-
-            if (result != null)
-            {
-                return result;
-            }
-
-            // Search in Other Assemblies
-            foreach (var assembly in Assemblies)
-            {
-                foreach (var typeInfo in assembly.ExportedTypes)
-                {
-                    if (typeInfo.Name == name)
-                    {
-                        return typeInfo;
-                    }
-                }
-            }
-
-            return null;
         }
 
         public void Dispose()

@@ -1,7 +1,8 @@
 using System.ComponentModel;
+using System.Text.Json;
 
 using Monaco.Languages;
-using Newtonsoft.Json;
+using Monaco.Serialization;
 
 
 namespace Monaco
@@ -46,8 +47,8 @@ namespace Monaco
                 {
                     if (args != null && args.Length >= 2)
                     {
-                        var range = JsonConvert.DeserializeObject<Range>(args[0]);
-                        var context = JsonConvert.DeserializeObject<CodeActionContext>(args[1]);
+                        var range = JsonSerializer.Deserialize(args[0], MonacoJsonContext.Default.Range);
+                        var context = JsonSerializer.Deserialize(args[1], MonacoJsonContext.Default.CodeActionContext);
 
                         if (editor.GetModel() is { } model
                             && range is not null
@@ -57,7 +58,7 @@ namespace Monaco
 
                             if (list != null)
                             {
-                                return JsonConvert.SerializeObject(list);
+                                return JsonSerializer.Serialize(list, MonacoJsonContext.Relaxed.CodeActionList);
                             }
                         }
                     }
@@ -83,7 +84,7 @@ namespace Monaco
 
                         if (list != null)
                         {
-                            return JsonConvert.SerializeObject(list);
+                            return JsonSerializer.Serialize(list, MonacoJsonContext.Relaxed.CodeLensList);
                         }
                     }
 
@@ -96,13 +97,13 @@ namespace Monaco
                     if (args != null && args.Length >= 1)
                     {
                         if (editor.GetModel() is { } model
-                            && JsonConvert.DeserializeObject<CodeLens>(args[0]) is { } codeLens)
+                            && JsonSerializer.Deserialize(args[0], MonacoJsonContext.Default.CodeLens) is { } codeLens)
                         {
                             var lens = await provider.ResolveCodeLensAsync(model, codeLens);
 
                             if (lens != null)
                             {
-                                return JsonConvert.SerializeObject(lens);
+                                return JsonSerializer.Serialize(lens, MonacoJsonContext.Relaxed.CodeLens);
                             }
                         }
                     }
@@ -128,13 +129,13 @@ namespace Monaco
                     if (args != null && args.Length >= 1)
                     {
                         if (editor.GetModel() is { } model
-                        && JsonConvert.DeserializeObject<ColorInformation>(args[0]) is { } colorInformation)
+                        && JsonSerializer.Deserialize(args[0], MonacoJsonContext.Default.ColorInformation) is { } colorInformation)
                         {
                             var items = await provider.ProvideColorPresentationsAsync(model, colorInformation);
 
                             if (items != null)
                             {
-                                return JsonConvert.SerializeObject(items);
+                                return JsonSerializer.Serialize(items, MonacoJsonContext.Relaxed.Options);
                             }
                         }
                     }
@@ -151,7 +152,7 @@ namespace Monaco
 
                         if (items != null)
                         {
-                            return JsonConvert.SerializeObject(items);
+                            return JsonSerializer.Serialize(items, MonacoJsonContext.Relaxed.Options);
                         }
                     }
 
@@ -175,15 +176,15 @@ namespace Monaco
                     if (args != null && args.Length >= 2)
                     {
                         if (editor.GetModel() is { } model
-                        && JsonConvert.DeserializeObject<Position>(args[0]) is { } position
-                        && JsonConvert.DeserializeObject<CompletionContext>(args[1]) is { } completionContext)
+                        && JsonSerializer.Deserialize(args[0], MonacoJsonContext.Default.Position) is { } position
+                        && JsonSerializer.Deserialize(args[1], MonacoJsonContext.Default.CompletionContext) is { } completionContext)
                         {
                             var items = await provider.ProvideCompletionItemsAsync(model, position, completionContext);
 
                             if (items != null)
                             {
                                 System.Diagnostics.Debug.WriteLine("Items: " + items);
-                                var serialized = JsonConvert.SerializeObject(items);
+                                var serialized = JsonSerializer.Serialize(items, MonacoJsonContext.Relaxed.CompletionList);
                                 System.Diagnostics.Debug.WriteLine("Items in JSON: " + serialized);
                                 return serialized;
                             }
@@ -199,13 +200,13 @@ namespace Monaco
                     if (args != null && args.Length >= 1)
                     {
                         if (editor.GetModel() is { } model
-                        && JsonConvert.DeserializeObject<CompletionItem>(args[0]) is { } requestedItem)
+                        && JsonSerializer.Deserialize(args[0], MonacoJsonContext.Default.CompletionItem) is { } requestedItem)
                         {
                             var completionItem = await provider.ResolveCompletionItemAsync(model, requestedItem);
 
                             if (completionItem != null)
                             {
-                                return JsonConvert.SerializeObject(completionItem);
+                                return JsonSerializer.Serialize(completionItem, MonacoJsonContext.Relaxed.CompletionItem);
                             }
                         }
                     }
@@ -231,13 +232,13 @@ namespace Monaco
                     if (args != null && args.Length >= 1)
                     {
                         if (editor.GetModel() is { } model
-                        && JsonConvert.DeserializeObject<Position>(args[0]) is { } position)
+                        && JsonSerializer.Deserialize(args[0], MonacoJsonContext.Default.Position) is { } position)
                         {
                             var hover = await provider.ProvideHover(model, position);
 
                             if (hover != null)
                             {
-                                return JsonConvert.SerializeObject(hover);
+                                return JsonSerializer.Serialize(hover, MonacoJsonContext.Relaxed.Hover);
                             }
                         }
                     }

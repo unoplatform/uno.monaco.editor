@@ -303,7 +303,6 @@ namespace Monaco
                         $"Unsupported presenter type: {_view.GetType().Name}");
                 }
 
-                _parentAccessor?.AddAssemblyForTypeLookup(typeof(Range).GetTypeInfo().Assembly);
                 _parentAccessor?.RegisterAction("Loaded", CodeEditorLoaded);
 
                 _themeListener.ThemeChanged += ThemeListener_ThemeChanged;

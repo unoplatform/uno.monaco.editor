@@ -1,14 +1,14 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 using CommunityToolkit.WinUI;
 
 using Microsoft.UI.Dispatching;
 
 using Monaco.Bridge;
-
-using Newtonsoft.Json;
+using Monaco.Serialization;
 
 using StreamJsonRpc;
 
@@ -28,7 +28,12 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
     private Dictionary<string, Action>? _actions;
     private readonly Dictionary<string, Action<string[]>> _actionParameters;
     private Dictionary<string, Func<string[], Task<string>?>>? _events;
-    private List<Assembly> _assemblies = [];
+
+    /// <summary>
+    /// AOT-safe type info lookup for <see cref="SetValue(string, string, string)"/>.
+    /// Keyed by both fully-qualified name and short name for backward compatibility.
+    /// </summary>
+    private readonly Dictionary<string, JsonTypeInfo> _typeInfoMap;
 
     public ParentAccessorDesktop(ICodeEditorPresenter parent, DispatcherQueue queue)
     {
@@ -41,6 +46,7 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
         _actions = [];
         _actionParameters = [];
         _events = [];
+        _typeInfoMap = MonacoJsonContext.BuildTypeInfoMap();
     }
 
     // ============================================================
@@ -62,9 +68,24 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
         _events?[name] = function;
     }
 
+    /// <summary>
+    /// Registers a <see cref="JsonTypeInfo"/> for AOT-safe deserialization in
+    /// <see cref="SetValue(string, string, string)"/>.
+    /// </summary>
+    /// <param name="name">Type name key (fully-qualified or short name).</param>
+    /// <param name="info">The <see cref="JsonTypeInfo"/> to register.</param>
+    public void RegisterTypeInfo(string name, JsonTypeInfo info)
+    {
+        _typeInfoMap[name] = info;
+    }
+
+    /// <summary>
+    /// Obsolete: Assembly scanning is no longer used. Use <see cref="RegisterTypeInfo"/> instead.
+    /// </summary>
+    [Obsolete("Use RegisterTypeInfo instead. Assembly scanning is not AOT-compatible.")]
     public void AddAssemblyForTypeLookup(Assembly assembly)
     {
-        _assemblies.Add(assembly);
+        // No-op: retained for API compatibility during migration.
     }
 
     public async Task<object?> GetValue(string name)
@@ -90,10 +111,22 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
             var propinfo = _typeinfo.GetProperty(name);
             var obj = propinfo?.GetValue(tobj);
 
-            return JsonConvert.SerializeObject(obj, new JsonSerializerSettings()
+            if (obj is null)
             {
-                NullValueHandling = NullValueHandling.Ignore
-            });
+                return "{}";
+            }
+
+            try
+            {
+                return JsonSerializer.Serialize(obj, obj.GetType(), MonacoJsonContext.Relaxed.Options);
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("not supported"))
+            {
+                throw new InvalidOperationException(
+                    $"Type '{obj.GetType().FullName}' is not registered in MonacoJsonContext. " +
+                    "Register it as a [JsonSerializable] attribute on MonacoJsonContext to enable AOT-safe serialization.",
+                    ex);
+            }
         }
 
         return "{}";
@@ -149,21 +182,24 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
             if (_parent.TryGetTarget(out var tobj))
             {
                 var propinfo = _typeinfo.GetProperty(name);
-                var typeobj = LookForTypeByName(type);
 
-                if (typeobj is not null)
+                if (!_typeInfoMap.TryGetValue(type, out var jsonTypeInfo))
                 {
-                    var obj = JsonConvert.DeserializeObject(newValue, typeobj);
+                    throw new InvalidOperationException(
+                        $"Type '{type}' is not registered for deserialization. " +
+                        "Register it in MonacoJsonContext or call RegisterTypeInfo.");
+                }
 
-                    tobj.IsSettingValue = true;
-                    try
-                    {
-                        propinfo?.SetValue(tobj, obj);
-                    }
-                    finally
-                    {
-                        tobj.IsSettingValue = false;
-                    }
+                var obj = JsonSerializer.Deserialize(newValue, jsonTypeInfo);
+
+                tobj.IsSettingValue = true;
+                try
+                {
+                    propinfo?.SetValue(tobj, obj);
+                }
+                finally
+                {
+                    tobj.IsSettingValue = false;
                 }
             }
         });
@@ -274,25 +310,6 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
     // ============================================================
     // Helpers
     // ============================================================
-
-    private Type? LookForTypeByName(string name)
-    {
-        var result = Type.GetType(name);
-        if (result is not null) return result;
-
-        foreach (var assembly in _assemblies)
-        {
-            foreach (var typeInfo in assembly.ExportedTypes)
-            {
-                if (typeInfo.Name == name)
-                {
-                    return typeInfo;
-                }
-            }
-        }
-
-        return null;
-    }
 
     /// <summary>
     /// Extracts a string value from a <see cref="JsonElement"/>.
