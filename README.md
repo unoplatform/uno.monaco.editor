@@ -34,7 +34,7 @@ Usage
 A NuGet Package is provided:
 
 ```
-Install-Package Monaco.Editor s
+Install-Package Monaco.Editor
 ```
 
 Look at the TestApp for current usage and basic examples.
