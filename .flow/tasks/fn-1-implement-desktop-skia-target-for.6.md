@@ -67,3 +67,11 @@ Create an xUnit v3 + MTP2 unit test project, extract testable pure helper logic 
 - [ ] CI workflow: Playwright browser + OS deps installed (`bin/Release/net10.0/playwright.ps1 install --with-deps chromium`)
 - [ ] CI workflow: `dotnet test -c Release --filter "Category!=DesktopCDP"` step added
 - [ ] CI workflow: `test-artifacts/` uploaded on test failure
+
+## Done summary
+Created xUnit v3 + MTP2 test project with 94 unit tests covering BridgeEncoding, WebView2JsonRpcMessageHandler, JsonRpc target dispatch, vscode-jsonrpc wire compatibility, IsNavigationAllowed, JsonElement conversion, RenderingBackend, and UriHelper. Updated CI with WASM build, Playwright install, test execution, and artifact upload steps.
+
+## Done evidence
+```json
+{"commits": ["b8355f7", "4bd2281"], "tests": ["dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj (94 passed, 0 failed)"], "prs": []}
+```
