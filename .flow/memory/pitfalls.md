@@ -45,3 +45,6 @@ In templated controls, child element event handlers must only be detached when t
 
 ## 2026-02-11 manual [pitfall]
 When keeping event handlers attached across unload/load cycles, add IsLoaded guards in handlers to prevent late callbacks from re-initializing a control that is unloaded
+
+## 2026-02-11 manual [pitfall]
+When a method computes a transformed value into a local variable but then writes the original parameter, this silently persists untransformed data -- always verify the correct variable is used in the final assignment

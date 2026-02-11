@@ -44,8 +44,8 @@ Refactor the presenter architecture from a single partial class to two separate 
 - [ ] Desktop presenter security settings configured
 
 ## Done summary
-Refactored presenter architecture: renamed CodeEditorPresenter to WasmCodeEditorPresenter with platform guard, added DesktopCodeEditorPresenter shell wrapping WebView2 with security hardening (navigation allowlist, disabled script dialogs/context menus/host objects), expanded ICodeEditorPresenter with InvokeScriptAsync/PostWebMessage/MessageReceived contracts, extracted helper interfaces (IParentAccessor, IThemeListener, IKeyboardListener, IDebugLogger), created BridgeFactory for platform-specific helper creation, added EditorLifecycleState for exactly-once event semantics, replaced CodeEditorPresenter in Generic.xaml with ContentPresenter placeholder, updated OnApplyTemplate to create correct presenter via OperatingSystem.IsBrowser(), refactored WebViewExtensions to use presenter's InvokeScriptAsync, and added StreamJsonRpc NuGet dependency.
+Refactored presenter architecture: renamed CodeEditorPresenter to WasmCodeEditorPresenter with platform guard, added DesktopCodeEditorPresenter shell wrapping WebView2 with security hardening (navigation allowlist, disabled script dialogs/context menus/host objects, buffered Source URI), expanded ICodeEditorPresenter with InvokeScriptAsync/PostWebMessage/MessageReceived/PresenterNavigationStartingEventArgs contracts, extracted helper interfaces (IParentAccessor, IThemeListener, IKeyboardListener, IDebugLogger), created BridgeFactory for platform-specific helper creation, added EditorLifecycleState for exactly-once event semantics with IsLoaded guards against late callbacks, replaced CodeEditorPresenter in Generic.xaml with ContentPresenter placeholder, updated OnApplyTemplate to create correct presenter via OperatingSystem.IsBrowser(), refactored WebViewExtensions to use presenter's InvokeScriptAsync, added StreamJsonRpc NuGet dependency, made ThemeListener IDisposable, and fixed ParentAccessor sanitize value flow bug.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: bb79bdcdf183a1d35701ea68fc24dad077e5dacb
+- Tests: dotnet build MonacoEditorComponent.slnx --no-restore, dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-desktop, dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm
 - PRs:
