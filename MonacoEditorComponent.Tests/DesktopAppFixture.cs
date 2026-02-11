@@ -165,6 +165,13 @@ public sealed class DesktopAppFixture : IAsyncLifetime
             {
                 Path = Path.Combine(artifactsDir, $"{testName}-trace.zip"),
             });
+
+            // Restart tracing so subsequent failing tests also get trace artifacts.
+            await Context.Tracing.StartAsync(new()
+            {
+                Screenshots = true,
+                Snapshots = true,
+            });
         }
         catch { /* best-effort */ }
 

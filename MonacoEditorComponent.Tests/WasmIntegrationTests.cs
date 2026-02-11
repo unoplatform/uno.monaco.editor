@@ -100,16 +100,19 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
             await _fixture.Page.EvaluateAsync(
                 "() => monaco.editor.setTheme('vs-dark')");
 
-            // Verify via DOM class or simply that no exception was thrown.
+            // Verify the theme was applied via DOM class or body attribute.
             var hasDarkClass = await _fixture.Page.EvaluateAsync<bool>(
                 "() => document.querySelector('.monaco-editor')?.classList.contains('vs-dark') ?? false");
+
+            var hasThemeAttr = await _fixture.Page.EvaluateAsync<bool>(
+                "() => (document.body.getAttribute('data-vscode-theme-name') || '').includes('dark')");
+
+            Assert.True(hasDarkClass || hasThemeAttr,
+                "Expected either .monaco-editor.vs-dark class or dark theme body attribute after switching to vs-dark.");
 
             // Switch back to default.
             await _fixture.Page.EvaluateAsync(
                 "() => monaco.editor.setTheme('vs')");
-
-            // If we got here without error, theme switching works on WASM.
-            // The class check may vary by Monaco version, so we accept either outcome.
         }
         catch
         {

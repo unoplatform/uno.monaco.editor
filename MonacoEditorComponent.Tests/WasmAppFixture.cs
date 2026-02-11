@@ -139,6 +139,13 @@ public sealed class WasmAppFixture : IAsyncLifetime
             {
                 Path = Path.Combine(artifactsDir, $"{testName}-trace.zip"),
             });
+
+            // Restart tracing so subsequent failing tests also get trace artifacts.
+            await Context.Tracing.StartAsync(new()
+            {
+                Screenshots = true,
+                Snapshots = true,
+            });
         }
         catch { /* best-effort */ }
 
@@ -174,21 +181,49 @@ public sealed class WasmAppFixture : IAsyncLifetime
 
     private static Process StartStaticServer(string wwwrootPath, int port)
     {
-        // Use python3 http.server as a cross-platform static file server.
-        // It is available on all CI images and developer machines.
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "python3",
-            Arguments = $"-m http.server {port} --directory \"{wwwrootPath}\"",
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true,
-        };
+        // Try multiple static file servers in priority order for cross-platform support.
+        // dotnet-serve is preferred (.NET ecosystem), then python3 (CI images), then python/py (Windows).
+        (string fileName, string arguments)[] candidates =
+        [
+            ("dotnet", $"serve --port {port} --directory \"{wwwrootPath}\""),
+            ("python3", $"-m http.server {port} --directory \"{wwwrootPath}\""),
+            ("python", $"-m http.server {port} --directory \"{wwwrootPath}\""),
+            ("py", $"-3 -m http.server {port} --directory \"{wwwrootPath}\""),
+        ];
 
-        return Process.Start(startInfo)
-            ?? throw new InvalidOperationException(
-                "Failed to start static file server. Ensure python3 is on PATH.");
+        var attempted = new List<string>();
+
+        foreach (var (fileName, arguments) in candidates)
+        {
+            try
+            {
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    Arguments = arguments,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                };
+
+                var process = Process.Start(startInfo);
+                if (process is not null)
+                {
+                    return process;
+                }
+
+                attempted.Add($"{fileName} (returned null)");
+            }
+            catch (Exception ex)
+            {
+                attempted.Add($"{fileName} ({ex.GetType().Name}: {ex.Message})");
+            }
+        }
+
+        throw new InvalidOperationException(
+            "Failed to start static file server. Tried:\n" +
+            string.Join("\n", attempted.Select(a => $"  - {a}")));
     }
 
     private static async Task WaitForServerReady(string url, int timeoutMs)

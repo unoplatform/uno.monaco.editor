@@ -134,21 +134,16 @@ public sealed class DesktopIntegrationTests : IAsyncLifetime
             await _fixture.Page.EvaluateAsync(
                 "() => monaco.editor.setTheme('vs-dark')");
 
-            // Verify the theme was applied by checking the editor's theme service.
-            // The exact API depends on Monaco internals, so we also accept checking
-            // the DOM for the dark theme class.
+            // Verify the theme was applied. Check the DOM class first (most reliable),
+            // then fall back to the body data attribute. At least one must confirm dark theme.
             var hasDarkClass = await _fixture.Page.EvaluateAsync<bool>(
                 "() => document.querySelector('.monaco-editor')?.classList.contains('vs-dark') ?? false");
 
-            // Alternative: check via the internal theme name if the class check fails.
-            if (!hasDarkClass)
-            {
-                // Fallback: verify via monaco.editor internal API.
-                var themeName = await _fixture.Page.EvaluateAsync<string>(
-                    "() => { try { return document.body.getAttribute('data-vscode-theme-name') || 'unknown'; } catch { return 'unknown'; } }");
-                // If we got here without exception, the theme switch at least executed.
-                // The exact verification depends on Monaco version internals.
-            }
+            var hasThemeAttr = await _fixture.Page.EvaluateAsync<bool>(
+                "() => (document.body.getAttribute('data-vscode-theme-name') || '').includes('dark')");
+
+            Assert.True(hasDarkClass || hasThemeAttr,
+                "Expected either .monaco-editor.vs-dark class or dark theme body attribute after switching to vs-dark.");
 
             // Switch back to default to not affect other tests.
             await _fixture.Page.EvaluateAsync(
@@ -172,19 +167,30 @@ public sealed class DesktopIntegrationTests : IAsyncLifetime
             await _fixture.Page.EvaluateAsync(
                 "() => monaco.editor.getEditors()[0].setValue('Line 1\\nLine 2\\nLine 3')");
 
-            // Add a decoration via Monaco JS API.
-            var decorationCount = await _fixture.Page.EvaluateAsync<int>("""
+            // Capture baseline decoration count before adding ours.
+            var countBefore = await _fixture.Page.EvaluateAsync<int>(
+                "() => monaco.editor.getEditors()[0].getModel().getAllDecorations().length");
+
+            // Add a decoration via Monaco JS API and capture the returned IDs.
+            var addedIds = await _fixture.Page.EvaluateAsync<string[]>("""
                 () => {
                     const editor = monaco.editor.getEditors()[0];
-                    editor.deltaDecorations([], [{
+                    return editor.deltaDecorations([], [{
                         range: new monaco.Range(1, 1, 1, 7),
                         options: { inlineClassName: 'test-decoration' }
                     }]);
-                    return editor.getModel().getAllDecorations().length;
                 }
                 """);
 
-            Assert.True(decorationCount > 0, "Expected at least one decoration after adding.");
+            Assert.NotNull(addedIds);
+            Assert.NotEmpty(addedIds);
+
+            // Verify decoration count increased.
+            var countAfter = await _fixture.Page.EvaluateAsync<int>(
+                "() => monaco.editor.getEditors()[0].getModel().getAllDecorations().length");
+
+            Assert.True(countAfter > countBefore,
+                $"Expected decoration count to increase after adding. Before: {countBefore}, After: {countAfter}");
         }
         catch
         {
