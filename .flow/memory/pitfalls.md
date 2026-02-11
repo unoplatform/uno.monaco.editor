@@ -81,3 +81,6 @@ Expression-bodied ReadJson that returns 'new NotSupportedException()' instead of
 
 ## 2026-02-11 manual [pitfall]
 When converting float channel values (0-1) to byte (0-255), always clamp and round before casting to byte -- raw cast of out-of-range values wraps/truncates silently
+
+## 2026-02-11 manual [pitfall]
+When replacing 'using Newtonsoft.Json' with 'using System.Text.Json.Serialization', [JsonIgnore] silently changes namespace - Newtonsoft no longer recognizes it. Add explicit [Newtonsoft.Json.JsonIgnore] on any property that must be ignored by both serializers during dual-stack period.

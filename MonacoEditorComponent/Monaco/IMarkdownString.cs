@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json.Serialization;
 using Windows.Foundation.Metadata;
 
 #if !NETSTANDARD2_0
@@ -29,7 +28,6 @@ namespace Monaco
         /// <summary>
         /// Gets or sets a mapping of URI strings used in the Markdown.
         /// </summary>
-        [JsonPropertyName("uris")]
         public IDictionary<string, Uri>? Uris { get; set; }
 
         /// <summary>
