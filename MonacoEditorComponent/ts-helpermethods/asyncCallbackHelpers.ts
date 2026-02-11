@@ -2,7 +2,7 @@ import * as monaco from 'monaco-editor';
 import { ParentAccessor } from './Monaco.Helpers.ParentAccessor';
 import { isDesktopHost, getConnection, sendRequestWithTimeout, retainConnection } from './bridge/jsonRpcBridge';
 import { Disposable } from 'vscode-jsonrpc/browser';
-import { EditorContext, getParentJsonValueAsync, changeTheme, getThemeCurrentThemeNameAsync, getThemeIsHighContrastAsync } from './otherScriptsToBeOrganized';
+import { EditorContext, changeTheme } from './otherScriptsToBeOrganized';
 
 type MethodWithReturnId = (parameter: string) => void;
 type NumberCallback = (parameter: any) => void;
@@ -163,7 +163,8 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any) =>
     });
 
     // Set theme -- async on desktop (JSON-RPC with timeout), sync on WASM (JSExport)
-    let theme: any = await getParentJsonValueAsync(element, "RequestedTheme");
+    // Use direct accessor/theme calls to avoid circular dependency with otherScriptsToBeOrganized
+    let theme: any = await editorContext.Accessor.getJsonValueAsync("RequestedTheme");
     theme = {
         "0": "Default",
         "1": "Light",
@@ -171,10 +172,10 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any) =>
     }[theme];
 
     if (theme == "Default") {
-        theme = await getThemeCurrentThemeNameAsync(element);
+        theme = await (editorContext as any).Theme.getCurrentThemeNameAsync();
     }
 
-    const isHighContrast = await getThemeIsHighContrastAsync(element);
+    const isHighContrast = await (editorContext as any).Theme.getIsHighContrastAsync();
     changeTheme(element, theme, isHighContrast as any);
 
     // Track resize handler for deterministic cleanup

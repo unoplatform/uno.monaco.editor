@@ -71,5 +71,8 @@ Modify JS/TS helpers for dual-mode operation (WASM JSExport + desktop JSON-RPC).
 - [ ] TypeScript compiles successfully
 
 ## Done summary
-
+Implemented JS bridge dual-mode communication layer: added WASM/desktop environment detection, migrated ParentAccessor and ThemeListener to dual-mode (JSExport on WASM, JSON-RPC on desktop), made initializeMonacoEditor async for desktop property reads with timeouts, registered C#->JS JSON-RPC handlers (editor/getValue, editor/updateOptions, editor/lifecycleUpdate), emitted editor/ready notification after init, skipped sanitize/desanitize on desktop, and added deterministic dispose with reference-counted connection lifecycle.
 ## Evidence
+- Commits: b257659, 453b42e, a696fe1, 92481d1
+- Tests: npx tsc --project MonacoEditorComponent/tsconfig.json --noEmit, npm run build, dotnet build MonacoEditorComponent.slnx --no-restore
+- PRs:
