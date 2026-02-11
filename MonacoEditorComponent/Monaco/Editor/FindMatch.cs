@@ -1,5 +1,6 @@
 using Monaco.Helpers;
 using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -18,8 +19,8 @@ namespace Monaco.Editor
         /// Gets or sets the range where the match was found.
         /// </summary>
         [JsonProperty("range", NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        [JsonConverter(typeof(InterfaceToClassConverter<IRange, Range>))]
+        [System.Text.Json.Serialization.JsonConverter(typeof(InterfaceToClassConverter<IRange, Range>))]
+        [Newtonsoft.Json.JsonConverter(typeof(NewtonsoftInterfaceToClassConverter<IRange, Range>))]
         public IRange? Range { get; set; }
     }
 }
-

@@ -1,7 +1,6 @@
-﻿using Newtonsoft.Json;
-
+using Newtonsoft.Json;
 using System.Text;
-
+using System.Text.Json.Serialization;
 using Windows.UI;
 
 namespace Monaco.Helpers
@@ -10,14 +9,17 @@ namespace Monaco.Helpers
     /// Simple Proxy to general CSS Line Styles.
     /// Line styles are overlayed behind text in the editor and are useful for highlighting sections of text efficiently
     /// </summary>
-    [JsonConverter(typeof(CssStyleConverter))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(CssLineStyleConverter))]
+    [Newtonsoft.Json.JsonConverter(typeof(NewtonsoftCssStyleConverter))]
     public sealed class CssLineStyle : ICssStyle
     {
-        [JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
+        [Newtonsoft.Json.JsonIgnore]
         public Color? BackgroundColor { get; set; }
 
         [Obsolete("Use ForegroundColor on CssInlineStyle instead, this is an overlay.")]
-        [JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
+        [Newtonsoft.Json.JsonIgnore]
         public Color? ForegroundColor { get; set; }
 
         public uint Id { get; }

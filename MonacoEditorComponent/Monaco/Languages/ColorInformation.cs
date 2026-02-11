@@ -1,7 +1,10 @@
-﻿using Monaco.Helpers;
+using Monaco.Helpers;
 using Newtonsoft.Json;
 using System;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Windows.UI;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace Monaco.Languages
 {
@@ -10,23 +13,91 @@ namespace Monaco.Languages
     /// </summary>
     public sealed class ColorInformation(Color color, IRange? range)
     {
+        [JsonPropertyName("color")]
         [JsonProperty("color")]
-        [JsonConverter(typeof(ColorConverter))]
+        [System.Text.Json.Serialization.JsonConverter(typeof(ColorConverter))]
+        [Newtonsoft.Json.JsonConverter(typeof(NewtonsoftColorConverter))]
         public Color Color { get; set; } = color;
 
+        [JsonPropertyName("range")]
         [JsonProperty("range")]
-        [JsonConverter(typeof(InterfaceToClassConverter<IRange, Range>))]
+        [System.Text.Json.Serialization.JsonConverter(typeof(InterfaceToClassConverter<IRange, Range>))]
+        [Newtonsoft.Json.JsonConverter(typeof(NewtonsoftInterfaceToClassConverter<IRange, Range>))]
         public IRange? Range { get; set; } = range;
     }
 
     /// <summary>
-    /// Helper to convert between <see cref="Windows.UI.Color"/> and Monaco <see href="https://microsoft.github.io/monaco-editor/api/interfaces/monaco.languages.icolor.html">IColor</see>.
+    /// STJ converter between <see cref="Windows.UI.Color"/> and Monaco IColor (0-1 float RGBA).
     /// </summary>
-    internal class ColorConverter : JsonConverter
+    internal class ColorConverter : System.Text.Json.Serialization.JsonConverter<Color>
+    {
+        public override Color Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType != JsonTokenType.StartObject)
+            {
+                throw new System.Text.Json.JsonException("Expected StartObject token for Color.");
+            }
+
+            Color color = new();
+
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonTokenType.EndObject)
+                {
+                    break;
+                }
+
+                if (reader.TokenType != JsonTokenType.PropertyName)
+                {
+                    throw new System.Text.Json.JsonException("Expected PropertyName token.");
+                }
+
+                var propertyName = reader.GetString();
+                reader.Read(); // Advance to the value
+
+                switch (propertyName)
+                {
+                    case "alpha":
+                        color.A = (byte)(reader.GetDouble() * 255);
+                        break;
+                    case "red":
+                        color.R = (byte)(reader.GetDouble() * 255);
+                        break;
+                    case "green":
+                        color.G = (byte)(reader.GetDouble() * 255);
+                        break;
+                    case "blue":
+                        color.B = (byte)(reader.GetDouble() * 255);
+                        break;
+                    default:
+                        reader.Skip();
+                        break;
+                }
+            }
+
+            return color;
+        }
+
+        public override void Write(Utf8JsonWriter writer, Color value, JsonSerializerOptions options)
+        {
+            writer.WriteStartObject();
+            writer.WriteNumber("alpha", value.A / 255F);
+            writer.WriteNumber("red", value.R / 255F);
+            writer.WriteNumber("green", value.G / 255F);
+            writer.WriteNumber("blue", value.B / 255F);
+            writer.WriteEndObject();
+        }
+    }
+
+    /// <summary>
+    /// Newtonsoft converter between <see cref="Windows.UI.Color"/> and Monaco IColor.
+    /// Retained for dual-stack compatibility until Newtonsoft is removed.
+    /// </summary>
+    internal class NewtonsoftColorConverter : Newtonsoft.Json.JsonConverter
     {
         public override bool CanConvert(Type t) => t == typeof(Color) || t == typeof(Color?);
 
-        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
+        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, Newtonsoft.Json.JsonSerializer serializer)
         {
             Color color = new();
 
@@ -57,7 +128,7 @@ namespace Monaco.Languages
             return color;
         }
 
-        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? untypedValue, Newtonsoft.Json.JsonSerializer serializer)
         {
             if (untypedValue == null)
             {

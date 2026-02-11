@@ -1,3 +1,4 @@
+using System;
 using System.Text.Json;
 using Monaco;
 using Monaco.Editor;
@@ -531,6 +532,194 @@ public class SerializationContractTests
         // Verify Newtonsoft serializes string enums correctly via [EnumMember] + StringEnumConverter
         var json = NewtonsoftSerializer.SerializeObject(value, NewtonsoftSettings);
         Assert.Equal($"\"{expected}\"", json);
+    }
+
+    #endregion
+
+    #region Domain converter contract tests — InterfaceToClassConverter, ColorConverter, CssStyleConverter
+
+    [Fact]
+    public void InterfaceToClassConverter_RoundTrip_IRange()
+    {
+        // Serialize a Range (concrete) via the ColorInformation path which uses
+        // InterfaceToClassConverter<IRange, Range>. Verify round-trip through STJ.
+        var colorInfo = new ColorInformation(
+            Windows.UI.Color.FromArgb(255, 0, 0, 0),
+            new Range(2, 3, 4, 5));
+
+        var json = JsonSerializer.Serialize(colorInfo, MonacoJsonContext.Default.ColorInformation);
+        var doc = JsonDocument.Parse(json);
+
+        // Verify range object is serialized correctly
+        var rangeElement = doc.RootElement.GetProperty("range");
+        Assert.Equal(2u, rangeElement.GetProperty("startLineNumber").GetUInt32());
+        Assert.Equal(3u, rangeElement.GetProperty("startColumn").GetUInt32());
+        Assert.Equal(4u, rangeElement.GetProperty("endLineNumber").GetUInt32());
+        Assert.Equal(5u, rangeElement.GetProperty("endColumn").GetUInt32());
+
+        // Verify round-trip deserialize restores the Range via InterfaceToClassConverter
+        var restored = JsonSerializer.Deserialize(json, MonacoJsonContext.Default.ColorInformation);
+        Assert.NotNull(restored);
+        Assert.NotNull(restored.Range);
+        Assert.IsType<Range>(restored.Range);
+    }
+
+    [Fact]
+    public void InterfaceToClassConverter_Newtonsoft_RoundTrip_IRange()
+    {
+        // Verify the Newtonsoft dual-stack path still works
+        var colorInfo = new ColorInformation(
+            Windows.UI.Color.FromArgb(255, 0, 0, 0),
+            new Range(2, 3, 4, 5));
+
+        var json = NewtonsoftSerializer.SerializeObject(colorInfo, NewtonsoftSettings);
+        var restored = NewtonsoftSerializer.DeserializeObject<ColorInformation>(json, NewtonsoftSettings);
+
+        Assert.NotNull(restored);
+        Assert.NotNull(restored.Range);
+        Assert.IsType<Range>(restored.Range);
+    }
+
+    [Fact]
+    public void ColorConverter_RoundTrip_Opaque()
+    {
+        // Full-opacity color: ARGB(255, 128, 64, 32)
+        var color = Windows.UI.Color.FromArgb(255, 128, 64, 32);
+        var colorInfo = new ColorInformation(color, null);
+
+        var json = JsonSerializer.Serialize(colorInfo, MonacoJsonContext.Default.ColorInformation);
+        var doc = JsonDocument.Parse(json);
+
+        // Verify Monaco IColor format: 0-1 floats
+        var colorElement = doc.RootElement.GetProperty("color");
+        Assert.True(Math.Abs(colorElement.GetProperty("alpha").GetDouble() - 1.0) < 0.01);
+        Assert.True(Math.Abs(colorElement.GetProperty("red").GetDouble() - 0.502) < 0.01);
+        Assert.True(Math.Abs(colorElement.GetProperty("green").GetDouble() - 0.251) < 0.01);
+        Assert.True(Math.Abs(colorElement.GetProperty("blue").GetDouble() - 0.125) < 0.01);
+
+        // Verify round-trip
+        var restored = JsonSerializer.Deserialize(json, MonacoJsonContext.Default.ColorInformation);
+        Assert.NotNull(restored);
+        Assert.Equal(255, restored.Color.A);
+        Assert.Equal(128, restored.Color.R);
+        Assert.Equal(64, restored.Color.G);
+        Assert.Equal(32, restored.Color.B);
+    }
+
+    [Fact]
+    public void ColorConverter_RoundTrip_Transparent()
+    {
+        // Semi-transparent color
+        var color = Windows.UI.Color.FromArgb(128, 255, 0, 255);
+        var colorInfo = new ColorInformation(color, null);
+
+        var json = JsonSerializer.Serialize(colorInfo, MonacoJsonContext.Default.ColorInformation);
+        var restored = JsonSerializer.Deserialize(json, MonacoJsonContext.Default.ColorInformation);
+
+        Assert.NotNull(restored);
+        Assert.Equal(128, restored.Color.A);
+        Assert.Equal(255, restored.Color.R);
+        Assert.Equal(0, restored.Color.G);
+        Assert.Equal(255, restored.Color.B);
+    }
+
+    [Fact]
+    public void ColorConverter_Newtonsoft_GoldenParity()
+    {
+        // Verify STJ produces the same float representation as Newtonsoft
+        var colorInfo = new ColorInformation(
+            Windows.UI.Color.FromArgb(255, 128, 64, 32),
+            new Range(1, 1, 1, 10));
+
+        var newtonsoftJson = NewtonsoftSerializer.SerializeObject(colorInfo, NewtonsoftSettings);
+        var stjJson = JsonSerializer.Serialize(colorInfo, MonacoJsonContext.Default.ColorInformation);
+
+        // Parse both and compare color values (order may differ)
+        var newtonsoftDoc = JsonDocument.Parse(newtonsoftJson);
+        var stjDoc = JsonDocument.Parse(stjJson);
+
+        var nColor = newtonsoftDoc.RootElement.GetProperty("color");
+        var sColor = stjDoc.RootElement.GetProperty("color");
+
+        Assert.Equal(nColor.GetProperty("alpha").GetDouble(), sColor.GetProperty("alpha").GetDouble(), 5);
+        Assert.Equal(nColor.GetProperty("red").GetDouble(), sColor.GetProperty("red").GetDouble(), 5);
+        Assert.Equal(nColor.GetProperty("green").GetDouble(), sColor.GetProperty("green").GetDouble(), 5);
+        Assert.Equal(nColor.GetProperty("blue").GetDouble(), sColor.GetProperty("blue").GetDouble(), 5);
+    }
+
+    [Fact]
+    public void CssStyleConverter_WriteOnly_CssLineStyle()
+    {
+        // CssLineStyle serializes as its Name string
+        var style = new CssLineStyle();
+
+        var options = MonacoJsonContext.Default.Options;
+        var json = JsonSerializer.Serialize(style, options);
+
+        // Should be a JSON string containing the generated class name
+        Assert.StartsWith("\"generated-style-", json);
+        Assert.EndsWith("\"", json);
+    }
+
+    [Fact]
+    public void CssStyleConverter_WriteOnly_CssGlyphStyle()
+    {
+        var style = new CssGlyphStyle();
+
+        var options = MonacoJsonContext.Default.Options;
+        var json = JsonSerializer.Serialize(style, options);
+
+        Assert.StartsWith("\"generated-style-", json);
+        Assert.EndsWith("\"", json);
+    }
+
+    [Fact]
+    public void CssStyleConverter_WriteOnly_CssInlineStyle()
+    {
+        var style = new CssInlineStyle();
+
+        var options = MonacoJsonContext.Default.Options;
+        var json = JsonSerializer.Serialize(style, options);
+
+        Assert.StartsWith("\"generated-style-", json);
+        Assert.EndsWith("\"", json);
+    }
+
+    [Fact]
+    public void CssStyleConverter_Newtonsoft_WriteOnly_Parity()
+    {
+        // Verify Newtonsoft dual-stack path produces same output
+        var style = new CssLineStyle();
+
+        var newtonsoftJson = NewtonsoftSerializer.SerializeObject(style, NewtonsoftSettings);
+        var stjJson = JsonSerializer.Serialize(style, MonacoJsonContext.Default.Options);
+
+        Assert.Equal(newtonsoftJson, stjJson);
+    }
+
+    [Fact]
+    public void CssStyleConverter_InModelDecorationOptions()
+    {
+        // Verify CSS styles serialize as string names within IModelDecorationOptions
+        var options = new IModelDecorationOptions
+        {
+            ClassName = new CssLineStyle(),
+            GlyphMarginClassName = new CssGlyphStyle(),
+            InlineClassName = new CssInlineStyle(),
+        };
+
+        var json = JsonSerializer.Serialize(options, MonacoJsonContext.Default.IModelDecorationOptions);
+        var doc = JsonDocument.Parse(json);
+
+        // Each CSS style property should be a string (the class name), not an object
+        Assert.Equal(JsonValueKind.String, doc.RootElement.GetProperty("className").ValueKind);
+        Assert.Equal(JsonValueKind.String, doc.RootElement.GetProperty("glyphMarginClassName").ValueKind);
+        Assert.Equal(JsonValueKind.String, doc.RootElement.GetProperty("inlineClassName").ValueKind);
+
+        // Values should be "generated-style-N"
+        Assert.StartsWith("generated-style-", doc.RootElement.GetProperty("className").GetString());
+        Assert.StartsWith("generated-style-", doc.RootElement.GetProperty("glyphMarginClassName").GetString());
+        Assert.StartsWith("generated-style-", doc.RootElement.GetProperty("inlineClassName").GetString());
     }
 
     #endregion

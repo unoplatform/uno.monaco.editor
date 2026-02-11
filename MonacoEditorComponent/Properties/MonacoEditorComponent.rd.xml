@@ -11,6 +11,11 @@
       <GenericParameter Name="TInterface" Dynamic="All" />
       <GenericParameter Name="TClass" Dynamic="All" />
     </Type>
+
+    <Type Name="Monaco.Helpers.NewtonsoftInterfaceToClassConverter{TInterface, TClass}">
+      <GenericParameter Name="TInterface" Dynamic="All" />
+      <GenericParameter Name="TClass" Dynamic="All" />
+    </Type>
     
     <Type Name="Newtonsoft.Json.JsonConvert">
       <Method Name="SerializeObject">

@@ -1,5 +1,6 @@
-﻿using Monaco.Helpers;
+using Monaco.Helpers;
 using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -26,14 +27,16 @@ namespace Monaco.Editor
         /// CSS class name describing the decoration.
         /// </summary>
         [JsonProperty("className")]
-        [JsonConverter(typeof(CssStyleConverter))]
+        [System.Text.Json.Serialization.JsonConverter(typeof(CssLineStyleConverter))]
+        [Newtonsoft.Json.JsonConverter(typeof(NewtonsoftCssStyleConverter))]
         public CssLineStyle? ClassName { get; set; }
 
         /// <summary>
         /// If set, the decoration will be rendered in the glyph margin with this CSS class name.
         /// </summary>
         [JsonProperty("glyphMarginClassName")]
-        [JsonConverter(typeof(CssStyleConverter))]
+        [System.Text.Json.Serialization.JsonConverter(typeof(CssGlyphStyleConverter))]
+        [Newtonsoft.Json.JsonConverter(typeof(NewtonsoftCssStyleConverter))]
         public CssGlyphStyle? GlyphMarginClassName { get; set; }
 
         /// <summary>
@@ -55,7 +58,8 @@ namespace Monaco.Editor
         /// to have a background color decoration.
         /// </summary>
         [JsonProperty("inlineClassName")]
-        [JsonConverter(typeof(CssStyleConverter))]
+        [System.Text.Json.Serialization.JsonConverter(typeof(CssInlineStyleConverter))]
+        [Newtonsoft.Json.JsonConverter(typeof(NewtonsoftCssStyleConverter))]
         public CssInlineStyle? InlineClassName { get; set; }
 
         /// <summary>

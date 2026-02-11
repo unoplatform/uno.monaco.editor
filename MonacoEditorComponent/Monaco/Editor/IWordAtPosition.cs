@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 using Monaco.Helpers;
 
 namespace Monaco.Editor
@@ -6,7 +7,8 @@ namespace Monaco.Editor
     /// <summary>
     /// https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.iwordatposition.html
     /// </summary>
-    [JsonConverter(typeof(InterfaceToClassConverter<IWordAtPosition, WordAtPosition>))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(InterfaceToClassConverter<IWordAtPosition, WordAtPosition>))]
+    [Newtonsoft.Json.JsonConverter(typeof(NewtonsoftInterfaceToClassConverter<IWordAtPosition, WordAtPosition>))]
     public interface IWordAtPosition
     {
         /// <summary>
