@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
@@ -109,7 +110,6 @@ namespace Monaco
                 Debug.WriteLine($"DesktopCodeEditorPresenter.Launch({GetHashCode():X8})");
 
                 await _webView.EnsureCoreWebView2Async();
-                _isCoreWebView2Initialized = true;
 
                 // Security hardening
                 if (_webView.CoreWebView2 is { Settings: { } settings })
@@ -129,10 +129,16 @@ namespace Monaco
                 // Block external navigation
                 _webView.CoreWebView2.NewWindowRequested += CoreWebView2_NewWindowRequested;
 
+                // Only mark initialized after all setup succeeds
+                _isCoreWebView2Initialized = true;
+
                 Debug.WriteLine("DesktopCodeEditorPresenter: CoreWebView2 initialized with security settings");
             }
             catch (Exception e)
             {
+                // Reset state so future Launch() calls can retry
+                _isCoreWebView2Initialized = false;
+                DetachCoreWebView2Handlers();
                 Debug.WriteLine($"DesktopCodeEditorPresenter.Launch error: {e}");
             }
         }
@@ -157,6 +163,21 @@ namespace Monaco
             }
 
             _webView.CoreWebView2.PostWebMessageAsJson(json);
+        }
+
+        /// <summary>
+        /// Detaches any CoreWebView2 event handlers that may have been partially attached.
+        /// Safe to call even if handlers were never attached.
+        /// </summary>
+        private void DetachCoreWebView2Handlers()
+        {
+            if (_webView.CoreWebView2 is { } coreWebView2)
+            {
+                coreWebView2.WebMessageReceived -= CoreWebView2_WebMessageReceived;
+                coreWebView2.NavigationStarting -= CoreWebView2_NavigationStarting;
+                coreWebView2.NavigationCompleted -= CoreWebView2_NavigationCompleted;
+                coreWebView2.NewWindowRequested -= CoreWebView2_NewWindowRequested;
+            }
         }
 
         private void CoreWebView2_WebMessageReceived(Microsoft.Web.WebView2.Core.CoreWebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs args)
@@ -216,15 +237,21 @@ namespace Monaco
                     return false;
                 }
 
-                // Normalize to forward slashes and ensure path stays under content root.
-                var localPath = parsed.LocalPath.Replace('\\', '/');
-                var normalizedRoot = allowedFileContentRoot.Replace('\\', '/');
-                if (!normalizedRoot.EndsWith('/'))
+                // Canonicalize paths to prevent traversal attacks and normalize separators.
+                // Use OS-appropriate case sensitivity: OrdinalIgnoreCase on Windows/macOS,
+                // Ordinal on Linux (case-sensitive filesystem).
+                var localPath = Path.GetFullPath(parsed.LocalPath);
+                var canonicalRoot = Path.GetFullPath(allowedFileContentRoot);
+                if (!canonicalRoot.EndsWith(Path.DirectorySeparatorChar))
                 {
-                    normalizedRoot += '/';
+                    canonicalRoot += Path.DirectorySeparatorChar;
                 }
 
-                return localPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase);
+                var comparison = OperatingSystem.IsLinux()
+                    ? StringComparison.Ordinal
+                    : StringComparison.OrdinalIgnoreCase;
+
+                return localPath.StartsWith(canonicalRoot, comparison);
             }
 
             return false;
@@ -253,6 +280,8 @@ namespace Monaco
         {
             // Block external navigation
             args.Handled = true;
+            // Pass null args — WebViewNewWindowRequestedEventArgs is a WinRT type
+            // that cannot be constructed. CodeEditor handler accepts null on desktop.
             NewWindowRequested?.Invoke(this, null);
         }
     }

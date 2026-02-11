@@ -96,6 +96,19 @@ namespace Monaco
             Debug.WriteLine($"Navigation completed - {args?.IsSuccess}");
 #endif
 
+            // On desktop, navigation completion means the host page has loaded but
+            // Monaco may not be ready yet. Task 5 adds a JSON-RPC "editor/ready"
+            // signal that gates the Loaded transition on actual Monaco readiness.
+            // Until then, desktop relies on the WASM path through CodeEditorLoaded()
+            // (called by ParentAccessor) which only fires after Monaco is initialized.
+            // This NavigationCompleted handler is the WASM fallback path.
+            if (!OperatingSystem.IsBrowser())
+            {
+                // Desktop: skip this handler — lifecycle is driven by CodeEditorLoaded()
+                // which fires when Monaco calls the "Loaded" parent accessor action.
+                return;
+            }
+
             // Make sure inner editor is focused
             await SendScriptAsync("EditorContext.getEditorForElement(element).editor.focus();");
 
@@ -301,10 +314,12 @@ namespace Monaco
 
         private void WebView_NewWindowRequested(ICodeEditorPresenter? sender, WebViewNewWindowRequestedEventArgs? args)
         {
-            if (sender is not null && args is not null)
+            if (sender is not null)
             {
-                // TODO: Should probably create own event args here as we don't want to expose the referrer to our internal page?
-                OpenLinkRequested?.Invoke(sender, args);
+                // On desktop, args is null because WebViewNewWindowRequestedEventArgs is a WinRT
+                // type that cannot be constructed. The desktop presenter already blocks the navigation
+                // (args.Handled = true). On WASM, args comes from the framework with Uri/Referrer.
+                OpenLinkRequested?.Invoke(sender, args!);
             }
         }
 

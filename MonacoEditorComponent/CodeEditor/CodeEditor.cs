@@ -264,7 +264,10 @@ namespace Monaco
             }
 
             // Create the correct presenter at runtime via OperatingSystem.IsBrowser()
-            var viewHost = (ContentPresenter)GetTemplateChild("View");
+            var viewHost = GetTemplateChild("View") as ContentPresenter
+                ?? throw new InvalidOperationException(
+                    "CodeEditor template must contain a ContentPresenter named 'View'. " +
+                    "Ensure Generic.xaml defines <ContentPresenter x:Name=\"View\" />.");
 
             if (viewHost != null)
             {
