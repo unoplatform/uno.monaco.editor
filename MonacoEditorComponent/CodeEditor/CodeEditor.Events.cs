@@ -99,24 +99,23 @@ namespace Monaco
         private ICodeEditorPresenter? _initializedPresenter;
 
         /// <summary>
-        /// Tears down web object wiring for the current presenter. Must be called
-        /// before nulling <see cref="_initializedPresenter"/> to ensure symmetric cleanup.
-        /// Safe to call when no presenter is initialized (no-op).
+        /// Tears down web object wiring based on actual field state.
+        /// Cleans up any partially or fully initialized objects, safe to call at any point.
         /// </summary>
         private void TeardownWebObjects()
         {
-            if (_initializedPresenter == null)
-            {
-                return;
-            }
-
             if (_themeListener != null)
             {
                 _themeListener.ThemeChanged -= ThemeListener_ThemeChanged;
                 _themeListener = null;
             }
-            UnregisterPropertyChangedCallback(RequestedThemeProperty, _themeToken);
-            KeyboardListener.RemoveInstance(_initializedPresenter);
+
+            if (_initializedPresenter != null)
+            {
+                UnregisterPropertyChangedCallback(RequestedThemeProperty, _themeToken);
+                KeyboardListener.RemoveInstance(_initializedPresenter);
+            }
+
             _parentAccessor?.Dispose();
             _parentAccessor = null;
             _keyboardListener = null;
@@ -136,13 +135,12 @@ namespace Monaco
                 }
 
                 // Skip if already initialized for this presenter instance.
-                // Re-initialize when the presenter changes (e.g. template re-apply).
                 if (ReferenceEquals(_initializedPresenter, _view))
                 {
                     return;
                 }
 
-                // Teardown old objects if reinitializing
+                // Teardown old or partial objects before reinitializing
                 TeardownWebObjects();
 
                 _parentAccessor = new ParentAccessor(_view, _queue);
@@ -161,6 +159,8 @@ namespace Monaco
             }
             catch (Exception ex)
             {
+                // Roll back partial setup to prevent leaked registrations
+                TeardownWebObjects();
                 Debug.WriteLine($"InitialiseWebObjects Error {ex.Message} {ex.StackTrace}");
             }
         }
