@@ -58,16 +58,16 @@ namespace Monaco.Languages
                 switch (propertyName)
                 {
                     case "alpha":
-                        color.A = (byte)(reader.GetDouble() * 255);
+                        color.A = ClampToByte(reader.GetDouble());
                         break;
                     case "red":
-                        color.R = (byte)(reader.GetDouble() * 255);
+                        color.R = ClampToByte(reader.GetDouble());
                         break;
                     case "green":
-                        color.G = (byte)(reader.GetDouble() * 255);
+                        color.G = ClampToByte(reader.GetDouble());
                         break;
                     case "blue":
-                        color.B = (byte)(reader.GetDouble() * 255);
+                        color.B = ClampToByte(reader.GetDouble());
                         break;
                     default:
                         reader.Skip();
@@ -86,6 +86,14 @@ namespace Monaco.Languages
             writer.WriteNumber("green", value.G / 255F);
             writer.WriteNumber("blue", value.B / 255F);
             writer.WriteEndObject();
+        }
+
+        /// <summary>
+        /// Clamps a 0-1 float channel value and converts to a 0-255 byte.
+        /// </summary>
+        private static byte ClampToByte(double value)
+        {
+            return (byte)Math.Clamp(Math.Round(value * 255), 0, 255);
         }
     }
 

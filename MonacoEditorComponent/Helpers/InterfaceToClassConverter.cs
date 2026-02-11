@@ -31,7 +31,7 @@ namespace Monaco.Helpers
     /// </summary>
     /// <typeparam name="TInterface">Type of base Interface.</typeparam>
     /// <typeparam name="TClass">Type of class to use for deserializing object with interface.</typeparam>
-    internal class NewtonsoftInterfaceToClassConverter<TInterface, TClass> : Newtonsoft.Json.JsonConverter where TClass : TInterface, new()
+    internal class NewtonsoftInterfaceToClassConverter<TInterface, TClass> : Newtonsoft.Json.JsonConverter where TClass : TInterface
     {
         public override bool CanConvert(Type objectType)
         {
@@ -40,9 +40,7 @@ namespace Monaco.Helpers
 
         public override object? ReadJson(JsonReader reader, Type objectType, object? existingValue, Newtonsoft.Json.JsonSerializer serializer)
         {
-            var pop = new TClass();
-            serializer.Populate(reader, pop);
-            return pop;
+            return serializer.Deserialize<TClass>(reader);
         }
 
         public override void WriteJson(JsonWriter writer, object? value, Newtonsoft.Json.JsonSerializer serializer)

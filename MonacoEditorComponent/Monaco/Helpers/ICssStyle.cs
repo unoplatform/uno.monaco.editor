@@ -103,7 +103,7 @@ namespace Monaco.Helpers
     {
         public override bool CanConvert(Type objectType) => typeof(ICssStyle).IsAssignableFrom(objectType);
 
-        public override object? ReadJson(JsonReader reader, Type objectType, object? existingValue, Newtonsoft.Json.JsonSerializer serializer) => new NotSupportedException();
+        public override object? ReadJson(JsonReader reader, Type objectType, object? existingValue, Newtonsoft.Json.JsonSerializer serializer) => throw new NotSupportedException("CssStyleConverter is write-only.");
 
         public override void WriteJson(JsonWriter writer, object? value, Newtonsoft.Json.JsonSerializer serializer)
         {
