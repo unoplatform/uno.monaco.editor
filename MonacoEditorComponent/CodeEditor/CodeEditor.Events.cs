@@ -96,22 +96,34 @@ namespace Monaco
             InitialiseWebObjects();
         }
 
-        private bool _webObjectsInitialized;
+        private ICodeEditorPresenter? _initializedPresenter;
 
         private void InitialiseWebObjects()
         {
             try
             {
-                if (_webObjectsInitialized)
-                {
-                    return;
-                }
-
                 _queue = _queue ?? throw new InvalidOperationException("DispatcherQueue not set");
 
                 if (_view == null)
                 {
                     throw new InvalidOperationException("Unable to find CodeEditorPresenter");
+                }
+
+                // Skip if already initialized for this presenter instance.
+                // Re-initialize when the presenter changes (e.g. template re-apply).
+                if (ReferenceEquals(_initializedPresenter, _view))
+                {
+                    return;
+                }
+
+                // Dispose/unhook old objects if reinitializing for a new presenter
+                if (_initializedPresenter != null)
+                {
+                    if (_themeListener != null)
+                    {
+                        _themeListener.ThemeChanged -= ThemeListener_ThemeChanged;
+                    }
+                    UnregisterPropertyChangedCallback(RequestedThemeProperty, _themeToken);
                 }
 
                 _parentAccessor = new ParentAccessor(_view, _queue);
@@ -125,7 +137,7 @@ namespace Monaco
                 _keyboardListener = new KeyboardListener(_view, _queue);
                 _debugLogger = new DebugLogger(_view);
 
-                _webObjectsInitialized = true;
+                _initializedPresenter = _view;
                 Debug.WriteLine($"InitialiseWebObjects - Completed");
             }
             catch (Exception ex)
