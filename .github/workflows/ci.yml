@@ -89,7 +89,9 @@ jobs:
           $pwPkg = Get-ChildItem -Path (Join-Path $globalPkgs "microsoft.playwright") -Directory | Sort-Object Name -Descending | Select-Object -First 1
           $pwDll = Join-Path $pwPkg.FullName "lib/netstandard2.0/Microsoft.Playwright.dll"
           if (-not (Test-Path $pwDll)) { throw "Microsoft.Playwright.dll not found at $pwDll" }
-          $env:PLAYWRIGHT_DRIVER_SEARCH_PATH = Join-Path $pwPkg.FullName ".playwright"
+          $driverPath = $pwPkg.FullName
+          $env:PLAYWRIGHT_DRIVER_SEARCH_PATH = $driverPath
+          "PLAYWRIGHT_DRIVER_SEARCH_PATH=$driverPath" | Out-File -FilePath $env:GITHUB_ENV -Append
           [Reflection.Assembly]::Load([System.IO.File]::ReadAllBytes($pwDll)) | Out-Null
           [Microsoft.Playwright.Program]::Main(@("install", "--with-deps", "chromium"))
 
@@ -154,7 +156,9 @@ jobs:
           $pwPkg = Get-ChildItem -Path (Join-Path $globalPkgs "microsoft.playwright") -Directory | Sort-Object Name -Descending | Select-Object -First 1
           $pwDll = Join-Path $pwPkg.FullName "lib/netstandard2.0/Microsoft.Playwright.dll"
           if (-not (Test-Path $pwDll)) { throw "Microsoft.Playwright.dll not found at $pwDll" }
-          $env:PLAYWRIGHT_DRIVER_SEARCH_PATH = Join-Path $pwPkg.FullName ".playwright"
+          $driverPath = $pwPkg.FullName
+          $env:PLAYWRIGHT_DRIVER_SEARCH_PATH = $driverPath
+          "PLAYWRIGHT_DRIVER_SEARCH_PATH=$driverPath" | Out-File -FilePath $env:GITHUB_ENV -Append
           [Reflection.Assembly]::Load([System.IO.File]::ReadAllBytes($pwDll)) | Out-Null
           [Microsoft.Playwright.Program]::Main(@("install", "--with-deps", "chromium"))
 
@@ -210,7 +214,9 @@ jobs:
           $pwPkg = Get-ChildItem -Path (Join-Path $globalPkgs "microsoft.playwright") -Directory | Sort-Object Name -Descending | Select-Object -First 1
           $pwDll = Join-Path $pwPkg.FullName "lib/netstandard2.0/Microsoft.Playwright.dll"
           if (-not (Test-Path $pwDll)) { throw "Microsoft.Playwright.dll not found at $pwDll" }
-          $env:PLAYWRIGHT_DRIVER_SEARCH_PATH = Join-Path $pwPkg.FullName ".playwright"
+          $driverPath = $pwPkg.FullName
+          $env:PLAYWRIGHT_DRIVER_SEARCH_PATH = $driverPath
+          "PLAYWRIGHT_DRIVER_SEARCH_PATH=$driverPath" | Out-File -FilePath $env:GITHUB_ENV -Append
           [Reflection.Assembly]::Load([System.IO.File]::ReadAllBytes($pwDll)) | Out-Null
           [Microsoft.Playwright.Program]::Main(@("install", "--with-deps", "chromium"))
 
