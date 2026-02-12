@@ -15,41 +15,49 @@
 - New test files for each bug fix area
 
 **Approach**:
-1. **Lifecycle tests**:
-   - Test that `TryCompleteInitialization` only completes when presenter signals readiness
-   - Test that `OnApplyTemplate` called twice doesn't double-subscribe events
-   - Test that `Dispose()` sets `_disposed = true` and unsubscribes events
-   - Test that methods throw/no-op after dispose
 
-2. **Property tests**:
+### Pure unit tests (always run, no platform dependencies):
+1. **Property tests**:
    - Test `DecorationsProperty` accepts `IObservableVector<IModelDeltaDecoration>` values
    - Test `MarkersProperty` accepts correct collection type
-   - Test `SelectedTextProperty` change callback error handling
+   - Test property callback error handling doesn't swallow exceptions
 
-3. **Data correctness tests** (validated through C#-observable integration paths, not JS-level tests):
-   - Test that `BridgeEncoding` round-trips strings with `\n`, `\r\n`, `\r`, `%`, and `'` correctly (exercises sanitize/desanitize indirectly)
+2. **Data correctness tests** (validated through C#-observable paths):
+   - Test `BridgeEncoding` round-trips with `\n`, `\r\n`, `\r`, `%`, and `'` characters
    - Test `RunScriptHelperAsync` with null return value (via mock WebView)
-   - Test EOL-sensitive code paths through the C# API surface
+   - Test navigation allowlist logic
 
-4. **Integration-like tests** (if feasible without live WebView):
+3. **Disposal state tests**:
+   - Test `_disposed` flag is set after `Dispose()`
+   - Test double-dispose is safe (no-throw)
+   - Test use-after-dispose guards on public methods
+
+### Integration-style tests (may require platform fixtures):
+4. **Lifecycle tests** (use `MockCodeEditorPresenter` to avoid real WebView):
+   - Test that `TryCompleteInitialization` only completes when presenter signals readiness
+   - Test that `Dispose()` unsubscribes events
+   - If full control tree is needed and can't be mocked, mark with `[Skip("Requires platform UI thread")]` with documented reason
+
+5. **Tab close disposal** (if feasible with mock presenter):
    - Test editor creation and disposal cycle via `MockCodeEditorPresenter`
-   - Test tab close triggers proper cleanup
+
+**Skip policy**: Tests requiring a live UI thread, WebView2, or browser runtime should be marked with `[Skip("reason")]` and documented reason. These are candidates for Playwright integration tests (separate epic).
 
 **Key context**:
 - xUnit v3 is the test framework; use `Microsoft.Testing.Extensions.CodeCoverage` (not coverlet) for coverage
 - See MEMORY.md for xUnit v3 fixture patterns (collection fixtures cannot inject each other)
-- Tests needing WebView2 should be marked with appropriate skip conditions for CI
-- No JavaScript test framework (Vitest/Jest) in scope — all TS behavior is validated through C#-observable integration paths
+- `MockCodeEditorPresenter` already exists in the test project — extend it as needed
+- No JavaScript test framework (Vitest/Jest) in scope — all TS behavior validated through C#-observable paths
 
 ## Acceptance
-- [ ] Unit tests exist for per-presenter initialization gates (one-shot, idempotent)
-- [ ] Unit tests exist for event handler leak prevention
-- [ ] Unit tests exist for `Dispose()` completeness
-- [ ] Unit tests exist for property type correctness
-- [ ] Unit tests exist for BridgeEncoding round-trip with edge-case characters
-- [ ] Unit tests exist for null-safety in `RunScriptHelperAsync`
-- [ ] All tests pass: `dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj`
-- [ ] No skipped tests without documented reason
+- [ ] Pure unit tests for property type correctness
+- [ ] Pure unit tests for BridgeEncoding round-trip with edge-case characters
+- [ ] Pure unit tests for null-safety in RunScriptHelperAsync
+- [ ] Pure unit tests for disposal state management (_disposed flag, double-dispose)
+- [ ] Integration-style tests for lifecycle initialization gate (via MockCodeEditorPresenter)
+- [ ] Integration-style tests for event handler leak prevention (via MockCodeEditorPresenter)
+- [ ] Any skipped tests have documented `[Skip("reason")]` with clear justification
+- [ ] All non-skipped tests pass: `dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj`
 
 ## Done summary
 TBD

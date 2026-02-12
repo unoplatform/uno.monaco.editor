@@ -2,7 +2,7 @@
 
 ## Overview
 
-Comprehensive bug-fixing epic for the `uno.monaco.editor` control and test app. Addresses confirmed bugs found through deep codebase analysis, covering resize/layout issues, initialization race conditions, incomplete disposal, data correctness problems, and error handling gaps. Also expands unit test coverage to 85%+ on both WASM and Desktop platforms.
+Comprehensive bug-fixing epic for the `uno.monaco.editor` control and test app. Addresses confirmed bugs found through deep codebase analysis, covering resize/layout issues, initialization race conditions, incomplete disposal, data correctness problems, and error handling gaps. Also expands unit test line coverage to 85%+ on the `MonacoEditorComponent` assembly (measured on `net10.0` TFM).
 
 ## Bug Inventory
 
@@ -20,7 +20,7 @@ Comprehensive bug-fixing epic for the `uno.monaco.editor` control and test app. 
 | 10 | SelectedTextProperty fire-and-forget | LOW | .4 | Open |
 | 11 | WASM EditorContext._editors map never cleaned | LOW | .3 | Open |
 | 12 | getEditorForElement auto-creates on miss | LOW | .3 | Open |
-| 13 | sanitize/desanitize ordering (verify if still present) | LOW | .4 | Open — verify first |
+| 13 | sanitize/desanitize ordering | LOW | — | Already verified — covered by BridgeEncodingTests |
 | 14 | Test app tab close doesn't call Dispose | LOW | .3 | Open |
 
 ## Scope
@@ -51,8 +51,8 @@ Comprehensive bug-fixing epic for the `uno.monaco.editor` control and test app. 
 
 Work from foundational fixes upward, serialized to minimize merge conflicts:
 1. **Resize fix** (PR #37 merge) — standalone, no deps
-2. **Lifecycle/init fixes** — per-presenter readiness gates, event handler leak prevention
-3. **Disposal/cleanup** — complete `Dispose()`, add WASM JS cleanup, fix tab close
+2. **Lifecycle/init fixes** — per-presenter readiness gates (Desktop: `editor/ready`, WASM: managed Loaded), event handler leak prevention
+3. **Disposal/cleanup** — add `IDisposable` to presenter contract, complete `Dispose()`, add WASM JS cleanup, fix tab close
 4. **Data correctness** — property types, EOL, null safety, error handling (serialized after .2 to avoid file overlap)
 5. **Test coverage** — unit tests for all fixes, validate TS behaviors through C#-observable paths
 6. **Coverage + changelog** — systematic expansion to 85%+ line coverage, changelog update, bug ledger closure
@@ -66,7 +66,7 @@ dotnet build MonacoEditorComponent.slnx --no-restore
 # Run unit tests
 dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj
 
-# Run with coverage
+# Run with coverage (tests target net10.0)
 dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -- --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
 ```
 
@@ -75,15 +75,14 @@ dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.cs
 - PR #37 may have merge conflicts with current branch (mitigate: review diff before cherry-pick)
 - 85% line coverage target may be hard for code paths requiring live WebView2/WASM runtime (mitigate: mock-based unit tests, `[ExcludeFromCodeCoverage]` with documented rationale for untestable interop paths)
 - Disposal changes may affect test app behavior (mitigate: verify on both WASM and Desktop targets)
-- BUG 13 (sanitize ordering) may already be resolved — verify before fixing
 
 ## Acceptance
 
-- [ ] All bugs in inventory have fixes or documented deferral rationale
+- [ ] All bugs in inventory have fixes or documented deferral/verification rationale
 - [ ] PR #37 resize fix is merged and working
 - [ ] `Dispose()` comprehensively cleans up all resources (C# events, TS Monaco instance, DOM)
 - [ ] No initialization race conditions (per-presenter readiness gate, one-shot transition)
-- [ ] Line coverage >= 85% on `MonacoEditorComponent` assembly (net10.0-desktop TFM, `[ExcludeFromCodeCoverage]` exclusions documented)
+- [ ] Line coverage >= 85% on `MonacoEditorComponent` assembly (tests run on `net10.0` TFM, `[ExcludeFromCodeCoverage]` exclusions documented)
 - [ ] `dotnet build MonacoEditorComponent.slnx` succeeds
 - [ ] `dotnet test` passes (unit tests + available integration tests)
 - [ ] changelog.md updated with bug fix entries and deferral notes

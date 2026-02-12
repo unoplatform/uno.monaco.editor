@@ -12,5 +12,5 @@
   "spec_path": ".flow/tasks/fn-6-bug-fixes-disposal-resize-and-test.2.md",
   "status": "todo",
   "title": "Fix initialization race condition and event handler leaks",
-  "updated_at": "2026-02-12T05:47:02.809853Z"
+  "updated_at": "2026-02-12T06:04:32.885366Z"
 }

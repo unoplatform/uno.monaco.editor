@@ -60,17 +60,24 @@ public class SmokeTests
             var projDir = Path.Combine(tempDir, "CompileTest");
             Directory.CreateDirectory(projDir);
 
-            // Copy only enum files (files that contain "public enum")
-            var enumDir = Path.Combine(projDir, "Enums");
-            Directory.CreateDirectory(enumDir);
+            // Copy only enum files (files that contain "public enum"),
+            // preserving directory structure to avoid filename collisions
             int enumCount = 0;
+            var destinations = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var file in Directory.EnumerateFiles(outputDir, "*.cs", SearchOption.AllDirectories))
             {
                 var content = File.ReadAllText(file);
                 if (content.Contains("public enum "))
                 {
-                    File.Copy(file, Path.Combine(enumDir, Path.GetFileName(file)), overwrite: true);
+                    var relativePath = Path.GetRelativePath(outputDir, file);
+                    var destPath = Path.Combine(projDir, relativePath);
+                    var destDir = Path.GetDirectoryName(destPath)!;
+                    Directory.CreateDirectory(destDir);
+
+                    Assert.True(destinations.Add(destPath),
+                        $"Duplicate destination path: {destPath}");
+                    File.Copy(file, destPath, overwrite: true);
                     enumCount++;
                 }
             }
@@ -105,7 +112,16 @@ public class SmokeTests
             using var process = Process.Start(psi)!;
             var stdout = process.StandardOutput.ReadToEnd();
             var stderr = process.StandardError.ReadToEnd();
-            process.WaitForExit(TimeSpan.FromMinutes(3));
+            var exited = process.WaitForExit(TimeSpan.FromMinutes(3));
+
+            if (!exited)
+            {
+                try { process.Kill(entireProcessTree: true); }
+                catch { /* best effort */ }
+                Assert.Fail(
+                    $"Build process timed out after 3 minutes ({enumCount} enum files).\n" +
+                    $"Partial stdout:\n{stdout}\nPartial stderr:\n{stderr}");
+            }
 
             Assert.True(process.ExitCode == 0,
                 $"Emitted enum files failed to compile ({enumCount} files).\n" +
@@ -116,6 +132,53 @@ public class SmokeTests
             try { Directory.Delete(tempDir, recursive: true); }
             catch { /* best effort cleanup */ }
         }
+    }
+
+    /// <summary>
+    /// Validates that emitted types include the correct serialization infrastructure:
+    /// JsonPropertyName attributes for camelCase wire format, InterfaceToClassConverter
+    /// for interface-typed properties, and JsonStringEnumConverter for string enums.
+    /// This validates the converter/context serialization subset without requiring
+    /// compilation of the full model (which has exotic TS identifiers).
+    /// </summary>
+    [Fact]
+    public void FullPipeline_SerializationAttributes_Present()
+    {
+        var model = EmitterTestHelper.LoadModel(EmitterTestHelper.GetFullModelPath());
+        var files = EmitterTestHelper.EmitToMemory(model);
+
+        // Verify concrete classes implement the corresponding interface
+        // (MarkerData : IMarkerData pattern for InterfaceToClassConverter round-trip)
+        var markerDataContent = files.First(f =>
+            f.Key.EndsWith("/MarkerData.cs", StringComparison.OrdinalIgnoreCase)
+            || f.Key == "MarkerData.cs").Value;
+        Assert.Contains(": IMarkerData", markerDataContent);
+        Assert.Contains("get; set;", markerDataContent);
+        // MarkerData property names map naturally via camelCase naming policy,
+        // so [JsonPropertyName] is correctly omitted when the PascalCase C# name
+        // maps to the exact camelCase TS name (e.g., Severity -> severity)
+
+        // Verify InterfaceToClassConverter on interface-typed properties
+        // IMarkerData -> MarkerData should have the converter attribute
+        var iMarkerDataContent = files.First(f =>
+            f.Key.EndsWith("IMarkerData.cs", StringComparison.OrdinalIgnoreCase)).Value;
+        Assert.Contains("InterfaceToClassConverter", iMarkerDataContent);
+
+        // Verify string enums have JsonStringEnumConverter
+        var builtinThemeContent = files.First(f =>
+            f.Key.EndsWith("BuiltinTheme.cs", StringComparison.OrdinalIgnoreCase)).Value;
+        Assert.Contains("JsonStringEnumConverter<BuiltinTheme>", builtinThemeContent);
+        Assert.Contains("EnumMember", builtinThemeContent);
+
+        // Verify numeric enums do NOT have JsonStringEnumConverter
+        var markerSeverityContent = files.First(f =>
+            f.Key.EndsWith("MarkerSeverity.cs", StringComparison.OrdinalIgnoreCase)).Value;
+        Assert.DoesNotContain("JsonStringEnumConverter", markerSeverityContent);
+
+        // Verify IRange interface has InterfaceToClassConverter for round-trip deserialization
+        var iRangeContent = files.First(f =>
+            f.Key.EndsWith("IRange.cs", StringComparison.OrdinalIgnoreCase)).Value;
+        Assert.Contains("InterfaceToClassConverter", iRangeContent);
     }
 
     /// <summary>

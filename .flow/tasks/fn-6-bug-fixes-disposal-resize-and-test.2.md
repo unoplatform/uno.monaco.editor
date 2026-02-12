@@ -12,23 +12,31 @@
 
 **Files**:
 - `MonacoEditorComponent/CodeEditor/CodeEditor.cs` — `OnApplyTemplate`, constructor
-- `MonacoEditorComponent/CodeEditor/CodeEditor.Events.cs` — `WebView_NavigationCompleted`, `CodeEditorLoaded`, initialization logic
-- `MonacoEditorComponent/CodeEditor/CodeEditor.Properties.cs` — `ApplyInitialPropertyValues()`
+- `MonacoEditorComponent/CodeEditor/CodeEditor.Events.cs` — `WebView_NavigationCompleted`, `CodeEditorLoaded`, `ApplyInitialPropertyValues()`, initialization logic
 - `MonacoEditorComponent/CodeEditor/EditorLifecycleState.cs` — lifecycle state enum
+- `MonacoEditorComponent/CodeEditor/DesktopCodeEditorPresenter.cs` — `BridgeHandshakeTarget.OnEditorReady`, wiring `editor/ready` to `TryCompleteInitialization()`
+- `MonacoEditorComponent/CodeEditor/ICodeEditorPresenter.cs` — add readiness callback/event contract
 
 **Approach**:
-1. Define readiness per presenter: Desktop keys off bridge/editor-ready signal; WASM keys off the managed `Loaded` callback path. Unify through a single `TryCompleteInitialization()` gate on `CodeEditor`.
-2. Use a one-shot transition guard keyed to `EditorLifecycleState`: only the first valid transition to `Loaded` can invoke `ApplyInitialPropertyValues()`. The guard must be set *before* calling init logic so re-entrant calls are blocked.
-3. Guard `OnApplyTemplate` event subscriptions: `-=` before `+=` for `NavigationCompleted`, `NewWindowRequested`, and any other WebView event handlers.
-4. Ensure `Unloaded` event properly resets lifecycle state for control re-use scenarios.
+1. Add a readiness callback or event to `ICodeEditorPresenter` so each presenter can signal when its editor is actually ready.
+2. Define readiness per presenter path:
+   - Desktop: `editor/ready` signal (currently only logged in `DesktopCodeEditorPresenter.BridgeHandshakeTarget.OnEditorReady`) must be wired to call `TryCompleteInitialization()` on `CodeEditor`. `bridge/ready` is transport-only prerequisite.
+   - WASM: managed `Loaded` callback path signals readiness.
+3. Implement `TryCompleteInitialization()` on `CodeEditor` with a one-shot transition guard keyed to `EditorLifecycleState`: only the first valid transition to `Loaded` can invoke `ApplyInitialPropertyValues()`. Guard must be set *before* calling init logic.
+4. Guard `OnApplyTemplate` event subscriptions: `-=` before `+=` for `NavigationCompleted`, `NewWindowRequested`, and any other WebView event handlers.
+5. Ensure `Unloaded` event properly resets lifecycle state for control re-use scenarios.
 
 **Key context**:
-- `NavigationCompleted` is the readiness signal on Desktop (WebView2), but is NOT the reliable signal on WASM (no WebView). Each presenter must define its own readiness contract.
-- Pattern reference: `.flow/memory/pitfalls.md` entries on lifecycle and event handler leaks
-- Uno Platform controls can have `OnApplyTemplate` called multiple times (theme changes, visual tree rebuilds)
+- `bridge/ready` fires at bundle load (`ts-helpermethods/index.ts`) BEFORE Monaco editor creation — it only means the JS transport is available
+- `editor/ready` fires after `editor.create()` completes — this is the correct Desktop readiness signal
+- Currently `OnEditorReady` in `DesktopCodeEditorPresenter` only logs; it needs to propagate up to `CodeEditor`
+- `ApplyInitialPropertyValues()` lives in `CodeEditor.Events.cs` (not Properties.cs)
+- Uno Platform controls can have `OnApplyTemplate` called multiple times
 
 ## Acceptance
-- [ ] Per-presenter readiness gates — Desktop via bridge-ready, WASM via managed Loaded path
+- [ ] `ICodeEditorPresenter` has a readiness callback/event that presenters use to signal editor-ready
+- [ ] Desktop: `editor/ready` → `OnEditorReady` → presenter callback → `TryCompleteInitialization()` on `CodeEditor`
+- [ ] WASM: managed Loaded callback → `TryCompleteInitialization()` on `CodeEditor`
 - [ ] One-shot `TryCompleteInitialization()` — `ApplyInitialPropertyValues()` called exactly once per lifecycle
 - [ ] `OnApplyTemplate` uses `-=` before `+=` for all event subscriptions
 - [ ] Re-applying template does not cause double event handler subscriptions
