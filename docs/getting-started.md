@@ -9,7 +9,7 @@ This guide walks you through adding the `Uno.Monaco.Editor` control to a new or 
 | [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) | Required for all targets |
 | `wasm-tools` workload | Required for WASM targets (`dotnet workload install wasm-tools`) |
 | [Uno Platform templates](https://platform.uno/docs/articles/getting-started.html) | `dotnet new install Uno.Templates` |
-| WebView2 runtime | Desktop targets on Windows require the [Evergreen WebView2 runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). macOS/Linux use WebKitGTK. |
+| Web host runtime | Desktop uses the Uno `WebView2` control. On Windows this requires the [Evergreen WebView2 runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/); on Linux, WebKitGTK (`libwebkit2gtk-4.1`); on macOS, the built-in WKWebView. |
 
 ## Installation
 
@@ -92,7 +92,7 @@ dotnet build -f net10.0-desktop
 dotnet run -f net10.0-desktop
 ```
 
-On desktop, the editor runs inside a WebView2 control. Windows uses the Chromium-based WebView2 runtime; macOS and Linux use WebKitGTK.
+On desktop, the editor runs inside the Uno `WebView2` control. Windows uses the Chromium-based WebView2 runtime; macOS uses WKWebView; Linux uses WebKitGTK.
 
 > **Platform note:** `AddActionAsync` and `AddCommandAsync` throw `PlatformNotSupportedException` on desktop because they require JSExport callbacks. See the [platform matrix](../README.md#platform-support) for the full list of platform differences.
 
@@ -230,7 +230,7 @@ string lang3 = Editor.Languages.GetCodeLanguageFromExtension("Program.cs");
 ### Monaco does not load on desktop
 
 - **Windows:** Verify the [WebView2 runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) is installed. The Evergreen bootstrapper installs it automatically on most systems.
-- **macOS/Linux:** The Uno Platform desktop host requires WebKitGTK. Install it via your package manager (e.g., `sudo apt install libwebkit2gtk-4.1-dev` on Ubuntu).
+- **Linux:** The Uno `WebView2` control requires WebKitGTK on Linux. Install it via your package manager (e.g., `sudo apt install libwebkit2gtk-4.1-dev` on Ubuntu). macOS uses the built-in WKWebView and requires no additional setup.
 
 ### `PlatformNotSupportedException` on desktop
 

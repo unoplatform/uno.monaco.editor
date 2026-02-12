@@ -79,17 +79,14 @@ public sealed partial class MainPage : Page
         Editor.EditorLoaded += Editor_Loaded;
     }
 
-    private async void Editor_Loaded(object sender, RoutedEventArgs e)
+    private void Editor_Loaded(object sender, RoutedEventArgs e)
     {
         // Set initial content
         Editor.Text = "Console.WriteLine(\"Hello, Monaco!\");";
 
         // Configure editor options
-        await Editor.UpdateOptionsAsync(new StandaloneEditorConstructionOptions
-        {
-            FontSize = 14,
-            Minimap = new EditorMinimapOptions { Enabled = false }
-        });
+        Editor.Options.FontSize = 14;
+        Editor.Options.Minimap = new EditorMinimapOptions { Enabled = false };
     }
 }
 ```

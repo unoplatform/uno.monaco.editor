@@ -324,7 +324,7 @@ private void Editor_Loaded(object sender, RoutedEventArgs e)
                 ClassName = new CssLineStyle { BackgroundColor = Colors.AliceBlue },
                 GlyphMarginClassName = new CssGlyphStyle
                 {
-                    GlyphImage = new Uri("ms-appx-web:///Icons/error.png")
+                    GlyphImage = new System.Uri("ms-appx-web:///Icons/error.png")
                 },
                 GlyphMarginHoverMessage = new[] { "Error on this line." }.ToMarkdownString()
             }));
@@ -508,7 +508,20 @@ private async void Editor_Loading(object sender, RoutedEventArgs e)
 
 **Key concepts:**
 - `AddCommandAsync` returns a command ID string that can be used with `CodeLensProvider` to link commands to code lenses.
-- `CommandHandler` receives `object?[]` parameters. Arguments are deserialized as `System.Text.Json.JsonElement` instances.
+- `CommandHandler` receives `object?[]` parameters. Arguments are deserialized as `System.Text.Json.JsonElement` instances (breaking change from the prior Newtonsoft `JObject` type). Extract values using the `JsonElement` API:
+
+```csharp
+await Editor.AddCommandAsync(KeyCode.F5, (args) =>
+{
+    if (args.Length > 0 && args[0] is System.Text.Json.JsonElement json)
+    {
+        // Read properties from the JsonElement
+        var value = json.GetString();
+        System.Diagnostics.Debug.WriteLine($"Arg: {value}");
+    }
+});
+```
+
 - Use `CreateContextKeyAsync` to gate commands on boolean conditions.
 
 **Platform support:** WASM only. Throws `PlatformNotSupportedException` on Desktop.
@@ -669,22 +682,23 @@ Code lens actions require a command ID. Register a command first, then pass its 
 ```csharp
 private async void Editor_Loading(object sender, RoutedEventArgs e)
 {
-    if (!OperatingSystem.IsBrowser()) return;
+    string? cmdId = null;
 
-    // Register a command that the code lens will invoke
-    var cmdId = await Editor.AddCommandAsync(0, (args) =>
+    // Commands are WASM-only; on Desktop, lenses display but are not clickable
+    if (OperatingSystem.IsBrowser())
     {
-        System.Diagnostics.Debug.WriteLine($"Code lens clicked with arg: {args[0]}");
-    });
-
-    if (cmdId != null)
-    {
-        await Editor.Languages.RegisterCodeLensProviderAsync("csharp", new MyCodeLensProvider(cmdId));
+        cmdId = await Editor.AddCommandAsync(0, (args) =>
+        {
+            System.Diagnostics.Debug.WriteLine($"Code lens clicked with arg: {args[0]}");
+        });
     }
+
+    // Provider registration works on both platforms
+    await Editor.Languages.RegisterCodeLensProviderAsync("csharp", new MyCodeLensProvider(cmdId ?? ""));
 }
 ```
 
-> **Note:** Because code lenses require `AddCommandAsync`, the interactive command behavior is WASM only. On Desktop, you can register the provider (the lenses will display) but clicking them will not invoke a command.
+> **Note:** `AddCommandAsync` is WASM only (`PlatformNotSupportedException` on Desktop). Code lenses will still display on Desktop, but their commands will not be invocable. Pass a placeholder command ID on Desktop or omit the `Command` property from `CodeLens` entries.
 
 **Platform support:** Provider registration works on WASM and Desktop. Command invocation is WASM only.
 
