@@ -76,9 +76,8 @@ Follow the [Humanizer](https://github.com/Humanizr/Humanizer) reference implemen
 - [ ] Merge job runs with `if: always()` so partial coverage is available when some jobs fail
 
 ## Done summary
-TBD
-
+Added code coverage collection and merged reporting to CI. Microsoft.Testing.Extensions.CodeCoverage v18.0.4 is added to the test project, all three CI test jobs (ubuntu, windows, macOS) now pass --coverage and --results-directory flags with per-job artifact uploads, and a new coverage-report merge job uses ReportGenerator to produce combined HTML/Cobertura reports with GitHub Step Summary output.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 5371fa48da7505956a50db26a62a905b06fdb530
+- Tests: dotnet restore MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj, dotnet build MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj --no-restore
 - PRs:
