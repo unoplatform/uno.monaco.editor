@@ -73,6 +73,55 @@ Validation checklist after code changes:
 3. If Monaco typings or TS helper behavior changed, run the type generation pipeline and rebuild:
    - `npx tsx tools/monaco-type-extractor/src/index.ts -- node_modules/monaco-editor/monaco.d.ts -o tools/monaco-type-extractor/output/model.json`
    - `dotnet run --project tools/MonacoTypeEmitter -- --input tools/monaco-type-extractor/output/model.json --output MonacoEditorComponent/Monaco/`
+4. If the branch has an active PR, verify CI passes after pushing (see CI Verification Policy below).
+
+## CI Verification Policy
+
+Branches with active pull requests must have CI verified green before marking tasks or epics as done. Never leave a PR in a broken CI state -- fix failures before moving on.
+
+### When it applies
+
+This policy applies whenever your working branch has an open pull request. At minimum, verify CI before marking an epic done. Ideally, check CI after every significant push.
+
+### CI job structure
+
+The CI pipeline (`.github/workflows/ci.yml`) runs the following jobs on pull requests:
+
+| Job | Runner | What it validates |
+|-----|--------|-------------------|
+| **Build** | `ubuntu-latest` | Library build, test build, WASM app build, Playwright browser tests, code coverage |
+| **Build (macOS ARM)** | `macos-26` | Library build, test build, WASM + desktop app builds, Playwright browser tests, code coverage |
+| **Desktop Tests (Windows)** | `windows-latest` | Desktop build compilation, unit tests (depends on Build) |
+| **Coverage Report** | `ubuntu-latest` | Merges coverage from all platforms (depends on all test jobs) |
+
+Additional jobs (Sign, Publish Dev, Publish Production) run only on pushes to `main` or `release/*` branches and are not triggered by PRs.
+
+### Known CI limitations
+
+- **Desktop CDP tests** are excluded from all CI runners (`--filter-not-trait "Category=DesktopCDP"`). WebView2 CDP tests require a GUI environment; GitHub Actions runners are headless, so these tests timeout on fixture initialization. They must be validated locally.
+- **WASM Playwright tests** are excluded from the Windows Desktop Tests job (`--filter-not-trait "Category=WasmPlaywright"`) since that job focuses on desktop compilation and unit tests.
+
+### How to verify
+
+Use the GitHub CLI to monitor CI status after pushing:
+
+```bash
+# Watch all checks on the current PR until they complete
+gh pr checks --watch
+
+# Check a specific PR by number
+gh pr checks 38 --watch
+```
+
+You can also view the GitHub Actions UI directly from the PR page.
+
+### What to do when CI fails
+
+1. Push your changes to the remote branch.
+2. Run `gh pr checks --watch` to monitor the pipeline.
+3. If any job fails, investigate the failure logs (`gh pr checks` shows URLs to failed runs).
+4. Fix the issue locally, commit, push, and repeat until all jobs pass.
+5. Only after CI is green, proceed with marking the task or epic as done.
 
 ## Code Conventions
 
