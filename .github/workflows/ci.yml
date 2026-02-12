@@ -94,7 +94,7 @@ jobs:
           [Microsoft.Playwright.Program]::Main(@("install", "--with-deps", "chromium"))
 
       - name: Run tests
-        run: dotnet test MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_DIR }}" --no-build -- --filter-not-trait "Category=DesktopCDP" --report-xunit --report-xunit-filename test-results.xml
+        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_DIR }}" --no-build -- --filter-not-trait "Category=DesktopCDP" --report-xunit --report-xunit-filename test-results.xml
 
       - name: Upload test artifacts
         if: failure()
@@ -159,7 +159,7 @@ jobs:
           [Microsoft.Playwright.Program]::Main(@("install", "--with-deps", "chromium"))
 
       - name: Run desktop CDP tests
-        run: dotnet test MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release --no-build -- --filter-trait "Category=DesktopCDP" --report-xunit --report-xunit-filename desktop-test-results.xml
+        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release --no-build -- --filter-trait "Category=DesktopCDP" --report-xunit --report-xunit-filename desktop-test-results.xml
 
       - name: Upload test artifacts
         if: failure()
@@ -215,7 +215,7 @@ jobs:
           [Microsoft.Playwright.Program]::Main(@("install", "--with-deps", "chromium"))
 
       - name: Run tests
-        run: dotnet test MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release --no-build -- --filter-not-trait "Category=DesktopCDP" --report-xunit --report-xunit-filename test-results.xml
+        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release --no-build -- --filter-not-trait "Category=DesktopCDP" --report-xunit --report-xunit-filename test-results.xml
 
       - name: Upload test artifacts
         if: failure()
