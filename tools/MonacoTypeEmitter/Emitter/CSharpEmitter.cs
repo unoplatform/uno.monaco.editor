@@ -1132,6 +1132,12 @@ public sealed class CSharpEmitter
     /// <summary>
     /// Constructs the Monaco TypeDoc URL for the given type name based on its source namespace and kind.
     /// </summary>
+    /// <remarks>
+    /// TODO: The generated URLs use the older <c>editor.{TypeName}</c> module path pattern which now
+    /// returns 404. Monaco's TypeDoc site was regenerated with the <c>editor_editor_api.editor.{TypeName}</c>
+    /// pattern. The namespace prefix logic needs updating to prepend <c>editor_editor_api.</c> to produce
+    /// working URLs (e.g., <c>interfaces/editor_editor_api.editor.IMarkerData.html</c>).
+    /// </remarks>
     private string? GetTypeDocUrl(string typeName)
     {
         if (!_typeToSourceNamespace.TryGetValue(typeName, out var sourceNs))

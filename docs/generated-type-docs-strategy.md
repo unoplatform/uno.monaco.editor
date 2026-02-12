@@ -218,6 +218,14 @@ Modify `CSharpEmitter.WriteDocComment()` and related methods:
    for unusual symbol types), fall back to the TypeDoc index page:
    `https://microsoft.github.io/monaco-editor/typedoc/index.html`
 
+   > **Note (fn-5.9):** The emitter (`CSharpEmitter.cs`) currently generates URLs using
+   > the older `editor.{TypeName}` pattern (e.g., `interfaces/editor.IMarkerData.html`).
+   > Monaco's TypeDoc site was regenerated with the `editor_editor_api.editor.{TypeName}`
+   > module path structure, making the older pattern return 404. The emitter's
+   > `GetTypeDocUrl()` method needs updating to use the `editor_editor_api` prefix.
+   > Until then, snapshot baselines reflect the emitter's current (outdated) output,
+   > while hand-written source files use the verified-correct `editor_editor_api` URLs.
+
 5. **Enum member documentation** -- The `WriteDocComment()` call site for enum members
    is currently missing. Add calls to `WriteDocComment(sb, member.Documentation, indent)`
    for each enum member in `EmitEnum()` and `EmitTypeAliasEnum()`.
