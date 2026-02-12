@@ -16,6 +16,19 @@ namespace Monaco.Bridge;
 /// Reader feeds from <see cref="ICodeEditorPresenter.MessageReceived"/> into a
 /// <see cref="Channel{T}"/> of UTF-8 byte sequences for deserialization.
 /// </summary>
+/// <remarks>
+/// <para>Security controls:</para>
+/// <list type="bullet">
+/// <item><description>Method allowlist — only explicitly registered RPC target methods are dispatchable;
+/// unrecognized methods are rejected by StreamJsonRpc before reaching application code.</description></item>
+/// <item><description>Payload size cap — inbound messages exceeding <c>10 MB</c> are dropped to prevent
+/// memory exhaustion from a hostile or buggy web side.</description></item>
+/// <item><description>Bounded inbound queue — the <see cref="Channel{T}"/> is capped at 256 messages,
+/// applying back-pressure and preventing unbounded memory growth.</description></item>
+/// <item><description>Parameter validation — each dispatchable method declares its required parameter
+/// names; payloads missing required fields are rejected before dispatch.</description></item>
+/// </list>
+/// </remarks>
 internal sealed class WebView2JsonRpcMessageHandler : IJsonRpcMessageHandler, IDisposable
 {
     // 10 MB max payload size per bridge-protocol.md security constraints.

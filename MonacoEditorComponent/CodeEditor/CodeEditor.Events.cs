@@ -17,8 +17,8 @@ namespace Monaco
         // Override default Loaded/Loading event so we can make sure we've initialized our WebView contents with the CodeEditor.
 
         /// <summary>
-        /// Occurs when the editor enters the Loading lifecycle state and is ready to receive
-        /// commands. Fires exactly once per initialization cycle.
+        /// Occurs when the editor begins initialization. The Monaco instance is not yet
+        /// available and script calls are still gated. Fires exactly once per initialization cycle.
         /// </summary>
         public event RoutedEventHandler? EditorLoading;
 

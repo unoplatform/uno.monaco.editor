@@ -77,12 +77,12 @@ namespace Monaco.Helpers
         /// <summary>
         /// Called from JavaScript, returns if event was handled or not.
         /// </summary>
-        /// <param name="keycode"></param>
-        /// <param name="ctrl"></param>
-        /// <param name="shift"></param>
-        /// <param name="alt"></param>
-        /// <param name="meta"></param>
-        /// <returns></returns>
+        /// <param name="keycode">The JavaScript key code of the pressed key.</param>
+        /// <param name="ctrl"><see langword="true"/> if the Ctrl modifier was held.</param>
+        /// <param name="shift"><see langword="true"/> if the Shift modifier was held.</param>
+        /// <param name="alt"><see langword="true"/> if the Alt modifier was held.</param>
+        /// <param name="meta"><see langword="true"/> if the Meta (Win/Cmd) modifier was held.</param>
+        /// <returns><see langword="true"/> if the editor handled the key event; otherwise, <see langword="false"/>.</returns>
         public bool KeyDown(int keycode, bool ctrl, bool shift, bool alt, bool meta)
         {
             if (parent.TryGetTarget(out var editor))

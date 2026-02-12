@@ -212,6 +212,9 @@ namespace Monaco
         /// <exception cref="PlatformNotSupportedException">
         /// Thrown on desktop. Custom commands require the WASM bridge; desktop support is not yet available.
         /// </exception>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the parent accessor bridge is not initialized.
+        /// </exception>
         public async Task<string?> AddCommandAsync(CommandHandler handler)
         {
             return await AddCommandAsync(0, handler, string.Empty);
@@ -225,6 +228,9 @@ namespace Monaco
         /// <returns>The command identifier string, or <see langword="null"/> on failure.</returns>
         /// <exception cref="PlatformNotSupportedException">
         /// Thrown on desktop. Custom commands require the WASM bridge; desktop support is not yet available.
+        /// </exception>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the parent accessor bridge is not initialized.
         /// </exception>
         public async Task<string?> AddCommandAsync(int keybinding, CommandHandler handler)
         {

@@ -137,23 +137,40 @@ namespace Monaco
 
                 await _webView.EnsureCoreWebView2Async();
 
-                // Security hardening
-                if (_webView.CoreWebView2 is { Settings: { } settings })
+                // Security hardening — CoreWebView2.Settings may not be supported on all
+                // Skia backends (e.g., X11/WebKitGTK), so wrap in try/catch.
+                try
                 {
-                    settings.AreDefaultScriptDialogsEnabled = false;
-                    settings.AreDefaultContextMenusEnabled = false;
-                    settings.AreHostObjectsAllowed = false;
+                    if (_webView.CoreWebView2 is { Settings: { } settings })
+                    {
+                        settings.AreDefaultScriptDialogsEnabled = false;
+                        settings.AreDefaultContextMenusEnabled = false;
+                        settings.AreHostObjectsAllowed = false;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"DesktopCodeEditorPresenter: Security settings not supported ({ex.GetType().Name})");
                 }
 
-                // Wire up WebMessageReceived to route inbound messages
-                _webView.CoreWebView2.WebMessageReceived += CoreWebView2_WebMessageReceived;
+                // Wire up navigation events using WebView2 CONTROL-level APIs.
+                // Uno documents these as implemented on Skia; the CoreWebView2-level
+                // equivalents may not fire on all backends (e.g., X11/WebKitGTK).
+                _webView.NavigationStarting += WebView2_NavigationStarting;
+                _webView.NavigationCompleted += WebView2_NavigationCompleted;
 
-                // Wire up navigation events
-                _webView.CoreWebView2.NavigationStarting += CoreWebView2_NavigationStarting;
-                _webView.CoreWebView2.NavigationCompleted += CoreWebView2_NavigationCompleted;
+                // WebMessageReceived — use control-level event (documented on Skia).
+                _webView.WebMessageReceived += WebView2_WebMessageReceived;
 
-                // Block external navigation
-                _webView.CoreWebView2.NewWindowRequested += CoreWebView2_NewWindowRequested;
+                // Block external navigation (CoreWebView2-only, best effort)
+                try
+                {
+                    _webView.CoreWebView2.NewWindowRequested += CoreWebView2_NewWindowRequested;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"DesktopCodeEditorPresenter: NewWindowRequested not supported ({ex.GetType().Name})");
+                }
 
                 // Only mark initialized after all setup succeeds
                 _isCoreWebView2Initialized = true;
@@ -162,7 +179,7 @@ namespace Monaco
                 // InitialiseWebObjects), not here. Launch() only initializes CoreWebView2.
                 // CreateBridgeTargets() is the single owner of JsonRpc lifecycle.
 
-                Debug.WriteLine("DesktopCodeEditorPresenter: CoreWebView2 initialized with security settings");
+                Debug.WriteLine("DesktopCodeEditorPresenter: CoreWebView2 initialized");
 
                 // Configure content serving and navigate to editor.html.
                 var contentRoot = ResolveDesktopContentPath();
@@ -175,7 +192,7 @@ namespace Monaco
                 _isCoreWebView2Initialized = false;
                 _pendingSource = null;
                 TeardownJsonRpc();
-                DetachCoreWebView2Handlers();
+                DetachEventHandlers();
                 Debug.WriteLine($"DesktopCodeEditorPresenter.Launch error: {e}");
 
                 // Re-throw so callers (CodeEditor) can detect failure and abort lifecycle.
@@ -206,21 +223,26 @@ namespace Monaco
         }
 
         /// <summary>
-        /// Detaches any CoreWebView2 event handlers that may have been partially attached.
+        /// Detaches event handlers that may have been partially attached during Launch().
+        /// Covers both WebView2 control-level and CoreWebView2-level handlers.
         /// Safe to call even if handlers were never attached.
         /// </summary>
-        private void DetachCoreWebView2Handlers()
+        private void DetachEventHandlers()
         {
+            // WebView2 control-level events (always safe to detach)
+            _webView.NavigationStarting -= WebView2_NavigationStarting;
+            _webView.NavigationCompleted -= WebView2_NavigationCompleted;
+            _webView.WebMessageReceived -= WebView2_WebMessageReceived;
+
+            // CoreWebView2-level events (may not have been attached if not supported)
             if (_webView.CoreWebView2 is { } coreWebView2)
             {
-                coreWebView2.WebMessageReceived -= CoreWebView2_WebMessageReceived;
-                coreWebView2.NavigationStarting -= CoreWebView2_NavigationStarting;
-                coreWebView2.NavigationCompleted -= CoreWebView2_NavigationCompleted;
-                coreWebView2.NewWindowRequested -= CoreWebView2_NewWindowRequested;
+                try { coreWebView2.NewWindowRequested -= CoreWebView2_NewWindowRequested; }
+                catch { /* Not supported on this platform */ }
             }
         }
 
-        private void CoreWebView2_WebMessageReceived(Microsoft.Web.WebView2.Core.CoreWebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs args)
+        private void WebView2_WebMessageReceived(WebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs args)
         {
             // Use WebMessageAsJson to handle both string and object payloads.
             // TryGetWebMessageAsString() would fail for JSON object messages
@@ -301,8 +323,10 @@ namespace Monaco
             return false;
         }
 
-        private void CoreWebView2_NavigationStarting(Microsoft.Web.WebView2.Core.CoreWebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationStartingEventArgs args)
+        private void WebView2_NavigationStarting(WebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationStartingEventArgs args)
         {
+            Debug.WriteLine($"DesktopCodeEditorPresenter: NavigationStarting → {args.Uri}");
+
             if (args.Uri is string uri && !IsNavigationAllowed(uri, AllowedFileContentRoot))
             {
                 Debug.WriteLine($"DesktopCodeEditorPresenter: Blocked navigation to {uri}");
@@ -323,8 +347,10 @@ namespace Monaco
             }
         }
 
-        private void CoreWebView2_NavigationCompleted(Microsoft.Web.WebView2.Core.CoreWebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs args)
+        private void WebView2_NavigationCompleted(WebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs args)
         {
+            Debug.WriteLine($"DesktopCodeEditorPresenter: NavigationCompleted (IsSuccess={args.IsSuccess})");
+
             NavigationCompleted?.Invoke(this, new PresenterNavigationCompletedEventArgs
             {
                 IsSuccess = args.IsSuccess
@@ -366,21 +392,46 @@ namespace Monaco
         }
 
         /// <summary>
-        /// Configures virtual host mapping and navigates the WebView2 to editor.html.
-        /// Uses <c>SetVirtualHostNameToFolderMapping</c> on all platforms -- Uno supports
-        /// this API cross-platform (Windows via Edge WebView2, Linux via WebKitGTK,
-        /// macOS via WKWebView). Navigation uses <c>http://</c> as per Uno docs.
+        /// Configures content serving and navigates the WebView2 to editor.html.
+        /// Uses <c>WebView2.Source</c> (documented as implemented on Skia) instead of
+        /// <c>CoreWebView2.Navigate()</c> which may not fire events on all backends.
+        /// Attempts virtual host mapping first; falls back to <c>file://</c> navigation
+        /// which works reliably on all WebView2 implementations.
         /// </summary>
         private void NavigateToEditorPage(string contentRoot)
         {
-            _webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
-                AllowedVirtualHost,
-                contentRoot,
-                Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
+            // Try virtual host mapping (CoreWebView2 API, may not be available on X11/WebKitGTK)
+            bool virtualHostAvailable = false;
+            try
+            {
+                _webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                    AllowedVirtualHost,
+                    contentRoot,
+                    Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
+                virtualHostAvailable = true;
+                Debug.WriteLine("DesktopCodeEditorPresenter: Virtual host mapping configured");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"DesktopCodeEditorPresenter: Virtual host mapping not available ({ex.GetType().Name}: {ex.Message})");
+            }
 
-            var editorUrl = $"http://{AllowedVirtualHost}/editor.html";
-            _webView.CoreWebView2.Navigate(editorUrl);
-            Debug.WriteLine($"DesktopCodeEditorPresenter: Navigating to {editorUrl} (content root: {contentRoot})");
+            // Navigate using WebView2.Source (documented as implemented on Skia).
+            // Prefer virtual host (proper origins for CORS); fall back to file://.
+            global::System.Uri editorUri;
+            if (virtualHostAvailable)
+            {
+                editorUri = new global::System.Uri($"http://{AllowedVirtualHost}/editor.html");
+            }
+            else
+            {
+                // file:// works reliably on all WebView2 backends (Edge, WebKitGTK, WKWebView).
+                // editor.html uses classic scripts (no ES modules) specifically for file:// compat.
+                editorUri = new global::System.Uri(Path.Combine(contentRoot, "editor.html"));
+            }
+
+            _webView.Source = editorUri;
+            Debug.WriteLine($"DesktopCodeEditorPresenter: Navigating to {editorUri} (content root: {contentRoot})");
         }
 
         // ============================================================
