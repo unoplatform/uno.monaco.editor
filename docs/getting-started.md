@@ -100,27 +100,21 @@ On desktop, the editor runs inside the Uno `WebView2` control. Windows uses the 
 
 The editor fires two lifecycle events in order:
 
-1. **`EditorLoading`** -- The editor infrastructure is initializing. Monaco is not yet available. Register language providers here.
-2. **`EditorLoaded`** -- Monaco is fully initialized and ready for interaction. Safe to read/write content, set cursor positions, and interact with the model.
+1. **`EditorLoading`** -- The editor infrastructure is initializing. Monaco is not yet available. Use this for non-editor setup (e.g., preparing data).
+2. **`EditorLoaded`** -- Monaco is fully initialized and ready for interaction. Safe to register providers, read/write content, set cursor positions, and interact with the model.
 
 ```csharp
 public MainPage()
 {
     this.InitializeComponent();
-    Editor.EditorLoading += Editor_Loading;
     Editor.EditorLoaded += Editor_Loaded;
 }
 
-private async void Editor_Loading(object sender, RoutedEventArgs e)
+private async void Editor_Loaded(object sender, RoutedEventArgs e)
 {
-    // Register providers before the editor is fully loaded
+    // Register providers and set content after the editor is ready
     await Editor.Languages.RegisterCompletionItemProviderAsync("csharp", new MyCompletionProvider());
     await Editor.Languages.RegisterHoverProviderAsync("csharp", new MyHoverProvider());
-}
-
-private void Editor_Loaded(object sender, RoutedEventArgs e)
-{
-    // Set content after the editor is ready
     Editor.Text = "// Start typing...";
 }
 ```

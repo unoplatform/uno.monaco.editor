@@ -1,6 +1,6 @@
 # API Cookbook
 
-Recipe-style examples for common `Uno.Monaco.Editor` scenarios. Each recipe is self-contained -- copy the code into your `EditorLoading` or `EditorLoaded` handler as indicated.
+Recipe-style examples for common `Uno.Monaco.Editor` scenarios. Each recipe is self-contained -- copy the code into your `EditorLoaded` handler (or the indicated event).
 
 All examples assume a page with a `CodeEditor` control named `Editor`:
 
@@ -165,7 +165,7 @@ private readonly StandaloneEditorConstructionOptions editorOptions = new()
 
 Provide custom IntelliSense suggestions for a language.
 
-**When:** `EditorLoading` (before the editor is fully loaded so completions are ready immediately).
+**When:** `EditorLoaded` (the editor must be fully initialized before provider registration).
 
 **Step 1: Implement `CompletionItemProvider`**
 
@@ -198,12 +198,6 @@ public class MyCompletionProvider : CompletionItemProvider
     }
 
     public Task<CompletionItem> ResolveCompletionItemAsync(
-        IModel model, Position position, CompletionItem item)
-    {
-        return Task.FromResult(item);
-    }
-
-    public Task<CompletionItem> ResolveCompletionItemAsync(
         IModel model, CompletionItem item)
     {
         return Task.FromResult(item);
@@ -233,7 +227,7 @@ private async void Editor_Loading(object sender, RoutedEventArgs e)
 
 Show tooltip information when the user hovers over tokens.
 
-**When:** `EditorLoading`
+**When:** `EditorLoaded`
 
 **Step 1: Implement `HoverProvider`**
 
@@ -420,7 +414,7 @@ await Editor.SetModelMarkersAsync("MyAnalyzer", []);
 
 Add a custom command to the editor context menu and command palette.
 
-**When:** `EditorLoading`
+**When:** `EditorLoaded`
 
 **Step 1: Implement `IActionDescriptor`**
 
@@ -473,7 +467,7 @@ private async void Editor_Loading(object sender, RoutedEventArgs e)
 
 Bind a keyboard shortcut to a callback without adding a context menu entry.
 
-**When:** `EditorLoading`
+**When:** `EditorLoaded`
 
 ```csharp
 private async void Editor_Loading(object sender, RoutedEventArgs e)
@@ -635,7 +629,7 @@ private void Editor_OpenLinkRequested(CodeEditor sender, OpenLinkRequestedEventA
 
 Display inline actionable information above code lines (similar to "N references" in Visual Studio).
 
-**When:** `EditorLoading`
+**When:** `EditorLoaded`
 
 **Step 1: Implement `CodeLensProvider`**
 
@@ -708,7 +702,7 @@ private async void Editor_Loading(object sender, RoutedEventArgs e)
 
 Enable color picker support for color values in the editor.
 
-**When:** `EditorLoading`
+**When:** `EditorLoaded`
 
 **Step 1: Implement `DocumentColorProvider`**
 
