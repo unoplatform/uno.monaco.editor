@@ -21,8 +21,8 @@ Follow the NuGet README standard structure:
 
 **NuGet packing setup** in `MonacoEditorComponent.csproj`:
 - Add `<PackageReadmeFile>README.md</PackageReadmeFile>` if not present
-- Add pack item to include repo-root README: `<None Include="..\README.md" Pack="true" PackagePath="\" Link="README.md" />`
-- Validate with `dotnet pack MonacoEditorComponent/MonacoEditorComponent.csproj --no-build` (verify README included)
+- Add pack target to include repo-root README via `_PackageFiles` injection (the standard `<None Pack="true"/>` pattern does not work with Uno SDK's `GenerateLibraryLayout=true`)
+- Validate with `dotnet pack MonacoEditorComponent/MonacoEditorComponent.csproj -c Release` (verify README included)
 
 **fn-4.7 coordination**: Update `.flow/tasks/fn-4-modernize-ci-add-code-coverage-and.7.md` to remove README update scope and note it is handled by fn-5.4.
 
@@ -42,9 +42,9 @@ Remove: "early alpha" language, stale API listings, wrong NuGet package name.
 - [ ] Getting started section with minimal XAML/C# example
 - [ ] Build-from-source instructions for both targets
 - [ ] Monaco version verified and noted correctly
-- [ ] Links to architecture docs, CHANGELOG, getting started guide
+- [ ] Links to architecture docs, CHANGELOG; getting started guide and API cookbook listed as coming soon (created by fn-5.7)
 - [ ] `<PackageReadmeFile>README.md</PackageReadmeFile>` present in csproj
-- [ ] Pack item includes repo-root README (`Pack="true" PackagePath="\"`)
-- [ ] `dotnet pack MonacoEditorComponent/MonacoEditorComponent.csproj --no-build` succeeds with README in package
+- [ ] Pack target includes repo-root README via `_PackageFiles` injection (`_IncludeReadmeInPackage` target)
+- [ ] `dotnet pack MonacoEditorComponent/MonacoEditorComponent.csproj -c Release` succeeds with README in package
 - [ ] fn-4.7 spec updated to remove README scope (note: "absorbed into fn-5.4")
 - [ ] fn-4.7 README scope covered (build instructions for .NET 10, dual targets, no VS 2019/Legacy Edge)
