@@ -123,3 +123,6 @@ Blanket .editorconfig suppression in a directory affects hand-written files too 
 
 ## 2026-02-12 manual [pitfall]
 Monaco namespace defines its own Uri type -- documentation examples and user code that use Uri with 'using Monaco' must fully qualify System.Uri to avoid ambiguity
+
+## 2026-02-12 manual [pitfall]
+Provider registration and all InvokeScriptAsync calls require EditorLoaded, not EditorLoading - _initialized is only set after CodeEditorLoaded() runs
