@@ -321,6 +321,8 @@ export interface ObjectLiteralType {
   kind: "objectLiteral";
   /** Properties in the object literal type. */
   properties: PropertyInfo[];
+  /** Methods in the object literal type (e.g., { dispose(): void }). */
+  methods: MethodInfo[];
   /** Index signatures in the object literal type. */
   indexSignatures: IndexSignatureInfo[];
   /** Call signatures in the object literal type. */

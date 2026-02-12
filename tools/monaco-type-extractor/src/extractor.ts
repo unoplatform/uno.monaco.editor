@@ -320,6 +320,11 @@ function extractGetAccessors(
 ): PropertyInfo[] {
   return accessors.map((acc) => {
     const returnTypeNode = acc.getReturnTypeNode();
+    // Check if a paired setter exists - if so, the property is not readonly
+    const parent = acc.getParent();
+    const hasSetter =
+      Node.isClassDeclaration(parent) &&
+      parent.getSetAccessor(acc.getName()) != null;
     return {
       name: acc.getName(),
       documentation: getDocumentation(acc),
@@ -327,7 +332,7 @@ function extractGetAccessors(
         ? extractTypeFromNode(returnTypeNode)
         : { kind: "intrinsic" as const, text: acc.getReturnType().getText() },
       isOptional: false,
-      isReadonly: true, // get accessors without set are effectively readonly
+      isReadonly: !hasSetter,
     };
   });
 }
@@ -374,25 +379,26 @@ function extractMethodSignatures(methods: MethodSignature[]): MethodInfo[] {
 }
 
 function extractClassMethods(methods: MethodDeclaration[]): MethodInfo[] {
-  // Group by name to collect overloads
+  // Group by name AND static-ness to correctly handle overloads.
+  // A class could theoretically have both static and instance methods with the same name.
   const methodMap = new Map<string, MethodDeclaration[]>();
   for (const method of methods) {
-    const name = method.getName();
-    const existing = methodMap.get(name);
+    const key = `${method.isStatic() ? "static" : "instance"}:${method.getName()}`;
+    const existing = methodMap.get(key);
     if (existing) {
       existing.push(method);
     } else {
-      methodMap.set(name, [method]);
+      methodMap.set(key, [method]);
     }
   }
 
   const result: MethodInfo[] = [];
-  for (const [name, overloads] of methodMap) {
+  for (const [, overloads] of methodMap) {
     const primary = overloads[0];
     const rest = overloads.slice(1);
 
     result.push({
-      name,
+      name: primary.getName(),
       documentation: getDocumentation(primary),
       typeParameters: extractTypeParameters(primary.getTypeParameters()),
       parameters: primary.getParameters().map(extractParameter),
@@ -546,6 +552,8 @@ function extractTypeFromNode(typeNode: TypeNode): TypeInfo {
       .getProperties()
       .map(extractPropertySignature)
       .sort(sortByName);
+    const methods = extractMethodSignatures(typeNode.getMethods())
+      .sort(sortByName);
     const indexSignatures = typeNode
       .getIndexSignatures()
       .map(extractIndexSignature)
@@ -557,6 +565,7 @@ function extractTypeFromNode(typeNode: TypeNode): TypeInfo {
     return {
       kind: "objectLiteral",
       properties,
+      methods,
       indexSignatures,
       callSignatures,
     };
