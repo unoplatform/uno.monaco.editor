@@ -37,6 +37,7 @@ Also add to the "Development Workflow" validation checklist:
 ## Done summary
 Added CI Verification Policy section to AGENTS.md with CI job structure table, known limitations (Desktop CDP and WASM Playwright exclusions), gh pr checks examples, and failure workflow. Updated Development Workflow checklist with step 4 for CI verification.
 ## Evidence
-- Commits: ccd362f291c023fa480c1775a28d57cc50ee5f79
+- Commits: ccd362f, ac9389b (updated macOS ARM WasmPlaywright exclusion docs)
 - Tests: documentation-only change, no test commands needed
+- PRs: PR #38 CI run 21954352819 all green
 - PRs:
