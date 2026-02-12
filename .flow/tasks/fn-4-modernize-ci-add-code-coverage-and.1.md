@@ -36,9 +36,8 @@ Update CI runner images and GitHub Action versions to latest in the targeted com
 - [ ] `dotnet build MonacoEditorComponent.slnx --no-restore` passes (no local breakage)
 
 ## Done summary
-TBD
-
+Updated CI runner images and GitHub Action versions: macos-15 to macos-26 for build-macos job, bumped tag-release action to checkout@v4/setup-dotnet@v4/dotnet 10.0.x/NBGV 3.8.118, bumped nuget-uno-publish to dotnet 10.0.x, and fixed stale "UWP" signing label.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 010b7492df2aa5754bfe5b5c704e44067941337b
+- Tests: dotnet build MonacoEditorComponent.slnx --no-restore
 - PRs:
