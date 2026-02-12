@@ -24,7 +24,7 @@ public sealed class WasmAppFixture : IAsyncLifetime
 {
     private const int MonacoReadyTimeoutMs = 30_000;
 
-    private readonly PlaywrightSetup _playwrightSetup;
+    private IPlaywright? _playwright;
     private Process? _serverProcess;
     private IBrowser? _browser;
     private string _processLogPath = string.Empty;
@@ -36,14 +36,12 @@ public sealed class WasmAppFixture : IAsyncLifetime
     /// <summary>The Playwright browser context for tracing support.</summary>
     public IBrowserContext Context { get; private set; } = null!;
 
-    public WasmAppFixture(PlaywrightSetup playwrightSetup)
-    {
-        _playwrightSetup = playwrightSetup;
-    }
-
     public async ValueTask InitializeAsync()
     {
         var repoRoot = FindRepoRoot();
+
+        // 0. Create Playwright instance (owned by this fixture).
+        _playwright = await Playwright.CreateAsync();
 
         // 1. Resolve WASM build output directory (Release then Debug fallback).
         var wwwrootPath = ResolveWasmBuildOutput(repoRoot);
@@ -65,7 +63,7 @@ public sealed class WasmAppFixture : IAsyncLifetime
         await WaitForServerReady($"http://localhost:{_serverPort}/", _serverProcess, _processLogPath, timeoutMs: 15_000);
 
         // 6. Launch Playwright Chromium browser (headless).
-        _browser = await _playwrightSetup.Instance.Chromium.LaunchAsync(new()
+        _browser = await _playwright.Chromium.LaunchAsync(new()
         {
             Headless = true,
         });
@@ -113,6 +111,7 @@ public sealed class WasmAppFixture : IAsyncLifetime
         }
 
         _serverProcess?.Dispose();
+        _playwright?.Dispose();
     }
 
     /// <summary>
@@ -161,22 +160,28 @@ public sealed class WasmAppFixture : IAsyncLifetime
 
     private static string ResolveWasmBuildOutput(string repoRoot)
     {
-        var releasePath = Path.Combine(repoRoot, "MonacoEditorTestApp", "bin", "Release", "net10.0-browserwasm", "wwwroot");
-        if (Directory.Exists(releasePath))
-        {
-            return releasePath;
-        }
+        // Search candidates in priority order: artifacts output (UseArtifactsOutput=true),
+        // then traditional bin layout, for both Release and Debug.
+        string[] candidates =
+        [
+            Path.Combine(repoRoot, "artifacts", "bin", "MonacoEditorTestApp", "release_net10.0-browserwasm", "wwwroot"),
+            Path.Combine(repoRoot, "MonacoEditorTestApp", "bin", "Release", "net10.0-browserwasm", "wwwroot"),
+            Path.Combine(repoRoot, "artifacts", "bin", "MonacoEditorTestApp", "debug_net10.0-browserwasm", "wwwroot"),
+            Path.Combine(repoRoot, "MonacoEditorTestApp", "bin", "Debug", "net10.0-browserwasm", "wwwroot"),
+        ];
 
-        var debugPath = Path.Combine(repoRoot, "MonacoEditorTestApp", "bin", "Debug", "net10.0-browserwasm", "wwwroot");
-        if (Directory.Exists(debugPath))
+        foreach (var candidate in candidates)
         {
-            return debugPath;
+            if (Directory.Exists(candidate))
+            {
+                return candidate;
+            }
         }
 
         throw new InvalidOperationException(
             "WASM build output not found. Run:\n" +
             "  dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm\n" +
-            $"Searched:\n  {releasePath}\n  {debugPath}");
+            $"Searched:\n  {string.Join("\n  ", candidates)}");
     }
 
     private static Process StartStaticServer(string wwwrootPath, int port)

@@ -150,12 +150,9 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
 
 /// <summary>
 /// xUnit collection definition for WASM Playwright tests, sharing a single
-/// <see cref="WasmAppFixture"/> (and its <see cref="PlaywrightSetup"/> dependency)
-/// across all tests in the collection.
-/// xUnit v3 creates <see cref="PlaywrightSetup"/> first, then injects it into
-/// <see cref="WasmAppFixture"/>'s constructor.
+/// <see cref="WasmAppFixture"/> across all tests in the collection.
 /// </summary>
 [CollectionDefinition("WasmPlaywright")]
-public sealed class WasmPlaywrightCollection : ICollectionFixture<PlaywrightSetup>, ICollectionFixture<WasmAppFixture>
+public sealed class WasmPlaywrightCollection : ICollectionFixture<WasmAppFixture>
 {
 }

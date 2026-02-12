@@ -520,12 +520,9 @@ public sealed class DesktopIntegrationTests : IAsyncLifetime
 
 /// <summary>
 /// xUnit collection definition for desktop CDP tests, sharing a single
-/// <see cref="DesktopAppFixture"/> (and its <see cref="PlaywrightSetup"/> dependency)
-/// across all tests in the collection.
-/// xUnit v3 creates <see cref="PlaywrightSetup"/> first, then injects it into
-/// <see cref="DesktopAppFixture"/>'s constructor.
+/// <see cref="DesktopAppFixture"/> across all tests in the collection.
 /// </summary>
 [CollectionDefinition("DesktopCDP")]
-public sealed class DesktopCdpCollection : ICollectionFixture<PlaywrightSetup>, ICollectionFixture<DesktopAppFixture>
+public sealed class DesktopCdpCollection : ICollectionFixture<DesktopAppFixture>
 {
 }

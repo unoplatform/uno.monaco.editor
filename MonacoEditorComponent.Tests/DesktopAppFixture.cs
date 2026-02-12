@@ -34,7 +34,7 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     private const int MonacoPageTimeoutMs = 10_000;
     private const int MonacoReadyTimeoutMs = 15_000;
 
-    private readonly PlaywrightSetup _playwrightSetup;
+    private IPlaywright? _playwright;
     private Process? _appProcess;
     private IBrowser? _browser;
     private string _userDataFolder = string.Empty;
@@ -47,13 +47,11 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     /// <summary>The Playwright browser context for tracing support.</summary>
     public IBrowserContext Context { get; private set; } = null!;
 
-    public DesktopAppFixture(PlaywrightSetup playwrightSetup)
-    {
-        _playwrightSetup = playwrightSetup;
-    }
-
     public async ValueTask InitializeAsync()
     {
+        // 0. Create Playwright instance (owned by this fixture).
+        _playwright = await Playwright.CreateAsync();
+
         // 1. Pick a random available port for CDP.
         _cdpPort = GetAvailablePort();
 
@@ -96,7 +94,7 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         await WaitForCdpReady(cdpEndpoint);
 
         // 6. Connect Playwright via CDP.
-        _browser = await _playwrightSetup.Instance.Chromium.ConnectOverCDPAsync(cdpEndpoint);
+        _browser = await _playwright!.Chromium.ConnectOverCDPAsync(cdpEndpoint);
 
         // 7. Find the Monaco page.
         Page = await FindMonacoPage();
@@ -133,6 +131,7 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         }
 
         _appProcess?.Dispose();
+        _playwright?.Dispose();
 
         // Clean up unique user data folder.
         if (!string.IsNullOrEmpty(_userDataFolder) && Directory.Exists(_userDataFolder))
