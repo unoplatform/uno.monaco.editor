@@ -44,3 +44,7 @@ Two sequence diagrams showing the same operation on both paths:
 - [ ] Cross-references `bridge-protocol.md` (no duplication)
 - [ ] Documents platform-asymmetric APIs
 - [ ] Documents TypeScript bundle structure
+
+## Done summary
+
+## Done evidence
