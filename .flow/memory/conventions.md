@@ -12,3 +12,6 @@ Navigation allowlists must enforce full origin (scheme + exact host + default po
 
 ## 2026-02-11 manual [convention]
 Classes that subscribe to OS-level events (AccessibilitySettings, UISettings, CoreWindow) must implement IDisposable for deterministic cleanup -- finalizers alone are not sufficient for UI component lifecycles
+
+## 2026-02-12 manual [convention]
+When reading process stdout/stderr concurrently with timeout: (1) start ReadToEndAsync tasks, (2) call WaitForExit, (3) if timeout kill process FIRST, (4) then await stream tasks. Never await streams before checking timeout.

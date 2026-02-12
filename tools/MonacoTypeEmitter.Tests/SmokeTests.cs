@@ -118,22 +118,29 @@ public class SmokeTests
 
             using var process = Process.Start(psi)!;
 
-            // Read both streams concurrently to avoid deadlock when one pipe buffer fills
+            // Read both streams concurrently to avoid deadlock when one pipe buffer fills.
+            // Important: do NOT await these before checking the timeout -- if the process
+            // hangs, the stream reads will also hang indefinitely.
             var stdoutTask = process.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
             var stderrTask = process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
             var exited = process.WaitForExit(TimeSpan.FromMinutes(3));
 
-            var stdout = await stdoutTask;
-            var stderr = await stderrTask;
-
             if (!exited)
             {
+                // Kill the process FIRST to unblock stream reads, then collect output
                 try { process.Kill(entireProcessTree: true); }
                 catch { /* best effort */ }
+
+                var partialStdout = await stdoutTask;
+                var partialStderr = await stderrTask;
                 Assert.Fail(
                     $"Build process timed out after 3 minutes ({enumCount} enum files).\n" +
-                    $"Partial stdout:\n{stdout}\nPartial stderr:\n{stderr}");
+                    $"Partial stdout:\n{partialStdout}\nPartial stderr:\n{partialStderr}");
             }
+
+            // Process exited normally -- safe to await streams
+            var stdout = await stdoutTask;
+            var stderr = await stderrTask;
 
             Assert.True(process.ExitCode == 0,
                 $"Emitted enum files failed to compile ({enumCount} files).\n" +
