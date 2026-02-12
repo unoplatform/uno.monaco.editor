@@ -202,7 +202,7 @@ public partial class RoundTripTests
         Assert.Contains("FilterText", content);
 
         // Must be emitted as interface (CompletionItem without I-prefix)
-        Assert.Contains("public interface CompletionItem", content);
+        Assert.Contains("public partial interface CompletionItem", content);
     }
 
     /// <summary>
@@ -307,13 +307,13 @@ public partial class RoundTripTests
             f.Key.EndsWith("IMarkerData.cs", StringComparison.OrdinalIgnoreCase)).Value;
         // Interface must have InterfaceToClassConverter for deserialization
         Assert.Contains("InterfaceToClassConverter<IMarkerData, MarkerData>", iMarkerData);
-        Assert.Contains("public interface IMarkerData", iMarkerData);
+        Assert.Contains("public partial interface IMarkerData", iMarkerData);
 
         var markerData = files.First(f =>
             f.Key.EndsWith("/MarkerData.cs", StringComparison.OrdinalIgnoreCase)
             || f.Key == "MarkerData.cs").Value;
         // Concrete class must be sealed and implement the interface
-        Assert.Contains("public sealed class MarkerData : IMarkerData", markerData);
+        Assert.Contains("public sealed partial class MarkerData : IMarkerData", markerData);
         // Must have mutable properties (SerializationContractTests sets them via object initializer)
         Assert.Matches(PropertyGetSetPattern(), markerData);
 
@@ -331,7 +331,7 @@ public partial class RoundTripTests
             && !f.Key.Contains("CompletionItemP", StringComparison.OrdinalIgnoreCase)
             && !f.Key.Contains("CompletionItemR", StringComparison.OrdinalIgnoreCase)
             && !f.Key.Contains("CompletionItemT", StringComparison.OrdinalIgnoreCase)).Value;
-        Assert.Contains("public interface CompletionItem", completionItem);
+        Assert.Contains("public partial interface CompletionItem", completionItem);
         Assert.Contains("Label", completionItem);
         Assert.Contains("InsertText", completionItem);
         Assert.Contains("Kind", completionItem);

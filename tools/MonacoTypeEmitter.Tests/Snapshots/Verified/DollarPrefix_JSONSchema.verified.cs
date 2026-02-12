@@ -10,7 +10,7 @@ namespace Monaco.Languages.Json
     /// <remarks>
     /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/languages.json.IJSONSchema.html">Monaco API</see> for more details.
     /// </remarks>
-    public sealed class JSONSchema : IJSONSchema
+    public sealed partial class JSONSchema : IJSONSchema
     {
         [JsonPropertyName("$comment")]
         public string? Comment { get; set; }

@@ -8,8 +8,11 @@ dotnet_diagnostic.IDE1006.severity = none
 # Naming: identifiers should have the right prefix
 dotnet_diagnostic.CA1715.severity = none
 
-# CS1591: Generated Monaco types do not require XML docs (fn-5.6/fn-5.8 will address)
-dotnet_diagnostic.CS1591.severity = none
+# CS1591: Generated Monaco types now have XML docs from upstream JSDoc (fn-10.2).
+# Severity raised from none to suggestion; full warning enforcement deferred until
+# the complete API surface type regeneration is done (avoids breaking hand-written
+# helper types that lack upstream JSDoc).
+dotnet_diagnostic.CS1591.severity = suggestion
 
 # Hand-written LanguagesHelper files re-enable CS1591 so undocumented public APIs fail build.
 [LanguagesHelper*.cs]

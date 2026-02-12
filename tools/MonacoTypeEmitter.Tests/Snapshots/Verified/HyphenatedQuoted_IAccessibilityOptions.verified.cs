@@ -11,7 +11,7 @@ namespace Monaco.Editor
     /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor.IAccessibilityOptions.html">Monaco API</see> for more details.
     /// </remarks>
     [JsonConverter(typeof(Monaco.Helpers.InterfaceToClassConverter<IAccessibilityOptions, AccessibilityOptions>))]
-    public interface IAccessibilityOptions
+    public partial interface IAccessibilityOptions
     {
         /// <summary>
         /// The ARIA label for the editor.

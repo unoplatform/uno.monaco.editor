@@ -9,7 +9,7 @@ namespace Monaco
     /// <remarks>
     /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/IPosition.html">Monaco API</see> for more details.
     /// </remarks>
-    public sealed class Position : IPosition
+    public sealed partial class Position : IPosition
     {
         /// <summary>
         /// line number (starts at 1)

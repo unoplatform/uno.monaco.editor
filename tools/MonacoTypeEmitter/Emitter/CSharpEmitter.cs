@@ -18,6 +18,16 @@ public sealed class CSharpEmitter
     private readonly HashSet<string> _knownEnumNames;
 
     /// <summary>
+    /// Class names that are extended by other classes and therefore must not be sealed.
+    /// </summary>
+    private readonly HashSet<string> _extendedClassNames;
+
+    /// <summary>
+    /// When true, only write to files that already exist on disk. New files are skipped.
+    /// </summary>
+    public bool UpdateOnly { get; set; }
+
+    /// <summary>
     /// Maps type names to their C# namespace for cross-namespace using directives.
     /// </summary>
     private readonly Dictionary<string, string> _typeToNamespace;
@@ -79,6 +89,17 @@ public sealed class CSharpEmitter
                 _typeDocKinds.TryAdd(cls.Name, "classes");
             }
         }
+
+        // Build set of class names that are extended by other classes
+        _extendedClassNames = [];
+        foreach (var ns in model.Namespaces)
+        {
+            foreach (var cls in ns.Classes)
+            {
+                if (cls.Extends is not null)
+                    _extendedClassNames.Add(cls.Extends.Name);
+            }
+        }
     }
 
     /// <summary>
@@ -122,10 +143,12 @@ public sealed class CSharpEmitter
 
             // Emit classes (concrete implementations that pair with interfaces)
             // Skip generic interfaces -- C# typeof() in attributes cannot use open type params.
+            // Skip interfaces with methods -- concrete stubs would require full implementations.
             foreach (var iface in ns.Interfaces)
             {
                 if (iface.Name.StartsWith("I") && iface.Name.Length > 1
-                    && char.IsUpper(iface.Name[1]) && iface.TypeParameters.Count == 0)
+                    && char.IsUpper(iface.Name[1]) && iface.TypeParameters.Count == 0
+                    && iface.Methods.Count == 0)
                 {
                     var className = iface.Name[1..];
                     var path = EmitConcreteClass(iface, className, csharpNs, relDir);
@@ -276,10 +299,14 @@ public sealed class CSharpEmitter
         // (I-prefix pattern: IFoo -> Foo)
         // Skip concrete pairing for generic interfaces -- C# cannot put
         // open type parameters in typeof() for converter attributes.
-        bool hasConcrete = iface.Name.StartsWith("I")
-            && iface.Name.Length > 1
-            && char.IsUpper(iface.Name[1])
-            && iface.TypeParameters.Count == 0;
+        // Skip interfaces with methods -- concrete stubs would require full implementations.
+        // In update-only mode, only pair if the concrete class file already exists.
+        var concreteCandidateName = (iface.Name.StartsWith("I") && iface.Name.Length > 1 && char.IsUpper(iface.Name[1]))
+            ? iface.Name[1..] : null;
+        bool hasConcrete = concreteCandidateName is not null
+            && iface.TypeParameters.Count == 0
+            && iface.Methods.Count == 0
+            && (!UpdateOnly || ConcreteClassFileExists(relDir, concreteCandidateName));
 
         var fileName = $"{iface.Name}.cs";
         var repoRelPath = GetRepoRelativePath(relDir, fileName);
@@ -326,7 +353,7 @@ public sealed class CSharpEmitter
         }
 
         var declTypeParams = FormatTypeParameters(iface.TypeParameters);
-        sb.AppendLine($"    public interface {iface.Name}{declTypeParams}{extendsClause}");
+        sb.AppendLine($"    public partial interface {iface.Name}{declTypeParams}{extendsClause}");
         sb.AppendLine("    {");
 
         foreach (var prop in iface.Properties)
@@ -403,7 +430,7 @@ public sealed class CSharpEmitter
         WriteDocComment(sb, iface.Documentation, "    ");
         WriteTypeDocRemarks(sb, iface.Name, "    ");
 
-        sb.AppendLine($"    public sealed class {className} : {iface.Name}");
+        sb.AppendLine($"    public sealed partial class {className} : {iface.Name}");
         sb.AppendLine("    {");
 
         foreach (var prop in iface.Properties)
@@ -495,7 +522,8 @@ public sealed class CSharpEmitter
             baseClause = $" : {string.Join(", ", bases)}";
 
         var declTypeParams = FormatTypeParameters(cls.TypeParameters);
-        sb.AppendLine($"    public sealed class {cls.Name}{declTypeParams}{baseClause}");
+        var sealedModifier = _extendedClassNames.Contains(cls.Name) ? "" : "sealed ";
+        sb.AppendLine($"    public {sealedModifier}partial class {cls.Name}{declTypeParams}{baseClause}");
         sb.AppendLine("    {");
 
         foreach (var prop in cls.Properties)
@@ -891,6 +919,10 @@ public sealed class CSharpEmitter
     {
         var baseType = TypeMapper.ToCSharpType(prop.Type);
 
+        // void cannot be used as a property type in C# (TS brand properties use void)
+        if (baseType == "void")
+            baseType = "object";
+
         // If optional, make nullable
         if (prop.IsOptional)
         {
@@ -910,6 +942,10 @@ public sealed class CSharpEmitter
     private string MapClassPropertyType(PropertyInfo prop)
     {
         var baseType = TypeMapper.ToCSharpType(prop.Type);
+
+        // void cannot be used as a property type in C# (TS brand properties use void)
+        if (baseType == "void")
+            baseType = "object";
 
         // For class properties, optional means nullable
         if (prop.IsOptional)
@@ -1022,17 +1058,32 @@ public sealed class CSharpEmitter
         return $"MonacoEditorComponent/Monaco/{relDir}/{fileName}";
     }
 
-    private void WriteFile(string relDir, string fileName, string content)
+    private bool WriteFile(string relDir, string fileName, string content)
     {
         var dir = string.IsNullOrEmpty(relDir)
             ? _outputRoot
             : Path.Combine(_outputRoot, relDir);
 
-        Directory.CreateDirectory(dir);
-
         var fullPath = Path.Combine(dir, fileName);
+
+        if (UpdateOnly && !File.Exists(fullPath))
+        {
+            Console.Error.WriteLine($"  Skipping (update-only, new file): {GetRepoRelativePath(relDir, fileName)}");
+            return false;
+        }
+
+        Directory.CreateDirectory(dir);
         File.WriteAllText(fullPath, content);
         Console.Error.WriteLine($"  Written: {GetRepoRelativePath(relDir, fileName)}");
+        return true;
+    }
+
+    private bool ConcreteClassFileExists(string relDir, string className)
+    {
+        var dir = string.IsNullOrEmpty(relDir)
+            ? _outputRoot
+            : Path.Combine(_outputRoot, relDir);
+        return File.Exists(Path.Combine(dir, $"{className}.cs"));
     }
 
     private static void WriteAutoGeneratedHeader(StringBuilder sb)

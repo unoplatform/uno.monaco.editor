@@ -10,6 +10,7 @@ string? outputPath = null;
 string? ignoreFile = null;
 string? repoRoot = null;
 bool validate = false;
+bool updateOnly = false;
 
 for (int i = 0; i < args.Length; i++)
 {
@@ -53,6 +54,9 @@ for (int i = 0; i < args.Length; i++)
             break;
         case "--validate":
             validate = true;
+            break;
+        case "--update-only":
+            updateOnly = true;
             break;
         case "--help" or "-h":
             PrintUsage();
@@ -171,7 +175,10 @@ Console.Error.WriteLine($"Namespaces: {model.Namespaces.Count}");
 
 // Emit
 Console.Error.WriteLine($"Emitting C# files to: {outputPath}");
-var emitter = new CSharpEmitter(model, ignoreList, outputPath, repoRoot);
+var emitter = new CSharpEmitter(model, ignoreList, outputPath, repoRoot)
+{
+    UpdateOnly = updateOnly
+};
 var written = emitter.EmitAll();
 
 Console.Error.WriteLine();
@@ -191,6 +198,7 @@ static void PrintUsage()
           -o, --output <dir>       Output directory for C# files (required)
           --ignore-file <file>     Path to .generator-ignore file
           --repo-root <dir>        Repository root for path resolution
+          --update-only            Only update existing files, skip new file creation
           --validate               Validate ignore list entries resolve to files
           -h, --help               Show this help message
 

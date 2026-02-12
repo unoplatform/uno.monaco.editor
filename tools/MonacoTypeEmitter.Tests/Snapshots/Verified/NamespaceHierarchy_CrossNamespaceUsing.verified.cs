@@ -12,7 +12,7 @@ namespace Monaco.Editor
     /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor.IMarkerData.html">Monaco API</see> for more details.
     /// </remarks>
     [JsonConverter(typeof(Monaco.Helpers.InterfaceToClassConverter<IMarkerData, MarkerData>))]
-    public interface IMarkerData
+    public partial interface IMarkerData
     {
         MarkerSeverity Severity { get; set; }
 

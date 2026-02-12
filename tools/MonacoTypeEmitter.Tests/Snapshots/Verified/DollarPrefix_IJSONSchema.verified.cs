@@ -11,7 +11,7 @@ namespace Monaco.Languages.Json
     /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/languages.json.IJSONSchema.html">Monaco API</see> for more details.
     /// </remarks>
     [JsonConverter(typeof(Monaco.Helpers.InterfaceToClassConverter<IJSONSchema, JSONSchema>))]
-    public interface IJSONSchema
+    public partial interface IJSONSchema
     {
         [JsonPropertyName("$comment")]
         string? Comment { get; set; }

@@ -11,7 +11,7 @@ namespace Monaco.Editor
     /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor.IGlobalEditorOptions.html">Monaco API</see> for more details.
     /// </remarks>
     [JsonConverter(typeof(Monaco.Helpers.InterfaceToClassConverter<IGlobalEditorOptions, GlobalEditorOptions>))]
-    public interface IGlobalEditorOptions
+    public partial interface IGlobalEditorOptions
     {
         /// <summary>
         /// Controls whether the semanticHighlighting is shown for the languages that support it.

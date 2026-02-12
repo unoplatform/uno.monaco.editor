@@ -9,7 +9,7 @@ namespace Monaco
     /// <remarks>
     /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/classes/Uri.html">Monaco API</see> for more details.
     /// </remarks>
-    public sealed class Uri
+    public sealed partial class Uri
     {
         /// <summary>
         /// scheme is the 'http' part of 'http://www.example.com/some/path?query#fragment'.

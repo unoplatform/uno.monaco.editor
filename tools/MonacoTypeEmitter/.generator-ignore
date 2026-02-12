@@ -29,3 +29,13 @@ MonacoEditorComponent/Monaco/Languages/CodeLensProvider.cs
 MonacoEditorComponent/Monaco/Languages/CompletionItemProvider.cs
 MonacoEditorComponent/Monaco/Languages/DocumentColorProvider.cs
 MonacoEditorComponent/Monaco/Languages/HoverProvider.cs
+
+# IMarkdownString is hand-written with constructor, WinRT attributes, and custom members
+MonacoEditorComponent/Monaco/IMarkdownString.cs
+
+# CancellationToken/Source conflict with System.Threading types
+MonacoEditorComponent/Monaco/CancellationToken.cs
+MonacoEditorComponent/Monaco/CancellationTokenSource.cs
+
+# Disposable conflicts with System.IDisposable patterns
+MonacoEditorComponent/Monaco/Disposable.cs
