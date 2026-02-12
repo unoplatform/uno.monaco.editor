@@ -1,14 +1,24 @@
 {
-  "assignee": null,
+  "assignee": "claire@novotny.org",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-02-12T13:26:55.246377Z",
   "created_at": "2026-02-12T04:45:35.792363Z",
   "depends_on": [],
   "epic": "fn-5-comprehensive-documentation-overhaul",
   "id": "fn-5-comprehensive-documentation-overhaul.3",
   "priority": null,
   "spec_path": ".flow/tasks/fn-5-comprehensive-documentation-overhaul.3.md",
-  "status": "todo",
+  "status": "done",
   "title": "Create architecture design docs with Mermaid diagrams",
-  "updated_at": "2026-02-12T05:05:32.730190Z"
+  "updated_at": "2026-02-12T13:55:27.737082Z",
+  "evidence": {
+    "commits": [
+      "8effa56b8753e73f4bdc33a416953d3a267914be",
+      "afb54dd9beb8e14e6f9ac3b6f13b8c94e969d8ef"
+    ],
+    "prs": [],
+    "tests": [
+      "dotnet build MonacoEditorComponent.slnx --no-restore"
+    ]
+  }
 }
