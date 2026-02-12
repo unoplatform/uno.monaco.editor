@@ -47,4 +47,4 @@ Two sequence diagrams showing the same operation on both paths:
 
 ## Done summary
 
-## Done evidence
+## Evidence
