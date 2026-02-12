@@ -18,8 +18,8 @@
 3. [Epic Summaries](#epic-summaries)
    - [fn-1: Desktop Skia Target](#fn-1-desktop-skia-target)
    - [fn-2: System.Text.Json Migration](#fn-2-systemtextjson-migration)
-   - [fn-3: CI Modernization](#fn-3-ci-modernization)
-   - [fn-4: Type Generation Pipeline](#fn-4-type-generation-pipeline)
+   - [fn-3: Merge, Stabilize CI, and Add macOS ARM](#fn-3-merge-stabilize-ci-and-add-macos-arm)
+   - [fn-4: CI Modernization, Code Coverage, and Type Generation Pipeline](#fn-4-ci-modernization-code-coverage-and-type-generation-pipeline)
 4. [Architecture: Before and After](#architecture-before-and-after)
 5. [Recommended Reading Order](#recommended-reading-order)
 6. [Risk Assessment](#risk-assessment)
@@ -52,7 +52,8 @@ This branch delivers four epics of work that collectively transform `uno.monaco.
 | `CommandHandler` delegate receives `JsonElement` instead of `JObject` | Command handler callbacks that inspect arguments via `JObject` APIs will break | Use `JsonElement.GetProperty()`, `.GetString()`, etc. instead of JObject indexers |
 | Newtonsoft.Json transitive dependency removed | Projects relying on Newtonsoft being provided transitively must add their own reference | Add `<PackageReference Include="Newtonsoft.Json" />` if still needed |
 | Custom Newtonsoft `JsonConverter` subclasses no longer recognized | Converters extending `Newtonsoft.Json.JsonConverter` are not used by STJ | Rewrite as `System.Text.Json.Serialization.JsonConverter<T>` implementations |
-| Nerdbank.GitVersioning version: `6.5.0-dev.{height}` | NuGet version scheme changed | No action needed; informational |
+
+**Versioning note**: The Nerdbank.GitVersioning scheme is `6.5.0-dev.{height}` (see `version.json`). This affects NuGet package version numbering but is not a consumer-facing API break.
 
 ---
 
@@ -111,37 +112,37 @@ This branch delivers four epics of work that collectively transform `uno.monaco.
 
 ---
 
-### fn-3: CI Modernization
+### fn-3: Merge, Stabilize CI, and Add macOS ARM
 
-**Goal**: Replace the legacy CI workflow with GitHub Actions, add code coverage, and fix test infrastructure.
+**Goal**: Merge the ralph branch into the upstream branch, add macOS ARM CI, fix CI blockers (Resizetizer, Playwright, xUnit v3), and gate release signing on all quality jobs.
 
 **Key commits** (chronological):
-- `2e77127` — Initial CI modernization: GitHub Actions, code coverage, type generator replacement
+- `2e77127` — Initial CI modernization with GitHub Actions
 - `1327326` — Fix Playwright browser install, commit `AppManifest.js`, split CI steps
 - `0963c7a` — Set `PLAYWRIGHT_DRIVER_SEARCH_PATH` for test runtime
 - `f3a991e` — Inline Playwright creation into fixtures for xUnit v3 compatibility
 - `9d1bd4b` — Fix desktop-tests job to report green on headless CI
-- `5371fa4` — Add code coverage collection and merged reporting
-- `eadd0d3` — Add macOS ARM CI job
-- `010b749` — Update runner images, action versions, SDK targets
+- `eadd0d3` — Add macOS ARM CI job and clean up CI workflow
 
 **Key files to review**:
 
 | File | What to look for |
 |------|------------------|
-| `.github/workflows/ci.yml` | Job matrix, coverage steps, workload installs |
-| `.github/actions/nuget-uno-publish/action.yml` | NuGet publish action updates |
-| `.github/actions/tag-release/action.yml` | Release tagging changes |
+| `.github/workflows/ci.yml` | Job graph, test trait filtering, sign gating on quality jobs |
+| `.gitattributes` | `linguist-generated` markers for reviewable PR diffs |
 
-**Review focus**: The CI workflow now has multiple jobs (build, WASM tests, desktop tests, coverage merge). The desktop-tests job filters out `DesktopCDP` and `WasmPlaywright` test traits via `--filter-not-trait`, running only unit tests on Windows. No DesktopCDP integration tests are currently gated in CI because headless runners lack the GUI environment WebView2 requires.
+**Review focus**: fn-3 stabilized CI after the fn-1/fn-2 changes. The `sign` job now depends on all quality gates (`build`, `desktop-tests`, `build-macos`). The desktop-tests job filters out `DesktopCDP` and `WasmPlaywright` test traits via `--filter-not-trait`, running only unit tests on Windows. No DesktopCDP integration tests are gated in CI because headless runners lack the GUI environment WebView2 requires.
 
 ---
 
-### fn-4: Type Generation Pipeline
+### fn-4: CI Modernization, Code Coverage, and Type Generation Pipeline
 
-**Goal**: Replace the broken TypedocConverter/PowerShell type generator with a new two-stage pipeline: ts-morph TypeScript extractor producing intermediate JSON, and a .NET CLI emitter producing C# source files.
+**Goal**: Three workstreams: (1) update CI runner images and action versions, (2) add code coverage collection with merged reporting, and (3) replace the broken TypedocConverter/PowerShell type generator with a new two-stage ts-morph + .NET CLI pipeline.
 
 **Key commits** (chronological):
+- `010b749` — Update runner images, action versions, and SDK targets
+- `ac1392f` — Delete stale `build/` directory and modernize README
+- `5371fa4` — Add code coverage collection and merged reporting
 - `323d8ee` — ts-morph Monaco type extractor (TypeScript)
 - `45db184` — .NET CLI emitter for C# type emission
 - `695be92` — Generator pipeline tests (snapshot + round-trip)
@@ -151,13 +152,16 @@ This branch delivers four epics of work that collectively transform `uno.monaco.
 
 | File | What to look for |
 |------|------------------|
+| `.github/workflows/ci.yml` | Runner image versions, coverage steps, artifact uploads |
+| `.github/actions/nuget-uno-publish/action.yml` | NuGet publish action version updates |
+| `.github/actions/tag-release/action.yml` | Release tagging action version updates |
 | `tools/monaco-type-extractor/src/extractor.ts` | ts-morph AST walking, type literal handling |
 | `tools/monaco-type-extractor/src/model.ts` | Intermediate JSON model schema |
 | `tools/MonacoTypeEmitter/` | C# emitter: class/enum/interface emission, STJ attributes |
 | `tools/MonacoTypeEmitter.Tests/` | Snapshot tests, round-trip validation |
 | `MonacoEditorComponent/Monaco/` | 102 regenerated files (net -1,298 lines) |
 
-**Review focus**: The regenerated Monaco types in `MonacoEditorComponent/Monaco/` should be treated as generated output. Review the generator pipeline (`tools/`) and spot-check a few generated files for correctness rather than reviewing all 102 files line-by-line.
+**Review focus**: For CI/coverage, verify the coverage-report merge job collects from all test jobs and produces a combined Cobertura + HTML report. For the type generator, the regenerated Monaco types in `MonacoEditorComponent/Monaco/` should be treated as generated output -- review the pipeline (`tools/`) and spot-check a few generated files rather than reviewing all 102 files line-by-line.
 
 ---
 
@@ -355,15 +359,20 @@ Use the severity labels from the dotnet/runtime 3-step review pattern:
 - [ ] `ConcurrentDictionary` used for runtime type registries
 - [ ] Catch-all handlers exclude STJ metadata exceptions for AOT debugging
 
-### fn-3: CI
+### fn-3: Merge and CI Stabilization
 
 - [ ] All CI jobs install required workloads (`wasm-tools`)
 - [ ] Playwright browser install uses correct driver path
-- [ ] Coverage merge step collects from all test jobs
 - [ ] Desktop tests filter out `DesktopCDP` and `WasmPlaywright` traits (headless CI limitation)
+- [ ] `sign` job depends on all quality gates (`build`, `desktop-tests`, `build-macos`)
+- [ ] Publish jobs are downstream of `sign`
+- [ ] `.gitattributes` linguist-generated markers cover generated files only (not hand-authored code)
 
-### fn-4: Type Generation
+### fn-4: CI Modernization, Coverage, and Type Generation
 
+- [ ] Runner images and action versions are current
+- [ ] Coverage collected via `--coverage` in all CI test jobs
+- [ ] Coverage merge job produces combined Cobertura + HTML report
 - [ ] ts-morph extractor handles type literals, methods, and properties separately
 - [ ] Emitter produces `[JsonPropertyName]` attributes on all emitted types
 - [ ] `CursorStyle` and `BuiltinTheme` are on the ignore list (hand-tuned enums)
