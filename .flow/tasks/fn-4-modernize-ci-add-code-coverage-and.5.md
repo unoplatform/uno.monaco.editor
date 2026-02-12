@@ -50,9 +50,8 @@ Create a .NET CLI tool that reads the intermediate JSON model from Task .4 and e
 - [ ] Deterministic output ordering
 
 ## Done summary
-TBD
-
+Created .NET CLI tool (MonacoTypeEmitter) that reads the intermediate JSON model from the ts-morph type extractor and emits C# files matching all existing patterns in MonacoEditorComponent/Monaco/. The tool handles enums (string-backed and numeric), type alias string literal unions, interfaces with InterfaceToClassConverter pairing, concrete classes, model classes with constructors, generic types, index signatures, call signatures, cross-namespace using directives, JsonPropertyName policy, and repo-relative .generator-ignore path matching. Produces 573 deterministic C# files from the real Monaco 0.54.0 model.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 45db184, ea12f0f, b08aea2, 67fe97b, 10fc88b, ee8d1c5
+- Tests: dotnet build MonacoEditorComponent.slnx --no-restore, dotnet run --project tools/MonacoTypeEmitter (573 files emitted), deterministic output check (two runs identical), JSON error handling check, constructor assignment verification
 - PRs:
