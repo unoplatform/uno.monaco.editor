@@ -66,5 +66,27 @@
       "console": "internalConsole",
       "stopAtEntry": false
     },
+    {
+      // WSL2 desktop profile — sets DISPLAY and GDK_GL for Skia/GTK rendering
+      // under WSLg (Windows 11+). DISPLAY=:0 is the WSLg default; GDK_GL=gles
+      // forces GLES rendering which is more reliable under WSL2's virtual GPU.
+      "name": "Uno Platform Desktop Debug (WSL2)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-desktop",
+      // If you have changed target frameworks, make sure to update the program path.
+      "program": "${workspaceFolder}/artifacts/bin/MonacoEditorTestApp/debug_net10.0-desktop/MonacoEditorTestApp.dll",
+      "args": [],
+      "launchSettingsProfile": "MonacoEditorTestApp (Desktop WSL2)",
+      "env": {
+        "DOTNET_MODIFIABLE_ASSEMBLIES": "debug",
+        "DISPLAY": ":0",
+        "GDK_GL": "gles"
+      },
+      "cwd": "${workspaceFolder}/MonacoEditorTestApp",
+      // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
+      "console": "internalConsole",
+      "stopAtEntry": false
+    },
   ]
 }

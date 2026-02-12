@@ -26,6 +26,17 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
+    },
+    "MonacoEditorTestApp (Desktop)": {
+      "commandName": "Project",
+      "environmentVariables": {}
+    },
+    "MonacoEditorTestApp (Desktop WSL2)": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DISPLAY": ":0",
+        "GDK_GL": "gles"
+      }
     }
   }
 }
