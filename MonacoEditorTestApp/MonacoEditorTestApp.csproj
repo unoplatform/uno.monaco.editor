@@ -17,10 +17,6 @@
 		<!-- Package Description -->
 		<Description>MonacoEditorTestApp powered by Uno Platform.</Description>
 
-		<!-- Disable splash screen — not needed for a test app, and Uno.Resizetizer
-		     GenerateWasmSplashAssets fails on ubuntu-latest CI runners -->
-		<UnoDisableSplashScreen>true</UnoDisableSplashScreen>
-
 		<!--
       UnoFeatures let's you quickly add and manage implicit package references based on the features you want to use.
       https://aka.platform.uno/singleproject-features
@@ -63,5 +59,10 @@
 			<WasmNativeDebugSymbols>true</WasmNativeDebugSymbols>
 		</PropertyGroup>
 	</Target>
+
+	<!-- Override Uno.Resizetizer GenerateUnoSplashWasm target which fails on CI
+	     because its WASM task (GenerateWasmSplashAssets) errors even with no
+	     UnoSplashScreen items. This no-op override prevents the MSB4181 error. -->
+	<Target Name="GenerateUnoSplashWasm" />
 
 </Project>
