@@ -126,3 +126,6 @@ Monaco namespace defines its own Uri type -- documentation examples and user cod
 
 ## 2026-02-12 manual [pitfall]
 Provider registration and all InvokeScriptAsync calls require EditorLoaded, not EditorLoading - _initialized is only set after CodeEditorLoaded() runs
+
+## 2026-02-12 manual [pitfall]
+Monaco TypeDoc site uses editor_editor_api module path prefix (not editor) in URLs -- the old editor.{Type} pattern was silently broken by a TypeDoc regeneration; always curl -s -o /dev/null -w '%{http_code}' to verify TypeDoc URLs resolve before committing

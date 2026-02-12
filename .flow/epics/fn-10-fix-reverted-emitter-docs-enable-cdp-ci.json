@@ -1,0 +1,18 @@
+{
+  "branch_name": "fn-10-fix-reverted-emitter-docs-enable-cdp-ci",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-02-12T19:48:26.212229Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "fn-10-fix-reverted-emitter-docs-enable-cdp-ci",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/fn-10-fix-reverted-emitter-docs-enable-cdp-ci.md",
+  "status": "open",
+  "title": "Fix reverted emitter docs, enable CDP CI, add WSL2 profile",
+  "updated_at": "2026-02-12T19:48:59.497906Z"
+}

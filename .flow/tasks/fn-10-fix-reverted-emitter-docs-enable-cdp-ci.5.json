@@ -1,0 +1,19 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-12T19:49:06.888497Z",
+  "depends_on": [
+    "fn-10-fix-reverted-emitter-docs-enable-cdp-ci.1",
+    "fn-10-fix-reverted-emitter-docs-enable-cdp-ci.2",
+    "fn-10-fix-reverted-emitter-docs-enable-cdp-ci.3",
+    "fn-10-fix-reverted-emitter-docs-enable-cdp-ci.4"
+  ],
+  "epic": "fn-10-fix-reverted-emitter-docs-enable-cdp-ci",
+  "id": "fn-10-fix-reverted-emitter-docs-enable-cdp-ci.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-10-fix-reverted-emitter-docs-enable-cdp-ci.5.md",
+  "status": "todo",
+  "title": "Commit, push, and verify all CI jobs pass",
+  "updated_at": "2026-02-12T19:50:18.422900Z"
+}

@@ -37,6 +37,6 @@ Implementation depends on strategy chosen in task 6. Regardless of strategy:
 ## Done summary
 Enhanced CSharpEmitter with rich XML documentation generation: WriteParamDocs, WriteReturnsDocs, WriteTypeDocRemarks with namespace-aware TypeDoc URL generation, enum member doc emission, and CollapseToSingleLine for XML safety. All 19 snapshot tests pass. Generated file regeneration and CS1591 re-enablement deferred until pre-existing emitter edge case bugs (exotic TS identifiers) are fixed.
 ## Evidence
-- Commits: eabeb5c, ad3b46b
-- Tests: dotnet test --project tools/MonacoTypeEmitter.Tests/, dotnet build MonacoEditorComponent.slnx --no-restore
+- Commits:
+- Tests:
 - PRs:

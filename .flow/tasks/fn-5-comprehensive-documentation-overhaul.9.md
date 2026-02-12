@@ -85,9 +85,8 @@ Navigate the TypeDoc site to find the correct replacement URL for each reference
 - [ ] `dotnet build MonacoEditorComponent.slnx --no-restore` succeeds
 
 ## Done summary
-TBD
-
+Replaced all broken Monaco Editor API documentation URLs across CHANGELOG, C# XML comments, and docs. Old `/api/` URLs (404) and outdated `/typedoc/` URLs were replaced with verified `editor_editor_api` TypeDoc equivalents (HTTP 200). Documented the known drift between hand-written URLs and emitter-generated URLs with a TODO for future emitter fix.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 2491fa75ae25300cef1b32aee41e0e6e45e40851, 5fc6f7dee9aaba76c11c1a4fb231f235744726d1
+- Tests: dotnet build MonacoEditorComponent.slnx --no-restore, dotnet test --project tools/MonacoTypeEmitter.Tests/MonacoTypeEmitter.Tests.csproj
 - PRs:
