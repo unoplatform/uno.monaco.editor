@@ -70,10 +70,9 @@ The previous attempt failed with `TimeoutException: Timeout 15000ms exceeded` at
 - [ ] AGENTS.md "Known CI limitations" updated to reflect CDP test enablement on Windows
 - [ ] AGENTS.md CI job structure table updated for Windows job description
 - [ ] Memory note updated with corrected CI finding
-## Completion summary
-TBD
-
+## Done summary
+Enabled Desktop CDP integration tests on the Windows CI runner by normalizing the fixture launch command to `-c Release --no-build --no-launch-profile` (eliminating Debug rebuild overhead that consumed ~30s of timeout), increasing MonacoReadyTimeoutMs from 15s to 60s for CI cold-start headroom, removing the `--filter-not-trait "Category=DesktopCDP"` exclusion from the Windows desktop-tests job, and updating AGENTS.md CI documentation accordingly. DesktopCDP exclusions are preserved on Ubuntu and macOS ARM jobs.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 02ad0e20674dfef5ea864c11d18cbb1e22288141
+- Tests: dotnet build MonacoEditorComponent.slnx --no-restore, dotnet test --project tools/MonacoTypeEmitter.Tests/, dotnet build MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release --no-restore
 - PRs:
