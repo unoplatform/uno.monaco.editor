@@ -6,6 +6,9 @@ namespace Monaco
     /// <summary>
     /// A position in the editor.
     /// </summary>
+    /// <remarks>
+    /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/IPosition.html">Monaco API</see> for more details.
+    /// </remarks>
     public sealed class Position : IPosition
     {
         /// <summary>

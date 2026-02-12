@@ -22,6 +22,16 @@ public sealed class CSharpEmitter
     /// </summary>
     private readonly Dictionary<string, string> _typeToNamespace;
 
+    /// <summary>
+    /// Maps type names to their Monaco source namespace (e.g., "monaco.editor") for TypeDoc URL generation.
+    /// </summary>
+    private readonly Dictionary<string, string> _typeToSourceNamespace;
+
+    /// <summary>
+    /// Maps type names to their TypeDoc kind string ("interface", "enum", "class", "type") for URL patterns.
+    /// </summary>
+    private readonly Dictionary<string, string> _typeDocKinds;
+
     public CSharpEmitter(MonacoModel model, IgnoreList ignoreList, string outputRoot, string repoRoot)
     {
         _model = model;
@@ -32,6 +42,8 @@ public sealed class CSharpEmitter
         _knownEnumNames = [];
         // Build type-to-namespace map for cross-namespace resolution
         _typeToNamespace = new Dictionary<string, string>();
+        _typeToSourceNamespace = new Dictionary<string, string>();
+        _typeDocKinds = new Dictionary<string, string>();
 
         foreach (var ns in model.Namespaces)
         {
@@ -41,6 +53,8 @@ public sealed class CSharpEmitter
             {
                 _knownEnumNames.Add(e.Name);
                 _typeToNamespace.TryAdd(e.Name, csharpNs);
+                _typeToSourceNamespace.TryAdd(e.Name, ns.Name);
+                _typeDocKinds.TryAdd(e.Name, "enums");
             }
             foreach (var ta in ns.TypeAliases)
             {
@@ -48,15 +62,21 @@ public sealed class CSharpEmitter
                 {
                     _knownEnumNames.Add(ta.Name);
                     _typeToNamespace.TryAdd(ta.Name, csharpNs);
+                    _typeToSourceNamespace.TryAdd(ta.Name, ns.Name);
+                    _typeDocKinds.TryAdd(ta.Name, "types");
                 }
             }
             foreach (var iface in ns.Interfaces)
             {
                 _typeToNamespace.TryAdd(iface.Name, csharpNs);
+                _typeToSourceNamespace.TryAdd(iface.Name, ns.Name);
+                _typeDocKinds.TryAdd(iface.Name, "interfaces");
             }
             foreach (var cls in ns.Classes)
             {
                 _typeToNamespace.TryAdd(cls.Name, csharpNs);
+                _typeToSourceNamespace.TryAdd(cls.Name, ns.Name);
+                _typeDocKinds.TryAdd(cls.Name, "classes");
             }
         }
     }
@@ -151,6 +171,7 @@ public sealed class CSharpEmitter
         sb.AppendLine("{");
 
         WriteDocComment(sb, enumInfo.Documentation, "    ");
+        WriteTypeDocRemarks(sb, enumInfo.Name, "    ");
 
         if (enumInfo.IsStringEnum)
         {
@@ -164,6 +185,8 @@ public sealed class CSharpEmitter
         {
             var member = enumInfo.Members[i];
             var memberName = NameMapper.ToCSharpEnumMemberName(member.Name);
+
+            WriteDocComment(sb, member.Documentation, "        ");
 
             if (enumInfo.IsStringEnum)
             {
@@ -218,6 +241,7 @@ public sealed class CSharpEmitter
         sb.AppendLine("{");
 
         WriteDocComment(sb, typeAlias.Documentation, "    ");
+        WriteTypeDocRemarks(sb, typeAlias.Name, "    ");
 
         sb.AppendLine($"    [JsonConverter(typeof(JsonStringEnumConverter<{typeAlias.Name}>))]");
         sb.AppendLine($"    public enum {typeAlias.Name}");
@@ -286,6 +310,7 @@ public sealed class CSharpEmitter
         sb.AppendLine("{");
 
         WriteDocComment(sb, iface.Documentation, "    ");
+        WriteTypeDocRemarks(sb, iface.Name, "    ");
 
         if (hasConcrete)
         {
@@ -376,6 +401,7 @@ public sealed class CSharpEmitter
         sb.AppendLine("{");
 
         WriteDocComment(sb, iface.Documentation, "    ");
+        WriteTypeDocRemarks(sb, iface.Name, "    ");
 
         sb.AppendLine($"    public sealed class {className} : {iface.Name}");
         sb.AppendLine("    {");
@@ -457,6 +483,7 @@ public sealed class CSharpEmitter
         sb.AppendLine("{");
 
         WriteDocComment(sb, cls.Documentation, "    ");
+        WriteTypeDocRemarks(sb, cls.Name, "    ");
 
         var baseClause = "";
         var bases = new List<string>();
@@ -518,6 +545,8 @@ public sealed class CSharpEmitter
     private void WriteMethod(StringBuilder sb, MethodInfo method, string indent, bool isInterface)
     {
         WriteDocComment(sb, method.Documentation, indent);
+        WriteParamDocs(sb, method.Parameters, indent);
+        WriteReturnsDocs(sb, method.ReturnType, indent);
 
         var returnType = TypeMapper.ToCSharpType(method.ReturnType);
         var methodName = NameMapper.ToCSharpPropertyName(method.Name);
@@ -539,6 +568,8 @@ public sealed class CSharpEmitter
         foreach (var overload in method.Overloads)
         {
             WriteDocComment(sb, overload.Documentation, indent);
+            WriteParamDocs(sb, overload.Parameters, indent);
+            WriteReturnsDocs(sb, overload.ReturnType, indent);
 
             var olReturnType = TypeMapper.ToCSharpType(overload.ReturnType);
             var olParams = FormatParameters(overload.Parameters);
@@ -564,6 +595,7 @@ public sealed class CSharpEmitter
         string indent, List<PropertyInfo> classProperties)
     {
         WriteDocComment(sb, ctor.Documentation, indent);
+        WriteParamDocs(sb, ctor.Parameters, indent);
         var parameters = FormatParameters(ctor.Parameters);
 
         // Match constructor params to class properties by name (case-insensitive)
@@ -624,6 +656,8 @@ public sealed class CSharpEmitter
     private void WriteCallSignature(StringBuilder sb, CallSignatureInfo cs, string indent, bool isInterface)
     {
         WriteDocComment(sb, cs.Documentation, indent);
+        WriteParamDocs(sb, cs.Parameters, indent);
+        WriteReturnsDocs(sb, cs.ReturnType, indent);
         var returnType = TypeMapper.ToCSharpType(cs.ReturnType);
         var parameters = FormatParameters(cs.Parameters);
         var typeParams = FormatTypeParameters(cs.TypeParameters);
@@ -1023,11 +1057,134 @@ public sealed class CSharpEmitter
         sb.AppendLine($"{indent}/// </summary>");
     }
 
+    /// <summary>
+    /// Writes <c>&lt;param&gt;</c> XML doc tags for parameters that have documentation.
+    /// </summary>
+    private static void WriteParamDocs(StringBuilder sb, List<ParameterInfo> parameters, string indent)
+    {
+        foreach (var param in parameters)
+        {
+            if (string.IsNullOrWhiteSpace(param.Documentation))
+                continue;
+
+            var paramName = EscapeCSharpKeyword(param.Name);
+            // Remove @ prefix for XML doc param name (C# uses the unescaped name in docs)
+            if (paramName.StartsWith("@"))
+                paramName = paramName[1..];
+
+            // Collapse multi-line documentation into a single line for <param> tags
+            var doc = CollapseToSingleLine(param.Documentation);
+            sb.AppendLine($"{indent}/// <param name=\"{paramName}\">{EscapeXml(doc)}</param>");
+        }
+    }
+
+    /// <summary>
+    /// Writes a <c>&lt;returns&gt;</c> XML doc tag for methods with non-void return types.
+    /// Only emits the tag when there is meaningful return type context.
+    /// </summary>
+    private static void WriteReturnsDocs(StringBuilder sb, TypeInfo returnType, string indent)
+    {
+        // Do not emit <returns> for void or primitive void returns
+        if (returnType.Kind == "primitive" && returnType.Name is "void" or "undefined")
+            return;
+
+        // Emit a brief returns tag based on the return type
+        var returnDesc = FormatReturnTypeDescription(returnType);
+        if (returnDesc is not null)
+        {
+            sb.AppendLine($"{indent}/// <returns>{EscapeXml(returnDesc)}</returns>");
+        }
+    }
+
+    /// <summary>
+    /// Formats a human-readable description of a return type for use in <c>&lt;returns&gt;</c> tags.
+    /// </summary>
+    private static string? FormatReturnTypeDescription(TypeInfo returnType)
+    {
+        return returnType.Kind switch
+        {
+            "primitive" when returnType.Name is "string" => "A string value.",
+            "primitive" when returnType.Name is "number" => "A numeric value.",
+            "primitive" when returnType.Name is "boolean" => "true if the condition is met; otherwise, false.",
+            "reference" when returnType.Name is "Promise" or "PromiseLike" or "Thenable"
+                => $"A task representing the asynchronous operation.",
+            "reference" => $"A {returnType.Name} instance.",
+            "array" => "An array of results.",
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Writes a <c>&lt;remarks&gt;</c> block with a <c>&lt;see href="..."/&gt;</c> link
+    /// to the corresponding Monaco TypeDoc API page for a type.
+    /// </summary>
+    private void WriteTypeDocRemarks(StringBuilder sb, string typeName, string indent)
+    {
+        var url = GetTypeDocUrl(typeName);
+        if (url is null)
+            return;
+
+        sb.AppendLine($"{indent}/// <remarks>");
+        sb.AppendLine($"{indent}/// See <see href=\"{url}\">Monaco API</see> for more details.");
+        sb.AppendLine($"{indent}/// </remarks>");
+    }
+
+    /// <summary>
+    /// Constructs the Monaco TypeDoc URL for the given type name based on its source namespace and kind.
+    /// </summary>
+    private string? GetTypeDocUrl(string typeName)
+    {
+        if (!_typeToSourceNamespace.TryGetValue(typeName, out var sourceNs))
+            return null;
+
+        if (!_typeDocKinds.TryGetValue(typeName, out var kindPath))
+            return null;
+
+        const string baseUrl = "https://microsoft.github.io/monaco-editor/typedoc";
+
+        // Build the namespace prefix for the URL
+        // "monaco" -> no prefix, "monaco.editor" -> "editor.", "monaco.languages" -> "languages."
+        var nsPrefix = GetTypeDocNamespacePrefix(sourceNs);
+
+        return $"{baseUrl}/{kindPath}/{nsPrefix}{typeName}.html";
+    }
+
+    /// <summary>
+    /// Extracts the TypeDoc namespace prefix from a Monaco source namespace.
+    /// "monaco" -> "", "monaco.editor" -> "editor.", "monaco.languages" -> "languages."
+    /// </summary>
+    private static string GetTypeDocNamespacePrefix(string sourceNamespace)
+    {
+        var parts = sourceNamespace.Split('.');
+        if (parts.Length <= 1)
+            return "";
+
+        return string.Join(".", parts.Skip(1)) + ".";
+    }
+
     private static string EscapeXml(string text)
     {
         return text
             .Replace("&", "&amp;")
             .Replace("<", "&lt;")
             .Replace(">", "&gt;");
+    }
+
+    /// <summary>
+    /// Collapses multi-line text into a single line by replacing newlines with spaces.
+    /// </summary>
+    private static string CollapseToSingleLine(string text)
+    {
+        var collapsed = text
+            .Replace("\r\n", " ")
+            .Replace('\n', ' ')
+            .Replace('\r', ' ')
+            .Trim();
+
+        // Collapse multiple consecutive spaces into one
+        while (collapsed.Contains("  "))
+            collapsed = collapsed.Replace("  ", " ");
+
+        return collapsed;
     }
 }

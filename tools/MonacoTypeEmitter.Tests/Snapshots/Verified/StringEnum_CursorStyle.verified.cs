@@ -8,6 +8,9 @@ namespace Monaco.Editor
     /// <summary>
     /// Control the cursor style.
     /// </summary>
+    /// <remarks>
+    /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/types/editor.CursorStyle.html">Monaco API</see> for more details.
+    /// </remarks>
     [JsonConverter(typeof(JsonStringEnumConverter<CursorStyle>))]
     public enum CursorStyle
     {

@@ -7,6 +7,9 @@ namespace Monaco
     /// <summary>
     /// A position in the editor.
     /// </summary>
+    /// <remarks>
+    /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/IPosition.html">Monaco API</see> for more details.
+    /// </remarks>
     [JsonConverter(typeof(Monaco.Helpers.InterfaceToClassConverter<IPosition, Position>))]
     public interface IPosition
     {

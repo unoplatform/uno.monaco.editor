@@ -54,6 +54,7 @@
           "methods": [
             {
               "name": "toString",
+              "documentation": "Returns a string representation of this Uri.",
               "typeParameters": [],
               "parameters": [],
               "returnType": { "kind": "primitive", "name": "string" },

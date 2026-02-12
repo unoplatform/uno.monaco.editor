@@ -8,6 +8,9 @@ namespace Monaco.Editor
     /// <summary>
     /// A structure defining a problem/warning/etc.
     /// </summary>
+    /// <remarks>
+    /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor.IMarkerData.html">Monaco API</see> for more details.
+    /// </remarks>
     [JsonConverter(typeof(Monaco.Helpers.InterfaceToClassConverter<IMarkerData, MarkerData>))]
     public interface IMarkerData
     {

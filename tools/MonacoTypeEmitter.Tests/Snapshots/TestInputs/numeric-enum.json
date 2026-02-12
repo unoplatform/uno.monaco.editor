@@ -12,10 +12,10 @@
           "documentation": "Marker severity levels.",
           "isStringEnum": false,
           "members": [
-            { "name": "Hint", "value": 1 },
-            { "name": "Info", "value": 2 },
-            { "name": "Warning", "value": 4 },
-            { "name": "Error", "value": 8 }
+            { "name": "Hint", "documentation": "A hint marker severity.", "value": 1 },
+            { "name": "Info", "documentation": "An informational marker severity.", "value": 2 },
+            { "name": "Warning", "documentation": "A warning marker severity.", "value": 4 },
+            { "name": "Error", "documentation": "An error marker severity.", "value": 8 }
           ]
         }
       ],

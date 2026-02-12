@@ -6,6 +6,9 @@ namespace Monaco
     /// <summary>
     /// A universal resource identifier representing either a file on disk or another resource.
     /// </summary>
+    /// <remarks>
+    /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/classes/Uri.html">Monaco API</see> for more details.
+    /// </remarks>
     public sealed class Uri
     {
         /// <summary>
@@ -33,6 +36,10 @@ namespace Monaco
         /// </summary>
         public string Fragment { get; }
 
+        /// <summary>
+        /// Returns a string representation of this Uri.
+        /// </summary>
+        /// <returns>A string value.</returns>
         public string ToString() => throw new NotImplementedException();
 
     }
