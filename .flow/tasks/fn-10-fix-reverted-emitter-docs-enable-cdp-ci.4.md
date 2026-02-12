@@ -20,10 +20,9 @@ Add a VSCode launch profile and launchSettings.json profile for running the desk
 - [ ] `DISPLAY` and `GDK_GL` environment variables set in the profile
 - [ ] `launchSettings.json` has a WSL2 profile with matching env vars
 - [ ] Existing launch profiles unchanged
-## Completion summary
-TBD
-
+## Done summary
+Added WSL2 desktop launch profile with DISPLAY=:0 and GDK_GL=gles environment variables to both .vscode/launch.json and MonacoEditorTestApp/Properties/launchSettings.json, including a missing base Desktop profile in launchSettings.json.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: b6bda6c65ca8a807dcdd9ce192b94c71a8872ee8
+- Tests: dotnet build MonacoEditorComponent.slnx --no-restore
 - PRs:
