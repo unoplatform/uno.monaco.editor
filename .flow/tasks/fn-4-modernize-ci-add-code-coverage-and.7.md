@@ -4,7 +4,9 @@
 Migrate from old GenerateMonacoTypings/ pipeline to new tools, delete old scripts, and clean up all references.
 
 **Size:** S
-**Files:** `GenerateMonacoTypings/` (delete all), `AGENTS.md`, `README.md`, `.gitignore`, `.gitattributes`
+**Files:** `GenerateMonacoTypings/` (delete all), `AGENTS.md`, `.gitignore`, `.gitattributes`
+
+> **Note:** The README.md update scope originally in this task has been absorbed into fn-5-comprehensive-documentation-overhaul.4 (major README rewrite).
 
 **Depends on:** Tasks .4, .5, .6 (new tools working + tests green)
 

@@ -111,3 +111,6 @@ Monaco CursorStyle is a hand-tuned string enum on the ignore list, not emittable
 
 ## 2026-02-12 manual [pitfall]
 Process.StandardOutput.ReadToEnd() before StandardError.ReadToEnd() can deadlock if stderr buffer fills first. Always read both streams concurrently with ReadToEndAsync + Task.WhenAll.
+
+## 2026-02-12 manual [pitfall]
+dotnet test --coverage produces binary .coverage files by default; add --coverage-output-format cobertura to get .cobertura.xml for ReportGenerator

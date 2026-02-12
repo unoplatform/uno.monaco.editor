@@ -26,6 +26,7 @@
 		<RepositoryUrl>https://github.com/unoplatform/uno.monaco.editor</RepositoryUrl>
 		<PackageProjectUrl>https://github.com/unoplatform/uno.monaco.editor</PackageProjectUrl>
     <PackageTags>wasm desktop skia monaco editor controls</PackageTags>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<GeneratePackageOnBuild Condition="'$(Configuration)'=='Release'">true</GeneratePackageOnBuild>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
@@ -88,6 +89,13 @@
 		<Content Include="DesktopContent\workers\html.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\html.worker.js" Condition="Exists('DesktopContent\workers\html.worker.js')" />
 		<Content Include="DesktopContent\workers\ts.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\ts.worker.js" Condition="Exists('DesktopContent\workers\ts.worker.js')" />
 	</ItemGroup>
+
+	<!-- Include repository-root README in NuGet package -->
+	<Target Name="_IncludeReadmeInPackage" BeforeTargets="GenerateNuspec">
+		<ItemGroup>
+			<_PackageFiles Include="..\README.md" PackagePath="/" />
+		</ItemGroup>
+	</Target>
 
 	<!-- Build-time check: Ensure esbuild bundles exist before packaging -->
 	<Target Name="ValidateEsbuildBundles" BeforeTargets="Build">
