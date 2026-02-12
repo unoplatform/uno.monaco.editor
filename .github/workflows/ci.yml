@@ -104,8 +104,7 @@ jobs:
         with:
           name: test-artifacts-ubuntu
           path: |
-            ${{ env.ARTIFACTS_DIR }}/TestResults
-            **/test-results.xml
+            ${{ runner.temp }}/TestResults/test-results.xml
             **/test-artifacts/**
           if-no-files-found: ignore
 
@@ -170,7 +169,7 @@ jobs:
         with:
           name: test-artifacts-windows
           path: |
-            **/desktop-test-results.xml
+            ${{ runner.temp }}/TestResults/desktop-test-results.xml
             **/test-artifacts/**
           if-no-files-found: ignore
 
@@ -238,7 +237,7 @@ jobs:
         with:
           name: test-artifacts-macos
           path: |
-            **/test-results.xml
+            ${{ runner.temp }}/TestResults/test-results.xml
             **/test-artifacts/**
           if-no-files-found: ignore
 

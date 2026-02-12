@@ -90,7 +90,13 @@
 		<Content Include="DesktopContent\workers\ts.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\ts.worker.js" Condition="Exists('DesktopContent\workers\ts.worker.js')" />
 	</ItemGroup>
 
-	<!-- Include repository-root README in NuGet package -->
+	<!--
+		Include repository-root README in NuGet package.
+		The standard <None Pack="true"/> pattern does not work here because the Uno SDK's
+		GenerateLibraryLayout=true packing flow does not propagate Pack metadata from None
+		items to the package file list. Injecting into _PackageFiles via a target is the
+		workaround recommended for Uno Platform library projects.
+	-->
 	<Target Name="_IncludeReadmeInPackage" BeforeTargets="GenerateNuspec">
 		<ItemGroup>
 			<_PackageFiles Include="..\README.md" PackagePath="/" />
