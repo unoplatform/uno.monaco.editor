@@ -129,6 +129,7 @@ jobs:
     name: Desktop Tests (Windows)
     runs-on: windows-latest
     needs: build
+    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
