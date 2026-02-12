@@ -26,9 +26,8 @@ Migrate from old GenerateMonacoTypings/ pipeline to new tools, delete old script
 - [ ] `.gitignore` and `.gitattributes` updated (old paths removed, new paths added)
 - [ ] All tests still pass
 ## Done summary
-TBD
-
+Migrated off old GenerateMonacoTypings pipeline: deleted the directory and all 5 files, updated AGENTS.md/README.md/.gitignore/.gitattributes/install-dependencies.ps1 to reference new tools/ directory, verified no stale references remain.
 ## Evidence
-- Commits:
-- Tests:
-- PRs:
+- Commits: e2fe5cc e2fe5cc
+- Tests: dotnet build (0 errors), dotnet test MonacoTypeEmitter.Tests (19 passed), grep verification (no stale refs) dotnet build MonacoEditorComponent.slnx --no-restore, dotnet test --project tools/MonacoTypeEmitter.Tests/MonacoTypeEmitter.Tests.csproj (19 passed), grep -rn GenerateMonacoTypings|TypedocConverter (no results)
+- PRs: N/A
