@@ -26,12 +26,22 @@ Write a comprehensive PR reviewer guide for the current refactoring branch (`ral
 - `HasGlyphMargin` has a copy-paste XML doc error at `CodeEditor.Properties.cs:137` — note as known issue
 
 ## Acceptance
-- [ ] PR reviewer guide exists at `docs/PR-REVIEW-GUIDE.md`
-- [ ] Document header includes pinned commit range: base SHA, head SHA, commit count
-- [ ] Covers all 4 epics with summary of what changed and why
-- [ ] Provides recommended reading order for the diff
-- [ ] Includes before/after architecture Mermaid diagram
-- [ ] Documents breaking changes from 2.0.0-dev.60
-- [ ] Lists risk areas and testing coverage
-- [ ] Notes package rename (Monaco.Editor → Uno.Monaco.Editor)
-- [ ] Includes a reviewer checklist (what to verify per area)
+- [x] PR reviewer guide exists at `docs/PR-REVIEW-GUIDE.md`
+- [x] Document header includes pinned commit range: base SHA, head SHA, commit count
+- [x] Covers all 4 epics with summary of what changed and why
+- [x] Provides recommended reading order for the diff
+- [x] Includes before/after architecture Mermaid diagram
+- [x] Documents breaking changes from 2.0.0-dev.60
+- [x] Lists risk areas and testing coverage
+- [x] Notes package rename (Monaco.Editor → Uno.Monaco.Editor)
+- [x] Includes a reviewer checklist (what to verify per area)
+
+## Done summary
+
+Wrote comprehensive PR reviewer guide at `docs/PR-REVIEW-GUIDE.md` covering all 4 epics (fn-1 Desktop Skia, fn-2 STJ migration, fn-3 CI stabilization, fn-4 CI modernization + type generation), with pinned commit range, before/after Mermaid architecture diagrams, lifecycle state machine, breaking changes table with migration guidance, risk assessment, testing coverage summary, and per-epic reviewer checklist.
+
+## Evidence
+
+- Commits: `49614d4`, `986c291`, `ea4d754`
+- Review: RepoPrompt impl-review, 2 fix rounds, SHIP verdict
+- Output: `docs/PR-REVIEW-GUIDE.md` (390+ lines)
