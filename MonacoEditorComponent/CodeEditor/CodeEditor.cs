@@ -27,8 +27,10 @@ namespace Monaco
     }
 
     /// <summary>
-    /// UWP Windows Runtime Component wrapper for the Monaco CodeEditor
-    /// https://microsoft.github.io/monaco-editor/
+    /// Provides a cross-platform Uno Platform wrapper around the
+    /// <see href="https://microsoft.github.io/monaco-editor/">Monaco Editor</see>.
+    /// On WebAssembly the editor runs natively in the browser; on desktop (Skia) it is
+    /// hosted inside a WebView2 control with a JSON-RPC bridge for interop.
     /// </summary>
     [TemplatePart(Name = "RootBorder", Type = typeof(Border))]
     public sealed partial class CodeEditor : Control, INotifyPropertyChanged, IDisposable
@@ -41,17 +43,25 @@ namespace Monaco
         private ModelHelper? _model;
         private CssStyleBroker? _cssBroker;
 
+        /// <inheritdoc />
         public event PropertyChangedEventHandler? PropertyChanged;
 
         /// <summary>
-        /// Template Property used during loading to prevent blank control visibility when it's still loading WebView.
+        /// Gets a value indicating whether the Monaco editor has completed its initialization
+        /// lifecycle and is ready to receive commands.
         /// </summary>
+        /// <remarks>
+        /// This property transitions to <see langword="true"/> after the editor fires
+        /// <see cref="CodeEditor.EditorLoaded"/>. It can be used in XAML templates to control
+        /// visibility and prevent displaying an empty WebView during loading.
+        /// </remarks>
         public bool IsEditorLoaded
         {
             get => (bool)GetValue(IsEditorLoadedProperty);
             private set => SetValue(IsEditorLoadedProperty, value);
         }
 
+        /// <summary>Identifies the <see cref="IsEditorLoaded"/> dependency property.</summary>
         public static DependencyProperty IsEditorLoadedProperty { get; } = DependencyProperty.Register(
             nameof(IsEditorLoaded),
             typeof(bool),
@@ -72,6 +82,7 @@ namespace Monaco
             private set => SetValue(RenderingBackendProperty, value);
         }
 
+        /// <summary>Identifies the <see cref="RenderingBackend"/> dependency property.</summary>
         public static DependencyProperty RenderingBackendProperty { get; } = DependencyProperty.Register(
             nameof(RenderingBackend),
             typeof(RenderingBackend),
@@ -79,14 +90,17 @@ namespace Monaco
             new PropertyMetadata(OperatingSystem.IsBrowser() ? RenderingBackend.Wasm : RenderingBackend.Desktop));
 
         /// <summary>
-        /// Construct a new Stand Alone Code Editor, assumes being constructed on UI Thread.
+        /// Initializes a new instance of the <see cref="CodeEditor"/> class on the current UI thread.
         /// </summary>
         public CodeEditor() : this(null) { }
 
         /// <summary>
-        /// Construct a new IStandAloneCodeEditor.
+        /// Initializes a new instance of the <see cref="CodeEditor"/> class with an explicit dispatcher.
         /// </summary>
-        /// <param name="queue"><see cref="DispatcherQueue"/> for the UI Thread, if none pass assumes the current thread is the UI thread.</param>
+        /// <param name="queue">
+        /// The <see cref="DispatcherQueue"/> for the UI thread. When <see langword="null"/>, the
+        /// current thread's dispatcher is used.
+        /// </param>
         public CodeEditor(DispatcherQueue? queue)
         {
             _queue = queue ?? DispatcherQueue.GetForCurrentThread();
@@ -253,6 +267,7 @@ namespace Monaco
             _model = null;
         }
 
+        /// <inheritdoc />
         protected override void OnApplyTemplate()
         {
             Console.WriteLine("OnApplyTemplate()");
@@ -415,6 +430,10 @@ namespace Monaco
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
+        /// <summary>
+        /// Releases managed resources held by the editor, including the CSS style broker
+        /// and the parent accessor bridge.
+        /// </summary>
         public new void Dispose()
         {
             _cssBroker?.Dispose();
@@ -427,11 +446,20 @@ namespace Monaco
         }
     }
 
+    /// <summary>
+    /// Provides extension methods for <see cref="System.Uri"/> to resolve absolute URI strings
+    /// in the Uno Platform WASM bootstrap environment.
+    /// </summary>
     public static class UriHelper
     {
         private static readonly string UNO_BOOTSTRAP_APP_BASE = global::System.Environment.GetEnvironmentVariable(nameof(UNO_BOOTSTRAP_APP_BASE)) ?? "";
         private static readonly string UNO_BOOTSTRAP_WEBAPP_BASE_PATH = Environment.GetEnvironmentVariable(nameof(UNO_BOOTSTRAP_WEBAPP_BASE_PATH)) ?? "";
 
+        /// <summary>
+        /// Returns the absolute URI string resolved against the Uno WASM bootstrap base paths.
+        /// </summary>
+        /// <param name="uri">The URI to resolve.</param>
+        /// <returns>The resolved absolute URI string suitable for use in the WASM host.</returns>
         public static string AbsoluteUriString(this System.Uri uri)
         {
             string target;

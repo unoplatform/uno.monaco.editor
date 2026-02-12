@@ -17,27 +17,34 @@ namespace Monaco
         // Override default Loaded/Loading event so we can make sure we've initialized our WebView contents with the CodeEditor.
 
         /// <summary>
-        /// When Editor is Loading, it is ready to receive commands to the Monaco Engine.
+        /// Occurs when the editor enters the Loading lifecycle state and is ready to receive
+        /// commands. Fires exactly once per initialization cycle.
         /// </summary>
         public event RoutedEventHandler? EditorLoading;
 
         /// <summary>
-        /// When Editor is Loaded, it has been rendered and is ready to be displayed.
+        /// Occurs when the editor has fully loaded and rendered the Monaco instance.
+        /// Fires exactly once per initialization cycle, after <see cref="EditorLoading"/>.
         /// </summary>
         public event RoutedEventHandler? EditorLoaded;
 
         /// <summary>
-        /// Called when a link is Ctrl+Clicked on in the editor, set Handled to true to prevent opening.
+        /// Occurs when a link is Ctrl+Clicked in the editor. Set
+        /// <see cref="OpenLinkRequestedEventArgs.Handled"/> to <see langword="true"/> to
+        /// prevent the default navigation behavior.
         /// </summary>
         public event TypedEventHandler<CodeEditor, OpenLinkRequestedEventArgs>? OpenLinkRequested;
 
         /// <summary>
-        /// Called when an internal exception is encountered while executing a command. (for testing/reporting issues)
+        /// Occurs when an internal exception is encountered while executing a script command.
+        /// Subscribe to this event for diagnostics and error reporting.
         /// </summary>
         public event TypedEventHandler<CodeEditor, Exception>? InternalException;
 
         /// <summary>
-        /// Custom Keyboard Handler.
+        /// Occurs when a key is pressed inside the Monaco editor.
+        /// Shadows <see cref="Microsoft.UI.Xaml.UIElement.KeyDown"/> to provide
+        /// Monaco-specific key event arguments.
         /// </summary>
         public new event WebKeyEventHandler? KeyDown;
 
@@ -463,6 +470,7 @@ namespace Monaco
             return args.Handled;
         }
 
+        /// <inheritdoc />
         protected override void OnGotFocus(RoutedEventArgs e)
         {
             base.OnGotFocus(e);

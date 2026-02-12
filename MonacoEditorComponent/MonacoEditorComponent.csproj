@@ -2,6 +2,7 @@
 
 	<PropertyGroup>
 		<TargetFrameworks>net10.0</TargetFrameworks>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<Title>Monaco Editor Component</Title>
 		<!--
 			SYSLIB1031: Monaco.Uri and System.Uri both appear as discovered types in

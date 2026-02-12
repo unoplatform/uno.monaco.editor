@@ -13,7 +13,8 @@ end_of_line = crlf
 dotnet_sort_system_directives_first = true
 
 # CS1591: Missing XML comment for publicly visible type or member
-dotnet_diagnostic.CS1591.severity = none
+# Enabled as warning for hand-written code; suppressed in Monaco/ for generated types.
+dotnet_diagnostic.CS1591.severity = warning
 
 # Namespace declarations should match folder structure
 dotnet_diagnostic.IDE0130.severity = none

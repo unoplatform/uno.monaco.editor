@@ -7,3 +7,6 @@ dotnet_diagnostic.IDE1006.severity = none
 
 # Naming: identifiers should have the right prefix
 dotnet_diagnostic.CA1715.severity = none
+
+# CS1591: Generated Monaco types do not require XML docs (fn-5.6/fn-5.8 will address)
+dotnet_diagnostic.CS1591.severity = none

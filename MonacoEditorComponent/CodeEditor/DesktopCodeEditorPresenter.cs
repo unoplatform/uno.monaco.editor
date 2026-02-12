@@ -26,6 +26,10 @@ namespace Monaco
         private WebView2JsonRpcMessageHandler? _messageHandler;
         private JsonRpc? _jsonRpc;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DesktopCodeEditorPresenter"/> class.
+        /// </summary>
+        /// <exception cref="PlatformNotSupportedException">Thrown when called on a WASM platform.</exception>
         public DesktopCodeEditorPresenter()
         {
             if (OperatingSystem.IsBrowser())
@@ -56,6 +60,7 @@ namespace Monaco
         /// <inheritdoc />
         public event EventHandler<WebViewMessageEventArgs>? MessageReceived;
 
+        /// <inheritdoc />
         public CodeEditor? ParentCodeEditor { get; set; }
 
         /// <summary>
@@ -70,8 +75,10 @@ namespace Monaco
         /// </summary>
         internal bool IsCoreWebView2Initialized => _isCoreWebView2Initialized;
 
+        /// <inheritdoc />
         public string ElementId => "desktop-" + GetHashCode().ToString("X8");
 
+        /// <inheritdoc />
         public bool IsSettingValue
         {
             get => ParentCodeEditor?.IsSettingValue ?? false;
@@ -84,11 +91,13 @@ namespace Monaco
             }
         }
 
+        /// <inheritdoc />
         public bool TriggerKeyDown(WebKeyEventArgs args)
             => ParentCodeEditor?.TriggerKeyDown(args) ?? false;
 
         private global::System.Uri? _pendingSource;
 
+        /// <inheritdoc />
         public global::System.Uri Source
         {
             get => _isCoreWebView2Initialized ? _webView.Source : (_pendingSource ?? _webView.Source);
@@ -107,6 +116,7 @@ namespace Monaco
             }
         }
 
+        /// <inheritdoc />
         public async Task Launch()
         {
             try
@@ -368,10 +378,15 @@ namespace Monaco
             var debugLogger = new DebugLoggerDesktop();
 
             // Register as local RPC targets so StreamJsonRpc routes messages automatically.
+            // All targets must be registered BEFORE StartListening -- StreamJsonRpc locks
+            // the configuration once listening begins and AddLocalRpcTarget will throw.
             _jsonRpc!.AddLocalRpcTarget(parentAccessor);
             _jsonRpc.AddLocalRpcTarget(themeListener);
             _jsonRpc.AddLocalRpcTarget(keyboardListener);
             _jsonRpc.AddLocalRpcTarget(debugLogger);
+
+            _jsonRpc.StartListening();
+            Debug.WriteLine("DesktopCodeEditorPresenter: JsonRpc bridge started");
 
             return (parentAccessor, themeListener, keyboardListener, debugLogger);
         }
@@ -391,11 +406,8 @@ namespace Monaco
             _jsonRpc = new JsonRpc(_messageHandler);
 
             // Register the initialization handshake targets directly on the presenter.
+            // StartListening is deferred to CreateBridgeTargets after all targets are registered.
             _jsonRpc.AddLocalRpcTarget(new BridgeHandshakeTarget(this));
-
-            _jsonRpc.StartListening();
-
-            Debug.WriteLine("DesktopCodeEditorPresenter: JsonRpc bridge started");
         }
 
         private void TeardownJsonRpc()

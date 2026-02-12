@@ -63,6 +63,11 @@ partial class ParentAccessor
         }
     }
 
+    /// <summary>
+    /// Encodes special characters in a JSON string for safe transport through the WASM bridge.
+    /// </summary>
+    /// <param name="jsonString">The JSON string to sanitize, or <see langword="null"/>.</param>
+    /// <returns>The encoded string, or <see langword="null"/> if the input was <see langword="null"/>.</returns>
     public static string? Santize(string? jsonString) => BridgeEncoding.Sanitize(jsonString);
 
     [JSExport]
@@ -114,6 +119,13 @@ partial class ParentAccessor
 
     private static string? Desanitize(string? parameter) => BridgeEncoding.Desanitize(parameter);
 
+    /// <summary>
+    /// JSExport entry point: invokes a registered event callback for the specified presenter owner.
+    /// </summary>
+    /// <param name="managedOwner">The managed presenter object passed from JavaScript.</param>
+    /// <param name="name">The event name.</param>
+    /// <param name="parameters">The sanitized JSON parameter strings.</param>
+    /// <returns>The desanitized result string, or <see langword="null"/>.</returns>
     [JSExport]
     public static async Task<string?> ManagedCallEvent([JSMarshalAs<JSType.Any>] object managedOwner, string name, string[] parameters)
     {
@@ -128,6 +140,10 @@ partial class ParentAccessor
         }
     }
 
+    /// <summary>
+    /// JSExport entry point: disposes the <see cref="ParentAccessor"/> for the specified owner.
+    /// </summary>
+    /// <param name="managedOwner">The managed presenter object passed from JavaScript.</param>
     [JSExport]
     public static void ManagedClose([JSMarshalAs<JSType.Any>] object managedOwner)
     {

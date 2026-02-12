@@ -9,6 +9,12 @@ using Windows.Foundation.Collections;
 
 namespace Collections.Generic
 {
+	/// <summary>
+	/// An observable collection that implements <see cref="IObservableVector{T}"/> for use
+	/// with WinRT data binding and the Monaco editor's <see cref="Monaco.CodeEditor.Decorations"/>
+	/// and <see cref="Monaco.CodeEditor.Markers"/> properties.
+	/// </summary>
+	/// <typeparam name="T">The element type.</typeparam>
 	internal class ObservableVector<T> : Collection<T>, IObservableVector<T>, INotifyPropertyChanged
 	{
 		private const string IndexerName = "Item[]";

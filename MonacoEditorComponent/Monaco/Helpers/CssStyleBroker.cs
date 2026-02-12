@@ -47,8 +47,8 @@ namespace Monaco.Helpers
 
         public bool AssociateStyles(IModelDeltaDecoration[] decorations)
         {
-            /// By construction we assume that decorations will not be null from the call in <see cref="CodeEditor.DeltaDecorationsHelperAsync"/>
-            bool newStyle = _isDirty[_parent]; /// Can be set in <see cref="GetStyles"/>.
+            // By construction we assume that decorations will not be null from the call in CodeEditor.DeltaDecorationsHelperAsync.
+            bool newStyle = _isDirty[_parent]; // Can be set in GetStyles.
 
             _isDirty[_parent] = false; // Reset
 

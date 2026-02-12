@@ -35,9 +35,10 @@ namespace Monaco.Helpers
         private readonly ConcurrentDictionary<string, JsonTypeInfo> _typeInfoMap;
 
         /// <summary>
-        /// Constructs a new reflective parent Accessor for the provided object.
+        /// Initializes a new instance of the <see cref="ParentAccessor"/> class.
         /// </summary>
-        /// <param name="parent">Object to provide Property Access.</param>
+        /// <param name="parent">The presenter to provide reflective property access for.</param>
+        /// <param name="queue">The UI thread dispatcher used to marshal callbacks.</param>
         public ParentAccessor(ICodeEditorPresenter parent, DispatcherQueue queue)
         {
             _queue = queue;
@@ -64,6 +65,12 @@ namespace Monaco.Helpers
             actions?[name] = action;
         }
 
+        /// <summary>
+        /// Registers an action with string parameters from the .NET side which can be called
+        /// from within the JavaScript code.
+        /// </summary>
+        /// <param name="name">String key to identify the action.</param>
+        /// <param name="action">Action to perform with string parameters.</param>
         public void RegisterActionWithParameters(string name, Action<string[]> action)
         {
             action_parameters[name] = action;
@@ -187,6 +194,15 @@ namespace Monaco.Helpers
             return result;
         }
 
+        /// <summary>
+        /// Returns the JSON-serialized value of the specified property using
+        /// <see cref="MonacoJsonContext.Relaxed"/>.
+        /// </summary>
+        /// <param name="name">Property name on the parent object.</param>
+        /// <returns>The JSON string, or <c>"null"</c> if the property value is <see langword="null"/>.</returns>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the property type is not registered in <see cref="MonacoJsonContext"/>.
+        /// </exception>
         public string GetJsonValue(string name)
         {
             if (parent.TryGetTarget(out var tobj))
@@ -248,7 +264,7 @@ namespace Monaco.Helpers
         /// Sets the value for the specified Property.
         /// </summary>
         /// <param name="name">Parent Property name.</param>
-        /// <param name="value">Value to set.</param>
+        /// <param name="newValue">Value to set.</param>
         public async Task SetValue(string name, object newValue)
         {
             await _queue.EnqueueAsync(() =>
@@ -310,6 +326,9 @@ namespace Monaco.Helpers
             });
         }
 
+        /// <summary>
+        /// Releases all registered actions and events.
+        /// </summary>
         public void Dispose()
         {
             actions?.Clear();

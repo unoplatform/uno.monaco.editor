@@ -80,6 +80,11 @@ namespace Monaco
         public bool Cancel { get; set; }
     }
 
+    /// <summary>
+    /// Defines the cross-platform contract for the editor presenter that hosts the Monaco
+    /// web content. WASM uses <see cref="WasmCodeEditorPresenter"/> (native browser element);
+    /// desktop uses <see cref="DesktopCodeEditorPresenter"/> (WebView2 with JSON-RPC bridge).
+    /// </summary>
     public interface ICodeEditorPresenter
 	{
 		/// <summary>Occurs when a user performs an action in a WebView that causes content to be opened in a new window.</summary>
@@ -99,26 +104,42 @@ namespace Monaco
         /// </summary>
         event EventHandler<WebViewMessageEventArgs>? MessageReceived;
 
+        /// <summary>Gets or sets the parent <see cref="CodeEditor"/> that owns this presenter.</summary>
         public CodeEditor? ParentCodeEditor { get; set; }
 
+		/// <summary>Routes a key-down event from JavaScript to the parent editor's <see cref="CodeEditor.KeyDown"/> handler.</summary>
+		/// <param name="args">The key event arguments.</param>
+		/// <returns><see langword="true"/> if the event was handled; otherwise, <see langword="false"/>.</returns>
 		public bool TriggerKeyDown(WebKeyEventArgs args);
 
         /// <summary>Gets or sets the Uniform Resource Identifier (URI) source of the HTML content to display in the WebView control.</summary>
         /// <returns>The Uniform Resource Identifier (URI) source of the HTML content to display in the WebView control.</returns>
         global::System.Uri Source { get; set; }
 
+		/// <summary>Gets the <see cref="Microsoft.UI.Dispatching.DispatcherQueue"/> for the UI thread.</summary>
 		DispatcherQueue DispatcherQueue { get; }
 
+		/// <summary>Gets the unique HTML element identifier for this presenter instance.</summary>
 		string ElementId { get; }
 
+		/// <summary>Gets or sets a value indicating whether the bridge is currently pushing a value, suppressing re-entrant change notifications.</summary>
 		bool IsSettingValue { get; set; }
 
+		/// <summary>Gets a value indicating whether this presenter element is loaded in the visual tree.</summary>
 		bool IsLoaded { get; }
 
+		/// <summary>Occurs when the presenter element is loaded in the visual tree.</summary>
         event RoutedEventHandler Loaded;
 
+		/// <summary>Attempts to set focus on the presenter.</summary>
+		/// <param name="state">The focus state to apply.</param>
+		/// <returns><see langword="true"/> if focus was successfully set.</returns>
 		bool Focus(FocusState state);
 
+		/// <summary>
+		/// Initializes the underlying web content host (WebView2 on desktop, BrowserHtmlElement
+		/// on WASM) and starts the Monaco editor bootstrap sequence.
+		/// </summary>
 		Task Launch();
 
         /// <summary>

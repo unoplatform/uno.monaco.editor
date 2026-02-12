@@ -20,6 +20,11 @@ namespace Monaco.Helpers
             _instances.Remove(presenter);
         }
 
+        /// <summary>
+        /// JSExport entry point: returns the current theme name for the specified presenter owner.
+        /// </summary>
+        /// <param name="managedOwner">The managed presenter object passed from JavaScript.</param>
+        /// <returns>The current theme name string.</returns>
         [JSExport]
         public static string ManagedGetCurrentThemeName([JSMarshalAs<JSType.Any>] object managedOwner)
         {
@@ -33,6 +38,11 @@ namespace Monaco.Helpers
             }
         }
 
+        /// <summary>
+        /// JSExport entry point: returns whether high contrast mode is active for the specified owner.
+        /// </summary>
+        /// <param name="managedOwner">The managed presenter object passed from JavaScript.</param>
+        /// <returns><see langword="true"/> if high contrast is active.</returns>
         [JSExport]
         public static bool ManagedGetIsHighContrast([JSMarshalAs<JSType.Any>] object managedOwner)
         {

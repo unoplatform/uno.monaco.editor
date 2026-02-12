@@ -9,18 +9,25 @@ using Monaco.Serialization;
 namespace Monaco
 {
     /// <summary>
-    /// Helper to static Monaco.Languages Namespace methods.
-    /// https://microsoft.github.io/monaco-editor/api/modules/monaco.languages.html
+    /// Provides access to the <c>monaco.languages.*</c> registration APIs, including
+    /// completion, hover, code-action, code-lens, and color providers.
     /// </summary>
+    /// <remarks>
+    /// Obtain an instance from <see cref="CodeEditor.Languages"/>. Do not construct directly.
+    /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/modules/languages.html">monaco.languages</see>.
+    /// </remarks>
     [method: Obsolete("Use <Editor Instance>.Languages.* instead of constructing your own LanguagesHelper.")]
-    [method: EditorBrowsable(EditorBrowsableState.Never)]    /// <summary>
-                                                             /// Helper to static Monaco.Languages Namespace methods.
-                                                             /// https://microsoft.github.io/monaco-editor/api/modules/monaco.languages.html
-                                                             /// </summary>
+    [method: EditorBrowsable(EditorBrowsableState.Never)]
     public sealed partial class LanguagesHelper(CodeEditor editor)
     {
         private readonly WeakReference<CodeEditor> _editor = new(editor);
 
+        /// <summary>
+        /// Gets the list of registered language identifiers and their extension points.
+        /// </summary>
+        /// <returns>A list of <see cref="ILanguageExtensionPoint"/> instances, or
+        /// <see langword="null"/> if the editor reference has been collected.</returns>
+        /// <remarks>Wraps Monaco <c>languages.getLanguages</c>.</remarks>
         public async Task<IList<ILanguageExtensionPoint>?> GetLanguagesAsync()
         {
             if (_editor.TryGetTarget(out var editor))
@@ -31,6 +38,11 @@ namespace Monaco
             return null;
         }
 
+        /// <summary>
+        /// Registers a new language with Monaco.
+        /// </summary>
+        /// <param name="language">The language extension point describing the language to register.</param>
+        /// <remarks>Wraps Monaco <c>languages.register</c>.</remarks>
         public async Task RegisterAsync(ILanguageExtensionPoint language)
         {
             if (_editor.TryGetTarget(out var editor))
@@ -39,6 +51,12 @@ namespace Monaco
             }
         }
 
+        /// <summary>
+        /// Registers a code action provider for the specified language.
+        /// </summary>
+        /// <param name="languageId">The language identifier (e.g., <c>"csharp"</c>).</param>
+        /// <param name="provider">The provider implementation.</param>
+        /// <remarks>Wraps Monaco <c>languages.registerCodeActionProvider</c>.</remarks>
         public async Task RegisterCodeActionProviderAsync(string languageId, CodeActionProvider provider)
         {
             if (_editor.TryGetTarget(out var editor))
@@ -72,6 +90,12 @@ namespace Monaco
             }
         }
 
+        /// <summary>
+        /// Registers a code lens provider for the specified language.
+        /// </summary>
+        /// <param name="languageId">The language identifier (e.g., <c>"csharp"</c>).</param>
+        /// <param name="provider">The provider implementation.</param>
+        /// <remarks>Wraps Monaco <c>languages.registerCodeLensProvider</c>.</remarks>
         public async Task RegisterCodeLensProviderAsync(string languageId, CodeLensProvider provider)
         {
             if (_editor.TryGetTarget(out var editor) && editor._parentAccessor is not null)
@@ -117,6 +141,12 @@ namespace Monaco
             }
         }
 
+        /// <summary>
+        /// Registers a document color provider for the specified language.
+        /// </summary>
+        /// <param name="languageId">The language identifier (e.g., <c>"css"</c>).</param>
+        /// <param name="provider">The provider implementation.</param>
+        /// <remarks>Wraps Monaco <c>languages.registerColorProvider</c>.</remarks>
         public async Task RegisterColorProviderAsync(string languageId, DocumentColorProvider provider)
         {
             if (_editor.TryGetTarget(out var editor)
@@ -165,6 +195,12 @@ namespace Monaco
             }
         }
 
+        /// <summary>
+        /// Registers a completion item provider for the specified language.
+        /// </summary>
+        /// <param name="languageId">The language identifier (e.g., <c>"javascript"</c>).</param>
+        /// <param name="provider">The provider implementation.</param>
+        /// <remarks>Wraps Monaco <c>languages.registerCompletionItemProvider</c>.</remarks>
         public async Task RegisterCompletionItemProviderAsync(string languageId, CompletionItemProvider provider)
         {
             if (_editor.TryGetTarget(out var editor)
@@ -220,6 +256,12 @@ namespace Monaco
             }
         }
 
+        /// <summary>
+        /// Registers a hover information provider for the specified language.
+        /// </summary>
+        /// <param name="languageId">The language identifier (e.g., <c>"typescript"</c>).</param>
+        /// <param name="provider">The provider implementation.</param>
+        /// <remarks>Wraps Monaco <c>languages.registerHoverProvider</c>.</remarks>
         public async Task RegisterHoverProviderAsync(string languageId, HoverProvider provider)
         {
             if (_editor.TryGetTarget(out var editor)

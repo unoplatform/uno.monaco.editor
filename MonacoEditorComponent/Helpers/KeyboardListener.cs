@@ -7,21 +7,41 @@ using Windows.Foundation.Metadata;
 
 namespace Monaco.Helpers
 {
+    /// <summary>
+    /// Delegate for handling keyboard events from the Monaco editor.
+    /// </summary>
+    /// <param name="sender">The <see cref="CodeEditor"/> that raised the event.</param>
+    /// <param name="args">The key event arguments.</param>
     public delegate void WebKeyEventHandler(CodeEditor sender, WebKeyEventArgs args);
 
+    /// <summary>
+    /// Provides data for keyboard events raised by the Monaco editor.
+    /// </summary>
     public sealed class WebKeyEventArgs
     {
+        /// <summary>Gets or sets the JavaScript key code of the pressed key.</summary>
         public int KeyCode { get; set; }
 
-        // TODO: Make these some sort of flagged state enum?
+        /// <summary>Gets or sets a value indicating whether the Ctrl key was held.</summary>
         public bool CtrlKey { get; set; }
+
+        /// <summary>Gets or sets a value indicating whether the Shift key was held.</summary>
         public bool ShiftKey { get; set; }
+
+        /// <summary>Gets or sets a value indicating whether the Alt key was held.</summary>
         public bool AltKey { get; set; }
+
+        /// <summary>Gets or sets a value indicating whether the Meta (Cmd/Win) key was held.</summary>
         public bool MetaKey { get; set; }
 
+        /// <summary>Gets or sets a value indicating whether the event has been handled.</summary>
         public bool Handled { get; set; }
     }
 
+    /// <summary>
+    /// Listens for keyboard events from the Monaco editor and routes them to the parent
+    /// <see cref="CodeEditor"/>. On WASM, events arrive via JSExport; on desktop, via JSON-RPC.
+    /// </summary>
     [AllowForWeb]
     public sealed partial class KeyboardListener : IKeyboardListener
     {
@@ -29,6 +49,11 @@ namespace Monaco.Helpers
         private readonly WeakReference<ICodeEditorPresenter> parent;
         private readonly DispatcherQueue _queue;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="KeyboardListener"/> class.
+        /// </summary>
+        /// <param name="parent">The presenter that owns this listener.</param>
+        /// <param name="queue">The UI thread dispatcher.</param>
         public KeyboardListener(ICodeEditorPresenter parent, DispatcherQueue queue)
         {
             this.parent = new WeakReference<ICodeEditorPresenter>(parent);

@@ -14,12 +14,23 @@ using Windows.Foundation;
 
 namespace Monaco
 {
+    /// <summary>
+    /// WebAssembly presenter that hosts the Monaco Editor inside a <c>BrowserHtmlElement</c>.
+    /// Uses JSImport/JSExport for direct interop with the browser DOM.
+    /// </summary>
+    /// <exception cref="PlatformNotSupportedException">
+    /// Thrown if instantiated on a non-WASM platform.
+    /// </exception>
     public partial class WasmCodeEditorPresenter : ContentControl, ICodeEditorPresenter
     {
         private static readonly string UNO_BOOTSTRAP_APP_BASE = global::System.Environment.GetEnvironmentVariable(nameof(UNO_BOOTSTRAP_APP_BASE)) ?? "";
         private static readonly string UNO_BOOTSTRAP_WEBAPP_BASE_PATH = Environment.GetEnvironmentVariable(nameof(UNO_BOOTSTRAP_WEBAPP_BASE_PATH)) ?? "";
         private readonly BrowserHtmlElement _element;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="WasmCodeEditorPresenter"/> class.
+        /// </summary>
+        /// <exception cref="PlatformNotSupportedException">Thrown when called on a non-WASM platform.</exception>
         public WasmCodeEditorPresenter()
         {
             if (!OperatingSystem.IsBrowser())
@@ -31,6 +42,7 @@ namespace Monaco
             Content = _element = BrowserHtmlElement.CreateHtmlElement("monaco-" + this.GetHashCode(), "div");
         }
 
+        /// <inheritdoc />
         public string ElementId => _element.ElementId;
 
         /// <inheritdoc />
@@ -46,8 +58,10 @@ namespace Monaco
         /// <remarks>WASM presenter never fires this event. JSExport direct calls are used instead.</remarks>
         public event EventHandler<WebViewMessageEventArgs>? MessageReceived;
 
+        /// <inheritdoc />
         public CodeEditor? ParentCodeEditor { get; set; }
 
+        /// <inheritdoc />
         public bool IsSettingValue
         {
             get => ParentCodeEditor?.IsSettingValue ?? false;
@@ -60,6 +74,7 @@ namespace Monaco
             }
         }
 
+        /// <inheritdoc />
         public bool TriggerKeyDown(WebKeyEventArgs args)
             => ParentCodeEditor?.TriggerKeyDown(args) ?? false;
 
@@ -103,6 +118,7 @@ namespace Monaco
             }
         }
 
+        /// <inheritdoc />
         public async Task Launch()
         {
             try

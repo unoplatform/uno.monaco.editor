@@ -10,6 +10,10 @@ using Windows.UI.ViewManagement;
 
 namespace Monaco.Helpers
 {
+    /// <summary>
+    /// Delegate for the <see cref="IThemeListener.ThemeChanged"/> event.
+    /// </summary>
+    /// <param name="sender">The theme listener that detected the change.</param>
     public delegate void ThemeChangedEvent(IThemeListener sender);
 
     /// <summary>
@@ -22,18 +26,34 @@ namespace Monaco.Helpers
         private readonly DispatcherQueue _queue;
         private readonly ICodeEditorPresenter _owner;
 
-        public string CurrentThemeName { get { return CurrentTheme.ToString(); } } // For Web Retrieval
+        /// <inheritdoc />
+        public string CurrentThemeName { get { return CurrentTheme.ToString(); } }
 
+        /// <inheritdoc />
         public ApplicationTheme CurrentTheme { get; set; }
+
+        /// <inheritdoc />
         public bool IsHighContrast { get; set; }
 
+        /// <inheritdoc />
         public event ThemeChangedEvent? ThemeChanged;
 
         private readonly AccessibilitySettings _accessible = new();
         private readonly UISettings _settings = new();
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ThemeListener"/> class using the
+        /// current thread's dispatcher.
+        /// </summary>
+        /// <param name="presenter">The presenter that owns this listener.</param>
         public ThemeListener(ICodeEditorPresenter presenter) : this(presenter, null) { }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ThemeListener"/> class.
+        /// </summary>
+        /// <param name="presenter">The presenter that owns this listener.</param>
+        /// <param name="queue">The UI thread dispatcher. When <see langword="null"/>, the
+        /// current thread's dispatcher is used.</param>
         public ThemeListener(ICodeEditorPresenter presenter, DispatcherQueue? queue)
         {
             _queue = queue ?? DispatcherQueue.GetForCurrentThread();
@@ -80,6 +100,9 @@ namespace Monaco.Helpers
             }
         }
 
+        /// <summary>
+        /// Releases unmanaged resources via <see cref="Dispose"/>.
+        /// </summary>
         ~ThemeListener()
         {
             Dispose();
