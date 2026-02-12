@@ -36,9 +36,8 @@ Add comprehensive tests for the new generator pipeline. This task is tests only 
 - [ ] All existing tests still pass (`dotnet test MonacoEditorComponent.Tests`)
 
 ## Done summary
-TBD
-
+Added MonacoTypeEmitter.Tests project with 19 tests across three levels: 6 snapshot tests (custom SnapshotAssert with verified baselines), 4 smoke tests (full pipeline emission + enum compilation + serialization attribute validation + deterministic ordering + model validation), and 9 round-trip tests (golden baseline verification for MarkerSeverity, BuiltinTheme, CompletionItemKind, MarkerData, CompletionItem, TextEditorCursorStyle, string enum emission path, wire-format compatibility chain, and structural validity). CursorStyle coverage uses TextEditorCursorStyle (emittable numeric enum) and BuiltinTheme (same string enum code path) because CursorStyle is hand-tuned and on the ignore list.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 695be92, 320e72c, cfd1951, 7d2be84
+- Tests: dotnet test --project tools/MonacoTypeEmitter.Tests/MonacoTypeEmitter.Tests.csproj (19 passed)
 - PRs:

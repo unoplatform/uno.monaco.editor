@@ -105,3 +105,6 @@ dotnet restore evaluates ALL TFMs even with -f flag; multi-TFM projects (e.g. br
 
 ## 2026-02-12 manual [pitfall]
 When walking TypeScript AST type literals, getMethods() must be called separately from getProperties() -- named methods like { dispose(): void } are not included in property lists
+
+## 2026-02-12 manual [pitfall]
+Monaco CursorStyle is a hand-tuned string enum on the ignore list, not emittable by the generator. TextEditorCursorStyle (numeric enum) is the emittable equivalent. BuiltinTheme covers the same string enum emission code path.
