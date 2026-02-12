@@ -44,9 +44,8 @@ Create a Node.js tool using ts-morph that parses `monaco.d.ts` and produces a ve
 - [ ] Schema documented as TypeScript types in `src/model.ts`
 
 ## Done summary
-TBD
-
+Created ts-morph Monaco type extractor in tools/monaco-type-extractor/ that parses monaco.d.ts (TS 5.x) and produces a versioned intermediate JSON model (schemaVersion 1) with structured type decomposition including interfaces, enums (string vs numeric), type aliases, classes, functions, union/intersection types, index signatures, and namespaces. All output arrays sorted alphabetically for deterministic ordering.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 323d8ee, d65fc2b
+- Tests: npx tsc --noEmit, npx tsx src/index.ts ../../node_modules/monaco-editor/monaco.d.ts -o output/model.json, dotnet build MonacoEditorComponent.slnx --no-restore
 - PRs:

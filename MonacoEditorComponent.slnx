@@ -20,4 +20,7 @@
   <Project Path="MonacoEditorComponent/MonacoEditorComponent.csproj" />
   <Project Path="MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj" />
   <Project Path="MonacoEditorTestApp/MonacoEditorTestApp.csproj" />
+  <Folder Name="/tools/">
+    <Project Path="tools/MonacoTypeEmitter/MonacoTypeEmitter.csproj" />
+  </Folder>
 </Solution>

@@ -102,3 +102,6 @@ linguist-generated markers must target only machine-generated/vendored files —
 
 ## 2026-02-12 manual [pitfall]
 dotnet restore evaluates ALL TFMs even with -f flag; multi-TFM projects (e.g. browserwasm+desktop) need wasm-tools workload even for desktop-only builds unless the multi-TFM project is excluded from the build
+
+## 2026-02-12 manual [pitfall]
+When walking TypeScript AST type literals, getMethods() must be called separately from getProperties() -- named methods like { dispose(): void } are not included in property lists
