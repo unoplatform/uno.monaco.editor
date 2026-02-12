@@ -1,7 +1,7 @@
 {
   "branch_name": "fn-4-update-ci-runner-images-to-latest-and",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-02-12T09:18:57.747667Z",
   "created_at": "2026-02-11T21:47:59.075454Z",
   "default_impl": null,
   "default_review": null,
@@ -14,5 +14,5 @@
   "spec_path": ".flow/specs/fn-4-modernize-ci-add-code-coverage-and.md",
   "status": "open",
   "title": "Modernize CI, add code coverage, and replace broken type generator",
-  "updated_at": "2026-02-11T22:46:31.746426Z"
+  "updated_at": "2026-02-12T09:18:57.765403Z"
 }

@@ -16,7 +16,6 @@ import {
     createMonacoEditor,
     disposeEditor,
     InvokeJS,
-    refreshLayout,
     languageIdFromExtension,
     sanitize,
     desanitize,
@@ -129,7 +128,6 @@ if (isDesktop) {
 
 // Core editor functions (referenced by [JSImport("globalThis.*")])
 globalThis.createMonacoEditor = createMonacoEditor;
-globalThis.refreshLayout = refreshLayout;
 globalThis.InvokeJS = InvokeJS;
 globalThis.languageIdFromExtension = languageIdFromExtension;
 

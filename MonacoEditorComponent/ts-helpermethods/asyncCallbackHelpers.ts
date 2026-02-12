@@ -178,10 +178,12 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any) =>
     const isHighContrast = await (editorContext as any).Theme.getIsHighContrastAsync();
     changeTheme(element, theme, isHighContrast as any);
 
-    // Track resize handler for deterministic cleanup
-    const resizeHandler = () => { editor.layout(); };
-    window.addEventListener("resize", resizeHandler);
-    (editorContext as any)._resizeHandler = resizeHandler;
+    // Track parent element size changes via ResizeObserver for deterministic cleanup.
+    // This replaces the old window "resize" listener that fired on every window resize
+    // even when the editor's container didn't change size.
+    const resizeObserver = new ResizeObserver(() => { editor.layout(); });
+    resizeObserver.observe(element);
+    (editorContext as any)._resizeObserver = resizeObserver;
 
     // Disable WebView Scrollbar so Monaco Scrollbar can do heavy lifting
     document.body.style.overflow = 'hidden';
@@ -199,18 +201,18 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any) =>
 };
 
 /**
- * Dispose an editor context: unregisters RPC handlers, removes resize listener,
+ * Dispose an editor context: disconnects ResizeObserver, unregisters RPC handlers,
  * disposes Monaco editor, removes context map entry, and releases the connection reference.
  */
 export const disposeEditor = (element: any) => {
     const editorContext = EditorContext.tryGetEditorForElement(element);
     if (!editorContext) return;
 
-    // Remove the resize handler
-    const resizeHandler = (editorContext as any)._resizeHandler as (() => void) | undefined;
-    if (resizeHandler) {
-        window.removeEventListener("resize", resizeHandler);
-        (editorContext as any)._resizeHandler = undefined;
+    // Disconnect the ResizeObserver
+    const resizeObserver = (editorContext as any)._resizeObserver as ResizeObserver | undefined;
+    if (resizeObserver) {
+        resizeObserver.disconnect();
+        (editorContext as any)._resizeObserver = undefined;
     }
 
     // Dispose tracked RPC handler registrations
@@ -332,10 +334,6 @@ export const createMonacoEditor = async (managedOwner: any, elementId: string, b
 export const InvokeJS = (elementId: string, command: string): string => {
     var r = eval(`var element = globalThis.document.getElementById("${elementId}"); ${command}`) || "";
     return JSON.stringify(r);
-}
-
-export const refreshLayout = (elementId: string) => {
-    EditorContext.getEditorForElement(document.getElementById(elementId)).editor.layout();
 }
 
 export const languageIdFromExtension = (extension: string): string => {
