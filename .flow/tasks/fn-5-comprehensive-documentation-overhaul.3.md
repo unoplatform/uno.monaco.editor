@@ -46,5 +46,8 @@ Two sequence diagrams showing the same operation on both paths:
 - [ ] Documents TypeScript bundle structure
 
 ## Done summary
-
+Created docs/architecture.md with 5 Mermaid-diagrammed sections covering system overview, dual-platform interop (WASM JSImport/JSExport and Desktop JSON-RPC), lifecycle state machine, presenter/bridge helper class hierarchy, and serialization layer (MonacoJsonContext + BridgeSerializerContext). Cross-references bridge-protocol.md, documents platform-asymmetric APIs and TypeScript bundle structure.
 ## Evidence
+- Commits: 8effa56b8753e73f4bdc33a416953d3a267914be, afb54dd9beb8e14e6f9ac3b6f13b8c94e969d8ef
+- Tests: dotnet build MonacoEditorComponent.slnx --no-restore
+- PRs:
