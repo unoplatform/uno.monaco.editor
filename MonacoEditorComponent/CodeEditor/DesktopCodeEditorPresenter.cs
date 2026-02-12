@@ -261,16 +261,17 @@ namespace Monaco
                 return false;
             }
 
-            // Windows: virtual host mapping serves content over https with a synthetic host.
-            // Enforce exact host + default port.
-            if (string.Equals(parsed.Scheme, "https", StringComparison.OrdinalIgnoreCase))
+            // Virtual host mapping: Windows WebView2 serves via https://, Uno's
+            // cross-platform implementation uses http://. Allow both schemes.
+            if (string.Equals(parsed.Scheme, "https", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(parsed.Scheme, "http", StringComparison.OrdinalIgnoreCase))
             {
                 return string.Equals(parsed.Host, AllowedVirtualHost, StringComparison.OrdinalIgnoreCase)
                     && parsed.IsDefaultPort;
             }
 
-            // macOS/Linux: Uno converts virtual host URLs to file:// with empty host.
-            // Only allow navigation under the configured content root path.
+            // Fallback: file:// navigation for platforms where virtual host mapping
+            // resolves to local file paths. Only allow under the configured content root.
             if (string.Equals(parsed.Scheme, "file", StringComparison.OrdinalIgnoreCase))
             {
                 if (string.IsNullOrEmpty(allowedFileContentRoot))
@@ -365,29 +366,21 @@ namespace Monaco
         }
 
         /// <summary>
-        /// Configures virtual host mapping (Windows) or file:// navigation (Linux/macOS)
-        /// and navigates the WebView2 to editor.html.
+        /// Configures virtual host mapping and navigates the WebView2 to editor.html.
+        /// Uses <c>SetVirtualHostNameToFolderMapping</c> on all platforms -- Uno supports
+        /// this API cross-platform (Windows via Edge WebView2, Linux via WebKitGTK,
+        /// macOS via WKWebView). Navigation uses <c>http://</c> as per Uno docs.
         /// </summary>
         private void NavigateToEditorPage(string contentRoot)
         {
-            if (OperatingSystem.IsWindows())
-            {
-                // Windows Edge WebView2: virtual host mapping provides an HTTPS origin.
-                _webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
-                    AllowedVirtualHost,
-                    contentRoot,
-                    Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
-                _webView.Source = new global::System.Uri($"https://{AllowedVirtualHost}/editor.html");
-                Debug.WriteLine($"DesktopCodeEditorPresenter: Navigating to https://{AllowedVirtualHost}/editor.html");
-            }
-            else
-            {
-                // macOS/Linux: Navigate via file:// directly.
-                // Uno's X11/GTK WebView2 may not support SetVirtualHostNameToFolderMapping.
-                var editorPath = Path.Combine(contentRoot, "editor.html");
-                _webView.Source = new global::System.Uri(editorPath);
-                Debug.WriteLine($"DesktopCodeEditorPresenter: Navigating to file://{editorPath}");
-            }
+            _webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                AllowedVirtualHost,
+                contentRoot,
+                Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
+
+            var editorUrl = $"http://{AllowedVirtualHost}/editor.html";
+            _webView.CoreWebView2.Navigate(editorUrl);
+            Debug.WriteLine($"DesktopCodeEditorPresenter: Navigating to {editorUrl} (content root: {contentRoot})");
         }
 
         // ============================================================

@@ -6,7 +6,7 @@ namespace MonacoEditorComponent.Tests;
 
 /// <summary>
 /// Tests for <see cref="DesktopCodeEditorPresenter.IsNavigationAllowed"/>.
-/// Validates the navigation allowlist for about:blank, virtual host HTTPS,
+/// Validates the navigation allowlist for about:blank, virtual host HTTP/HTTPS,
 /// file:// with content root, and blocked external URIs.
 /// </summary>
 public sealed class IsNavigationAllowedTests
@@ -58,7 +58,15 @@ public sealed class IsNavigationAllowedTests
     }
 
     [Fact]
-    public void Http_Blocked()
+    public void AllowedVirtualHost_Http_Allowed()
+    {
+        // Uno's cross-platform SetVirtualHostNameToFolderMapping uses http:// scheme.
+        var uri = $"http://{DesktopCodeEditorPresenter.AllowedVirtualHost}/editor.html";
+        Assert.True(DesktopCodeEditorPresenter.IsNavigationAllowed(uri, null));
+    }
+
+    [Fact]
+    public void ExternalHttp_Blocked()
     {
         Assert.False(DesktopCodeEditorPresenter.IsNavigationAllowed("http://example.com", null));
     }
