@@ -338,7 +338,7 @@ public sealed class CSharpEmitter
 
             if (NameMapper.NeedsJsonPropertyName(prop.Name, propName))
             {
-                sb.AppendLine($"        [JsonPropertyName(\"{prop.Name}\")]");
+                sb.AppendLine($"        [JsonPropertyName(\"{NameMapper.GetJsonWireName(prop.Name)}\")]");
             }
 
             var getter = prop.IsReadonly ? "get;" : "get; set;";
@@ -415,7 +415,7 @@ public sealed class CSharpEmitter
 
             if (NameMapper.NeedsJsonPropertyName(prop.Name, propName))
             {
-                sb.AppendLine($"        [JsonPropertyName(\"{prop.Name}\")]");
+                sb.AppendLine($"        [JsonPropertyName(\"{NameMapper.GetJsonWireName(prop.Name)}\")]");
             }
 
             sb.AppendLine($"        public {csharpType} {propName} {{ get; set; }}");
@@ -507,7 +507,7 @@ public sealed class CSharpEmitter
 
             if (NameMapper.NeedsJsonPropertyName(prop.Name, propName))
             {
-                sb.AppendLine($"        [JsonPropertyName(\"{prop.Name}\")]");
+                sb.AppendLine($"        [JsonPropertyName(\"{NameMapper.GetJsonWireName(prop.Name)}\")]");
             }
 
             var accessor = prop.IsReadonly ? "get;" : "get; set;";
@@ -1081,12 +1081,21 @@ public sealed class CSharpEmitter
     /// <summary>
     /// Writes a <c>&lt;returns&gt;</c> XML doc tag for methods with non-void return types.
     /// Only emits the tag when there is meaningful return type context.
+    /// For TypeScript type predicates, notes the original TS semantics.
     /// </summary>
     private static void WriteReturnsDocs(StringBuilder sb, TypeInfo returnType, string indent)
     {
         // Do not emit <returns> for void or primitive void returns
         if (returnType.Kind == "primitive" && returnType.Name is "void" or "undefined")
             return;
+
+        // TypeScript type predicates get a specific return doc noting the TS semantics
+        if (returnType.Kind == "intrinsic" && returnType.Text is not null
+            && TypeMapper.IsTypePredicatePattern(returnType.Text))
+        {
+            sb.AppendLine($"{indent}/// <returns>True if the argument satisfies the TypeScript type predicate <c>{EscapeXml(returnType.Text)}</c>.</returns>");
+            return;
+        }
 
         // Emit a brief returns tag based on the return type
         var returnDesc = FormatReturnTypeDescription(returnType);

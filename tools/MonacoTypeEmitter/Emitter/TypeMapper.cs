@@ -47,9 +47,47 @@ public static class TypeMapper
             "indexedAccess" => "object", // Complex indexed access maps to object
             "typeOperator" => MapTypeOperator(typeInfo),
             "conditional" => "object", // Conditional types map to object
-            "intrinsic" => typeInfo.Text ?? "object",
+            "intrinsic" => MapIntrinsic(typeInfo),
             _ => "object"
         };
+    }
+
+    /// <summary>
+    /// Maps intrinsic types. Detects TypeScript type predicates (<c>x is Type</c>) and maps
+    /// them to <c>bool</c>, since C# has no equivalent of TS type guard return types.
+    /// </summary>
+    private static string MapIntrinsic(TypeInfo typeInfo)
+    {
+        var text = typeInfo.Text;
+        if (text is null)
+            return "object";
+
+        // TypeScript type predicate pattern: "paramName is TypeName"
+        // Examples: "obj is IPosition", "thing is Uri"
+        if (IsTypePredicatePattern(text))
+            return "bool";
+
+        return text;
+    }
+
+    /// <summary>
+    /// Detects whether intrinsic text represents a TypeScript type predicate (type guard).
+    /// Pattern: a simple identifier, followed by " is ", followed by a type name.
+    /// </summary>
+    internal static bool IsTypePredicatePattern(string text)
+    {
+        var isIndex = text.IndexOf(" is ", StringComparison.Ordinal);
+        if (isIndex < 1)
+            return false;
+
+        // The part before " is " must be a simple identifier (the parameter name)
+        var paramPart = text[..isIndex];
+        if (paramPart.Length == 0 || !paramPart.All(c => char.IsLetterOrDigit(c) || c == '_'))
+            return false;
+
+        // The part after " is " must be non-empty (the type name)
+        var typePart = text[(isIndex + 4)..];
+        return typePart.Length > 0;
     }
 
     private static string MapPrimitive(string name)

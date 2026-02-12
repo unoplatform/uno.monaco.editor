@@ -101,4 +101,67 @@ public class SnapshotTests
 
         SnapshotAssert.MatchesVerified("NamespaceHierarchy_CrossNamespaceUsing", files["Editor/IMarkerData.cs"]);
     }
+
+    [Fact]
+    public void DollarPrefix_IJSONSchema()
+    {
+        var model = EmitterTestHelper.LoadModel(
+            EmitterTestHelper.GetTestInputPath("dollar-prefix-properties.json"));
+        var files = EmitterTestHelper.EmitToMemory(model);
+
+        // Should produce IJSONSchema.cs (interface) + JSONSchema.cs (concrete class)
+        Assert.Equal(2, files.Count);
+        Assert.True(files.ContainsKey("Languages/Json/IJSONSchema.cs"),
+            $"Expected 'Languages/Json/IJSONSchema.cs' but got: {string.Join(", ", files.Keys)}");
+
+        SnapshotAssert.MatchesVerified("DollarPrefix_IJSONSchema", files["Languages/Json/IJSONSchema.cs"]);
+    }
+
+    [Fact]
+    public void DollarPrefix_JSONSchema()
+    {
+        var model = EmitterTestHelper.LoadModel(
+            EmitterTestHelper.GetTestInputPath("dollar-prefix-properties.json"));
+        var files = EmitterTestHelper.EmitToMemory(model);
+
+        Assert.True(files.ContainsKey("Languages/Json/JSONSchema.cs"),
+            $"Expected 'Languages/Json/JSONSchema.cs' but got: {string.Join(", ", files.Keys)}");
+
+        SnapshotAssert.MatchesVerified("DollarPrefix_JSONSchema", files["Languages/Json/JSONSchema.cs"]);
+    }
+
+    [Fact]
+    public void DottedIdentifier_IGlobalEditorOptions()
+    {
+        var model = EmitterTestHelper.LoadModel(
+            EmitterTestHelper.GetTestInputPath("dotted-identifier-property.json"));
+        var files = EmitterTestHelper.EmitToMemory(model);
+
+        // Should produce IGlobalEditorOptions.cs + GlobalEditorOptions.cs
+        Assert.Equal(2, files.Count);
+        Assert.True(files.ContainsKey("Editor/IGlobalEditorOptions.cs"),
+            $"Expected 'Editor/IGlobalEditorOptions.cs' but got: {string.Join(", ", files.Keys)}");
+
+        SnapshotAssert.MatchesVerified("DottedIdentifier_IGlobalEditorOptions", files["Editor/IGlobalEditorOptions.cs"]);
+    }
+
+    [Fact]
+    public void TypePredicate_Position()
+    {
+        var model = EmitterTestHelper.LoadModel(
+            EmitterTestHelper.GetTestInputPath("type-predicate-return.json"));
+        var files = EmitterTestHelper.EmitToMemory(model);
+
+        // Should produce Position.cs (class with type predicate method)
+        Assert.Single(files);
+        Assert.True(files.ContainsKey("Position.cs"),
+            $"Expected 'Position.cs' but got: {string.Join(", ", files.Keys)}");
+
+        // Verify type predicate maps to bool, not raw "obj is IPosition"
+        var content = files["Position.cs"];
+        Assert.Contains("bool IsIPosition", content);
+        Assert.DoesNotContain("obj is IPosition IsIPosition", content);
+
+        SnapshotAssert.MatchesVerified("TypePredicate_Position", files["Position.cs"]);
+    }
 }

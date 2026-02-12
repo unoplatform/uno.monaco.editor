@@ -26,19 +26,28 @@ The previous attempt failed with `TimeoutException: Timeout 15000ms exceeded` at
 - Consider other blockers: WebView2 virtual host mapping, file access permissions, etc.
 
 ### Phase 2: Fix based on findings
-Potential fixes depending on root cause:
-- **Config mismatch fix**: Pass `-c Release` to the fixture's `dotnet run` command OR launch the pre-built binary directly instead of using `dotnet run`
-- **Timeout increase**: If Monaco is just slow on CI, increase `MonacoReadyTimeoutMs` from 15s to 30-60s with rationale comment
+**Required fix (regardless of other findings):**
+- **Fixture command normalization**: Update `DesktopAppFixture.cs` launch command to use `-c Release --no-build --no-launch-profile` to match CI pre-built artifacts and eliminate rebuild overhead. This is the primary suspected root cause.
+
+**Additional fixes depending on root cause:**
+- **Timeout increase**: If Monaco is genuinely slow on CI cold-start, increase `MonacoReadyTimeoutMs` from 15s to 30-60s with rationale comment documenting why (CI cold-start overhead vs local)
 - **Init race workaround**: If fn-6.2's dual init path prevents Monaco from ever loading, may need a targeted workaround or to defer this task until fn-6.2 is complete
 - **Other**: Whatever investigation reveals
 
-### Phase 3: Enable and verify
+### Phase 3: Local preflight verification
+- **Before pushing CI changes**, run DesktopCDP tests locally on Windows to validate the fixture fix:
+  ```bash
+  dotnet test --project MonacoEditorComponent.Tests/ --filter "Category=DesktopCDP" -c Release
+  ```
+- Document the local test result in the completion summary
+
+### Phase 4: Enable and verify on CI
 - Remove `--filter-not-trait "Category=DesktopCDP"` from the Windows desktop-tests job (`.github/workflows/ci.yml` line 185)
 - Keep the exclusion on Ubuntu (no WebView2) and macOS ARM (no WebView2 on macOS)
 - Push and monitor via `gh pr checks --watch`
 - If tests fail again, investigate the new failure before retrying
 
-### Phase 4: Update docs
+### Phase 5: Update docs
 - Update AGENTS.md "Known CI limitations" section (lines 99-102) to reflect that DesktopCDP now runs on Windows
 - Update the CI job structure table (lines 90-95) to include Desktop CDP in the Windows job description
 
@@ -52,15 +61,16 @@ Potential fixes depending on root cause:
 
 ## Acceptance
 - [ ] Root cause of prior timeout understood and documented
+- [ ] Fixture launch command normalized: `-c Release --no-build --no-launch-profile` in `DesktopAppFixture.cs`
+- [ ] If timeout budget is insufficient for CI cold-start, `MonacoReadyTimeoutMs` increased with rationale comment
+- [ ] Local DesktopCDP test preflight passed on Windows before CI push (documented in completion summary)
 - [ ] `--filter-not-trait "Category=DesktopCDP"` removed from Windows job in ci.yml
 - [ ] Desktop CDP tests pass on Windows CI runner (verify via `gh pr checks --watch`)
 - [ ] DesktopCDP exclusion preserved on Ubuntu and macOS ARM jobs
 - [ ] AGENTS.md "Known CI limitations" updated to reflect CDP test enablement on Windows
 - [ ] AGENTS.md CI job structure table updated for Windows job description
-- [ ] If fixture timeout is the issue, timeout constants increased with rationale comment
-- [ ] If config mismatch is the issue, fixture updated to use correct configuration
 - [ ] Memory note updated with corrected CI finding
-## Done summary
+## Completion summary
 TBD
 
 ## Evidence

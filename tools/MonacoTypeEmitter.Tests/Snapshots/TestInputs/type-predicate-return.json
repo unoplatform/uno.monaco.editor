@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "sourceFile": "test.d.ts",
+  "extractedAt": "2026-01-01T00:00:00.000Z",
+  "namespaces": [
+    {
+      "name": "monaco",
+      "interfaces": [],
+      "enums": [],
+      "typeAliases": [],
+      "classes": [
+        {
+          "name": "Position",
+          "documentation": "A position in the editor. This interface is suitable for serialization.",
+          "typeParameters": [],
+          "extends": null,
+          "implements": [],
+          "properties": [
+            {
+              "name": "lineNumber",
+              "documentation": "line number (starts at 1)",
+              "type": { "kind": "primitive", "name": "number" },
+              "isOptional": false,
+              "isReadonly": true,
+              "isStatic": false
+            },
+            {
+              "name": "column",
+              "documentation": "column (the first character in a line is between column 1 and column 2)",
+              "type": { "kind": "primitive", "name": "number" },
+              "isOptional": false,
+              "isReadonly": true,
+              "isStatic": false
+            }
+          ],
+          "methods": [
+            {
+              "name": "isIPosition",
+              "documentation": "Test if `obj` is an `IPosition`.",
+              "typeParameters": [],
+              "parameters": [
+                {
+                  "name": "obj",
+                  "type": { "kind": "primitive", "name": "any" },
+                  "isOptional": false,
+                  "isRestParameter": false
+                }
+              ],
+              "returnType": { "kind": "intrinsic", "text": "obj is IPosition" },
+              "isStatic": true,
+              "overloads": []
+            },
+            {
+              "name": "equals",
+              "documentation": "Test if position `a` equals position `b`.",
+              "typeParameters": [],
+              "parameters": [
+                {
+                  "name": "a",
+                  "type": { "kind": "reference", "name": "IPosition" },
+                  "isOptional": false,
+                  "isRestParameter": false
+                },
+                {
+                  "name": "b",
+                  "type": { "kind": "reference", "name": "IPosition" },
+                  "isOptional": false,
+                  "isRestParameter": false
+                }
+              ],
+              "returnType": { "kind": "primitive", "name": "boolean" },
+              "isStatic": true,
+              "overloads": []
+            }
+          ],
+          "constructors": [
+            {
+              "parameters": [
+                {
+                  "name": "lineNumber",
+                  "type": { "kind": "primitive", "name": "number" },
+                  "isOptional": false,
+                  "isRestParameter": false
+                },
+                {
+                  "name": "column",
+                  "type": { "kind": "primitive", "name": "number" },
+                  "isOptional": false,
+                  "isRestParameter": false
+                }
+              ]
+            }
+          ],
+          "indexSignatures": []
+        }
+      ],
+      "functions": []
+    }
+  ]
+}

@@ -32,10 +32,64 @@ public static class NameMapper
 
     /// <summary>
     /// Converts a TypeScript property name to a C# PascalCase property name.
+    /// Handles exotic identifiers: <c>$</c>-prefixed names, quoted dotted names,
+    /// and other characters that are invalid in C# identifiers.
     /// </summary>
     public static string ToCSharpPropertyName(string tsName)
     {
-        return PascalCase(tsName);
+        var sanitized = SanitizeIdentifier(tsName);
+        return PascalCase(sanitized);
+    }
+
+    /// <summary>
+    /// Returns the original TypeScript wire name for a property, stripping
+    /// surrounding quotes if present. Used for <c>[JsonPropertyName]</c> attributes.
+    /// </summary>
+    public static string GetJsonWireName(string tsName)
+    {
+        // Strip surrounding single or double quotes from quoted identifiers
+        if (tsName.Length >= 2 &&
+            ((tsName[0] == '\'' && tsName[^1] == '\'') ||
+             (tsName[0] == '"' && tsName[^1] == '"')))
+        {
+            return tsName[1..^1];
+        }
+
+        return tsName;
+    }
+
+    /// <summary>
+    /// Sanitizes a TypeScript identifier into a valid C# identifier fragment.
+    /// Strips <c>$</c> prefixes, surrounding quotes, and replaces dots with underscores.
+    /// </summary>
+    private static string SanitizeIdentifier(string tsName)
+    {
+        var name = tsName;
+
+        // Strip surrounding single or double quotes
+        if (name.Length >= 2 &&
+            ((name[0] == '\'' && name[^1] == '\'') ||
+             (name[0] == '"' && name[^1] == '"')))
+        {
+            name = name[1..^1];
+        }
+
+        // Replace dots with underscores (e.g., "semanticHighlighting.enabled")
+        if (name.Contains('.'))
+        {
+            name = string.Join("",
+                name.Split('.')
+                    .Select(PascalCase));
+        }
+
+        // Strip leading $ characters (e.g., "$comment" -> "comment")
+        name = name.TrimStart('$');
+
+        // If the name became empty after sanitization, fall back to original
+        if (string.IsNullOrEmpty(name))
+            name = "Value";
+
+        return name;
     }
 
     /// <summary>
@@ -71,12 +125,14 @@ public static class NameMapper
 
     /// <summary>
     /// Determines whether a [JsonPropertyName] attribute is needed.
-    /// It is only needed when the JSON name differs from the CamelCase form of the C# name.
+    /// It is only needed when the JSON wire name differs from the camelCase form of the C# name.
+    /// Exotic identifiers (<c>$</c>-prefixed, dotted, quoted) always need the attribute.
     /// </summary>
     public static bool NeedsJsonPropertyName(string tsName, string csharpName)
     {
+        var wireName = GetJsonWireName(tsName);
         var camelCSharp = ToCamelCase(csharpName);
-        return !string.Equals(tsName, camelCSharp, StringComparison.Ordinal);
+        return !string.Equals(wireName, camelCSharp, StringComparison.Ordinal);
     }
 
     private static string PascalCase(string input)
