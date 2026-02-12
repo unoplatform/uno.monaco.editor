@@ -12,10 +12,11 @@ Migrate from old GenerateMonacoTypings/ pipeline to new tools, delete old script
 
 1. Run new generator against current `monaco.d.ts`, diff output against existing `MonacoEditorComponent/Monaco/` (excluding ignored files)
 2. Resolve any differences
-3. Delete `GenerateMonacoTypings/` (all: generate-typings.ps1, postprocess-stj.ps1, package.json, README.md, .generator-ignore, output/)
+3. Delete `GenerateMonacoTypings/` (all: generate-typings.ps1, postprocess-stj.ps1, package.json, README.md, .generator-ignore — note: `output/` does not exist on disk, it is gitignored)
 4. Update AGENTS.md: "Key Directories" section → reference `tools/monaco-type-extractor/` and `tools/MonacoTypeEmitter/`
 5. Update README.md: reference new tools
-6. Update `.gitignore` (lines 287-288) and `.gitattributes` (line 68): remove old paths, add new
+6. Update `.gitignore` (lines 289-291: comment + `GenerateMonacoTypings/output/` and `GenerateMonacoTypings/.temp/`) and `.gitattributes` (line 68: comment referencing `GenerateMonacoTypings/.generator-ignore`): remove old paths, add new. Note: preserve nearby entries added by task .6 (lines 293-294: `*.received.cs` snapshot test pattern)
+<!-- Updated by plan-sync: fn-4.6 shifted .gitignore line numbers from 287-288 to 289-291 and added *.received.cs at 293-294 -->
 7. Verify: `grep -rn "GenerateMonacoTypings\|TypedocConverter" . --include="*.md" --include="*.yml" --include="*.cs" --include="*.ps1" --include="*.json" | grep -v ".flow/"` returns no results
 ## Acceptance
 - [ ] `GenerateMonacoTypings/` directory fully deleted

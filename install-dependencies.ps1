@@ -25,16 +25,6 @@ try {
         throw "esbuild build failed with exit code $LASTEXITCODE"
     }
 
-    # Copy monaco.d.ts for the C# typings generation pipeline
-    $monacoTypingsSource = Join-Path $script_dir "node_modules/monaco-editor/monaco.d.ts"
-    $monacoTypingsDest = Join-Path $script_dir "GenerateMonacoTypings/monaco.d.ts"
-    if (Test-Path $monacoTypingsSource) {
-        Write-Host "Copying monaco.d.ts for typings generation..."
-        Copy-Item -Path $monacoTypingsSource -Destination $monacoTypingsDest -Force
-    } else {
-        Write-Warning "monaco.d.ts not found at $monacoTypingsSource"
-    }
-
     Write-Host "Dependencies installed and bundles built successfully."
 }
 finally {

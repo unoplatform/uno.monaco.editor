@@ -287,8 +287,7 @@ scripts/ralph/run/
 test-artifacts/
 
 # Type generation pipeline output (generated, not checked in)
-GenerateMonacoTypings/output/
-GenerateMonacoTypings/.temp/
+tools/monaco-type-extractor/output/
 
 # Snapshot test received files (generated on mismatch, never committed)
 *.received.cs

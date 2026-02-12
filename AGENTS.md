@@ -32,7 +32,7 @@ This file provides guidance to AI agents working in `uno.monaco.editor`.
 
 - `MonacoEditorComponent/`: the packaged control/library (`Uno.Monaco.Editor`)
 - `MonacoEditorTestApp/`: sample app used for manual validation
-- `GenerateMonacoTypings/`: scripts to regenerate C# API surface from Monaco typings
+- `tools/`: type generation pipeline (ts-morph extractor + .NET CLI emitter)
 
 ## Key Directories
 
@@ -41,6 +41,9 @@ This file provides guidance to AI agents working in `uno.monaco.editor`.
 - `MonacoEditorComponent/ts-helpermethods/`: TypeScript helpers compiled into runtime assets
 - `MonacoEditorComponent/monaco-editor/`: vendored Monaco distribution used by the component
 - `MonacoEditorTestApp/`: functional playground for verifying behavior
+- `tools/monaco-type-extractor/`: ts-morph parser that extracts Monaco API into intermediate JSON
+- `tools/MonacoTypeEmitter/`: .NET CLI tool that emits C# types from intermediate JSON
+- `tools/MonacoTypeEmitter.Tests/`: snapshot and round-trip tests for the emitter
 
 ## Build Setup (Required)
 
@@ -67,7 +70,9 @@ Validation checklist after code changes:
 
 1. `dotnet build MonacoEditorComponent.slnx --no-restore`
 2. If API surface or behavior changed, build `MonacoEditorTestApp` for browserwasm and desktop targets.
-3. If Monaco typings or TS helper behavior changed, run typings/dependency generation workflows and rebuild.
+3. If Monaco typings or TS helper behavior changed, run the type generation pipeline and rebuild:
+   - `npx tsx tools/monaco-type-extractor/src/index.ts -- node_modules/monaco-editor/monaco.d.ts -o tools/monaco-type-extractor/output/model.json`
+   - `dotnet run --project tools/MonacoTypeEmitter -- --input tools/monaco-type-extractor/output/model.json --output MonacoEditorComponent/Monaco/`
 
 ## Code Conventions
 

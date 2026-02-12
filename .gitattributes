@@ -65,7 +65,7 @@
 ###############################################################################
 # Mark generated/machine-generated files so GitHub collapses their diffs.
 # Hand-authored helpers and .flow specs are explicitly excluded below so they
-# remain visible for code review. See GenerateMonacoTypings/.generator-ignore
+# remain visible for code review. See tools/MonacoTypeEmitter/.generator-ignore
 # for the canonical list of hand-tuned files.
 ###############################################################################
 MonacoEditorComponent/Monaco/Editor/**/*.cs  linguist-generated=true

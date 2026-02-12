@@ -86,6 +86,19 @@ dotnet restore MonacoEditorComponent.slnx
 dotnet build MonacoEditorComponent.slnx --no-restore
 ```
 
+Type Generation
+---------------
+The C# API surface in `MonacoEditorComponent/Monaco/` is generated from Monaco's TypeScript definitions using a two-stage pipeline:
+
+1. **ts-morph extractor** (`tools/monaco-type-extractor/`): Parses `monaco.d.ts` into a versioned intermediate JSON model.
+2. **.NET CLI emitter** (`tools/MonacoTypeEmitter/`): Emits C# classes with System.Text.Json attributes from the intermediate model.
+
+To regenerate after updating the Monaco version:
+```bash
+npx tsx tools/monaco-type-extractor/src/index.ts -- node_modules/monaco-editor/monaco.d.ts -o tools/monaco-type-extractor/output/model.json
+dotnet run --project tools/MonacoTypeEmitter -- --input tools/monaco-type-extractor/output/model.json --output MonacoEditorComponent/Monaco/
+```
+
 License
 -------
 MIT
