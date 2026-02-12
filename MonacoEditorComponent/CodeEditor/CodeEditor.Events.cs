@@ -156,7 +156,13 @@ namespace Monaco
             // This is the desktop equivalent of WasmCodeEditorPresenter.Launch() calling
             // NativeMethods.InitializeMonaco(). The CodeEditorLoaded callback handles
             // _initialized, property application, and lifecycle transitions.
-            if (_view is DesktopCodeEditorPresenter)
+            //
+            // Idempotency guard: only invoke createMonacoEditor when lifecycle is Loading
+            // (set by InitialiseWebObjects) and the editor has not yet been initialized.
+            // This prevents duplicate bootstrap on repeated navigations or WebView reloads.
+            if (_view is DesktopCodeEditorPresenter
+                && _lifecycleState == EditorLifecycleState.Loading
+                && !_initialized)
             {
                 try
                 {

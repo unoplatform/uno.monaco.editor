@@ -11,10 +11,10 @@
   ],
   "id": "fn-11-extract-emitter-as-general-purpose-dts",
   "next_task": 1,
-  "plan_review_status": "needs_work",
-  "plan_reviewed_at": "2026-02-12T21:38:09.931611Z",
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-02-12T22:47:56.637290Z",
   "spec_path": ".flow/specs/fn-11-extract-emitter-as-general-purpose-dts.md",
   "status": "open",
   "title": "Extract emitter as general-purpose .d.ts to C# source generator library",
-  "updated_at": "2026-02-12T22:35:19.398003Z"
+  "updated_at": "2026-02-12T22:47:56.637451Z"
 }

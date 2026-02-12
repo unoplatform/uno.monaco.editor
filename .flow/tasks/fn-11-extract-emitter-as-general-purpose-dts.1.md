@@ -20,32 +20,32 @@ Create the standalone solution structure under `tools/DtsSharp/`, extract model 
 
 - Create `tools/DtsSharp/DtsSharp.slnx` with two projects
 - **DtsSharp** (`netstandard2.0`): core library containing model + emitter. Add `Microsoft.CodeAnalysis.CSharp` package reference (needed later for source gen, but the project targets ns2.0 from the start)
-- **DtsSharp.Runtime** (`netstandard2.0`): extract `InterfaceToClassConverter<TInterface, TClass>` from `MonacoEditorComponent/Helpers/InterfaceToClassConverter.cs` into `DtsSharp.Runtime` namespace
+- **DtsSharp.Runtime** (`netstandard2.0`): extract `InterfaceToClassConverter<TInterface, TClass>` from `MonacoEditorComponent/Helpers/InterfaceToClassConverter.cs` into `DtsSharp.Runtime` namespace. **Must be `public`** (currently `internal` in Monaco — consumer-generated code needs cross-assembly access)
 - Rename namespaces: `MonacoTypeEmitter.Model` → `DtsSharp.Model`, `MonacoTypeEmitter.Emitter` → `DtsSharp.Emitter`
 - **Rename only the top-level model type**: `MonacoModel` → `TypeModel` (class with properties: `SchemaVersion`, `ExtractedAt`, `SourceFile`, `Namespaces`)
-- All other type names preserved: `NamespaceInfo`, `InterfaceInfo`, `ClassInfo`, `EnumInfo`, `TypeAliasInfo`, `FunctionInfo`, `MethodInfo`, `PropertyInfo`, `ParameterInfo`, `TypeParameterInfo`, `TypeInfo` (12 variants)
-- Preserve **class-based** model structure exactly — no conversion to records yet (task 3 handles value equality)
+- All other type names preserved: `NamespaceInfo`, `InterfaceInfo`, `ClassInfo`, `EnumInfo`, `TypeAliasInfo`, `FunctionInfo`, `MethodInfo`, `PropertyInfo`, `ParameterInfo`, `TypeParameterInfo`, `TypeInfo` (13 variants: primitive, reference, union, intersection, array, tuple, literal, function, objectLiteral, indexedAccess, typeOperator, conditional, intrinsic)
+- Mechanical extraction + rename, NOT a refactor
+- Preserve **class-based** model structure exactly as in current `MonacoModel.cs`
 - JSON schema backward compatible (same JSON deserializes into renamed types)
-- Mechanical extraction — Monaco-specific coupling points remain as-is (task 2 decouples them)
 
 ## Key context
 
 - Model types are **classes** — see `tools/MonacoTypeEmitter/Model/MonacoModel.cs`
-- `TypeInfoConverter` uses `kind` discriminator for 12-variant `TypeInfo` union — preserve exactly
-- `InterfaceToClassConverter` is ~25 lines, generic STJ converter that reads JSON as concrete class and exposes as interface
-- `netstandard2.0` is required for Roslyn analyzer host compatibility
+- `TypeInfoConverter` uses `kind` discriminator for **13-variant** `TypeInfo` union — preserve exactly
+- `TypeModel` properties: `SchemaVersion`, `ExtractedAt`, `SourceFile`, `Namespaces` (all from current `MonacoModel`)
+- `InterfaceToClassConverter` is currently `internal` in `MonacoEditorComponent/Helpers/` — must become `public` in `DtsSharp.Runtime`
 
 ## Acceptance
 - [ ] `tools/DtsSharp/DtsSharp.slnx` exists and `dotnet build` succeeds
-- [ ] `DtsSharp.csproj` targets `netstandard2.0`
-- [ ] `DtsSharp.Runtime.csproj` targets `netstandard2.0`
 - [ ] Zero `Monaco` references in namespaces or public type names
 - [ ] `MonacoModel` → `TypeModel` rename complete; includes `SourceFile` property
 - [ ] All other model class names preserved
 - [ ] Class-based model structure preserved
+- [ ] `TypeInfo` has 13 variants (including `intrinsic`) — all preserved
 - [ ] Existing `model.json` deserializes correctly into renamed types
 - [ ] `TypeInfoConverter` discriminator logic unchanged
-- [ ] `InterfaceToClassConverter` works identically in `DtsSharp.Runtime` namespace
+- [ ] `InterfaceToClassConverter` is `public` in `DtsSharp.Runtime` namespace
+- [ ] External consumer compile test: generated code with `[JsonConverter(typeof(InterfaceToClassConverter<,>))]` compiles against `DtsSharp.Runtime`
 - [ ] No changes to `tools/MonacoTypeEmitter/` (original stays intact)
 
 ## Done summary

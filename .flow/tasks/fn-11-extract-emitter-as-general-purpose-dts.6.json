@@ -13,5 +13,5 @@
   "spec_path": ".flow/tasks/fn-11-extract-emitter-as-general-purpose-dts.6.md",
   "status": "todo",
   "title": "Migrate uno.monaco.editor to consume source generator",
-  "updated_at": "2026-02-12T22:36:58.391261Z"
+  "updated_at": "2026-02-12T22:45:26.219103Z"
 }

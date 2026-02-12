@@ -33,14 +33,14 @@ Build the core C# parser for TypeScript `.d.ts` declaration files — lexer, rec
 
 **Fallback:** Unsupported constructs → `TypeInfo` kind `primitive` name `unknown` (no exceptions, log diagnostic via Roslyn reporting if available, else silent fallback).
 
-**Sorting:** All output arrays sorted alphabetically by name.
+**Sorting:** Named declaration collections (namespaces, interfaces, classes, enums, type aliases, functions, methods, properties) sorted alphabetically by name. Source order preserved for positional items (parameters, tuple elements, overloads within a method name group).
 
 **netstandard2.0 constraint:** No C# 9+ language features that require runtime support beyond what ns2.0 provides. Records are OK (with `IsExternalInit` polyfill from task 3). Avoid `Span<T>` and other ns2.1+ APIs.
 
 ## Key context
 
 - Model classes in `DtsSharp.Model` (from task 1). Parser produces instances of these.
-- `TypeInfo` has 12 variants discriminated by `kind`.
+- `TypeInfo` has 13 variants discriminated by `kind` (primitive, reference, union, intersection, array, tuple, literal, function, objectLiteral, indexedAccess, typeOperator, conditional, intrinsic).
 - String literal union type aliases (`type Foo = "a" | "b"`) → recognized as string enum pattern.
 
 ## Acceptance
@@ -52,7 +52,7 @@ Build the core C# parser for TypeScript `.d.ts` declaration files — lexer, rec
 - [ ] Extracts JSDoc comments (description + `@param` tags)
 - [ ] Handles `export` and `declare` modifiers
 - [ ] Unsupported constructs → `unknown` primitive TypeInfo (no exceptions)
-- [ ] Output arrays sorted alphabetically
+- [ ] Named declaration collections sorted alphabetically; positional items (parameters, tuple elements) preserve source order
 - [ ] Pure C# targeting `netstandard2.0` — no Node.js, no ns2.1+ APIs
 - [ ] Smoke test: parses hand-written multi-construct `.d.ts` fixture
 

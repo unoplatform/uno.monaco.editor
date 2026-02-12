@@ -21,14 +21,21 @@ Migrate `uno.monaco.editor` to use the `DtsSharp` source generator. Add project 
                     OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   <ProjectReference Include="..\tools\DtsSharp\DtsSharp.Runtime\DtsSharp.Runtime.csproj" />
   ```
-- Add `<AdditionalFiles Include="path/to/monaco.d.ts" />` pointing to the vendored Monaco declaration file
+- **Monaco `.d.ts` source:** Use the vendored `node_modules/monaco-editor/monaco.d.ts` (installed via `install-dependencies.ps1` → `npm install`). Monaco version is pinned by `package-lock.json`. This is the same canonical input the current ts-morph extractor uses.
+  ```xml
+  <AdditionalFiles Include="$(MSBuildThisFileDirectory)..\node_modules\monaco-editor\monaco.d.ts" />
+  ```
+- **Ignore file as AdditionalFiles** (required for incremental tracking):
+  ```xml
+  <AdditionalFiles Include="$(MSBuildThisFileDirectory)..\tools\DtsSharp\monaco.generator-ignore" />
+  ```
 - Set MSBuild properties for Monaco-specific configuration:
   ```xml
   <PropertyGroup>
     <DtsSharp_RootNamespace>monaco</DtsSharp_RootNamespace>
     <DtsSharp_ConverterType>Monaco.Helpers.InterfaceToClassConverter</DtsSharp_ConverterType>
     <DtsSharp_OutputPathPrefix>MonacoEditorComponent/Monaco/</DtsSharp_OutputPathPrefix>
-    <DtsSharp_IgnoreFile>$(MSBuildThisFileDirectory)..\tools\DtsSharp\monaco.generator-ignore</DtsSharp_IgnoreFile>
+    <DtsSharp_IgnoreFile>monaco.generator-ignore</DtsSharp_IgnoreFile>
   </PropertyGroup>
   ```
 - Move `.generator-ignore` to `tools/DtsSharp/monaco.generator-ignore` (stable path)
@@ -48,12 +55,17 @@ Migrate `uno.monaco.editor` to use the `DtsSharp` source generator. Add project 
 ## Key context
 
 - With source generator, generated types are no longer checked into the repo — they're produced at compile time
+- Monaco version is pinned in `package.json` / `package-lock.json` — parity tests depend on this stable input
+- `node_modules/monaco-editor/` is the canonical Monaco source, installed by `install-dependencies.ps1` which runs `npm install`
 - AGENTS.md lines 35, 44-46, 73-75 reference old paths
 - The `MonacoEditorComponent/Monaco/` directory contains both generated AND hand-authored files — removal must be selective via manifest
 - ts-morph extractor can be kept as reference or removed (separate decision)
 
 ## Acceptance
 - [ ] DtsSharp source generator produces byte-for-byte identical output to old MonacoTypeEmitter (verified by diff test before migration)
+- [ ] Monaco `.d.ts` source pinned to `node_modules/monaco-editor/monaco.d.ts` via AdditionalFiles
+- [ ] Monaco version pinned by `package-lock.json` — parity tests use this exact version
+- [ ] Ignore file included as AdditionalFiles (not filesystem read)
 - [ ] Generated file manifest created — only manifested files removed
 - [ ] Hand-authored files in `MonacoEditorComponent/Monaco/` preserved
 - [ ] `dotnet build MonacoEditorComponent.slnx` succeeds with source-generated types

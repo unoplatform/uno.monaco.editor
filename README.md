@@ -15,7 +15,7 @@ A cross-platform [Uno Platform](https://platform.uno/) wrapper around the [Monac
 - **Themes** -- automatic light/dark/high-contrast theme switching based on system settings
 - **Decorations and markers** -- strongly-typed C# abstractions for line decorations and diagnostic markers
 - **Language providers** -- CodeAction, CodeLens, Color, Completion, and Hover provider bridges
-- **Actions and commands** -- register custom editor actions and keybinding commands (WASM)
+- **Actions and commands** -- register custom editor actions and keybinding commands
 - **Editor options** -- full `StandaloneEditorConstructionOptions` support through `CodeEditor.Options`
 - **Two-way text binding** -- bind editor content to C# properties with change notifications
 - **Dual-platform support** -- single codebase runs on both `net10.0-browserwasm` and `net10.0-desktop`
@@ -28,11 +28,11 @@ A cross-platform [Uno Platform](https://platform.uno/) wrapper around the [Monac
 | Editor options and themes | Supported | Supported |
 | Decorations and markers | Supported | Supported |
 | Language providers (Completion, Hover, etc.) | Supported | Supported |
-| `AddActionAsync` / `AddCommandAsync` | Supported | Not supported |
+| `AddActionAsync` / `AddCommandAsync` | Supported | Supported |
 | `PostWebMessage` | Not supported | Supported |
 | Interop mechanism | JSImport / JSExport | JSON-RPC over WebView2 |
 
-`AddActionAsync` and `AddCommandAsync` require JSExport callbacks and throw `PlatformNotSupportedException` on desktop. See [architecture docs](docs/architecture.md#platform-asymmetric-apis) for details.
+`AddActionAsync` and `AddCommandAsync` work on both WASM and desktop platforms. On WASM they use JSExport callbacks; on desktop they use JSON-RPC bridge routing. See [architecture docs](docs/architecture.md#platform-api-parity) for details.
 
 ## Getting Started
 

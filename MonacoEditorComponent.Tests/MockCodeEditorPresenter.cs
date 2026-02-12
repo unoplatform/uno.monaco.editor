@@ -17,6 +17,15 @@ internal sealed class MockCodeEditorPresenter : ICodeEditorPresenter
 {
     public List<string> PostedMessages { get; } = [];
 
+    /// <summary>Records each (method, args) pair passed to <see cref="InvokeMethodAsync"/>.</summary>
+    public List<(string Method, string[] Args)> InvokeMethodCalls { get; } = [];
+
+    /// <summary>Records each script passed to <see cref="InvokeScriptWithElementAsync"/>.</summary>
+    public List<string> InvokeScriptWithElementCalls { get; } = [];
+
+    /// <summary>Records each script passed to <see cref="InvokeScriptAsync"/>.</summary>
+    public List<string> InvokeScriptCalls { get; } = [];
+
     public event TypedEventHandler<ICodeEditorPresenter?, PresenterNewWindowRequestedEventArgs?>? NewWindowRequested;
     public event TypedEventHandler<ICodeEditorPresenter?, PresenterNavigationStartingEventArgs?>? NavigationStarting;
     public event TypedEventHandler<ICodeEditorPresenter?, PresenterNavigationCompletedEventArgs?>? NavigationCompleted;
@@ -33,9 +42,24 @@ internal sealed class MockCodeEditorPresenter : ICodeEditorPresenter
     public bool TriggerKeyDown(WebKeyEventArgs args) => false;
     public bool Focus(FocusState state) => false;
     public Task Launch() => Task.CompletedTask;
-    public Task<string> InvokeScriptAsync(string script) => Task.FromResult("null");
-    public Task<string> InvokeMethodAsync(string method, string[] serializedArgs) => Task.FromResult("null");
-    public Task<string> InvokeScriptWithElementAsync(string script) => Task.FromResult("null");
+
+    public Task<string> InvokeScriptAsync(string script)
+    {
+        InvokeScriptCalls.Add(script);
+        return Task.FromResult("null");
+    }
+
+    public Task<string> InvokeMethodAsync(string method, string[] serializedArgs)
+    {
+        InvokeMethodCalls.Add((method, serializedArgs));
+        return Task.FromResult("null");
+    }
+
+    public Task<string> InvokeScriptWithElementAsync(string script)
+    {
+        InvokeScriptWithElementCalls.Add(script);
+        return Task.FromResult("null");
+    }
 
     public void PostWebMessage(string json)
     {
