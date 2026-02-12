@@ -103,26 +103,35 @@
 		</ItemGroup>
 	</Target>
 
-	<!-- Build-time check: Ensure esbuild bundles exist before packaging -->
-	<Target Name="ValidateEsbuildBundles" BeforeTargets="Build">
+	<!-- Auto-restore Monaco JS bundles when missing (clean checkout) -->
+	<Target Name="RestoreMonacoBundles"
+		BeforeTargets="CoreCompile"
+		Condition="!Exists('WasmScripts\uno-monaco-helpers.js')">
+		<Message Importance="high" Text="Monaco JS bundles not found — running npm install and esbuild..." />
+		<Exec Command="npm install" WorkingDirectory="$(MSBuildThisFileDirectory).." StandardOutputImportance="low" />
+		<Exec Command="node MonacoEditorComponent/ts-helpermethods/esbuild.config.mjs" WorkingDirectory="$(MSBuildThisFileDirectory).." />
+	</Target>
+
+	<!-- Safety net: fail with clear message if bundles still missing after restore -->
+	<Target Name="ValidateEsbuildBundles" BeforeTargets="CoreCompile" DependsOnTargets="RestoreMonacoBundles">
 		<Error
 			Condition="!Exists('WasmScripts\uno-monaco-helpers.js')"
-			Text="esbuild bundle not found at WasmScripts\uno-monaco-helpers.js. Run 'npm install &amp;&amp; npm run build' from the repository root first." />
+			Text="esbuild bundle not found at WasmScripts\uno-monaco-helpers.js. Run 'npm install &amp;&amp; npm run build' from the repository root." />
 		<Error
 			Condition="!Exists('WasmScripts\workers\editor.worker.js')"
-			Text="Worker bundle not found at WasmScripts\workers\editor.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root first." />
+			Text="Worker bundle not found at WasmScripts\workers\editor.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root." />
 		<Error
 			Condition="!Exists('WasmScripts\workers\json.worker.js')"
-			Text="Worker bundle not found at WasmScripts\workers\json.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root first." />
+			Text="Worker bundle not found at WasmScripts\workers\json.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root." />
 		<Error
 			Condition="!Exists('WasmScripts\workers\css.worker.js')"
-			Text="Worker bundle not found at WasmScripts\workers\css.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root first." />
+			Text="Worker bundle not found at WasmScripts\workers\css.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root." />
 		<Error
 			Condition="!Exists('WasmScripts\workers\html.worker.js')"
-			Text="Worker bundle not found at WasmScripts\workers\html.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root first." />
+			Text="Worker bundle not found at WasmScripts\workers\html.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root." />
 		<Error
 			Condition="!Exists('WasmScripts\workers\ts.worker.js')"
-			Text="Worker bundle not found at WasmScripts\workers\ts.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root first." />
+			Text="Worker bundle not found at WasmScripts\workers\ts.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root." />
 	</Target>
 
 </Project>
