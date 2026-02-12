@@ -135,10 +135,9 @@ The current docs mention WebKitGTK only briefly (getting-started.md:12, L227). A
 - [ ] Action/command callback fires in C# when triggered from Monaco on desktop
 - [ ] Existing WASM behavior unchanged (no regression)
 - [ ] Solution builds: `dotnet build MonacoEditorComponent.slnx`
-## Completion summary
-TBD
-
+## Done summary
+Enable AddActionAsync/AddCommandAsync on desktop by introducing InvokeMethodAsync and InvokeScriptWithElementAsync on ICodeEditorPresenter, which encapsulate element resolution per-platform. Desktop presenter wraps scripts with editor-container element lookup; WASM presenter delegates to existing InvokeJS which already defines element. Added idempotency guard for desktop createMonacoEditor call, updated all docs (README, architecture, cookbook, getting-started, PR-REVIEW-GUIDE), and added 5 regression tests pinning the routing change.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 064c81b, 2079123
+- Tests: dotnet test --project MonacoEditorComponent.Tests --no-build --filter-not-trait Category=WasmPlaywright --filter-not-trait Category=DesktopCdp (182 passed), dotnet test --project tools/MonacoTypeEmitter.Tests --no-build (24 passed)
 - PRs:
