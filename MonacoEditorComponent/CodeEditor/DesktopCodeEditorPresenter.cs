@@ -164,12 +164,10 @@ namespace Monaco
 
                 Debug.WriteLine("DesktopCodeEditorPresenter: CoreWebView2 initialized with security settings");
 
-                // Apply any buffered Source navigation now that security handlers are attached.
-                if (_pendingSource is { } pending)
-                {
-                    _pendingSource = null;
-                    _webView.Source = pending;
-                }
+                // Configure content serving and navigate to editor.html.
+                var contentRoot = ResolveDesktopContentPath();
+                AllowedFileContentRoot = contentRoot;
+                NavigateToEditorPage(contentRoot);
             }
             catch (Exception e)
             {
@@ -343,6 +341,53 @@ namespace Monaco
                 Uri = global::System.Uri.TryCreate(args.Uri, UriKind.Absolute, out var parsed) ? parsed : null
             };
             NewWindowRequested?.Invoke(this, presenterArgs);
+        }
+
+        // ============================================================
+        // Content serving
+        // ============================================================
+
+        /// <summary>
+        /// Resolves the DesktopContent folder path from the application's base directory.
+        /// Content files are copied to output via CopyToOutputDirectory="PreserveNewest".
+        /// </summary>
+        private static string ResolveDesktopContentPath()
+        {
+            var contentRoot = Path.Combine(AppContext.BaseDirectory, "DesktopContent");
+            if (!Directory.Exists(contentRoot))
+            {
+                throw new DirectoryNotFoundException(
+                    $"DesktopContent folder not found at {contentRoot}. " +
+                    "Ensure the MonacoEditorComponent NuGet package content files are present.");
+            }
+
+            return contentRoot;
+        }
+
+        /// <summary>
+        /// Configures virtual host mapping (Windows) or file:// navigation (Linux/macOS)
+        /// and navigates the WebView2 to editor.html.
+        /// </summary>
+        private void NavigateToEditorPage(string contentRoot)
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                // Windows Edge WebView2: virtual host mapping provides an HTTPS origin.
+                _webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                    AllowedVirtualHost,
+                    contentRoot,
+                    Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
+                _webView.Source = new global::System.Uri($"https://{AllowedVirtualHost}/editor.html");
+                Debug.WriteLine($"DesktopCodeEditorPresenter: Navigating to https://{AllowedVirtualHost}/editor.html");
+            }
+            else
+            {
+                // macOS/Linux: Navigate via file:// directly.
+                // Uno's X11/GTK WebView2 may not support SetVirtualHostNameToFolderMapping.
+                var editorPath = Path.Combine(contentRoot, "editor.html");
+                _webView.Source = new global::System.Uri(editorPath);
+                Debug.WriteLine($"DesktopCodeEditorPresenter: Navigating to file://{editorPath}");
+            }
         }
 
         // ============================================================
