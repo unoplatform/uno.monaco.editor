@@ -47,8 +47,8 @@ Add comprehensive XML documentation to all hand-written public APIs in MonacoEdi
 - [ ] `dotnet build MonacoEditorComponent.slnx /warnaserror:CS1591` passes (generated files suppressed)
 
 ## Done summary
-Added comprehensive XML documentation to all hand-written public APIs across 24 files. Enabled CS1591 enforcement via .editorconfig (warning in root, suppressed for generated Monaco types with hand-written LanguagesHelper files re-enabled). Fixed HasGlyphMargin copy-paste doc error, used inheritdoc for presenter implementations, and added exception/remarks tags for interop methods. Build passes with 0 warnings under warnaserror.
+Added comprehensive XML documentation to all hand-written public APIs. CS1591 enforced via .editorconfig. Review feedback addressed (EditorLoading wording, AddCommandAsync exception docs, KeyboardListener.KeyDown params, WebView2JsonRpcMessageHandler security remarks).
 ## Evidence
-- Commits: bd6d6c0, 6a57552, ba83056c5fd5de4e001b52e0c4a2d7278d3bd1d9
+- Commits: bd6d6c0, 6a57552, 1bc1f83
 - Tests: dotnet build MonacoEditorComponent/MonacoEditorComponent.csproj --no-restore -warnaserror
 - PRs:
