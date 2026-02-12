@@ -150,15 +150,30 @@ namespace Monaco
                 return;
             }
 
-            // Note: On desktop, navigation completion means the host page loaded but
-            // Monaco may not be fully ready. Task 5 will add a JSON-RPC "editor/ready"
-            // signal for a more precise Loaded transition. Until then, both WASM and
-            // desktop use this handler as the lifecycle trigger.
+            // On desktop, navigation completion means editor.html and the JS bundle have loaded.
+            // Initialize the Monaco editor by calling createMonacoEditor(), which registers the
+            // editor context and fires the "Loaded" callback (CodeEditorLoaded) when complete.
+            // This is the desktop equivalent of WasmCodeEditorPresenter.Launch() calling
+            // NativeMethods.InitializeMonaco(). The CodeEditorLoaded callback handles
+            // _initialized, property application, and lifecycle transitions.
+            if (_view is DesktopCodeEditorPresenter)
+            {
+                try
+                {
+                    await _view.InvokeScriptAsync("createMonacoEditor(null, 'editor-container', '')");
+                    Debug.WriteLine("WebView_NavigationCompleted: createMonacoEditor invoked on desktop");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"WebView_NavigationCompleted: createMonacoEditor failed: {ex}");
+                    InternalException?.Invoke(this, ex);
+                }
+                return;
+            }
 
-            // Enable script execution before init-time calls. SendScriptAsync and
-            // InvokeScriptAsync are gated by _initialized, so we must set it before
-            // applying initial properties. If any script fails, InternalException
-            // is surfaced by the existing try/catch in those helpers.
+            // WASM path: NavigationCompleted does not fire on WASM (BrowserHtmlElement
+            // does not emit this event). This code is a legacy fallback for any future
+            // presenter that does emit NavigationCompleted.
             _initialized = true;
 
             // Make sure inner editor is focused

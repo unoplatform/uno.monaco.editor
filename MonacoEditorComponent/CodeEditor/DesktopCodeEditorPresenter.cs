@@ -208,6 +208,12 @@ namespace Monaco
             }
         }
 
+        /// <summary>
+        /// The element ID used by the desktop editor container in editor.html.
+        /// All eval scripts that reference <c>element</c> resolve this from the DOM.
+        /// </summary>
+        private const string EditorContainerId = "editor-container";
+
         /// <inheritdoc />
         public async Task<string> InvokeScriptAsync(string script)
         {
@@ -217,6 +223,34 @@ namespace Monaco
             }
 
             return await _webView.CoreWebView2.ExecuteScriptAsync(script);
+        }
+
+        /// <inheritdoc />
+        public async Task<string> InvokeMethodAsync(string method, string[] serializedArgs)
+        {
+            if (!_isCoreWebView2Initialized || _webView.CoreWebView2 is null)
+            {
+                throw new InvalidOperationException("CoreWebView2 is not initialized. Call Launch() first.");
+            }
+
+            // Desktop wraps the call to define `element` from the DOM before invoking the function.
+            // editor.html contains <div id="editor-container"> which is the Monaco mount point.
+            var script = "var element = document.getElementById(\"" + EditorContainerId + "\"); " +
+                         method + "(element," + string.Join(",", serializedArgs) + ");";
+            return await _webView.CoreWebView2.ExecuteScriptAsync(script);
+        }
+
+        /// <inheritdoc />
+        public async Task<string> InvokeScriptWithElementAsync(string script)
+        {
+            if (!_isCoreWebView2Initialized || _webView.CoreWebView2 is null)
+            {
+                throw new InvalidOperationException("CoreWebView2 is not initialized. Call Launch() first.");
+            }
+
+            // Prepend element definition so raw scripts that reference `element` work on desktop.
+            var wrappedScript = "var element = document.getElementById(\"" + EditorContainerId + "\"); " + script;
+            return await _webView.CoreWebView2.ExecuteScriptAsync(wrappedScript);
         }
 
         /// <inheritdoc />

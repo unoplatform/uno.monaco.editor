@@ -1,117 +1,113 @@
-# General-Purpose .d.ts → C# Roslyn Source Generator
+# fn-7: Testing Foundation Skills
 
 ## Overview
+Delivers comprehensive testing foundation covering strategy, xUnit v3, integration testing, UI testing across frameworks (Blazor, MAUI, Uno), Playwright, snapshot testing, and test quality analysis.
 
-Extract the Monaco type emitter into a standalone Roslyn incremental source generator that converts TypeScript `.d.ts` declaration files into C# proxy types at compile time. Pure .NET, no Node.js, no CLI — consumers just add a NuGet package and their `.d.ts` file.
+## Scope Boundary
+**In scope:** Testing design patterns, testing framework usage, test quality analysis, and testing strategy guidance.
 
-### Consumer experience
+**Out of scope / Owned by other skills:**
+- Test project scaffolding (directory layout, xUnit project creation, coverlet setup, editorconfig overrides) -- owned by [skill:dotnet-add-testing]
+- CI test reporting and pipeline integration -- owned by fn-19
 
-```xml
-<PackageReference Include="DtsSharp" />
-<AdditionalFiles Include="api.d.ts" />
-```
+The boundary is: `dotnet-add-testing` handles "how to create a test project"; fn-7 skills handle "how to write effective tests."
 
-At build time, the source generator reads the `.d.ts`, parses it in C#, and emits typed C# proxies directly into the compilation. No separate build step.
+## Skills
+Each skill lives at `skills/testing/<skill-name>/SKILL.md` (folder-per-skill convention).
 
-### Current state
+- `dotnet-testing-strategy` -- Core testing patterns: unit vs integration vs E2E decision tree, test organization, naming conventions, when to use mocks vs fakes vs stubs
+- `dotnet-xunit` -- xUnit v3 features: `[Fact]`/`[Theory]`, fixtures (`IClassFixture`, `ICollectionFixture`), parallel execution, `IAsyncLifetime`, custom assertions, analyzers; includes xUnit v2 compatibility notes
+- `dotnet-integration-testing` -- WebApplicationFactory, Testcontainers, Aspire testing patterns, database fixtures, test isolation
+- `dotnet-ui-testing-core` -- Core UI testing patterns applicable across frameworks: page object model, test selectors, async wait strategies, accessibility testing
+- `dotnet-blazor-testing` -- bUnit for Blazor component testing: rendering, events, cascading parameters, JS interop mocking
+- `dotnet-maui-testing` -- Appium + XHarness for MAUI testing: device/emulator testing, platform-specific behavior
+- `dotnet-uno-testing` -- Playwright for Uno WASM, platform-specific testing, runtime heads
+- `dotnet-playwright` -- Playwright for .NET: browser automation, E2E testing, CI caching, trace viewer, codegen
+- `dotnet-snapshot-testing` -- Verify (VerifyTests): API surfaces, HTTP responses, rendered emails, scrubbing/filtering, custom converters
+- `dotnet-test-quality` -- Code coverage (coverlet + ReportGenerator), CRAP analysis, mutation testing (Stryker.NET), flaky test detection
 
-The existing pipeline is two stages: ts-morph (Node.js) parses `.d.ts` → JSON, then a .NET CLI emitter reads JSON → emits C# files. The emitter is ~90% generic already with only ~6 Monaco-specific coupling points.
+## Minimum Supported Versions
+- xUnit: v3 primary, v2 compatibility notes where behavior differs
+- .NET: 8.0+ (LTS baseline); note when features require 9.0+ or 10.0+
+- Playwright: 1.40+ for .NET
+- Testcontainers: 3.x+
+- Verify: 20.x+
 
-### Target state
+## Cross-Reference Matrix
+Each skill MUST include outbound `[skill:...]` cross-references as follows:
 
-Two NuGet packages:
-- **DtsSharp** — Roslyn `IIncrementalGenerator` analyzer package. Contains the .d.ts parser + C# emitter. Targets `netstandard2.0` (with potential Roslyn-version-specific builds for perf).
-- **DtsSharp.Runtime** — Small runtime package with `InterfaceToClassConverter` and any other types that generated code references.
+| Skill | Required Outbound Refs |
+|---|---|
+| `dotnet-testing-strategy` | `dotnet-xunit`, `dotnet-integration-testing`, `dotnet-snapshot-testing`, `dotnet-test-quality`, `dotnet-add-testing` |
+| `dotnet-xunit` | `dotnet-testing-strategy`, `dotnet-integration-testing` |
+| `dotnet-integration-testing` | `dotnet-testing-strategy`, `dotnet-xunit`, `dotnet-snapshot-testing` |
+| `dotnet-ui-testing-core` | `dotnet-testing-strategy`, `dotnet-playwright`, `dotnet-blazor-testing`, `dotnet-maui-testing`, `dotnet-uno-testing` |
+| `dotnet-blazor-testing` | `dotnet-ui-testing-core`, `dotnet-xunit` |
+| `dotnet-maui-testing` | `dotnet-ui-testing-core`, `dotnet-xunit` |
+| `dotnet-uno-testing` | `dotnet-ui-testing-core`, `dotnet-playwright` |
+| `dotnet-playwright` | `dotnet-ui-testing-core`, `dotnet-testing-strategy` |
+| `dotnet-snapshot-testing` | `dotnet-testing-strategy`, `dotnet-integration-testing` |
+| `dotnet-test-quality` | `dotnet-testing-strategy`, `dotnet-xunit` |
 
-## Scope
+## fn-7 Reconciliation Scope
+After all fn-7 skills land, replace ALL `<!-- TODO: fn-7 reconciliation -->` and `<!-- TODO(fn-7): ... -->` placeholders repo-wide with canonical `[skill:...]` cross-references. Affected skills span TWO categories:
 
-**In scope:**
-- Roslyn incremental source generator reading `.d.ts` via `AdditionalTextsProvider`
-- C# declaration parser for `.d.ts` (interfaces, classes, enums, type aliases, functions, namespaces, generics, unions/intersections)
-- Decoupled emitter with configurable options (via MSBuild properties or attributes)
-- Runtime NuGet package for `InterfaceToClassConverter`
-- Analyzer NuGet packaging (`analyzers/dotnet/cs/`)
-- Migration of `uno.monaco.editor` to consume the source generator
-- Test suite with non-Monaco `.d.ts` fixtures
+**Architecture** (tracked in `skills/architecture/FN7-RECONCILIATION.md`):
+`dotnet-architecture-patterns`, `dotnet-background-services`, `dotnet-resilience`, `dotnet-http-client`, `dotnet-observability`, `dotnet-efcore-patterns`, `dotnet-efcore-architecture`, `dotnet-data-access-strategy`, `dotnet-containers`, `dotnet-container-deployment`
 
-**Out of scope:**
-- CLI tool (no executable)
-- JSON intermediate format for consumers
-- Full TypeScript type checker
-- Multi-file `.d.ts` with `/// <reference>` following (v1 = single file)
-- Construct signatures (not in intermediate model)
+**Serialization**:
+`dotnet-serialization`, `dotnet-grpc`, `dotnet-service-communication`, `dotnet-realtime-communication`
 
-## Dependencies
-
-- **fn-10** — should complete first (actively improving emitter code)
-
-## Quick commands
-
+Verification after reconciliation:
 ```bash
-# Build the generator
-dotnet build tools/DtsSharp/DtsSharp.slnx
-
-# Run tests
-dotnet test --project tools/DtsSharp/DtsSharp.Tests
-
-# Consumer project (after packaging):
-# Just add <AdditionalFiles Include="api.d.ts" /> and build
+# Confirm no fn-7 TODOs remain anywhere
+grep -rl "TODO.*fn-7\|fn-7.*TODO" skills/  # expect empty
 ```
 
-## Acceptance
+## Quick Commands
+```bash
+# Smoke test: verify testing strategy skill exists
+ls skills/testing/dotnet-testing-strategy/SKILL.md
 
-- [ ] Source generator compiles targeting `netstandard2.0` with zero Monaco references
-- [ ] Consumer project with `<AdditionalFiles Include="test.d.ts" />` gets generated C# types at build time
-- [ ] Parser handles: interfaces, classes, enums, type aliases, functions, namespaces, generics (with defaults/constraints), unions/intersections, arrays, literals, `typeof`, `keyof`
-- [ ] Parser has deterministic fallbacks for unsupported constructs
-- [ ] `DtsSharp.Runtime` contains `InterfaceToClassConverter` in a generic namespace
-- [ ] Configuration via MSBuild properties: root namespace, converter type name, doc link base URL
-- [ ] Incremental generator caches correctly — unchanged `.d.ts` files don't trigger re-emission
-- [ ] `uno.monaco.editor` produces byte-for-byte identical output using the source generator
-- [ ] Test suite includes 3+ real non-Monaco library `.d.ts` fixtures
-- [ ] NuGet package layout: `analyzers/dotnet/cs/` for generator, `lib/netstandard2.0/` for runtime
+# Validate xUnit v3 coverage
+grep -i "xunit.*v3" skills/testing/dotnet-xunit/SKILL.md
 
-## Architecture
+# Test snapshot testing patterns
+grep -i "Verify" skills/testing/dotnet-snapshot-testing/SKILL.md
 
-```mermaid
-graph TB
-    subgraph "Build Time (DtsSharp analyzer)"
-        AT["AdditionalTextsProvider"] --> DTS[".d.ts content"]
-        MSB["MSBuild Properties"] --> Opts["EmitterOptions"]
-        DTS --> Parser["DtsParser"]
-        Parser --> Model["TypeModel (internal)"]
-        Model --> Emitter["CSharpEmitter"]
-        Opts --> Emitter
-        Emitter --> SRC["Generated C# source"]
-        SRC --> AddSrc["context.AddSource()"]
-    end
+# Verify all 10 skills registered in plugin.json
+grep -c "skills/testing/" .claude-plugin/plugin.json  # expect 10
 
-    subgraph "NuGet Packages"
-        Gen["DtsSharp<br/>(analyzers/dotnet/cs/)"]
-        RT["DtsSharp.Runtime<br/>(lib/netstandard2.0/)"]
-    end
-
-    AddSrc -.->|"generated code refs"| RT
+# Verify no fn-7 TODOs remain
+grep -rl "TODO.*fn-7" skills/  # expect empty after reconciliation
 ```
 
-## Key design decisions
+## Acceptance Criteria
+1. All 10 skills written at `skills/testing/<name>/SKILL.md` with required frontmatter (`name`, `description`)
+2. Each skill has: description, scope boundary, prerequisites, cross-references, ≥2 practical code examples, gotchas/pitfalls section, references
+3. Testing strategy skill provides decision tree for unit/integration/E2E with concrete criteria
+4. xUnit skill covers v3 features with v2 compatibility notes where behavior differs
+5. Integration testing skill documents WebApplicationFactory + Testcontainers + Aspire testing patterns
+6. UI testing skills cover framework-specific patterns (bUnit, Appium, Playwright) with `dotnet-ui-testing-core` owning shared patterns
+7. Snapshot testing skill uses Verify library with scrubbing/filtering and custom converter examples
+8. Test quality skill covers coverage (coverlet + ReportGenerator), CRAP analysis, mutation testing (Stryker.NET)
+9. Cross-references validated against the cross-reference matrix above (grep-based check)
+10. All 10 skills registered in `.claude-plugin/plugin.json` skills array
+11. All `TODO(fn-7)` and `TODO: fn-7 reconciliation` placeholders replaced repo-wide with canonical `[skill:...]` refs
+12. Updated `skills/architecture/FN7-RECONCILIATION.md` verification commands to include serialization scope
 
-1. **Roslyn incremental source generator** — runs at compile time via `IIncrementalGenerator`. Reads `.d.ts` from `AdditionalTextsProvider`. No CLI, no separate build step.
-
-2. **netstandard2.0 baseline** — required for Roslyn host compatibility. Can add Roslyn-version-specific builds (e.g., `analyzers/roslyn4.4/dotnet/cs/`) if newer APIs offer meaningful perf gains.
-
-3. **Incremental caching** — model types must have value equality for the incremental pipeline to skip re-emission when `.d.ts` hasn't changed. Use `record` or implement `IEquatable<T>`.
-
-4. **Configuration via MSBuild properties** — read from `AnalyzerConfigOptionsProvider.GlobalOptions`. Properties like `build_property.DtsSharp_RootNamespace`, `build_property.DtsSharp_ConverterType`. Set in consumer's `.csproj` or `Directory.Build.props`.
-
-5. **Single analyzer package** — parser + emitter + generator wiring all in one package. Keep it simple.
-
-6. **Runtime companion** — `DtsSharp.Runtime` ships separately in `lib/netstandard2.0/` so generated code can reference it at runtime without pulling in the analyzer.
+## Test Notes
+- Validate xUnit skill theory and fixture examples compile conceptually
+- Verify Playwright skill includes CI caching patterns (browser binary caching)
+- Check snapshot testing skill covers scrubbing/filtering patterns for dates, GUIDs
+- Confirm cross-reference matrix compliance with grep
+- Confirm no overlap with `dotnet-add-testing` (scaffolding) -- fn-7 skills reference it, not duplicate it
 
 ## References
-
-- Current emitter: `tools/MonacoTypeEmitter/Emitter/CSharpEmitter.cs`
-- Current model: `tools/MonacoTypeEmitter/Model/MonacoModel.cs`
-- Packaging reference: [Mapperly](https://github.com/riok/mapperly) (production source generator packaging)
-- Pattern reference: [dagger/dagger](https://github.com/dagger/dagger) (IIncrementalGenerator reading JSON via AdditionalTexts)
-- Pattern reference: [spectre.console](https://github.com/spectreconsole/spectre.console) (IIncrementalGenerator reading JSON for emoji generation)
+- xUnit Documentation: https://xunit.net/
+- WebApplicationFactory: https://learn.microsoft.com/en-us/aspnet/core/test/integration-tests
+- Testcontainers: https://dotnet.testcontainers.org/
+- Playwright for .NET: https://playwright.dev/dotnet/
+- Verify: https://github.com/VerifyTests/Verify
+- Coverlet: https://github.com/coverlet-coverage/coverlet
+- Stryker.NET: https://stryker-mutator.io/docs/stryker-net/introduction/

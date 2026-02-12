@@ -94,7 +94,7 @@ dotnet run -f net10.0-desktop
 
 On desktop, the editor runs inside the Uno `WebView2` control. Windows uses the Chromium-based WebView2 runtime; macOS uses WKWebView; Linux uses WebKitGTK.
 
-> **Platform note:** `AddActionAsync` and `AddCommandAsync` throw `PlatformNotSupportedException` on desktop because they require JSExport callbacks. See the [platform matrix](../README.md#platform-support) for the full list of platform differences.
+All public APIs (including `AddActionAsync` and `AddCommandAsync`) work identically on both WASM and desktop. See the [platform matrix](../README.md#platform-support) for details.
 
 ## Editor Lifecycle
 
@@ -223,18 +223,17 @@ string lang3 = Editor.Languages.GetCodeLanguageFromExtension("Program.cs");
 
 ### Monaco does not load on desktop
 
-- **Windows:** Verify the [WebView2 runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) is installed. The Evergreen bootstrapper installs it automatically on most systems.
-- **Linux:** The Uno `WebView2` control requires WebKitGTK on Linux. Install it via your package manager (e.g., `sudo apt install libwebkit2gtk-4.1-dev` on Ubuntu). macOS uses the built-in WKWebView and requires no additional setup.
+See the [Desktop Prerequisites](#desktop-prerequisites) section below for platform-specific requirements.
 
-### `PlatformNotSupportedException` on desktop
+### `InvalidOperationException` when calling `AddActionAsync` or `AddCommandAsync`
 
-`AddActionAsync` and `AddCommandAsync` are WASM-only. Guard calls with a platform check:
+These methods require the editor bridge to be initialized. Always call them after `EditorLoaded` fires:
 
 ```csharp
-if (OperatingSystem.IsBrowser())
+Editor.EditorLoaded += async (s, e) =>
 {
     await Editor.AddActionAsync(new MyAction());
-}
+};
 ```
 
 ### Content set before `EditorLoaded` does not appear
@@ -244,6 +243,45 @@ The `Text` property can be set at any time (including before the editor loads). 
 ### Editor does not respond to input
 
 Check that the editor has keyboard focus. Use `Editor.Focus(FocusState.Programmatic)` to explicitly focus the editor after modal dialogs or other focus-stealing operations.
+
+## Desktop Prerequisites
+
+The desktop editor runs inside the Uno `WebView2` control, which delegates to the platform's native web engine. Each platform has specific runtime requirements.
+
+### Windows
+
+The [WebView2 Evergreen runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) is required. It is pre-installed on Windows 10 version 1803 and later. If missing, the Evergreen bootstrapper installs it automatically.
+
+### macOS
+
+No additional setup is needed. The editor uses the built-in WKWebView.
+
+### Linux (native)
+
+The Uno `WebView2` control requires WebKitGTK on Linux. Install the runtime library for your distribution:
+
+```bash
+# Ubuntu 24.04+ / Debian 13+
+sudo apt install libgtk-3-0t64 libwebkit2gtk-4.1-0
+
+# Ubuntu 22.04 / Debian 12
+sudo apt install libwebkit2gtk-4.0-37
+```
+
+If WebKitGTK is not found at runtime, the presenter throws a `PlatformNotSupportedException` with specific install instructions.
+
+### WSL2 on Windows 11
+
+WSL2 with WSLg (Windows 11 22H2 and later) supports GUI Linux applications, including the desktop editor. Requirements:
+
+1. **WSLg** -- included automatically in Windows 11 22H2+. Verify with `echo $DISPLAY` (should show `:0` or similar).
+2. **WebKitGTK** -- same packages as native Linux (see above).
+3. **Environment variables** -- set `DISPLAY=:0` and `GDK_GL=gles` for GPU-accelerated rendering compatibility. If using Visual Studio or the provided launch profiles, these are set automatically in `launchSettings.json`.
+
+```bash
+# Manual launch from terminal
+DISPLAY=:0 GDK_GL=gles dotnet run -f net10.0-desktop
+```
 
 ## Next Steps
 

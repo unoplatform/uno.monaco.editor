@@ -1,49 +1,65 @@
-# fn-11-extract-emitter-as-general-purpose-dts.3 Create runtime companion package and CLI dotnet tool
+# fn-11-extract-emitter-as-general-purpose-dts.3 Wire IIncrementalGenerator pipeline and analyzer packaging
 
 ## Description
-Create two additional projects: a runtime companion NuGet package containing `InterfaceToClassConverter`, and a CLI tool that wraps the core library as a `dotnet tool`. The CLI owns all file I/O concerns including ignore-file loading and output directory management (coupling point #6 from the original emitter).
+Wire the Roslyn `IIncrementalGenerator` that reads `.d.ts` from `AdditionalTextsProvider`, reads configuration from MSBuild properties via `AnalyzerConfigOptionsProvider`, parses → models → emits C# → `context.AddSource()`. Set up NuGet analyzer packaging layout. Implement structural equality on model types for incremental caching. Add exclusion support via `DtsSharp_IgnoreFile` MSBuild property.
 
 **Size:** M
 **Files:**
-- `tools/DtsSharp/DtsSharp.Runtime/DtsSharp.Runtime.csproj` (new)
-- `tools/DtsSharp/DtsSharp.Runtime/InterfaceToClassConverter.cs` (extracted from `MonacoEditorComponent/Helpers/InterfaceToClassConverter.cs`)
-- `tools/DtsSharp/DtsSharp.Cli/DtsSharp.Cli.csproj` (new — `<PackAsTool>true</PackAsTool>`)
-- `tools/DtsSharp/DtsSharp.Cli/Program.cs` (new — CLI wrapper owning file I/O)
-- `tools/DtsSharp/DtsSharp.slnx` (update — add new projects)
+- `tools/DtsSharp/DtsSharp/DtsSharpGenerator.cs` (new — `IIncrementalGenerator` implementation)
+- `tools/DtsSharp/DtsSharp/Model/TypeModel.cs` (modify — `ImmutableArray<T>` collections, structural equality)
+- `tools/DtsSharp/DtsSharp/DtsSharp.csproj` (modify — analyzer packaging properties)
 
 ## Approach
 
-**Runtime package:**
-- Extract `InterfaceToClassConverter<TInterface, TClass>` from `MonacoEditorComponent/Helpers/InterfaceToClassConverter.cs` into `DtsSharp.Runtime` namespace
-- ~25 lines — generic STJ `JsonConverter` that reads JSON as the concrete class and exposes it as the interface
-- Target `netstandard2.0` for maximum consumer compatibility
+**Generator wiring:**
+- Implement `IIncrementalGenerator.Initialize(IncrementalGeneratorInitializationContext)`
+- `context.AdditionalTextsProvider` → filter for `.d.ts` extension → `Select` content
+- **Multiple `.d.ts` files:** Each file is processed independently (no cross-file resolution). Generator emits types per file.
+- `context.AnalyzerConfigOptionsProvider.GlobalOptions` → read MSBuild properties:
+  - `build_property.DtsSharp_RootNamespace` → `EmitterOptions.RootNamespace`
+  - `build_property.DtsSharp_ConverterType` → `EmitterOptions.InterfaceConverterTypeName`
+  - `build_property.DtsSharp_DocLinkBaseUrl` → `EmitterOptions.DocLinkBaseUrl`
+  - `build_property.DtsSharp_OutputPathPrefix` → `EmitterOptions.OutputPathPrefix`
+  - `build_property.DtsSharp_IgnoreFile` → path to ignore file (read via `AdditionalTextsProvider` or filesystem)
+- Combine `.d.ts` content + options → parse → model → emit → `context.AddSource(hintName, sourceText)`
+- One `AddSource` call per generated file (matching emitter's per-file output)
 
-**CLI tool:**
-- Owns all file I/O: input loading, output directory creation, ignore-file loading
-- **Coupling point #6**: No `FindToolDirectory` auto-discovery. Ignore file is always an explicit `--ignore-file` parameter.
-- Dual input mode: `--input <file>` accepts either `.d.ts` or `.json` (detect by extension)
-- For `.d.ts` input: stub with `throw new NotImplementedException("Parser not yet available")` until task 7 wires it
-- For `.json` input: deserialize directly (existing behavior)
-- `<PackAsTool>true</PackAsTool>`, `<ToolCommandName>dts-sharp</ToolCommandName>`
-- CLI flags: `--input`, `--output`, `--ignore-file`, `--root-namespace`, `--converter-type`, `--no-docs`
-- CLI constructs `EmitterOptions` from flags and passes to library
+**Exclusion support:**
+- `DtsSharp_IgnoreFile` MSBuild property points to an ignore file (same format as current `.generator-ignore`)
+- Load the ignore file content at generation time and pass to emitter as `IgnoreList`
+- Exclusion is essential for migration (Monaco has hand-authored files that must not be regenerated)
+
+**Incremental caching (structural equality):**
+- **Replace `List<T>` with `ImmutableArray<T>`** in all model types — `List<T>` has reference equality which breaks Roslyn's incremental comparison
+- Model types must implement structural deep equality (`IEquatable<T>`) or use records with custom collection equality
+- Consider using a content hash of the `.d.ts` text as the pipeline boundary value (simple, correct, avoids deep model comparison)
+- **`IsExternalInit` polyfill** needed if using records on `netstandard2.0`
+- **`ImmutableArray<T>` on `netstandard2.0`** requires `System.Collections.Immutable` NuGet package reference
+
+**NuGet packaging:**
+- Set in `.csproj`: `<IsRoslynComponent>true</IsRoslynComponent>` or manually configure `analyzers/dotnet/cs/` pack layout
+- `DtsSharp.Runtime` should be a package dependency that consumers automatically get
+- Reference pattern: [Mapperly](https://github.com/riok/mapperly) for production source generator packaging
 
 ## Key context
 
-- `InterfaceToClassConverter` deliberately serializes the concrete type, not the interface. This is correct for proxy patterns.
-- Use raw arg parsing (match current `MonacoTypeEmitter/Program.cs` approach, keep it simple).
-- `docfx` is a reference for `PackAsTool` packaging.
+- The emitter (after task 2) returns `IReadOnlyList<(string hintName, string source)>` — the generator just iterates and calls `context.AddSource()`.
+- Roslyn incremental generators must be deterministic and side-effect-free.
+- The simplest correct caching approach may be: hash `.d.ts` content + serialized options as the pipeline key, and if unchanged, skip re-emission entirely.
 
 ## Acceptance
-- [ ] `DtsSharp.Runtime` project compiles targeting `netstandard2.0`
-- [ ] `InterfaceToClassConverter<TInterface, TClass>` works identically to the Monaco version
-- [ ] `DtsSharp.Cli` compiles and runs: `dotnet run --project tools/DtsSharp/DtsSharp.Cli -- --help` shows usage
-- [ ] CLI accepts `--input model.json --output ./out/` and produces C# files
-- [ ] CLI accepts `--input api.d.ts` and shows clear error that parser is pending
-- [ ] CLI flag `--ignore-file` loads ignore list (no auto-discovery)
-- [ ] CLI constructs `EmitterOptions` from flags and passes to library
-- [ ] `<PackAsTool>true</PackAsTool>` set; `dotnet pack` produces a tool NuGet package
-- [ ] All projects referenced in `DtsSharp.slnx`
+- [ ] `DtsSharpGenerator` implements `IIncrementalGenerator`
+- [ ] Reads `.d.ts` files from `AdditionalTextsProvider` — multiple files processed independently
+- [ ] Reads MSBuild properties from `AnalyzerConfigOptionsProvider.GlobalOptions`
+- [ ] `DtsSharp_IgnoreFile` property loads exclusion list and filters generated types
+- [ ] Pipeline: parse → model → emit → `context.AddSource()`
+- [ ] Model types use `ImmutableArray<T>` (not `List<T>`) for collections
+- [ ] Structural equality implemented — unchanged `.d.ts` skips re-emission
+- [ ] `IsExternalInit` polyfill included for `netstandard2.0` record support
+- [ ] `System.Collections.Immutable` referenced for `ImmutableArray<T>` on ns2.0
+- [ ] `.csproj` configured for analyzer NuGet packaging (`analyzers/dotnet/cs/`)
+- [ ] `DtsSharp.Runtime` referenced as package dependency
+- [ ] `dotnet build tools/DtsSharp/DtsSharp.slnx` succeeds
 
 ## Done summary
 TBD

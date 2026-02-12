@@ -150,6 +150,26 @@ namespace Monaco
         Task<string> InvokeScriptAsync(string script);
 
         /// <summary>
+        /// Invokes a named JavaScript function with pre-serialized arguments, automatically
+        /// resolving the editor element reference per-platform. Callers never reference
+        /// <c>element</c> directly -- the presenter injects it.
+        /// </summary>
+        /// <param name="method">The global function name (e.g., <c>"updateContent"</c>).</param>
+        /// <param name="serializedArgs">Pre-serialized argument strings (JSON literals or raw values).</param>
+        /// <returns>The raw JSON result string from the function call.</returns>
+        Task<string> InvokeMethodAsync(string method, string[] serializedArgs);
+
+        /// <summary>
+        /// Executes a raw script that references <c>element</c>, with the presenter
+        /// automatically defining the <c>element</c> variable per-platform before evaluation.
+        /// Use this for ad-hoc scripts that reference <c>EditorContext.getEditorForElement(element)</c>.
+        /// Prefer <see cref="InvokeMethodAsync"/> for named function calls.
+        /// </summary>
+        /// <param name="script">The raw JavaScript to execute. May reference <c>element</c>.</param>
+        /// <returns>The raw JSON result string.</returns>
+        Task<string> InvokeScriptWithElementAsync(string script);
+
+        /// <summary>
         /// Posts a JSON message to the web view.
         /// Desktop wraps CoreWebView2.PostWebMessageAsJson().
         /// WASM throws PlatformNotSupportedException (not used on WASM).

@@ -9,6 +9,6 @@
   "priority": null,
   "spec_path": ".flow/tasks/fn-11-extract-emitter-as-general-purpose-dts.1.md",
   "status": "todo",
-  "title": "Scaffold standalone library solution and extract model types",
-  "updated_at": "2026-02-12T21:50:18.650296Z"
+  "title": "Scaffold solution, extract model/emitter, create runtime package",
+  "updated_at": "2026-02-12T22:24:48.741095Z"
 }

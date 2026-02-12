@@ -156,27 +156,20 @@ namespace Monaco
 
         /// <summary>
         /// Registers a custom action in the editor that appears in the context menu and command palette.
+        /// Works on both WASM and desktop platforms.
         /// </summary>
         /// <param name="action">The action descriptor defining the label, keybindings, and run callback.</param>
         /// <returns>An asynchronous action that completes when the action is registered in Monaco.</returns>
-        /// <exception cref="PlatformNotSupportedException">
-        /// Thrown on desktop. Custom actions require the WASM bridge; desktop support is not yet available.
-        /// </exception>
         /// <exception cref="InvalidOperationException">
-        /// Thrown when the parent accessor bridge is not initialized.
+        /// Thrown when the editor is not yet initialized. Call this method after <see cref="EditorLoaded"/> fires.
         /// </exception>
         /// <remarks>Wraps Monaco <c>editor.addAction</c>.</remarks>
         public IAsyncAction AddActionAsync(IActionDescriptor action)
         {
             if (_parentAccessor is null)
             {
-                if (!OperatingSystem.IsBrowser())
-                {
-                    throw new PlatformNotSupportedException(
-                        "AddActionAsync is not yet supported on desktop. Desktop bridge helpers will be available in a future update.");
-                }
-
-                throw new InvalidOperationException("_parentAccessor is not available");
+                throw new InvalidOperationException(
+                    "The editor bridge is not initialized. Call AddActionAsync after EditorLoaded fires.");
             }
 
             var wref = new WeakReference<CodeEditor>(this);
@@ -206,14 +199,12 @@ namespace Monaco
 
         /// <summary>
         /// Registers a command with no keybinding in the editor.
+        /// Works on both WASM and desktop platforms.
         /// </summary>
         /// <param name="handler">The callback to invoke when the command is triggered.</param>
         /// <returns>The command identifier string, or <see langword="null"/> on failure.</returns>
-        /// <exception cref="PlatformNotSupportedException">
-        /// Thrown on desktop. Custom commands require the WASM bridge; desktop support is not yet available.
-        /// </exception>
         /// <exception cref="InvalidOperationException">
-        /// Thrown when the parent accessor bridge is not initialized.
+        /// Thrown when the editor is not yet initialized. Call this method after <see cref="EditorLoaded"/> fires.
         /// </exception>
         public async Task<string?> AddCommandAsync(CommandHandler handler)
         {
@@ -222,15 +213,13 @@ namespace Monaco
 
         /// <summary>
         /// Registers a keybinding-triggered command in the editor.
+        /// Works on both WASM and desktop platforms.
         /// </summary>
         /// <param name="keybinding">The Monaco keybinding code. Use <c>0</c> for no binding.</param>
         /// <param name="handler">The callback to invoke when the command is triggered.</param>
         /// <returns>The command identifier string, or <see langword="null"/> on failure.</returns>
-        /// <exception cref="PlatformNotSupportedException">
-        /// Thrown on desktop. Custom commands require the WASM bridge; desktop support is not yet available.
-        /// </exception>
         /// <exception cref="InvalidOperationException">
-        /// Thrown when the parent accessor bridge is not initialized.
+        /// Thrown when the editor is not yet initialized. Call this method after <see cref="EditorLoaded"/> fires.
         /// </exception>
         public async Task<string?> AddCommandAsync(int keybinding, CommandHandler handler)
         {
@@ -239,16 +228,14 @@ namespace Monaco
 
         /// <summary>
         /// Registers a keybinding-triggered command with an optional context key expression.
+        /// Works on both WASM and desktop platforms.
         /// </summary>
         /// <param name="keybinding">The Monaco keybinding code. Use <c>0</c> for no binding.</param>
         /// <param name="handler">The callback to invoke when the command is triggered.</param>
         /// <param name="context">A Monaco context key expression that gates when the command is active.</param>
         /// <returns>The command identifier string, or <see langword="null"/> on failure.</returns>
-        /// <exception cref="PlatformNotSupportedException">
-        /// Thrown on desktop. Custom commands require the WASM bridge; desktop support is not yet available.
-        /// </exception>
         /// <exception cref="InvalidOperationException">
-        /// Thrown when the parent accessor bridge is not initialized.
+        /// Thrown when the editor is not yet initialized. Call this method after <see cref="EditorLoaded"/> fires.
         /// </exception>
         /// <remarks>
         /// Wraps Monaco <c>editor.addCommand</c>. Command parameters arrive as
@@ -259,13 +246,8 @@ namespace Monaco
         {
             if (_parentAccessor is null)
             {
-                if (!OperatingSystem.IsBrowser())
-                {
-                    throw new PlatformNotSupportedException(
-                        "AddCommandAsync is not yet supported on desktop. Desktop bridge helpers will be available in a future update.");
-                }
-
-                throw new InvalidOperationException("_parentAccessor is not available");
+                throw new InvalidOperationException(
+                    "The editor bridge is not initialized. Call AddCommandAsync after EditorLoaded fires.");
             }
 
             var name = "Command" + Interlocked.Increment(ref _commandIndex);

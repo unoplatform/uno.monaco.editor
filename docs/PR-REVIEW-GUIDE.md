@@ -47,7 +47,7 @@ This branch delivers four epics of work that collectively transform `uno.monaco.
 | Newtonsoft.Json removed; STJ is the sole serializer | Custom converters or serialization extensions using Newtonsoft will break | Migrate to `System.Text.Json`; use `MonacoJsonContext` for AOT |
 | TFM consolidated to `net10.0` | Consumers on .NET 8 must upgrade | Target .NET 10 |
 | `ICodeEditorPresenter` interface extracted | Casting to concrete types will break | Program against `ICodeEditorPresenter` |
-| Platform-asymmetric APIs throw `PlatformNotSupportedException` on Desktop | `AddActionAsync`, `AddCommandAsync` fail at runtime on Desktop Skia | Guard with `OperatingSystem.IsBrowser()` or catch the exception |
+| `AddActionAsync` / `AddCommandAsync` now work on Desktop | Previously threw `PlatformNotSupportedException` on Desktop | Remove `OperatingSystem.IsBrowser()` guards; call after `EditorLoaded` |
 | `MonacoJsonContext` source-gen context required for AOT | Direct `JsonSerializer.Serialize<T>()` without context fails in AOT | Use `MonacoJsonContext.Default` or register types in your own context |
 | `CommandHandler` delegate receives `JsonElement` instead of `JObject` | Command handler callbacks that inspect arguments via `JObject` APIs will break | Use `JsonElement.GetProperty()`, `.GetString()`, etc. instead of JObject indexers |
 | Newtonsoft.Json transitive dependency removed | Projects relying on Newtonsoft being provided transitively must add their own reference | Add `<PackageReference Include="Newtonsoft.Json" />` if still needed |
@@ -280,7 +280,7 @@ Follow `git log main..HEAD --oneline` in reverse order. The commits are organize
 | Area | Risk | Mitigation |
 |------|------|------------|
 | ESM bundle loading | esbuild output not loading correctly on one platform | Tested on WASM (Playwright) and Desktop (manual validation) |
-| Platform-asymmetric APIs | `PlatformNotSupportedException` surprises at runtime | Documented; guard pattern shown in codebase |
+| Platform API parity | All public APIs now work on both WASM and Desktop | Unified `InvokeMethodAsync` handles element resolution per-platform |
 | Type generator output | Incorrect C# emission for edge-case Monaco types | Snapshot tests pin expected output; `CursorStyle` and `BuiltinTheme` are on the ignore list (hand-tuned) |
 
 ### Low Risk
@@ -322,7 +322,7 @@ Follow `git log main..HEAD --oneline` in reverse order. The commits are organize
 
 1. **`HasGlyphMargin` XML doc copy-paste error** (`CodeEditor.Properties.cs:137`): The `<summary>` says "Get or Set the CodeEditor Text" instead of describing the glyph margin property. This is a pre-existing issue documented for a future docs task.
 
-2. **Desktop `AddActionAsync` / `AddCommandAsync`**: These throw `PlatformNotSupportedException` on Desktop Skia. The JSON-RPC bridge does not yet support the callback registration pattern these APIs require.
+2. **Desktop `AddActionAsync` / `AddCommandAsync`**: These now work on Desktop Skia. The unified `InvokeMethodAsync` presenter method handles element resolution, and the `ParentAccessorDesktop` JSON-RPC targets route callbacks end-to-end.
 
 3. **Desktop integration tests excluded from CI**: The `desktop-tests` job filters out `DesktopCDP` and `WasmPlaywright` test traits because headless CI runners lack the GUI environment WebView2 requires. Only unit tests run in the desktop-tests CI job. DesktopCDP integration tests pass locally but are not gated in CI.
 
@@ -382,6 +382,6 @@ Use the severity labels from the dotnet/runtime 3-step review pattern:
 ### Cross-Cutting
 
 - [ ] No Newtonsoft.Json references remain in the library (tests may retain for comparison)
-- [ ] `PlatformNotSupportedException` documented on all platform-asymmetric APIs
+- [ ] All public `CodeEditor` APIs work on both WASM and Desktop (no `PlatformNotSupportedException`)
 - [ ] Conventional commit messages used throughout
 - [ ] No secrets or credentials in committed files

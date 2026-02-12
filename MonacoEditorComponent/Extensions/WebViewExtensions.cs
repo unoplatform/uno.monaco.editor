@@ -39,7 +39,10 @@ namespace Monaco.Extensions
 
         private static async Task<T?> RunScriptHelperAsync<T>(ICodeEditorPresenter _view, string script)
         {
-            var returnstring = await _view.InvokeScriptAsync(script);
+            // Use InvokeScriptWithElementAsync so scripts referencing `element` work on all platforms.
+            // WASM: InvokeJS already defines element via document.getElementById(elementId).
+            // Desktop: wraps the script with element = document.getElementById("editor-container").
+            var returnstring = await _view.InvokeScriptWithElementAsync(script);
 
             // TODO: Need to decode the error correctly
             if (returnstring.Contains("wv_internal_error"))
@@ -130,12 +133,24 @@ namespace Monaco.Extensions
                     sanitizedargs = [.. args.Select(item => item?.ToString())];
                 }
 
-                var script = method + "(element," + string.Join(",", sanitizedargs) + ");";
+                // Use InvokeMethodAsync so the presenter handles element resolution per-platform.
+                // WASM: InvokeJS defines `element` via document.getElementById(elementId).
+                // Desktop: wraps the call with element definition from editor-container div.
+                var returnstring = await _view.InvokeMethodAsync(method, sanitizedargs!);
 
-                System.Diagnostics.Debug.WriteLine($"Script {script})");
+                System.Diagnostics.Debug.WriteLine($"InvokeMethodAsync {method} result: {returnstring}");
 
+                if (returnstring.Contains("wv_internal_error"))
+                {
+                    throw new JavaScriptInnerException(returnstring, "");
+                }
 
-                return await RunScriptAsync<T>(_view, script, member, file, line);
+                if (!string.IsNullOrEmpty(returnstring) && returnstring != "\"\"" && returnstring != "null")
+                {
+                    return JsonSerializer.Deserialize<T>(returnstring, MonacoJsonContext.Default.Options);
+                }
+
+                return default;
             }
             catch (Exception ex) when (ex is not InvalidOperationException and not NotSupportedException)
             {

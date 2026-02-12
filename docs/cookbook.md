@@ -33,8 +33,8 @@ using Monaco.Helpers;
 5. [Register a Hover Provider](#5-register-a-hover-provider)
 6. [Add Line Decorations](#6-add-line-decorations)
 7. [Set Diagnostic Markers](#7-set-diagnostic-markers)
-8. [Register a Custom Action (WASM Only)](#8-register-a-custom-action-wasm-only)
-9. [Register a Keybinding Command (WASM Only)](#9-register-a-keybinding-command-wasm-only)
+8. [Register a Custom Action](#8-register-a-custom-action)
+9. [Register a Keybinding Command](#9-register-a-keybinding-command)
 10. [Get and Set Cursor Position](#10-get-and-set-cursor-position)
 11. [Navigate to a Line](#11-navigate-to-a-line)
 12. [Handle Link Clicks](#12-handle-link-clicks)
@@ -410,7 +410,7 @@ await Editor.SetModelMarkersAsync("MyAnalyzer", []);
 
 ---
 
-## 8. Register a Custom Action (WASM Only)
+## 8. Register a Custom Action
 
 Add a custom command to the editor context menu and command palette.
 
@@ -447,23 +447,20 @@ public class FormatAction : IActionDescriptor
 ```csharp
 private async void Editor_Loaded(object sender, RoutedEventArgs e)
 {
-    if (OperatingSystem.IsBrowser())
-    {
-        await Editor.AddActionAsync(new FormatAction());
-    }
+    await Editor.AddActionAsync(new FormatAction());
 }
 ```
 
 **Key concepts:**
 - `ContextMenuGroupId` places the action in the context menu: `"navigation"`, `"1_modification"`, or `"9_cutcopypaste"`.
 - Use `KeyMod.Chord(first, second)` for two-key chord bindings (e.g., Ctrl+K followed by Ctrl+M).
-- Guard with `OperatingSystem.IsBrowser()` to avoid `PlatformNotSupportedException` on desktop.
+- Always call `AddActionAsync` after `EditorLoaded` fires to ensure the bridge is initialized.
 
-**Platform support:** WASM only. Throws `PlatformNotSupportedException` on Desktop.
+**Platform support:** WASM and Desktop.
 
 ---
 
-## 9. Register a Keybinding Command (WASM Only)
+## 9. Register a Keybinding Command
 
 Bind a keyboard shortcut to a callback without adding a context menu entry.
 
@@ -472,8 +469,6 @@ Bind a keyboard shortcut to a callback without adding a context menu entry.
 ```csharp
 private async void Editor_Loaded(object sender, RoutedEventArgs e)
 {
-    if (!OperatingSystem.IsBrowser()) return;
-
     // Simple keybinding
     await Editor.AddCommandAsync(KeyCode.F5, (args) =>
     {
@@ -518,7 +513,7 @@ await Editor.AddCommandAsync(KeyCode.F5, (args) =>
 
 - Use `CreateContextKeyAsync` to gate commands on boolean conditions.
 
-**Platform support:** WASM only. Throws `PlatformNotSupportedException` on Desktop.
+**Platform support:** WASM and Desktop.
 
 ---
 
@@ -676,25 +671,16 @@ Code lens actions require a command ID. Register a command first, then pass its 
 ```csharp
 private async void Editor_Loaded(object sender, RoutedEventArgs e)
 {
-    string? cmdId = null;
-
-    // Commands are WASM-only; on Desktop, lenses display but are not clickable
-    if (OperatingSystem.IsBrowser())
+    var cmdId = await Editor.AddCommandAsync(0, (args) =>
     {
-        cmdId = await Editor.AddCommandAsync(0, (args) =>
-        {
-            System.Diagnostics.Debug.WriteLine($"Code lens clicked with arg: {args[0]}");
-        });
-    }
+        System.Diagnostics.Debug.WriteLine($"Code lens clicked with arg: {args[0]}");
+    });
 
-    // Provider registration works on both platforms
     await Editor.Languages.RegisterCodeLensProviderAsync("csharp", new MyCodeLensProvider(cmdId ?? ""));
 }
 ```
 
-> **Note:** `AddCommandAsync` is WASM only (`PlatformNotSupportedException` on Desktop). Code lenses will still display on Desktop, but their commands will not be invocable. Pass a placeholder command ID on Desktop or omit the `Command` property from `CodeLens` entries.
-
-**Platform support:** Provider registration works on WASM and Desktop. Command invocation is WASM only.
+**Platform support:** WASM and Desktop.
 
 ---
 

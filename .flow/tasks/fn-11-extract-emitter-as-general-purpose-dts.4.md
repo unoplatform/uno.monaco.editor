@@ -1,7 +1,7 @@
-# fn-11-extract-emitter-as-general-purpose-dts.4 Build .d.ts declaration parser in C# — core grammar
+# fn-11-extract-emitter-as-general-purpose-dts.4 Build .d.ts declaration parser — core grammar
 
 ## Description
-Build the core C# parser for TypeScript `.d.ts` declaration files — lexer, recursive-descent parser for top-level declarations, and type expression parser. Core grammar only; edge constructs and Monaco-parity hardening are in task 7.
+Build the core C# parser for TypeScript `.d.ts` declaration files — lexer, recursive-descent parser for top-level declarations, and type expression parser. Core grammar only; edge constructs and Monaco-parity hardening are in task 7. All code targets `netstandard2.0`.
 
 **Size:** M
 **Files:**
@@ -31,9 +31,11 @@ Build the core C# parser for TypeScript `.d.ts` declaration files — lexer, rec
 
 **Note:** Construct signatures are out of scope for the entire epic (not in the intermediate model).
 
-**Fallback:** Unsupported constructs → `TypeInfo` kind `primitive` name `unknown` (no exceptions, log warning).
+**Fallback:** Unsupported constructs → `TypeInfo` kind `primitive` name `unknown` (no exceptions, log diagnostic via Roslyn reporting if available, else silent fallback).
 
 **Sorting:** All output arrays sorted alphabetically by name.
+
+**netstandard2.0 constraint:** No C# 9+ language features that require runtime support beyond what ns2.0 provides. Records are OK (with `IsExternalInit` polyfill from task 3). Avoid `Span<T>` and other ns2.1+ APIs.
 
 ## Key context
 
@@ -51,7 +53,7 @@ Build the core C# parser for TypeScript `.d.ts` declaration files — lexer, rec
 - [ ] Handles `export` and `declare` modifiers
 - [ ] Unsupported constructs → `unknown` primitive TypeInfo (no exceptions)
 - [ ] Output arrays sorted alphabetically
-- [ ] Pure C# — no Node.js
+- [ ] Pure C# targeting `netstandard2.0` — no Node.js, no ns2.1+ APIs
 - [ ] Smoke test: parses hand-written multi-construct `.d.ts` fixture
 
 ## Done summary

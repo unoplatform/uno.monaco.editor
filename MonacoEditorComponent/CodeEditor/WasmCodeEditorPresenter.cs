@@ -146,6 +146,24 @@ namespace Monaco
         }
 
         /// <inheritdoc />
+        public Task<string> InvokeMethodAsync(string method, string[] serializedArgs)
+        {
+            // WASM InvokeJS defines `element` via: var element = document.getElementById("${elementId}");
+            // Build: method(element, arg1, arg2, ...);
+            var script = method + "(element," + string.Join(",", serializedArgs) + ");";
+            var result = Extensions.NativeMethods.InvokeJS(_element.ElementId, script);
+            return Task.FromResult(result);
+        }
+
+        /// <inheritdoc />
+        public Task<string> InvokeScriptWithElementAsync(string script)
+        {
+            // InvokeJS already prepends: var element = document.getElementById("${elementId}");
+            var result = Extensions.NativeMethods.InvokeJS(_element.ElementId, script);
+            return Task.FromResult(result);
+        }
+
+        /// <inheritdoc />
         /// <remarks>Not used on WASM. JSExport direct calls are used instead.</remarks>
         public void PostWebMessage(string json)
         {

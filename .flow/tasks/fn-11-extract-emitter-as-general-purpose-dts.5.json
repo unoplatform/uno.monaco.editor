@@ -4,10 +4,8 @@
   "claimed_at": null,
   "created_at": "2026-02-12T21:29:46.187315Z",
   "depends_on": [
-    "fn-11-extract-emitter-as-general-purpose-dts.2",
-    "fn-11-extract-emitter-as-general-purpose-dts.4",
     "fn-11-extract-emitter-as-general-purpose-dts.3",
-    "fn-11-extract-emitter-as-general-purpose-dts.7"
+    "fn-11-extract-emitter-as-general-purpose-dts.4"
   ],
   "epic": "fn-11-extract-emitter-as-general-purpose-dts",
   "id": "fn-11-extract-emitter-as-general-purpose-dts.5",
@@ -15,5 +13,5 @@
   "spec_path": ".flow/tasks/fn-11-extract-emitter-as-general-purpose-dts.5.md",
   "status": "todo",
   "title": "Build test suite with generic .d.ts fixtures",
-  "updated_at": "2026-02-12T21:50:59.642069Z"
+  "updated_at": "2026-02-12T22:36:34.130709Z"
 }

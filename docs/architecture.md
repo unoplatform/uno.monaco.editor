@@ -143,16 +143,16 @@ sequenceDiagram
     PAD->>CE: SetValue(name, value) via DispatcherQueue
 ```
 
-### Platform-Asymmetric APIs
+### Platform API Parity
 
-Some APIs are only available on one platform due to transport differences:
+All public `CodeEditor` APIs work identically on WASM and desktop. The unified `InvokeMethodAsync` on `ICodeEditorPresenter` handles element resolution per-platform, ensuring scripts reference the correct editor element on both transport paths.
 
 | API | WASM | Desktop | Notes |
 |-----|------|---------|-------|
-| `AddActionAsync` | Supported | `PlatformNotSupportedException` | Requires `ParentAccessor.RegisterAction` callback, which relies on JSExport |
-| `AddCommandAsync` | Supported | `PlatformNotSupportedException` | Same callback mechanism as AddAction |
-| `PostWebMessage` | `PlatformNotSupportedException` | Supported | WASM uses JSExport direct calls instead |
-| `ICodeEditorPresenter.MessageReceived` | Never fires | Fires from WebMessageReceived | WASM callbacks bypass message events entirely |
+| `AddActionAsync` | Supported | Supported | Action callbacks routed through `ParentAccessor` on both platforms |
+| `AddCommandAsync` | Supported | Supported | Command callbacks routed through `ParentAccessor` on both platforms |
+| `PostWebMessage` | `PlatformNotSupportedException` | Supported | WASM uses JSExport direct calls instead (internal transport, not public API) |
+| `ICodeEditorPresenter.MessageReceived` | Never fires | Fires from WebMessageReceived | WASM callbacks bypass message events entirely (internal transport detail) |
 
 ## Lifecycle State Machine
 

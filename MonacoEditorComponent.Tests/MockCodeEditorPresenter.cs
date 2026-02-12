@@ -34,6 +34,8 @@ internal sealed class MockCodeEditorPresenter : ICodeEditorPresenter
     public bool Focus(FocusState state) => false;
     public Task Launch() => Task.CompletedTask;
     public Task<string> InvokeScriptAsync(string script) => Task.FromResult("null");
+    public Task<string> InvokeMethodAsync(string method, string[] serializedArgs) => Task.FromResult("null");
+    public Task<string> InvokeScriptWithElementAsync(string script) => Task.FromResult("null");
 
     public void PostWebMessage(string json)
     {
