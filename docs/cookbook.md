@@ -208,7 +208,7 @@ public class MyCompletionProvider : CompletionItemProvider
 **Step 2: Register the provider**
 
 ```csharp
-private async void Editor_Loading(object sender, RoutedEventArgs e)
+private async void Editor_Loaded(object sender, RoutedEventArgs e)
 {
     await Editor.Languages.RegisterCompletionItemProviderAsync("csharp", new MyCompletionProvider());
 }
@@ -262,7 +262,7 @@ public class MyHoverProvider : HoverProvider
 **Step 2: Register**
 
 ```csharp
-private async void Editor_Loading(object sender, RoutedEventArgs e)
+private async void Editor_Loaded(object sender, RoutedEventArgs e)
 {
     await Editor.Languages.RegisterHoverProviderAsync("csharp", new MyHoverProvider());
 }
@@ -445,7 +445,7 @@ public class FormatAction : IActionDescriptor
 **Step 2: Register**
 
 ```csharp
-private async void Editor_Loading(object sender, RoutedEventArgs e)
+private async void Editor_Loaded(object sender, RoutedEventArgs e)
 {
     if (OperatingSystem.IsBrowser())
     {
@@ -470,7 +470,7 @@ Bind a keyboard shortcut to a callback without adding a context menu entry.
 **When:** `EditorLoaded`
 
 ```csharp
-private async void Editor_Loading(object sender, RoutedEventArgs e)
+private async void Editor_Loaded(object sender, RoutedEventArgs e)
 {
     if (!OperatingSystem.IsBrowser()) return;
 
@@ -674,7 +674,7 @@ public class MyCodeLensProvider(string commandId) : CodeLensProvider
 Code lens actions require a command ID. Register a command first, then pass its ID to the code lens provider:
 
 ```csharp
-private async void Editor_Loading(object sender, RoutedEventArgs e)
+private async void Editor_Loaded(object sender, RoutedEventArgs e)
 {
     string? cmdId = null;
 
@@ -749,7 +749,7 @@ public class MyColorProvider : DocumentColorProvider
 **Step 2: Register**
 
 ```csharp
-private async void Editor_Loading(object sender, RoutedEventArgs e)
+private async void Editor_Loaded(object sender, RoutedEventArgs e)
 {
     await Editor.Languages.RegisterColorProviderAsync("css", new MyColorProvider());
 }
