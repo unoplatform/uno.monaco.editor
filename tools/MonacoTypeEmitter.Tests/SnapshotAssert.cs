@@ -53,21 +53,34 @@ internal static class SnapshotAssert
 
     private static string GetVerifiedDirectory()
     {
-        // Walk up from test assembly base to find Snapshots/Verified in the project dir
+        // Walk up from test assembly base to find Snapshots/Verified.
+        // Prefer the project source directory over the build output directory
+        // so that .received.cs files land next to .verified.cs baselines for
+        // easy promotion (rename .received.cs -> .verified.cs).
         var dir = AppContext.BaseDirectory;
+        string? outputCandidate = null;
+
         while (dir is not null)
         {
-            var candidate = Path.Combine(dir, "Snapshots", "Verified");
-            if (Directory.Exists(candidate))
-                return candidate;
-
-            // Check project source directory
+            // Project source directory (preferred -- enables checked-in snapshot workflow)
             var projCandidate = Path.Combine(dir, "tools", "MonacoTypeEmitter.Tests", "Snapshots", "Verified");
             if (Directory.Exists(projCandidate))
                 return projCandidate;
 
+            // Build output directory (fallback only)
+            if (outputCandidate is null)
+            {
+                var candidate = Path.Combine(dir, "Snapshots", "Verified");
+                if (Directory.Exists(candidate))
+                    outputCandidate = candidate;
+            }
+
             dir = Path.GetDirectoryName(dir);
         }
+
+        // Fall back to build output if source directory not found
+        if (outputCandidate is not null)
+            return outputCandidate;
 
         throw new DirectoryNotFoundException(
             "Could not find Snapshots/Verified directory. Ensure it exists in the test project.");

@@ -108,3 +108,6 @@ When walking TypeScript AST type literals, getMethods() must be called separatel
 
 ## 2026-02-12 manual [pitfall]
 Monaco CursorStyle is a hand-tuned string enum on the ignore list, not emittable by the generator. TextEditorCursorStyle (numeric enum) is the emittable equivalent. BuiltinTheme covers the same string enum emission code path.
+
+## 2026-02-12 manual [pitfall]
+Process.StandardOutput.ReadToEnd() before StandardError.ReadToEnd() can deadlock if stderr buffer fills first. Always read both streams concurrently with ReadToEndAsync + Task.WhenAll.

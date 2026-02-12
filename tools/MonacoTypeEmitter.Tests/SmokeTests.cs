@@ -28,7 +28,7 @@ public class SmokeTests
     /// and the WireFormatCompatibility_FullAttributeChain round-trip test.
     /// </summary>
     [Fact]
-    public void FullPipeline_EmitAndCompileEnums()
+    public async Task FullPipeline_EmitAndCompileEnums()
     {
         var modelPath = EmitterTestHelper.GetFullModelPath();
         var model = EmitterTestHelper.LoadModel(modelPath);
@@ -117,9 +117,14 @@ public class SmokeTests
             };
 
             using var process = Process.Start(psi)!;
-            var stdout = process.StandardOutput.ReadToEnd();
-            var stderr = process.StandardError.ReadToEnd();
+
+            // Read both streams concurrently to avoid deadlock when one pipe buffer fills
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
+            var stderrTask = process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
             var exited = process.WaitForExit(TimeSpan.FromMinutes(3));
+
+            var stdout = await stdoutTask;
+            var stderr = await stderrTask;
 
             if (!exited)
             {

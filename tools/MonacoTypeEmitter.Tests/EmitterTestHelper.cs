@@ -64,24 +64,34 @@ internal static class EmitterTestHelper
 
     /// <summary>
     /// Returns the path to a test input JSON file in the Snapshots/TestInputs directory.
+    /// Prefers the project source directory over the build output directory so that
+    /// test inputs are read from the canonical source location.
     /// </summary>
     public static string GetTestInputPath(string fileName)
     {
-        // Walk up from the test assembly to find the project directory
         var dir = AppContext.BaseDirectory;
+        string? outputCandidate = null;
+
         while (dir is not null)
         {
-            var candidate = Path.Combine(dir, "Snapshots", "TestInputs", fileName);
-            if (File.Exists(candidate))
-                return candidate;
-
-            // Also check the project directory (for source-relative paths)
+            // Project source directory (preferred)
             var projDir = Path.Combine(dir, "tools", "MonacoTypeEmitter.Tests", "Snapshots", "TestInputs", fileName);
             if (File.Exists(projDir))
                 return projDir;
 
+            // Build output directory (fallback)
+            if (outputCandidate is null)
+            {
+                var candidate = Path.Combine(dir, "Snapshots", "TestInputs", fileName);
+                if (File.Exists(candidate))
+                    outputCandidate = candidate;
+            }
+
             dir = Path.GetDirectoryName(dir);
         }
+
+        if (outputCandidate is not null)
+            return outputCandidate;
 
         throw new FileNotFoundException($"Test input file not found: {fileName}");
     }

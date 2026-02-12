@@ -24,10 +24,16 @@
 - The old `LayoutUpdated` approach fires on every frame, not just resizes
 - PR was authored against an older branch; watch for merge conflicts in `WasmCodeEditorPresenter.cs`
 
+## Required Tests
+
+- **BUG 1 test**: Verify `WasmCodeEditorPresenter` does not subscribe to `LayoutUpdated` (reflection-based or code review verification)
+- **BUG 1 test**: Verify `NativeMethods.RefreshLayout` has no callers if removed (build verification)
+
 ## Acceptance
 - [ ] PR #37 changes are incorporated into the branch
 - [ ] `WasmCodeEditorPresenter` no longer uses `LayoutUpdated` for resize
 - [ ] `NativeMethods.RefreshLayout()` removed only after confirming zero runtime callers
+- [ ] BUG 1 has regression test(s)
 - [ ] `dotnet build MonacoEditorComponent.slnx --no-restore` succeeds
 - [ ] `dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm` succeeds
 - [ ] Editor visually resizes when browser window changes in WASM (manual verification note)

@@ -31,10 +31,12 @@
    - Extension methods
    - Mark genuinely untestable interop paths with `[ExcludeFromCodeCoverage]` + XML doc justification
 
-4. **Close bug ledger**:
-   - Update `changelog.md` with entries for each fixed bug
-   - Document deferred bugs (BUG 5) and already-verified bugs (BUG 13) with rationale
-   - Update epic bug inventory table with final status
+4. **Close bug ledger** (31 bugs total):
+   - Update `changelog.md` with entries for each fixed bug (BUGs 1-4, 6-12, 14-31)
+   - Document deferred bugs (BUG 5: AllowedFileContentRoot) with rationale
+   - Document already-verified bugs (BUG 13: sanitize/desanitize) with rationale
+   - Verify every bug (1-31) has at least one regression test in the test suite
+   - Update epic bug inventory table with final status (Fixed/Deferred/Verified)
 
 **Key context**:
 - Tests target `net10.0` (not a platform-specific TFM) — see `MonacoEditorComponent.Tests.csproj:4`
@@ -51,9 +53,11 @@
 - [ ] Coverage gaps filled with meaningful tests (not trivial/padding)
 - [ ] `dotnet test` passes with coverage collection enabled
 - [ ] Coverage report artifacts generated (Cobertura XML)
-- [ ] `changelog.md` updated with all bug fix entries
-- [ ] Deferred/verified bugs documented with rationale
-- [ ] Epic bug inventory table updated with final status
+- [ ] `changelog.md` updated with all 31 bug fix entries
+- [ ] Every bug (1-31) has at least one regression test verified
+- [ ] Deferred bugs (BUG 5) documented with rationale
+- [ ] Verified bugs (BUG 13) documented with rationale
+- [ ] Epic bug inventory table updated with final status (Fixed/Deferred/Verified)
 
 ## Done summary
 TBD
