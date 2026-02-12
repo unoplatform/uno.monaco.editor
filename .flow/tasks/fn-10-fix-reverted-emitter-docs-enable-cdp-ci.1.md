@@ -30,9 +30,8 @@ Fix CSharpEmitter and TypeMapper to handle exotic TypeScript identifiers that pr
 - [ ] All 19+ existing snapshot tests still pass
 - [ ] `dotnet test --project tools/MonacoTypeEmitter.Tests/` passes
 ## Done summary
-TBD
-
+Fixed emitter edge cases for exotic TS identifiers: $-prefixed properties sanitized via NameMapper with [JsonPropertyName] wire-name preservation, dotted/quoted identifiers joined as PascalCase, and TypeScript type predicates mapped to bool in TypeMapper. Added 4 snapshot tests covering all edge cases; all 23 emitter tests pass.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 5f658177edfef482260a8ff66fe8782f2f071b38
+- Tests: dotnet test --project tools/MonacoTypeEmitter.Tests/
 - PRs:

@@ -11,10 +11,11 @@ Two agent loops ran concurrently and fn-5.8's emitter regeneration was reverted 
 3. **Enable Desktop CDP tests on Windows CI** — Remove `--filter-not-trait "Category=DesktopCDP"` from the Windows CI job. Investigate and fix the fixture timeout that caused the previous rollback (commit `8d522af`). Normalize fixture launch command (`-c Release`, `--no-build`, `--no-launch-profile`).
 4. **Add WSL2 launch profile** — Create `.vscode/launch.json` (if absent) and add launchSettings.json profile with `DISPLAY=:0` and `GDK_GL=gles` environment variables for Skia Desktop under WSL2
 5. **Update documentation** — Update AGENTS.md CI limitations section, docs/generated-type-docs-strategy.md (mark complete; defer TypeDoc URL pattern drift as tracked follow-up), and CHANGELOG.md
+6. **Enable AddActionAsync/AddCommandAsync on desktop** — Remove outdated `PlatformNotSupportedException` guards and fix the `element` undefined issue in desktop eval-based `InvokeScriptAsync` calls. The JSON-RPC bridge infrastructure already supports action callbacks end-to-end.
 
 ## Parallelism
 
-fn-10.1 → fn-10.2 must be strictly sequential (both touch emitter tests/snapshots). fn-10.3 and fn-10.4 can run in parallel with each other and with fn-10.1. fn-10.5 depends on all.
+fn-10.1 → fn-10.2 must be strictly sequential (both touch emitter tests/snapshots). fn-10.3, fn-10.4, and fn-10.6 can run in parallel with each other and with fn-10.1. fn-10.5 depends on all.
 
 ## Quick commands
 
@@ -43,6 +44,7 @@ gh pr checks --watch
 - [ ] AGENTS.md CI limitations section updated to reflect CDP test enablement
 - [ ] CHANGELOG.md updated with Unreleased entries for: emitter edge-case fixes, XML doc regeneration, Desktop CDP CI enablement, WSL2 profile
 - [ ] TypeDoc URL pattern drift explicitly deferred with tracked follow-up in docs/generated-type-docs-strategy.md
+- [ ] AddActionAsync/AddCommandAsync work on desktop (PlatformNotSupportedException removed, `element` properly defined in desktop WebView2 JS context)
 - [ ] All CI jobs pass on the PR
 
 ## References
