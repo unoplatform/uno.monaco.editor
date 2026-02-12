@@ -38,8 +38,10 @@ generated Monaco types, satisfying the fn-5.8 implementation task.
 
 The emitter already emits `<summary>` XML doc comments when JSDoc is present in the
 TypeScript source. The `WriteDocComment()` method in `CSharpEmitter.cs` writes JSDoc
-content as `<summary>` tags. This means **generated files that have upstream JSDoc
-already get `<summary>` documentation today**.
+content as `<summary>` tags for types, properties, methods, and call signatures.
+However, **enum member documentation is not yet emitted** -- the `WriteDocComment()`
+call site for individual enum members is missing. This means type-level, property-level,
+and method-level docs flow through today, but enum members only get their names.
 
 Files with strong existing coverage:
 - `IEditorOptions.cs` -- 105 summary tags (matches `IEditorOptions` JSDoc in `monaco.d.ts`)
@@ -198,8 +200,23 @@ Modify `CSharpEmitter.WriteDocComment()` and related methods:
 
 4. **`<remarks>` with TypeDoc links** -- For type-level documentation, append a
    `<remarks>` block with a `<see href="..."/>` link to the corresponding Monaco
-   TypeDoc page. The link pattern is:
-   `https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor.{TypeName}.html`
+   TypeDoc page. The link pattern must be namespace-aware and symbol-kind-aware:
+
+   | Kind | Namespace | URL pattern |
+   |------|-----------|-------------|
+   | interface | `monaco.editor` | `https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor.{TypeName}.html` |
+   | interface | `monaco.languages` | `https://microsoft.github.io/monaco-editor/typedoc/interfaces/languages.{TypeName}.html` |
+   | interface | `monaco` | `https://microsoft.github.io/monaco-editor/typedoc/interfaces/{TypeName}.html` |
+   | enum | `monaco.editor` | `https://microsoft.github.io/monaco-editor/typedoc/enums/editor.{TypeName}.html` |
+   | enum | `monaco.languages` | `https://microsoft.github.io/monaco-editor/typedoc/enums/languages.{TypeName}.html` |
+   | enum | `monaco` | `https://microsoft.github.io/monaco-editor/typedoc/enums/{TypeName}.html` |
+   | class | `monaco` | `https://microsoft.github.io/monaco-editor/typedoc/classes/{TypeName}.html` |
+   | type alias | (any) | `https://microsoft.github.io/monaco-editor/typedoc/types/{ns}.{TypeName}.html` |
+
+   The emitter should construct links based on the source namespace and symbol kind
+   from the intermediate model. If a specific URL pattern cannot be determined (e.g.,
+   for unusual symbol types), fall back to the TypeDoc index page:
+   `https://microsoft.github.io/monaco-editor/typedoc/index.html`
 
 5. **Enum member documentation** -- The `WriteDocComment()` call site for enum members
    is currently missing. Add calls to `WriteDocComment(sb, member.Documentation, indent)`
@@ -257,22 +274,25 @@ Derived from the chosen strategy:
       enum members that have upstream JSDoc
 - [ ] Emitter generates `<param>` tags for method/constructor parameters that have
       `@param` JSDoc
+- [ ] Emitter generates `<returns>` tags for methods/functions that have `@returns`
+      JSDoc (requires minor extractor enhancement to capture `@returns` separately)
 - [ ] Emitter generates `<remarks>` with Monaco TypeDoc cross-reference links for
-      type-level documentation
+      type-level documentation, using namespace-aware and symbol-kind-aware URL patterns
 - [ ] All generated files regenerated with the enhanced emitter
 - [ ] `dotnet build MonacoEditorComponent.slnx --no-restore` succeeds with 0 errors
 - [ ] `MonacoEditorComponent/Monaco/.editorconfig` updated to re-enable CS1591 for
       generated types
 - [ ] `dotnet build MonacoEditorComponent.slnx /warnaserror:CS1591` passes (generated
       files have sufficient XML doc coverage)
-- [ ] Snapshot tests updated for new XML doc format
+- [ ] Snapshot tests updated for new XML doc format (including `<param>`, `<returns>`,
+      `<remarks>` tag output)
 - [ ] No regressions in existing hand-written documentation
 
 ## References
 
 - [Monaco Editor TypeDoc API](https://microsoft.github.io/monaco-editor/typedoc/index.html)
 - [Microsoft Learn - XML Documentation Tags](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/xmldoc/recommended-tags)
-- [monaco.d.ts JSDoc source](https://github.com/microsoft/monaco-editor/blob/main/src/language/typescript/lib/typescriptServicesMetadata.ts)
+- [monaco.d.ts](https://github.com/microsoft/monaco-editor/blob/main/release/esm/vs/editor/editor.api.d.ts) (upstream TypeScript declarations parsed by the extractor)
 - Emitter source: `tools/MonacoTypeEmitter/Emitter/CSharpEmitter.cs`
 - Extractor source: `tools/monaco-type-extractor/src/extractor.ts`
 - Intermediate model: `tools/monaco-type-extractor/src/model.ts`
