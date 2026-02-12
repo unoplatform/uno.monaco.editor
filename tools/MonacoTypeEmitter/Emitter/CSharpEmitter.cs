@@ -240,7 +240,8 @@ public sealed class CSharpEmitter
         sb.AppendLine("    }");
         sb.AppendLine("}");
 
-        WriteFile(relDir, fileName, sb.ToString());
+        if (!WriteFile(relDir, fileName, sb.ToString()))
+            return null;
         return repoRelPath;
     }
 
@@ -289,7 +290,8 @@ public sealed class CSharpEmitter
         sb.AppendLine("    }");
         sb.AppendLine("}");
 
-        WriteFile(relDir, fileName, sb.ToString());
+        if (!WriteFile(relDir, fileName, sb.ToString()))
+            return null;
         return repoRelPath;
     }
 
@@ -394,7 +396,8 @@ public sealed class CSharpEmitter
         sb.AppendLine("    }");
         sb.AppendLine("}");
 
-        WriteFile(relDir, fileName, sb.ToString());
+        if (!WriteFile(relDir, fileName, sb.ToString()))
+            return null;
         return repoRelPath;
     }
 
@@ -470,7 +473,8 @@ public sealed class CSharpEmitter
         sb.AppendLine("    }");
         sb.AppendLine("}");
 
-        WriteFile(relDir, fileName, sb.ToString());
+        if (!WriteFile(relDir, fileName, sb.ToString()))
+            return null;
         return repoRelPath;
     }
 
@@ -564,7 +568,8 @@ public sealed class CSharpEmitter
         sb.AppendLine("    }");
         sb.AppendLine("}");
 
-        WriteFile(relDir, fileName, sb.ToString());
+        if (!WriteFile(relDir, fileName, sb.ToString()))
+            return null;
         return repoRelPath;
     }
 
