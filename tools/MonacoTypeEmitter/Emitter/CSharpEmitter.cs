@@ -491,7 +491,7 @@ public sealed class CSharpEmitter
         // Emit constructors
         foreach (var ctor in cls.Constructors)
         {
-            WriteConstructor(sb, ctor, cls.Name, "        ");
+            WriteConstructor(sb, ctor, cls.Name, "        ", cls.Properties);
         }
 
         // Emit methods
@@ -558,13 +558,43 @@ public sealed class CSharpEmitter
     }
 
     /// <summary>
-    /// Emits a constructor for a class.
+    /// Emits a constructor for a class, with property assignments for matching parameters.
     /// </summary>
-    private void WriteConstructor(StringBuilder sb, ConstructorInfo ctor, string className, string indent)
+    private void WriteConstructor(StringBuilder sb, ConstructorInfo ctor, string className,
+        string indent, List<PropertyInfo> classProperties)
     {
         WriteDocComment(sb, ctor.Documentation, indent);
         var parameters = FormatParameters(ctor.Parameters);
-        sb.AppendLine($"{indent}public {className}({parameters}) {{ }}");
+
+        // Match constructor params to class properties by name (case-insensitive)
+        var propLookup = classProperties
+            .ToDictionary(p => NameMapper.ToCSharpPropertyName(p.Name), p => p, StringComparer.OrdinalIgnoreCase);
+
+        var assignments = new List<(string propName, string paramName)>();
+        foreach (var param in ctor.Parameters)
+        {
+            var csharpParamName = EscapeCSharpKeyword(param.Name);
+            var propName = NameMapper.ToCSharpPropertyName(param.Name);
+            if (propLookup.ContainsKey(propName))
+            {
+                assignments.Add((propName, csharpParamName));
+            }
+        }
+
+        if (assignments.Count == 0)
+        {
+            sb.AppendLine($"{indent}public {className}({parameters}) {{ }}");
+        }
+        else
+        {
+            sb.AppendLine($"{indent}public {className}({parameters})");
+            sb.AppendLine($"{indent}{{");
+            foreach (var (propName, paramName) in assignments)
+            {
+                sb.AppendLine($"{indent}    {propName} = {paramName};");
+            }
+            sb.AppendLine($"{indent}}}");
+        }
         sb.AppendLine();
     }
 
@@ -657,7 +687,7 @@ public sealed class CSharpEmitter
         if (typeRef.TypeArguments.Count == 0)
             return typeRef.Name;
 
-        var typeArgs = string.Join(", ", typeRef.TypeArguments.Select(ta => TypeMapper.ToCSharpType(ta)));
+        var typeArgs = string.Join(", ", typeRef.TypeArguments.Select(TypeMapper.ToCSharpTypeArg));
         return $"{typeRef.Name}<{typeArgs}>";
     }
 

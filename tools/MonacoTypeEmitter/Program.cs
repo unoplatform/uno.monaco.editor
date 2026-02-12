@@ -143,12 +143,26 @@ if (validate)
 
 // Load model
 Console.Error.WriteLine($"Reading model from: {inputPath}");
-var json = File.ReadAllText(inputPath);
-var model = JsonSerializer.Deserialize<MonacoModel>(json);
+MonacoModel? model;
+try
+{
+    var json = File.ReadAllText(inputPath);
+    model = JsonSerializer.Deserialize<MonacoModel>(json);
+}
+catch (IOException ex)
+{
+    Console.Error.WriteLine($"Error: Failed to read input file: {ex.Message}");
+    return 1;
+}
+catch (JsonException ex)
+{
+    Console.Error.WriteLine($"Error: Failed to parse JSON model: {ex.Message}");
+    return 1;
+}
 
 if (model is null)
 {
-    Console.Error.WriteLine("Error: Failed to deserialize model.");
+    Console.Error.WriteLine("Error: Failed to deserialize model (null result).");
     return 1;
 }
 

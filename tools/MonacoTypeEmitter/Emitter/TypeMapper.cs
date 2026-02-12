@@ -21,6 +21,16 @@ public static class TypeMapper
         return result;
     }
 
+    /// <summary>
+    /// Converts a TypeInfo to a C# type string suitable for use as a generic type argument.
+    /// Replaces "void" with "object" since void cannot be a type argument in C#.
+    /// </summary>
+    public static string ToCSharpTypeArg(TypeInfo typeInfo)
+    {
+        var result = ToCSharpTypeCore(typeInfo);
+        return result == "void" ? "object" : result;
+    }
+
     private static string ToCSharpTypeCore(TypeInfo typeInfo)
     {
         return typeInfo.Kind switch
@@ -94,7 +104,7 @@ public static class TypeMapper
         // Preserve type arguments for non-collapsed reference types
         if (typeInfo.TypeArguments is { Count: > 0 } && mapped == name)
         {
-            var typeArgs = string.Join(", ", typeInfo.TypeArguments.Select(ta => ToCSharpTypeCore(ta)));
+            var typeArgs = string.Join(", ", typeInfo.TypeArguments.Select(ToCSharpTypeArg));
             return $"{mapped}<{typeArgs}>";
         }
 
