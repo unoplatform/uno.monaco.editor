@@ -42,7 +42,7 @@ The control communicates with Monaco through two fundamentally different interop
 
 ### WASM Interop Path
 
-On WebAssembly, .NET and JavaScript share the same browser process. Communication uses `JSImport`/`JSExport` attributes (part of the .NET WASM interop layer) for zero-copy synchronous calls.
+On WebAssembly, .NET and JavaScript share the same browser process. Communication uses `JSImport`/`JSExport` attributes (part of the .NET WASM interop layer) for direct interop calls (synchronous or asynchronous depending on the API).
 
 ```mermaid
 sequenceDiagram
@@ -180,7 +180,6 @@ stateDiagram-v2
         direction LR
         note right of Loading
             EditorLoading event fires (once)
-            Desktop: bridge/ready received
             Bridge helpers wired
         end note
     }
@@ -191,7 +190,6 @@ stateDiagram-v2
             EditorLoaded event fires (once)
             IsEditorLoaded = true
             _initialized = true
-            Desktop: editor/ready received
         end note
     }
 ```
@@ -203,11 +201,11 @@ stateDiagram-v2
 3. The presenter's `Launch()` method is called (WASM: `createMonacoEditor` via JSImport; Desktop: `EnsureCoreWebView2Async` + security settings).
 4. On navigation completion (`WebView_NavigationCompleted`) or the `"Loaded"` callback from JS, the lifecycle transitions to `Loaded`.
 
-**Desktop initialization handshake:**
+**Desktop initialization handshake (informational):**
 
-On desktop, two JSON-RPC notifications signal readiness:
-- `bridge/ready` (at IIFE bundle load, before any editor exists)
-- `editor/ready` (after `createMonacoEditor()` completes)
+On desktop, two JSON-RPC notifications are observed during initialization. These are currently informational signals logged by `BridgeHandshakeTarget` -- they do not drive lifecycle state transitions (which are driven by `WebView_NavigationCompleted` and the `"Loaded"` callback):
+- `bridge/ready` (typically arrives at IIFE bundle load, before any editor exists)
+- `editor/ready` (typically arrives after `createMonacoEditor()` completes)
 
 See [bridge-protocol.md](../MonacoEditorComponent/DesktopContent/bridge-protocol.md) for the full handshake specification.
 
