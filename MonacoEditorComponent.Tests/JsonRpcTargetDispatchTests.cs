@@ -67,7 +67,7 @@ public sealed class JsonRpcTargetDispatchTests : IAsyncLifetime
 
         // Wait for async dispatch with deterministic signaling.
         Assert.True(
-            await _target!.ActionCalledSignal.Task.WaitAsync(TimeSpan.FromSeconds(5)),
+            await _target!.ActionCalledSignal.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken),
             "callAction notification was not dispatched");
         Assert.Contains("testAction", _target.CalledActions);
     }
@@ -100,7 +100,7 @@ public sealed class JsonRpcTargetDispatchTests : IAsyncLifetime
 
         // Wait for async dispatch with deterministic signaling.
         Assert.True(
-            await _target!.BridgeReadySignal.Task.WaitAsync(TimeSpan.FromSeconds(5)),
+            await _target!.BridgeReadySignal.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken),
             "bridge/ready notification was not dispatched");
         Assert.True(_target.BridgeReadyReceived);
         Assert.Equal(1, _target.BridgeReadyProtocolVersion);
@@ -149,6 +149,97 @@ public sealed class JsonRpcTargetDispatchTests : IAsyncLifetime
             BridgeReadySignal.TrySetResult(true);
         }
     }
+
+    /// <summary>
+    /// Regression: StreamJsonRpc locks configuration after StartListening().
+    /// AddLocalRpcTarget called after StartListening must throw.
+    /// This documents the constraint that caused the WSL2 desktop init failure
+    /// when SetupJsonRpc() called StartListening() before CreateBridgeTargets()
+    /// registered the bridge helper targets.
+    /// </summary>
+    [Fact]
+    public void AddLocalRpcTarget_AfterStartListening_Throws()
+    {
+        var pipes = FullDuplexStream.CreatePipePair();
+        var formatter = new SystemTextJsonFormatter
+        {
+            JsonSerializerOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            },
+        };
+
+        using var rpc = new JsonRpc(new HeaderDelimitedMessageHandler(pipes.Item1, formatter));
+        rpc.StartListening();
+
+        Assert.Throws<InvalidOperationException>(() =>
+            rpc.AddLocalRpcTarget(new MockBridgeTarget()));
+    }
+
+    /// <summary>
+    /// Verifies the correct pattern: multiple targets registered before StartListening.
+    /// This matches the production pattern in CreateBridgeTargets where handshake,
+    /// parentAccessor, themeListener, keyboardListener, and debugLogger targets are
+    /// all registered before the bridge starts listening.
+    /// </summary>
+    [Fact]
+    public async Task MultipleTargets_RegisteredBeforeListening_AllDispatch()
+    {
+        var pipes = FullDuplexStream.CreatePipePair();
+        var formatter = new SystemTextJsonFormatter
+        {
+            JsonSerializerOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            },
+        };
+
+        var target1 = new MockBridgeTarget();
+        var target2 = new SecondaryTarget();
+
+        using var serverRpc = new JsonRpc(new HeaderDelimitedMessageHandler(pipes.Item1, formatter));
+        serverRpc.AddLocalRpcTarget(target1);
+        serverRpc.AddLocalRpcTarget(target2);
+        serverRpc.StartListening();
+
+        using var clientRpc = new JsonRpc(new HeaderDelimitedMessageHandler(pipes.Item2, new SystemTextJsonFormatter
+        {
+            JsonSerializerOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            },
+        }));
+        clientRpc.StartListening();
+
+        // Dispatch to first target
+        await clientRpc.NotifyAsync("bridge/ready", new { protocolVersion = 1 });
+        Assert.True(
+            await target1.BridgeReadySignal.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken),
+            "bridge/ready not dispatched to first target");
+
+        // Dispatch to second target
+        await clientRpc.NotifyAsync("secondary/ping", new { value = "hello" });
+        Assert.True(
+            await target2.PingSignal.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken),
+            "secondary/ping not dispatched to second target");
+        Assert.Equal("hello", target2.LastPingValue);
+    }
+
+    /// <summary>Secondary target for multi-target registration test.</summary>
+    private sealed class SecondaryTarget
+    {
+        public string? LastPingValue { get; private set; }
+        public TaskCompletionSource<bool> PingSignal { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        [JsonRpcMethod("secondary/ping")]
+        public void OnPing(SecondaryPingDto p)
+        {
+            LastPingValue = p.Value;
+            PingSignal.TrySetResult(true);
+        }
+    }
+
+    private record SecondaryPingDto(string Value);
 
     // DTOs used by the mock target (match bridge-protocol.md schemas).
     private record CallActionDto(string Name);
