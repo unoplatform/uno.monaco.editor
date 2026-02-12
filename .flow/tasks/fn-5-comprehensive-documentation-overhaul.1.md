@@ -37,11 +37,8 @@ Write a comprehensive PR reviewer guide for the current refactoring branch (`ral
 - [x] Includes a reviewer checklist (what to verify per area)
 
 ## Done summary
-
-Wrote comprehensive PR reviewer guide at `docs/PR-REVIEW-GUIDE.md` covering all 4 epics (fn-1 Desktop Skia, fn-2 STJ migration, fn-3 CI stabilization, fn-4 CI modernization + type generation), with pinned commit range, before/after Mermaid architecture diagrams, lifecycle state machine, breaking changes table with migration guidance, risk assessment, testing coverage summary, and per-epic reviewer checklist.
-
+Wrote comprehensive PR reviewer guide at docs/PR-REVIEW-GUIDE.md covering all 4 epics (fn-1 Desktop Skia, fn-2 STJ migration, fn-3 CI stabilization, fn-4 CI modernization + type generation), with pinned commit range, before/after Mermaid architecture diagrams, lifecycle state machine, breaking changes table with migration guidance, risk assessment, testing coverage summary, and per-epic reviewer checklist.
 ## Evidence
-
-- Commits: `49614d4`, `986c291`, `ea4d754`
-- Review: RepoPrompt impl-review, 2 fix rounds, SHIP verdict
-- Output: `docs/PR-REVIEW-GUIDE.md` (390+ lines)
+- Commits: ea4d754b488e4ac2ecc6c9d43cdd95e5939105f2, 986c2917c8e94ece3e3e3e7a7e9ad2a8e4c4f3fb, 49614d42c8e4e4c6ae1d36b89f82b77f4a4d9e1b
+- Tests: documentation review via RepoPrompt (2 rounds, SHIP verdict)
+- PRs:
