@@ -313,6 +313,40 @@ public sealed class JsonRpcTargetDispatchTests : IAsyncLifetime
         public void OnPing() => Changed?.Invoke(this, new StandardEventArgs());
     }
 
+    /// <summary>
+    /// Validates that all desktop bridge target types used in CreateBridgeTargets
+    /// have events compatible with StreamJsonRpc (EventHandler or EventHandler&lt;T&gt; only).
+    /// Catches delegate incompatibilities at unit test time instead of at runtime.
+    /// </summary>
+    [Theory]
+    [InlineData(typeof(Monaco.Helpers.ThemeListenerDesktop))]
+    [InlineData(typeof(Monaco.Helpers.ParentAccessorDesktop))]
+    [InlineData(typeof(Monaco.Helpers.KeyboardListenerDesktop))]
+    [InlineData(typeof(Monaco.Helpers.DebugLoggerDesktop))]
+    public void BridgeTargetType_EventDelegates_AreStreamJsonRpcCompatible(Type targetType)
+    {
+        var events = targetType.GetEvents(
+            System.Reflection.BindingFlags.Public |
+            System.Reflection.BindingFlags.NonPublic |
+            System.Reflection.BindingFlags.Instance);
+
+        foreach (var evt in events)
+        {
+            var handlerType = evt.EventHandlerType!;
+
+            // StreamJsonRpc accepts: EventHandler, or EventHandler<T> where T : EventArgs
+            var isEventHandler = handlerType == typeof(EventHandler);
+            var isGenericEventHandler = handlerType.IsGenericType
+                && handlerType.GetGenericTypeDefinition() == typeof(EventHandler<>)
+                && typeof(EventArgs).IsAssignableFrom(handlerType.GetGenericArguments()[0]);
+
+            Assert.True(
+                isEventHandler || isGenericEventHandler,
+                $"{targetType.Name}.{evt.Name} uses delegate {handlerType.Name} which is not " +
+                $"compatible with StreamJsonRpc. Use EventHandler or EventHandler<T> where T : EventArgs.");
+        }
+    }
+
     // DTOs used by the mock target (match bridge-protocol.md schemas).
     private record CallActionDto(string Name);
     private record GetJsonValueDto(string Name);
