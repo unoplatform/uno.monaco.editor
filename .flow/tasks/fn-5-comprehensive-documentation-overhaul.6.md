@@ -27,3 +27,10 @@ Decide and document the XML documentation strategy for the ~40+ generated Monaco
 - [ ] Chosen strategy documented with rationale
 - [ ] Implementation steps for task 8 clearly defined
 - [ ] Acceptance criteria for task 8 derived from chosen strategy
+
+## Done summary
+Created XML documentation strategy document at docs/generated-type-docs-strategy.md. Baselined fn-4.5 emitter output (117 files, 67 types, ~398 members, 570 existing summaries), evaluated 3 strategies (emitter enhancement, post-processing merge, hand-written preservation), chose Strategy A (enhance emitter) for zero maintenance and automatic sync with upstream JSDoc, and defined implementation plan and acceptance criteria for fn-5.8.
+## Evidence
+- Commits: e3b76d7, e12278b9cc06722eff59ac9885f1e55695a592a7
+- Tests: dotnet build MonacoEditorComponent.slnx --no-restore
+- PRs:
