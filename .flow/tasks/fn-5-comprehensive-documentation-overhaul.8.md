@@ -20,6 +20,8 @@ Implementation depends on strategy chosen in task 6. Regardless of strategy:
 ## Key context
 - Detailed acceptance criteria and implementation steps defined by task 6 strategy document
 - Per-member enum docs are expected (not just type-level)
+- CS1591 is currently suppressed for generated Monaco types via `MonacoEditorComponent/Monaco/.editorconfig` (set to `none`), with an override re-enabling it for `LanguagesHelper*.cs` files. After adding XML docs to generated files, change `Monaco/.editorconfig` to re-enable CS1591 (remove or change the `none` severity) so the warnaserror acceptance criterion passes.
+<!-- Updated by plan-sync: fn-5.5 used .editorconfig (not #pragma) for CS1591 suppression of generated Monaco types -->
 
 ## Acceptance
 - [ ] All public types in Monaco/ directory have `<summary>` XML docs

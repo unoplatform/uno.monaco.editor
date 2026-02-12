@@ -117,3 +117,6 @@ dotnet test --coverage produces binary .coverage files by default; add --coverag
 
 ## 2026-02-12 manual [pitfall]
 Uno SDK GenerateLibraryLayout=true breaks standard <None Pack="true"/> NuGet README inclusion; use _PackageFiles target injection via BeforeTargets=GenerateNuspec instead
+
+## 2026-02-12 manual [pitfall]
+Blanket .editorconfig suppression in a directory affects hand-written files too -- use file glob overrides (e.g. [LanguagesHelper*.cs]) to re-enable diagnostics for specific hand-written files within otherwise-suppressed generated directories
