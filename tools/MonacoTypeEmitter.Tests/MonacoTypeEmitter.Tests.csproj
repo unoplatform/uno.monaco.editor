@@ -10,7 +10,8 @@
 
   <ItemGroup>
     <PackageReference Include="xunit.v3.mtp-v2" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

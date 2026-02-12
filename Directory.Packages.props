@@ -13,11 +13,11 @@
     <PackageVersion Include="Uno.Core.Extensions.Logging" Version="4.1.1" />
     <PackageVersion Include="Uno.Core.Extensions.Logging.Singleton" Version="4.1.1" />
     <PackageVersion Include="Microsoft.TypeScript.MSBuild" Version="5.9.3" />
-    <PackageVersion Include="xunit.v3.mtp-v2" Version="3.2.0" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
+    <PackageVersion Include="xunit.v3.mtp-v2" Version="3.2.2" />
     <PackageVersion Include="Microsoft.Playwright" Version="1.52.0" />
     <PackageVersion Include="Nerdbank.Streams" Version="2.13.16" />
-    <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.0.4" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.4.1" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.TrxReport" Version="2.0.2" />
     <GlobalPackageReference Include="Nerdbank.GitVersioning" Version="3.8.118"/>
   </ItemGroup>
 </Project>

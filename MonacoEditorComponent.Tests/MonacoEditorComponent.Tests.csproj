@@ -11,7 +11,6 @@
 
 	<ItemGroup>
 		<PackageReference Include="xunit.v3.mtp-v2" />
-		<PackageReference Include="Microsoft.NET.Test.Sdk" />
 		<!-- Playwright runtime is referenced for Task 8 integration tests.
 		     Build/buildTransitive assets are excluded to prevent the Playwright targets
 		     from copying node driver files into a subdirectory that conflicts with the
@@ -21,6 +20,7 @@
 		<PackageReference Include="StreamJsonRpc" />
 		<PackageReference Include="Nerdbank.Streams" />
 		<PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" PrivateAssets="all" />
+		<PackageReference Include="Microsoft.Testing.Extensions.TrxReport" PrivateAssets="all" />
 	</ItemGroup>
 
 	<ItemGroup>
