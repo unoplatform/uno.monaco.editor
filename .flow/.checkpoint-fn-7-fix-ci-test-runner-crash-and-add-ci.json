@@ -1,0 +1,68 @@
+{
+  "created_at": "2026-02-12T15:14:12.056751Z",
+  "epic": {
+    "data": {
+      "branch_name": "dev/cnov/desktop-head",
+      "completion_review_status": "unknown",
+      "completion_reviewed_at": null,
+      "created_at": "2026-02-12T15:09:32.679864Z",
+      "default_impl": null,
+      "default_review": null,
+      "default_sync": null,
+      "depends_on_epics": [],
+      "id": "fn-7-fix-ci-test-runner-crash-and-add-ci",
+      "next_task": 1,
+      "plan_review_status": "unknown",
+      "plan_reviewed_at": null,
+      "spec_path": ".flow/specs/fn-7-fix-ci-test-runner-crash-and-add-ci.md",
+      "status": "open",
+      "title": "Fix CI test runner crash and add CI verification policy",
+      "updated_at": "2026-02-12T15:13:39.327907Z"
+    },
+    "spec": "# Bug Fixes, Disposal, Resize, and Test Coverage\n\n## Overview\n\nComprehensive bug-fixing epic for the `uno.monaco.editor` control and test app. Addresses confirmed bugs found through deep codebase analysis, covering resize/layout issues, initialization race conditions, incomplete disposal, data correctness problems, and error handling gaps. Also expands unit test coverage to 85%+ on both WASM and Desktop platforms.\n\n## Bug Inventory\n\n| # | Bug | Severity | Task | Status |\n|---|-----|----------|------|--------|\n| 1 | WASM LayoutUpdated fires every frame (resize perf) | HIGH | .1 | Open |\n| 2 | Dual initialization paths (race condition) | HIGH | .2 | Open |\n| 3 | OnApplyTemplate leaks event handlers | MEDIUM | .2 | Open |\n| 4 | Dispose() incomplete (C# side) | MEDIUM | .3 | Open |\n| 5 | Desktop AllowedFileContentRoot never set | MEDIUM | \u2014 | Deferred (requires fn-1 content delivery) |\n| 6 | NullReferenceException in RunScriptHelperAsync | MEDIUM | .4 | Open |\n| 7 | updateSelectedContent.ts uses \\r instead of \\n | MEDIUM | .4 | Open |\n| 8 | DecorationsProperty/MarkersProperty wrong type registration | MEDIUM | .4 | Open |\n| 9 | async void swallows exceptions in property callbacks | LOW | .4 | Open |\n| 10 | SelectedTextProperty fire-and-forget | LOW | .4 | Open |\n| 11 | WASM EditorContext._editors map never cleaned | LOW | .3 | Open |\n| 12 | getEditorForElement auto-creates on miss | LOW | .3 | Open |\n| 13 | sanitize/desanitize ordering (verify if still present) | LOW | .4 | Open \u2014 verify first |\n| 14 | Test app tab close doesn't call Dispose | LOW | .3 | Open |\n\n## Scope\n\n### In Scope\n- Merge PR #37 (WASM ResizeObserver fix)\n- Fix initialization race condition (per-presenter readiness gates)\n- Complete `Dispose()` implementation (C# + JS-side cleanup)\n- Fix event handler leaks in `OnApplyTemplate`\n- Fix `DecorationsProperty`/`MarkersProperty` type registration\n- Fix `updateSelectedContent.ts` EOL handling\n- Fix `RunScriptHelperAsync` null reference\n- Fix async void exception swallowing in property callbacks\n- Fix WASM EditorContext leak (no `disposeEditor` called)\n- Fix test app tab close disposal\n- Add unit tests for lifecycle, disposal, and data correctness\n- Configure code coverage reporting (85%+ line coverage target)\n- Update changelog.md with bug fix entries\n\n### Out of Scope\n- Desktop content delivery completion (folder mapping / fn-1 Task 3) \u2014 this includes BUG 5 (AllowedFileContentRoot), which requires the content delivery infrastructure to be meaningful\n- New feature additions\n- Monaco editor version upgrade\n- Formatting or style-only changes\n- JavaScript-level test framework (Vitest/Jest) \u2014 TS behavior validated through C#-observable integration paths\n\n## Approach\n\nWork from foundational fixes upward, serialized to minimize merge conflicts:\n1. **Resize fix** (PR #37 merge) \u2014 standalone, no deps\n2. **Lifecycle/init fixes** \u2014 per-presenter readiness gates, event handler leak prevention\n3. **Disposal/cleanup** \u2014 complete `Dispose()`, add WASM JS cleanup, fix tab close\n4. **Data correctness** \u2014 property types, EOL, null safety, error handling (serialized after .2 to avoid file overlap)\n5. **Test coverage** \u2014 unit tests for all fixes, validate TS behaviors through C#-observable paths\n6. **Coverage + changelog** \u2014 systematic expansion to 85%+ line coverage, changelog update, bug ledger closure\n\n## Quick commands\n\n```bash\n# Build and verify\ndotnet build MonacoEditorComponent.slnx --no-restore\n\n# Run unit tests\ndotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj\n\n# Run with coverage\ndotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -- --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml\n```\n\n## Risks\n\n- PR #37 may have merge conflicts with current branch (mitigate: review diff before cherry-pick)\n- 85% line coverage target may be hard for code paths requiring live WebView2/WASM runtime (mitigate: mock-based unit tests, `[ExcludeFromCodeCoverage]` with documented rationale for untestable interop paths)\n- Disposal changes may affect test app behavior (mitigate: verify on both WASM and Desktop targets)\n- BUG 13 (sanitize ordering) may already be resolved \u2014 verify before fixing\n\n## Acceptance\n\n- [ ] All bugs in inventory have fixes or documented deferral rationale\n- [ ] PR #37 resize fix is merged and working\n- [ ] `Dispose()` comprehensively cleans up all resources (C# events, TS Monaco instance, DOM)\n- [ ] No initialization race conditions (per-presenter readiness gate, one-shot transition)\n- [ ] Line coverage >= 85% on `MonacoEditorComponent` assembly (net10.0-desktop TFM, `[ExcludeFromCodeCoverage]` exclusions documented)\n- [ ] `dotnet build MonacoEditorComponent.slnx` succeeds\n- [ ] `dotnet test` passes (unit tests + available integration tests)\n- [ ] changelog.md updated with bug fix entries and deferral notes\n\n## References\n\n- PR #37: https://github.com/unoplatform/uno.monaco.editor/pull/37\n- PR #38: https://github.com/unoplatform/uno.monaco.editor/pull/38\n- Monaco ResizeObserver: https://github.com/microsoft/monaco-editor/issues/3051\n- Monaco dispose issues: https://github.com/microsoft/monaco-editor/issues/4702\n- Uno WASM resize lag: https://github.com/unoplatform/uno/issues/22144\n- Monaco multi-instance themes: https://github.com/microsoft/monaco-editor/issues/4425\n- Memory pitfalls: `.flow/memory/pitfalls.md`\n"
+  },
+  "epic_id": "fn-7-fix-ci-test-runner-crash-and-add-ci",
+  "schema_version": 2,
+  "tasks": [
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-12T15:10:38.678753Z",
+        "depends_on": [],
+        "epic": "fn-7-fix-ci-test-runner-crash-and-add-ci",
+        "id": "fn-7-fix-ci-test-runner-crash-and-add-ci.1",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-7-fix-ci-test-runner-crash-and-add-ci.1.md",
+        "status": "todo",
+        "title": "Fix test package versions and verify CI green",
+        "updated_at": "2026-02-12T15:14:04.298077Z"
+      },
+      "id": "fn-7-fix-ci-test-runner-crash-and-add-ci.1",
+      "runtime": null,
+      "spec": "# fn-7-fix-ci-test-runner-crash-and-add-ci.1 Fix test package versions and verify CI green\n\n## Description\nFix the test runner TypeLoadException that crashes CI on all platforms by updating test infrastructure packages to latest versions.\n\n**Size:** M\n**Files:** `Directory.Packages.props`, `MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj`, `tools/MonacoTypeEmitter.Tests/MonacoTypeEmitter.Tests.csproj`\n\n## Approach\n\n1. In `Directory.Packages.props`:\n   - Update `xunit.v3.mtp-v2` from 3.2.0 \u2192 3.2.2\n   - Update `Microsoft.Testing.Extensions.CodeCoverage` from 18.0.4 \u2192 18.4.1\n   - Remove `Microsoft.NET.Test.Sdk` 18.0.1 (redundant with mtp-v2)\n   - Add `Microsoft.Testing.Extensions.TrxReport` 2.0.2\n\n2. In `MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj`:\n   - Remove `<PackageReference Include=\"Microsoft.NET.Test.Sdk\" />`\n   - Add `<PackageReference Include=\"Microsoft.Testing.Extensions.TrxReport\" PrivateAssets=\"all\" />`\n\n3. In `tools/MonacoTypeEmitter.Tests/MonacoTypeEmitter.Tests.csproj`:\n   - Apply same package reference changes if it uses the same packages\n\n4. Verify locally: `dotnet test` passes for both test projects\n\n5. Push to `dev/cnov/desktop-head`, monitor CI via `gh pr checks 38 --watch`\n\n6. If CI fails, diagnose from logs, fix, and iterate until all checks pass\n\n## Key context\n\n- `xunit.v3.mtp-v2` bundles Microsoft Testing Platform v2 support \u2014 `Microsoft.NET.Test.Sdk` is redundant and causes version conflicts\n- The `--coverage` flag in `dotnet test` works with the CodeCoverage extension; no CI workflow changes needed\n- `tools/MonacoTypeEmitter.Tests` may use different test packages \u2014 check before applying changes\n- CI has 3 test jobs: Build (ubuntu), Build macOS ARM, Desktop Tests (Windows) \u2014 all must pass\n- Coverage Report job merges `.cobertura.xml` from all platforms\n\n## Acceptance\n- [ ] `Directory.Packages.props` updated: xunit.v3.mtp-v2 \u2192 3.2.2, CodeCoverage \u2192 18.4.1, NET.Test.Sdk removed, TrxReport 2.0.2 added\n- [ ] `MonacoEditorComponent.Tests.csproj` updated: NET.Test.Sdk ref removed, TrxReport ref added\n- [ ] `MonacoTypeEmitter.Tests.csproj` updated if applicable\n- [ ] Local `dotnet test` passes for MonacoEditorComponent.Tests (filter: --filter-not-trait Category=DesktopCDP)\n- [ ] Local `dotnet test` passes for MonacoTypeEmitter.Tests\n- [ ] Changes pushed to dev/cnov/desktop-head\n- [ ] CI Build job (ubuntu) passes\n- [ ] CI Build (macOS ARM) job passes\n- [ ] CI Desktop Tests (Windows) job passes\n- [ ] CI Coverage Report job passes\n"
+    },
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-12T15:10:43.934947Z",
+        "depends_on": [
+          "fn-7-fix-ci-test-runner-crash-and-add-ci.1"
+        ],
+        "epic": "fn-7-fix-ci-test-runner-crash-and-add-ci",
+        "id": "fn-7-fix-ci-test-runner-crash-and-add-ci.2",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-7-fix-ci-test-runner-crash-and-add-ci.2.md",
+        "status": "todo",
+        "title": "Add CI verification policy to AGENTS.md",
+        "updated_at": "2026-02-12T15:11:15.702429Z"
+      },
+      "id": "fn-7-fix-ci-test-runner-crash-and-add-ci.2",
+      "runtime": null,
+      "spec": "# fn-7-fix-ci-test-runner-crash-and-add-ci.2 Add CI verification policy to AGENTS.md\n\n## Description\nAdd a CI verification policy section to AGENTS.md requiring agents to verify CI is green on active PRs before marking epics/tasks as done. This prevents leaving PRs in a broken CI state.\n\n**Size:** S\n**Files:** `AGENTS.md`\n\n## Approach\n\nAdd a new section \"## CI Verification Policy\" after the \"Development Workflow\" section in `AGENTS.md` (after line 75). Follow existing AGENTS.md style (hierarchical markdown with code blocks).\n\nThe section should cover:\n- **When it applies**: whenever a branch has an active PR open\n- **What to do**: push changes, monitor CI via `gh pr checks <PR#> --watch`, fix failures, iterate until green\n- **Timing**: at minimum before marking an epic done; ideally after significant pushes\n- **How to check**: `gh pr checks` command, GitHub Actions UI\n- **Policy**: never leave a PR in a broken CI state \u2014 fix before moving on\n\nAlso add to the \"Development Workflow\" validation checklist:\n- Step 4: If branch has an active PR, verify CI passes after pushing\n\n## Key context\n\n- Current AGENTS.md has \"Development Workflow\" section (lines 67-75) with local validation checklist but NO CI verification requirement\n- The CI pipeline has Build (ubuntu), Build macOS ARM, Desktop Tests (Windows), and Coverage Report jobs\n- Desktop CDP tests are excluded from CI (require GUI) \u2014 document this known limitation\n- `gh pr checks` is the preferred CLI command for monitoring\n## Acceptance\n- [ ] AGENTS.md contains new \"CI Verification Policy\" section\n- [ ] Policy clearly states: branches with active PRs must have CI verified green before marking work done\n- [ ] Includes `gh pr checks` command example\n- [ ] Explains the CI job structure (Build, Build macOS ARM, Desktop Tests, Coverage Report)\n- [ ] Notes known CI limitations (Desktop CDP tests excluded on headless runners)\n- [ ] Development Workflow checklist updated to include CI verification step\n- [ ] CI still passes after AGENTS.md update is pushed\n## Done summary\nTBD\n\n## Evidence\n- Commits:\n- Tests:\n- PRs:\n"
+    }
+  ]
+}
