@@ -145,14 +145,14 @@ This release contains several breaking changes. Follow these steps to migrate fr
 - `IsLoaded` renamed to `IsEditorLoaded`
 - `CssStyleBroker` made internal ([#42](https://github.com/nicollasricas/monaco-editor-uwp/issues/42))
 
-## [0.8.1] - 2019-01-15
+## 0.8.1 - 2019-01-15
 
 ### Fixed
 
 - Revert min target back to 14393
 - Revert dependency changes
 
-## [0.8] - 2019-01-15
+## 0.8 - 2019-01-15
 
 ### Added
 
@@ -184,7 +184,7 @@ This release contains several breaking changes. Follow these steps to migrate fr
 
 - `IModelDecorationOptions` now uses `IMarkdownString` for both `HoverMessage` and `GlyphMarginHoverMessage` to reflect change in Monaco API. A convenience `string` and `string[]` extension `ToMarkdownString` has been provided. Fixes [#22](https://github.com/nicollasricas/monaco-editor-uwp/issues/22).
 
-## [0.6] - 2018-05-04
+## 0.6 - 2018-05-04
 
 ### Added
 
@@ -266,12 +266,11 @@ This release contains several breaking changes. Follow these steps to migrate fr
 - **Theme Aware**: control automatically picks theme based on system/app light/dark theme and high contrast settings
 - **Render Aware**: control only displays once code editor has been loaded
 
+<!-- Versions 0.8.1, 0.8, and 0.6 have no matching git tags; headings are unlinked. -->
+
 [Unreleased]: https://github.com/unoplatform/uno.monaco.editor/compare/1.1.0...HEAD
 [0.9]: https://github.com/unoplatform/uno.monaco.editor/compare/v0.7.0...1.0
-[0.8.1]: https://github.com/unoplatform/uno.monaco.editor/releases/tag/v0.7.0
-[0.8]: https://github.com/unoplatform/uno.monaco.editor/releases/tag/v0.7.0
 [0.7]: https://github.com/unoplatform/uno.monaco.editor/compare/v0.5.0...v0.7.0
-[0.6]: https://github.com/unoplatform/uno.monaco.editor/releases/tag/v0.5.0
 [0.5]: https://github.com/unoplatform/uno.monaco.editor/compare/v0.4.0...v0.5.0
 [0.4]: https://github.com/unoplatform/uno.monaco.editor/compare/v0.3.0...v0.4.0
 [0.3]: https://github.com/unoplatform/uno.monaco.editor/compare/v0.2.0...v0.3.0
