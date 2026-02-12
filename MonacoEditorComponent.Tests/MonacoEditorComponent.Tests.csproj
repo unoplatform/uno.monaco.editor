@@ -20,6 +20,7 @@
 		<PackageReference Include="Microsoft.Playwright" IncludeAssets="compile;runtime" PrivateAssets="contentFiles;build;buildTransitive;analyzers;native" />
 		<PackageReference Include="StreamJsonRpc" />
 		<PackageReference Include="Nerdbank.Streams" />
+		<PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" PrivateAssets="all" />
 	</ItemGroup>
 
 	<ItemGroup>
