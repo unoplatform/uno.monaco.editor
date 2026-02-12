@@ -168,7 +168,7 @@ jobs:
 
   build-macos:
     name: Build (macOS ARM)
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -267,7 +267,7 @@ jobs:
         shell: pwsh
         run: >-
           ./sign code azure-key-vault "${{ env.ARTIFACTS_DIR_REL }}/**/*.nupkg" --publisher-name "uno.monaco.editor"
-          --description "Uno Monaco Editor UWP"
+          --description "Uno Monaco Editor"
           --description-url "https://github.com/${{ github.repository }}"
           --azure-key-vault-url "${{ secrets.SIGN_KEY_VAULT_URL }}"
           --azure-key-vault-certificate "${{ secrets.SIGN_KEY_VAULT_CERTIFICATE_ID }}"

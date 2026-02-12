@@ -5,18 +5,18 @@ runs:
   using: "composite"
   steps:
   - name: Checkout
-    uses: actions/checkout@v2
+    uses: actions/checkout@v4
 
   - name: Setup .NET SDK
-    uses: actions/setup-dotnet@v1
+    uses: actions/setup-dotnet@v4
     with:
-      dotnet-version: '9.0.201'
+      dotnet-version: '10.0.x'
 
   - uses: dotnet/nbgv@f088059084cb5d872e9d1a994433ca6440c2bf72 # v0.4.2
     name: NBGV
     id: nbgv
     with:
-      toolVersion: 3.6.139
+      toolVersion: 3.8.118
       setAllVars: true
 
   - name: "Tag and push to GitHub"

@@ -99,3 +99,6 @@ When migrating encoding/decoding logic across layers (e.g., JSExport boundary vs
 
 ## 2026-02-11 manual [pitfall]
 linguist-generated markers must target only machine-generated/vendored files — never hand-authored specs or docs even if in same directory tree
+
+## 2026-02-12 manual [pitfall]
+dotnet restore evaluates ALL TFMs even with -f flag; multi-TFM projects (e.g. browserwasm+desktop) need wasm-tools workload even for desktop-only builds unless the multi-TFM project is excluded from the build
