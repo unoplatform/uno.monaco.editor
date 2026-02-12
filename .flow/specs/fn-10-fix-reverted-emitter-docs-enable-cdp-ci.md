@@ -11,7 +11,7 @@ Two agent loops ran concurrently and fn-5.8's emitter regeneration was reverted 
 3. **Enable Desktop CDP tests on Windows CI** — Remove `--filter-not-trait "Category=DesktopCDP"` from the Windows CI job. Investigate and fix the fixture timeout that caused the previous rollback (commit `8d522af`). Normalize fixture launch command (`-c Release`, `--no-build`, `--no-launch-profile`).
 4. **Add WSL2 launch profile** — Create `.vscode/launch.json` (if absent) and add launchSettings.json profile with `DISPLAY=:0` and `GDK_GL=gles` environment variables for Skia Desktop under WSL2
 5. **Update documentation** — Update AGENTS.md CI limitations section, docs/generated-type-docs-strategy.md (mark complete; defer TypeDoc URL pattern drift as tracked follow-up), and CHANGELOG.md
-6. **Enable AddActionAsync/AddCommandAsync on desktop** — Remove outdated `PlatformNotSupportedException` guards and fix the `element` undefined issue in desktop eval-based `InvokeScriptAsync` calls. The JSON-RPC bridge infrastructure already supports action callbacks end-to-end.
+6. **Unified script invocation and full WASM/desktop parity** — Create a single `InvokeMethodAsync` on `ICodeEditorPresenter` that encapsulates element resolution per-platform. Migrate all callers, remove the leaky `element` global from `WebViewExtensions.cs`, remove ALL `PlatformNotSupportedException` guards from the public `CodeEditor` API (`AddActionAsync`, `AddCommandAsync`, any others). Update all docs that say "WASM only". Add explicit Linux and WSL2-on-Win11 prerequisites to getting-started.md. After this task, every public API works identically on both platforms.
 
 ## Parallelism
 
@@ -44,7 +44,9 @@ gh pr checks --watch
 - [ ] AGENTS.md CI limitations section updated to reflect CDP test enablement
 - [ ] CHANGELOG.md updated with Unreleased entries for: emitter edge-case fixes, XML doc regeneration, Desktop CDP CI enablement, WSL2 profile
 - [ ] TypeDoc URL pattern drift explicitly deferred with tracked follow-up in docs/generated-type-docs-strategy.md
-- [ ] AddActionAsync/AddCommandAsync work on desktop (PlatformNotSupportedException removed, `element` properly defined in desktop WebView2 JS context)
+- [ ] Unified `InvokeMethodAsync` on `ICodeEditorPresenter` — one invocation path, both platforms
+- [ ] ALL `PlatformNotSupportedException` removed from `CodeEditor` public API — full WASM/desktop parity
+- [ ] Docs updated: no "WASM only" notes remain; Linux/WSL2 prerequisites documented in getting-started.md
 - [ ] All CI jobs pass on the PR
 
 ## References
