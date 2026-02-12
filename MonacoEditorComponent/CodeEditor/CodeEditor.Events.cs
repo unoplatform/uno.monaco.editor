@@ -449,13 +449,13 @@ namespace Monaco
             }
         }
 
-        private void ThemeListener_ThemeChanged(IThemeListener sender)
+        private void ThemeListener_ThemeChanged(object? sender, ThemeChangedEventArgs e)
         {
             if (RequestedTheme == ElementTheme.Default)
             {
                 if (!_queue!.TryEnqueue(DispatcherQueuePriority.Normal, async () =>
                 {
-                    await InvokeScriptAsync("changeTheme", args: [sender.CurrentTheme.ToString(), sender.IsHighContrast.ToString()]);
+                    await InvokeScriptAsync("changeTheme", args: [e.Listener.CurrentTheme.ToString(), e.Listener.IsHighContrast.ToString()]);
                 }))
                 {
                     Debug.WriteLine("Failed to enqueue theme change -- dispatcher queue unavailable");

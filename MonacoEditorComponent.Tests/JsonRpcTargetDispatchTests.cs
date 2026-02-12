@@ -241,6 +241,78 @@ public sealed class JsonRpcTargetDispatchTests : IAsyncLifetime
 
     private record SecondaryPingDto(string Value);
 
+    /// <summary>
+    /// Regression: StreamJsonRpc rejects targets with custom delegate events
+    /// (only EventHandler/EventHandler&lt;T&gt; are supported). This documents
+    /// why ThemeListenerDesktop.ThemeChanged uses EventHandler&lt;ThemeChangedEventArgs&gt;
+    /// instead of a custom delegate.
+    /// </summary>
+    [Fact]
+    public void AddLocalRpcTarget_CustomDelegateEvent_Throws()
+    {
+        var pipes = FullDuplexStream.CreatePipePair();
+        var formatter = new SystemTextJsonFormatter
+        {
+            JsonSerializerOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            },
+        };
+
+        using var rpc = new JsonRpc(new HeaderDelimitedMessageHandler(pipes.Item1, formatter));
+
+        // StreamJsonRpc rejects custom delegate events during target registration.
+        Assert.ThrowsAny<Exception>(() =>
+            rpc.AddLocalRpcTarget(new TargetWithCustomDelegateEvent()));
+    }
+
+    /// <summary>
+    /// Verifies that targets with standard EventHandler&lt;T&gt; events register
+    /// successfully. This is the pattern used by ThemeListenerDesktop after
+    /// converting from custom ThemeChangedEvent to EventHandler&lt;ThemeChangedEventArgs&gt;.
+    /// </summary>
+    [Fact]
+    public void AddLocalRpcTarget_StandardEventHandlerT_Succeeds()
+    {
+        var pipes = FullDuplexStream.CreatePipePair();
+        var formatter = new SystemTextJsonFormatter
+        {
+            JsonSerializerOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            },
+        };
+
+        using var rpc = new JsonRpc(new HeaderDelimitedMessageHandler(pipes.Item1, formatter));
+
+        // EventHandler<T> is supported — should not throw.
+        rpc.AddLocalRpcTarget(new TargetWithStandardEvent());
+    }
+
+    /// <summary>Custom delegate that StreamJsonRpc rejects.</summary>
+    private delegate void CustomEvent(string value);
+
+    /// <summary>Target with a custom delegate event — fails AddLocalRpcTarget.</summary>
+    private sealed class TargetWithCustomDelegateEvent
+    {
+        public event CustomEvent? Changed;
+
+        [JsonRpcMethod("custom/ping")]
+        public void OnPing() => Changed?.Invoke("ping");
+    }
+
+    /// <summary>EventArgs for standard event pattern test.</summary>
+    private sealed class StandardEventArgs : EventArgs;
+
+    /// <summary>Target with EventHandler&lt;T&gt; event — succeeds AddLocalRpcTarget.</summary>
+    private sealed class TargetWithStandardEvent
+    {
+        public event EventHandler<StandardEventArgs>? Changed;
+
+        [JsonRpcMethod("standard/ping")]
+        public void OnPing() => Changed?.Invoke(this, new StandardEventArgs());
+    }
+
     // DTOs used by the mock target (match bridge-protocol.md schemas).
     private record CallActionDto(string Name);
     private record GetJsonValueDto(string Name);

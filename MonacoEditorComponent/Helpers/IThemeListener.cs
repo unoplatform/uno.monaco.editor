@@ -27,6 +27,6 @@ namespace Monaco.Helpers
         /// <summary>
         /// Raised when the application theme changes.
         /// </summary>
-        event ThemeChangedEvent? ThemeChanged;
+        event EventHandler<ThemeChangedEventArgs>? ThemeChanged;
     }
 }

@@ -28,7 +28,7 @@ internal sealed class ThemeListenerDesktop : IThemeListener, IDisposable
     public ApplicationTheme CurrentTheme { get; set; }
     public bool IsHighContrast { get; set; }
 
-    public event ThemeChangedEvent? ThemeChanged;
+    public event EventHandler<ThemeChangedEventArgs>? ThemeChanged;
 
     public ThemeListenerDesktop(DispatcherQueue queue)
     {
@@ -94,7 +94,7 @@ internal sealed class ThemeListenerDesktop : IThemeListener, IDisposable
             CurrentTheme = Application.Current.RequestedTheme;
         }
 
-        ThemeChanged?.Invoke(this);
+        ThemeChanged?.Invoke(this, new ThemeChangedEventArgs(this));
     }
 
     public void Dispose()

@@ -11,10 +11,16 @@ using Windows.UI.ViewManagement;
 namespace Monaco.Helpers
 {
     /// <summary>
-    /// Delegate for the <see cref="IThemeListener.ThemeChanged"/> event.
+    /// Event arguments for the <see cref="IThemeListener.ThemeChanged"/> event.
     /// </summary>
-    /// <param name="sender">The theme listener that detected the change.</param>
-    public delegate void ThemeChangedEvent(IThemeListener sender);
+    public class ThemeChangedEventArgs : EventArgs
+    {
+        /// <summary>Gets the theme listener that detected the change.</summary>
+        public IThemeListener Listener { get; }
+
+        /// <summary>Initializes a new instance of the <see cref="ThemeChangedEventArgs"/> class.</summary>
+        public ThemeChangedEventArgs(IThemeListener listener) => Listener = listener;
+    }
 
     /// <summary>
     /// Class which listens for changes to Application Theme or High Contrast Modes 
@@ -36,7 +42,7 @@ namespace Monaco.Helpers
         public bool IsHighContrast { get; set; }
 
         /// <inheritdoc />
-        public event ThemeChangedEvent? ThemeChanged;
+        public event EventHandler<ThemeChangedEventArgs>? ThemeChanged;
 
         private readonly AccessibilitySettings _accessible = new();
         private readonly UISettings _settings = new();
@@ -172,7 +178,7 @@ namespace Monaco.Helpers
                 CurrentTheme = Application.Current.RequestedTheme;
             }
 
-            ThemeChanged?.Invoke(this);
+            ThemeChanged?.Invoke(this, new ThemeChangedEventArgs(this));
         }
     }
 }
