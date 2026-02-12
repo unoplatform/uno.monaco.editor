@@ -12,5 +12,5 @@
   "spec_path": ".flow/tasks/fn-11-extract-emitter-as-general-purpose-dts.2.md",
   "status": "todo",
   "title": "Decouple emitter from Monaco specifics and create EmitterOptions",
-  "updated_at": "2026-02-12T21:30:27.041314Z"
+  "updated_at": "2026-02-12T21:45:17.429056Z"
 }

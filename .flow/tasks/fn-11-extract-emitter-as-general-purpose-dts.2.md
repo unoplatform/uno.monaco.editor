@@ -1,7 +1,7 @@
 # fn-11-extract-emitter-as-general-purpose-dts.2 Decouple emitter from Monaco specifics and create EmitterOptions
 
 ## Description
-Decouple the extracted emitter from all Monaco-specific assumptions by introducing an `EmitterOptions` configuration object and extracting the TypeDoc URL generation into an optional `IDocLinkProvider` strategy.
+Decouple the extracted emitter from all Monaco-specific assumptions by introducing an `EmitterOptions` configuration object (emission concerns only) and extracting the TypeDoc URL generation into an optional `IDocLinkProvider` strategy.
 
 **Size:** M
 **Files:**
@@ -12,28 +12,30 @@ Decouple the extracted emitter from all Monaco-specific assumptions by introduci
 
 ## Approach
 
-**6 coupling points to address** (from research):
+**5 emission-related coupling points** (coupling point #6, ignore-file discovery, is handled by Task 3 CLI):
 
 1. **`GetRepoRelativePath`** hardcodes `MonacoEditorComponent/Monaco/` — replace with `EmitterOptions.OutputPathPrefix` (default: `""`)
 2. **`InterfaceToClassConverter` reference** at `CSharpEmitter.cs:345` — replace with `EmitterOptions.InterfaceConverterTypeName` (default: `null` to omit attribute)
-3. **TypeDoc URL generation** (`WriteTypeDocRemarks`, `GetTypeDocUrl`, `GetTypeDocNamespacePrefix` + `_typeToSourceNamespace`/`_typeDocKinds` dictionaries) — extract to `IDocLinkProvider` interface with a single `string? GetDocUrl(string kind, string fullTypeName)` method. The Monaco implementation becomes an example. Emitter accepts `EmitterOptions.DocLinkProvider` (default: `null`)
-4. **`NameMapper.ToCSharpNamespace`** root stripping — add `EmitterOptions.RootNamespace` that controls the C# namespace prefix (default: derive from first segment)
+3. **TypeDoc URL generation** — extract to `IDocLinkProvider` interface: `string? GetDocUrl(string kind, string fullTypeName)`. Emitter accepts `EmitterOptions.DocLinkProvider` (default: `null`).
+4. **`NameMapper.ToCSharpNamespace`** root stripping — add `EmitterOptions.RootNamespace` (default: derive from first segment)
 5. **`NameMapper.ToRelativeDirectory`** root stripping — same config as #4
-6. **`FindToolDirectory` / ignore file discovery** in `Program.cs` — remove; ignore file is an explicit parameter
 
 ## Key context
 
-- `EmitterOptions` should follow the .NET Options pattern: `sealed class` with `init` properties and sensible defaults
-- The constructor of `CSharpEmitter` currently takes `(MonacoModel model, IgnoreList ignoreList, string outputRoot, string repoRoot)` — replace with `(TypeModel model, EmitterOptions options)`
-- `TypeMapper` and `NameMapper` are currently `static` — keep static for now but ensure they accept configuration parameters where needed (e.g., `NameMapper.ToCSharpNamespace(string tsNamespace, string? rootNamespace)`)
+- `EmitterOptions`: `sealed class` with `init` properties. Emission concerns ONLY (not file I/O).
+- Constructor changes from `(MonacoModel model, IgnoreList ignoreList, string outputRoot, string repoRoot)` to `(TypeModel model, IgnoreList ignoreList, EmitterOptions options)`. `IgnoreList` stays as a direct parameter since it's loaded by the caller (CLI or test harness).
+- `TypeMapper` and `NameMapper` remain `static` but accept config parameters where needed.
+
 ## Acceptance
-- [ ] `EmitterOptions` exists with properties: `OutputPathPrefix`, `InterfaceConverterTypeName`, `DocLinkProvider`, `RootNamespace`, `IgnoreFilePath`, `OutputDirectory`
+- [ ] `EmitterOptions` exists with emission-only properties: `OutputPathPrefix`, `InterfaceConverterTypeName`, `DocLinkProvider`, `RootNamespace`
+- [ ] No file I/O concerns in `EmitterOptions`
 - [ ] `IDocLinkProvider` interface extracted; TypeDoc-specific logic removed from core emitter
-- [ ] `CSharpEmitter` constructor accepts `(TypeModel, EmitterOptions)` — no hardcoded Monaco strings remain
+- [ ] `CSharpEmitter` constructor accepts `(TypeModel, IgnoreList, EmitterOptions)` — no hardcoded Monaco strings
 - [ ] Zero occurrences of `"Monaco"` in emitter output when `InterfaceConverterTypeName` and `DocLinkProvider` are null
 - [ ] `NameMapper.ToCSharpNamespace` respects configurable root namespace
-- [ ] All existing behavior preserved when options are configured to match Monaco defaults
+- [ ] All existing behavior preserved when options match Monaco defaults
 - [ ] `dotnet build tools/DtsSharp/DtsSharp.slnx` succeeds
+
 ## Done summary
 TBD
 

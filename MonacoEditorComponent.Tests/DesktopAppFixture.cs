@@ -32,7 +32,10 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     private const int CdpPollIntervalMs = 500;
     private const int CdpReadyTimeoutMs = 30_000;
     private const int MonacoPageTimeoutMs = 10_000;
-    private const int MonacoReadyTimeoutMs = 15_000;
+    // CI cold-start (Windows runner) can take significantly longer than local dev:
+    // dotnet run launches the pre-built app, WebView2 initializes, then Monaco loads.
+    // 15s was insufficient on CI run 21957402273; 60s provides adequate headroom.
+    private const int MonacoReadyTimeoutMs = 60_000;
 
     private IPlaywright? _playwright;
     private Process? _appProcess;
@@ -68,10 +71,14 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         var repoRoot = FindRepoRoot();
         var testAppProject = Path.Combine(repoRoot, "MonacoEditorTestApp", "MonacoEditorTestApp.csproj");
 
+        // Use -c Release --no-build to run the pre-built app without triggering a Debug
+        // rebuild. CI pre-builds with -c Release (ci.yml desktop-tests job), so omitting
+        // -c Release here caused dotnet run to rebuild in Debug, eating ~30s of timeout.
+        // --no-launch-profile prevents launch profile env vars from interfering.
         var startInfo = new ProcessStartInfo
         {
             FileName = "dotnet",
-            Arguments = $"run --project \"{testAppProject}\" -f net10.0-desktop",
+            Arguments = $"run --project \"{testAppProject}\" -f net10.0-desktop -c Release --no-build --no-launch-profile",
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,

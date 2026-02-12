@@ -16,25 +16,33 @@ Create the standalone solution structure under `tools/DtsSharp/` and extract the
 
 ## Approach
 
-- Follow the existing project structure convention in `tools/` — see `tools/MonacoTypeEmitter/MonacoTypeEmitter.csproj`
+- Follow the existing project structure convention in `tools/`
 - Create a new `.slnx` solution file under `tools/DtsSharp/`
-- Target `net10.0` for the library (match repo's `global.json` SDK)
-- Rename all namespaces: `MonacoTypeEmitter.Model` → `DtsSharp.Model`, `MonacoTypeEmitter.Emitter` → `DtsSharp.Emitter`
-- Rename `MonacoModel` class → `TypeModel`, `MonacoNamespace` → `TypeNamespace`, etc.
-- Keep all logic identical — this is a mechanical extraction + rename, NOT a refactor
-- The intermediate JSON schema contract must remain backward compatible (same JSON deserializes into renamed C# types via `[JsonPropertyName]` if needed)
+- Target `net10.0` (match repo's `global.json` SDK)
+- Rename namespaces: `MonacoTypeEmitter.Model` → `DtsSharp.Model`, `MonacoTypeEmitter.Emitter` → `DtsSharp.Emitter`
+- **Rename only the top-level model type** (current code uses classes):
+  - `MonacoModel` → `TypeModel` (class with properties: `SchemaVersion`, `ExtractedAt`, `SourceFile`, `Namespaces`)
+  - All other type names preserved: `NamespaceInfo`, `InterfaceInfo`, `ClassInfo`, `EnumInfo`, `TypeAliasInfo`, `FunctionInfo`, `MethodInfo`, `PropertyInfo`, `ParameterInfo`, `TypeParameterInfo`, `TypeInfo` (12 variants)
+- Mechanical extraction + rename, NOT a refactor
+- Preserve **class-based** model structure exactly as in current `MonacoModel.cs`
+- JSON schema backward compatible (same JSON deserializes into renamed types)
 
 ## Key context
 
-- The model has 12 `TypeInfo` variants (discriminated union via `TypeInfoConverter.cs`)
-- `TypeInfoConverter` uses `kind` field as discriminator — this must be preserved
-- All model types are currently records — keep them as records
+- Model types are **classes** — see `tools/MonacoTypeEmitter/Model/MonacoModel.cs`
+- `TypeInfoConverter` uses `kind` discriminator for 12-variant `TypeInfo` union — preserve exactly
+- `TypeModel` properties: `SchemaVersion`, `ExtractedAt`, `SourceFile`, `Namespaces` (all from current `MonacoModel`)
+
 ## Acceptance
 - [ ] `tools/DtsSharp/DtsSharp.slnx` exists and `dotnet build` succeeds
-- [ ] All source files compile with zero `Monaco` references in namespaces or public type names
-- [ ] `MonacoModel` → `TypeModel` rename is complete across all model types
-- [ ] Existing `model.json` from the ts-morph extractor deserializes correctly into renamed types
-- [ ] No changes to `tools/MonacoTypeEmitter/` (original stays intact until task 6)
+- [ ] Zero `Monaco` references in namespaces or public type names
+- [ ] `MonacoModel` → `TypeModel` rename complete; includes `SourceFile` property
+- [ ] All other model class names preserved
+- [ ] Class-based model structure preserved
+- [ ] Existing `model.json` deserializes correctly into renamed types
+- [ ] `TypeInfoConverter` discriminator logic unchanged
+- [ ] No changes to `tools/MonacoTypeEmitter/`
+
 ## Done summary
 TBD
 

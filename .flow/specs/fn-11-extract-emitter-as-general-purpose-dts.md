@@ -24,26 +24,39 @@ A standalone NuGet-packaged .NET library + CLI tool that:
 **In scope:**
 - New standalone solution with library, CLI tool, runtime, and parser projects
 - C# declaration parser for `.d.ts` files (interfaces, classes, enums, type aliases, functions, namespaces, generics, unions/intersections, literals)
-- Decoupled emitter with `EmitterOptions` configuration
+- Decoupled emitter with `EmitterOptions` configuration (emission concerns only)
 - Runtime NuGet package for `InterfaceToClassConverter`
-- CLI tool packaged as `dotnet tool`
+- CLI tool packaged as `dotnet tool` (file I/O, ignore list loading, output directory management)
 - Migration of `uno.monaco.editor` to consume the extracted library
-- Test suite with non-Monaco fixtures
+- Test suite with non-Monaco fixtures from 3 real library `.d.ts` files
 
 **Out of scope (deferred):**
 - Roslyn incremental source generator (future enhancement — reads JSON via `AdditionalTextsProvider`)
 - Full TypeScript type checker (the parser extracts declarations, not semantic analysis)
 - Declaration merging across multiple files (v1 handles single-file `.d.ts`)
-- Conditional types, mapped types, template literal types in parser (emitter already falls back to `object`)
+- Construct signatures (not in current intermediate model)
+
+## Design boundaries
+
+**Library API (dual input):**
+- `DtsParser.Parse(string dtsContent)` → `TypeModel` (parse `.d.ts` directly)
+- `TypeModel.LoadFromJson(string json)` / STJ deserialization → `TypeModel` (load intermediate JSON)
+- Both input paths produce the same `TypeModel` consumed by the emitter
+
+**Emitter options** control emission behavior only:
+- `RootNamespace`, `InterfaceConverterTypeName`, `DocLinkProvider`, `OutputPathPrefix`
+
+**CLI options** control file I/O and tooling:
+- `--input`, `--output`, `--ignore-file`, `--root-namespace`, `--converter-type`, `--no-docs`
 
 ## Dependencies
 
-- **fn-10** (Fix emitter edge cases, XML docs) — should complete first. fn-10 is actively improving `CSharpEmitter.cs` with exotic identifier handling and XML doc generation. Extract after those improvements land to avoid merge conflicts.
+- **fn-10** (Fix emitter edge cases, XML docs) — should complete first.
 
 ## Quick commands
 
 ```bash
-# After extraction — build the library
+# Build the library
 dotnet build tools/DtsSharp/DtsSharp.slnx
 
 # Run tests
@@ -52,37 +65,41 @@ dotnet test --project tools/DtsSharp/DtsSharp.Tests
 # CLI usage: parse .d.ts and emit C#
 dotnet run --project tools/DtsSharp/DtsSharp.Cli -- --input path/to/api.d.ts --output Generated/
 
-# From uno.monaco.editor — regenerate Monaco types using extracted library
-dotnet run --project tools/DtsSharp/DtsSharp.Cli -- --input node_modules/monaco-editor/monaco.d.ts --output MonacoEditorComponent/Monaco/ --ignore tools/MonacoTypeEmitter/.generator-ignore
+# From uno.monaco.editor — regenerate Monaco types
+dotnet run --project tools/DtsSharp/DtsSharp.Cli -- --input node_modules/monaco-editor/monaco.d.ts --output MonacoEditorComponent/Monaco/ --ignore-file tools/DtsSharp/monaco.generator-ignore
 ```
 
 ## Acceptance
 
 - [ ] Standalone library compiles and passes all tests with zero Monaco references in public API
+- [ ] Library exposes dual input: `DtsParser.Parse()` for `.d.ts` and JSON deserialization for intermediate model
 - [ ] CLI tool accepts a `.d.ts` file and emits C# without Node.js
-- [ ] `uno.monaco.editor` regenerated output is byte-for-byte identical using the extracted library
+- [ ] `uno.monaco.editor` regenerated output is byte-for-byte identical using the extracted library (task 7 resolves any interim diffs before task 6 finalizes parity)
 - [ ] Runtime companion package contains `InterfaceToClassConverter` in a generic namespace
-- [ ] Library is configurable: root namespace, output prefix, converter type name, doc link provider
-- [ ] `.d.ts` parser handles: interfaces, classes, enums, type aliases (string literal unions), functions, namespaces, generic type parameters, union/intersection types, array types, literal types, optional/readonly members
-- [ ] Test suite includes non-Monaco `.d.ts` fixtures (at least 3 different libraries)
+- [ ] Emitter is configurable via `EmitterOptions`: root namespace, output prefix, converter type name, doc link provider
+- [ ] CLI handles file I/O concerns: ignore-file loading, output directory, input format detection
+- [ ] `.d.ts` parser handles: interfaces, classes, enums, type aliases (string literal unions), functions, namespaces, generic type parameters (with defaults and constraints), union/intersection types, array types, literal types, optional/readonly members, `typeof` queries
+- [ ] Parser has deterministic fallback rules for unsupported constructs (mapped types, template literals, conditional types, infer, rest elements)
+- [ ] Test suite includes fixtures from at least 3 real non-Monaco library `.d.ts` files
 - [ ] CLI is packable as a `dotnet tool`
+- [ ] At least one test validates generated code works against `DtsSharp.Runtime` converter
 
 ## Architecture
 
 ```mermaid
 graph TB
     subgraph "DtsSharp Library (pure .NET)"
-        DTS[".d.ts file"] --> Parser["DtsSharp.Parser<br/>(C# declaration parser)"]
-        Parser --> Model["DtsSharp.Model<br/>(intermediate TypeModel)"]
-        JSON["model.json"] --> Deser["JSON deserializer"]
+        DTS[".d.ts file"] --> Parser["DtsParser.Parse()<br/>(C# declaration parser)"]
+        Parser --> Model["TypeModel<br/>(intermediate model)"]
+        JSON["model.json"] --> Deser["TypeModel.LoadFromJson()<br/>(STJ deserialization)"]
         Deser --> Model
-        Model --> Emitter["DtsSharp.Emitter<br/>(C# code emitter)"]
+        Model --> Emitter["CSharpEmitter<br/>(C# code emitter)"]
         Opts["EmitterOptions"] --> Emitter
         Emitter --> CS["Generated .cs files"]
     end
 
     subgraph "Packages"
-        Lib["DtsSharp<br/>(core library)"]
+        Lib["DtsSharp<br/>(core: parser + emitter)"]
         RT["DtsSharp.Runtime<br/>(InterfaceToClassConverter)"]
         CLI["DtsSharp.Cli<br/>(dotnet tool)"]
     end
@@ -93,15 +110,17 @@ graph TB
 
 ## Key design decisions
 
-1. **Parser strategy**: Build a focused C# parser for `.d.ts` declaration syntax. This is feasible because `.d.ts` files contain only declarations (no implementation code), which is a bounded grammar. The parser produces the same intermediate model the emitter already consumes.
+1. **Parser strategy**: Build a focused C# parser for `.d.ts` declaration syntax. `.d.ts` files contain only declarations (bounded grammar). Split into core grammar (task 4) and edge construct hardening (task 7).
 
-2. **Dual input**: The library accepts EITHER a `.d.ts` file (via parser) OR the intermediate JSON model. This preserves backward compatibility and lets users with complex setups (e.g., multi-file `.d.ts` with `/// <reference>` directives) use the ts-morph extractor to produce JSON.
+2. **Dual input at library level**: The library exposes both `DtsParser.Parse()` and JSON deserialization. Both produce `TypeModel`. This preserves backward compatibility and lets users with complex `.d.ts` setups use the ts-morph extractor to produce JSON.
 
-3. **Package structure**: Three NuGet packages — core library (parser + emitter), runtime (converter), CLI tool. The runtime package is intentionally small (~30 lines) to minimize transitive dependency impact.
+3. **Package structure**: Three NuGet packages — core library (parser + emitter), runtime (converter), CLI tool.
 
-4. **EmitterOptions pattern**: Replace all Monaco-specific hardcoding with a configuration object. Follow the Options pattern per `tools/MonacoTypeEmitter/Emitter/CSharpEmitter.cs` constructor.
+4. **EmitterOptions pattern**: Emission concerns only. File I/O stays in CLI layer.
 
-5. **Naming**: `DtsSharp` as working name (short, descriptive). Final name TBD.
+5. **Parity gate**: Task 7 resolves all parser diffs against Monaco baseline. Task 6 verifies byte-for-byte identical output. No "acceptable diffs" at final migration.
+
+6. **Naming**: `DtsSharp` as working name. CLI flag: `--ignore-file`.
 
 ## References
 
@@ -111,4 +130,3 @@ graph TB
 - Name mapper: `tools/MonacoTypeEmitter/Emitter/NameMapper.cs`
 - Test infrastructure: `tools/MonacoTypeEmitter.Tests/`
 - InterfaceToClassConverter: `MonacoEditorComponent/Helpers/InterfaceToClassConverter.cs`
-- Similar projects: [alphaTab](https://github.com/CoderLine/alphaTab) (TS→C# transpiler), [fern](https://github.com/fern-api/fern) (multi-language SDK generator), [quicktype](https://github.com/glideapps/quicktype) (cross-language IR design)

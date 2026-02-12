@@ -49,9 +49,8 @@ This is a 3-line change. All snapshot tests will need updating (run `dotnet test
 - [x] `docs/generated-type-docs-strategy.md` acceptance criteria updated; TypeDoc URL pattern drift explicitly marked as deferred with TODO
 - [x] `CHANGELOG.md` Unreleased section updated with entries for all fn-10 changes
 ## Done summary
-TBD
-
+Enriched 71 generated Monaco C# files with XML documentation (summary, remarks with TypeDoc URLs, enum member docs), auto-generated headers, #nullable enable, and partial keyword on interfaces/classes. Added --update-only mode and edge-case fixes to the emitter. Raised CS1591 severity from none to suggestion. Updated snapshot tests, docs strategy, and CHANGELOG.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: e96a3278a6f9b6a228f2825724e5bfd09d8610ef, 2b0f7193c38139855c4d81fab699c818749c2563, d228a913dbeec47f00ea7b5d88725236f11064ff
+- Tests: dotnet test --project tools/MonacoTypeEmitter.Tests/, dotnet build MonacoEditorComponent.slnx --no-restore
 - PRs:

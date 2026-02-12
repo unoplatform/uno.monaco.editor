@@ -6,7 +6,8 @@
   "depends_on": [
     "fn-11-extract-emitter-as-general-purpose-dts.2",
     "fn-11-extract-emitter-as-general-purpose-dts.3",
-    "fn-11-extract-emitter-as-general-purpose-dts.5"
+    "fn-11-extract-emitter-as-general-purpose-dts.5",
+    "fn-11-extract-emitter-as-general-purpose-dts.7"
   ],
   "epic": "fn-11-extract-emitter-as-general-purpose-dts",
   "id": "fn-11-extract-emitter-as-general-purpose-dts.6",
@@ -14,5 +15,5 @@
   "spec_path": ".flow/tasks/fn-11-extract-emitter-as-general-purpose-dts.6.md",
   "status": "todo",
   "title": "Migrate uno.monaco.editor to consume extracted library",
-  "updated_at": "2026-02-12T21:31:58.453217Z"
+  "updated_at": "2026-02-12T21:51:17.469072Z"
 }
