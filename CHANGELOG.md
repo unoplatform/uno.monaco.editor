@@ -10,11 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 This is the first release under the **`Uno.Monaco.Editor`** package name (formerly `Monaco.Editor`).
 It includes major architectural changes, a new platform target, and a complete serialization migration.
 
-Monaco Editor version: **0.52.2** (declared `^0.52.2` in `package.json`, resolved `0.52.2`).
+Monaco Editor version: **0.52.2** (declared `^0.52.2` in `package.json`; resolved version verified from `node_modules/monaco-editor/package.json` at release preparation time).
 
 ### Added
 
-- **Desktop Skia target**: new `net10.0-desktop` TFM with WebView2-based presenter and JSON-RPC bridge for cross-platform desktop support (Windows, macOS, Linux)
+- **Desktop Skia support**: desktop platform support on `net10.0` via runtime platform detection, WebView2-based presenter, and JSON-RPC bridge (Windows, macOS, Linux)
 - **`ICodeEditorPresenter` abstraction**: pluggable presenter pattern replacing the monolithic WebView coupling; WASM and Desktop each have dedicated implementations
 - **`EditorLifecycleState` state machine**: deterministic lifecycle management replacing ad-hoc boolean flags with a proper state machine
 - **ESM module bundling**: migrated from AMD/global Monaco script loading to ES modules with esbuild, enabling tree-shaking and faster load times
@@ -74,15 +74,23 @@ Monaco Editor version: **0.52.2** (declared `^0.52.2` in `package.json`, resolve
 - Gate lifecycle notifications on `CoreWebView2` readiness
 - Single-owner `JsonRpc` initialization preventing orphaned instances
 
+### Security
+
+- Navigation allowlist enforces strict origin matching (scheme + exact host + port) to prevent subdomain and query-string bypass attacks
+- WebView2 `Source` is deferred until after `EnsureCoreWebView2Async` completes to prevent allowlist bypass during initialization
+- Inbound message queue uses `Channel.CreateBounded` to prevent DoS via memory exhaustion from untrusted sources
+
 ### Migration Guide
 
 This release contains several breaking changes. Follow these steps to migrate from `Monaco.Editor` 2.0.0-dev.60 or earlier:
 
-1. **Package reference**: Replace `Monaco.Editor` with `Uno.Monaco.Editor` in your project file.
+1. **Target framework**: Upgrade consuming projects to .NET 10 and Uno Platform 5+. The library now targets `net10.0` exclusively.
 
-2. **Newtonsoft.Json removal**: If your project relied on `Newtonsoft.Json` being provided transitively, add `<PackageReference Include="Newtonsoft.Json" />` to your project directly.
+2. **Package reference**: Replace `Monaco.Editor` with `Uno.Monaco.Editor` in your project file.
 
-3. **CommandHandler callbacks**: Replace `JObject`/`JToken` usage with `JsonElement` and its accessor methods (`.GetProperty()`, `.GetString()`, etc.).
+3. **Newtonsoft.Json removal**: If your project relied on `Newtonsoft.Json` being provided transitively, add `<PackageReference Include="Newtonsoft.Json" />` to your project directly.
+
+4. **CommandHandler callbacks**: Replace `JObject`/`JToken` usage with `JsonElement` and its accessor methods (`.GetProperty()`, `.GetString()`, etc.).
 
    ```csharp
    // Before (Newtonsoft)
@@ -92,11 +100,11 @@ This release contains several breaking changes. Follow these steps to migrate fr
    editor.AddCommandAsync(myCommand, (JsonElement args) => { ... });
    ```
 
-4. **Custom JSON converters**: Rewrite `Newtonsoft.Json.JsonConverter` subclasses as `System.Text.Json.Serialization.JsonConverter<T>` implementations.
+5. **Custom JSON converters**: Rewrite `Newtonsoft.Json.JsonConverter` subclasses as `System.Text.Json.Serialization.JsonConverter<T>` implementations.
 
-5. **Type registration**: Replace `AddAssemblyForTypeLookup` calls with `RegisterTypeInfo`.
+6. **Type registration**: Replace `AddAssemblyForTypeLookup` calls with `RegisterTypeInfo`.
 
-6. **Desktop target**: If targeting desktop, implement or use the provided `ICodeEditorPresenter` for WebView2 hosting. The `EditorLifecycleState` state machine governs initialization flow.
+7. **Desktop target**: If targeting desktop, implement or use the provided `ICodeEditorPresenter` for WebView2 hosting. The `EditorLifecycleState` state machine governs initialization flow.
 
 ## [0.9] - 2021-10-27
 
@@ -260,10 +268,10 @@ This release contains several breaking changes. Follow these steps to migrate fr
 
 [Unreleased]: https://github.com/unoplatform/uno.monaco.editor/compare/1.1.0...HEAD
 [0.9]: https://github.com/unoplatform/uno.monaco.editor/compare/v0.7.0...1.0
-[0.8.1]: https://github.com/unoplatform/uno.monaco.editor/compare/v0.7.0...v0.7.0
-[0.8]: https://github.com/unoplatform/uno.monaco.editor/compare/v0.7.0...v0.7.0
+[0.8.1]: https://github.com/unoplatform/uno.monaco.editor/releases/tag/v0.7.0
+[0.8]: https://github.com/unoplatform/uno.monaco.editor/releases/tag/v0.7.0
 [0.7]: https://github.com/unoplatform/uno.monaco.editor/compare/v0.5.0...v0.7.0
-[0.6]: https://github.com/unoplatform/uno.monaco.editor/compare/v0.5.0...v0.5.0
+[0.6]: https://github.com/unoplatform/uno.monaco.editor/releases/tag/v0.5.0
 [0.5]: https://github.com/unoplatform/uno.monaco.editor/compare/v0.4.0...v0.5.0
 [0.4]: https://github.com/unoplatform/uno.monaco.editor/compare/v0.3.0...v0.4.0
 [0.3]: https://github.com/unoplatform/uno.monaco.editor/compare/v0.2.0...v0.3.0
