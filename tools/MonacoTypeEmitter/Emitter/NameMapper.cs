@@ -60,7 +60,9 @@ public static class NameMapper
 
     /// <summary>
     /// Sanitizes a TypeScript identifier into a valid C# identifier fragment.
-    /// Strips <c>$</c> prefixes, surrounding quotes, and replaces dots with underscores.
+    /// Strips <c>$</c> prefixes, surrounding quotes, and splits on any character
+    /// that is not a letter, digit, or underscore (dots, hyphens, spaces, etc.),
+    /// PascalCasing each segment.
     /// </summary>
     private static string SanitizeIdentifier(string tsName)
     {
@@ -74,22 +76,44 @@ public static class NameMapper
             name = name[1..^1];
         }
 
-        // Replace dots with underscores (e.g., "semanticHighlighting.enabled")
-        if (name.Contains('.'))
-        {
-            name = string.Join("",
-                name.Split('.')
-                    .Select(PascalCase));
-        }
-
         // Strip leading $ characters (e.g., "$comment" -> "comment")
         name = name.TrimStart('$');
 
-        // If the name became empty after sanitization, fall back to original
+        // Split on any non-identifier character (dots, hyphens, spaces, etc.)
+        // and PascalCase each segment
+        if (name.Any(c => !char.IsLetterOrDigit(c) && c != '_'))
+        {
+            var segments = SplitOnNonIdentifierChars(name);
+            name = string.Join("", segments.Select(PascalCase));
+        }
+
+        // Prefix with underscore if name starts with a digit
+        if (name.Length > 0 && char.IsDigit(name[0]))
+            name = "_" + name;
+
+        // If the name became empty after sanitization, fall back
         if (string.IsNullOrEmpty(name))
             name = "Value";
 
         return name;
+    }
+
+    /// <summary>
+    /// Splits a string on any character that is not a letter, digit, or underscore,
+    /// filtering out empty segments.
+    /// </summary>
+    private static IEnumerable<string> SplitOnNonIdentifierChars(string input)
+    {
+        var start = 0;
+        for (var i = 0; i <= input.Length; i++)
+        {
+            if (i == input.Length || (!char.IsLetterOrDigit(input[i]) && input[i] != '_'))
+            {
+                if (i > start)
+                    yield return input[start..i];
+                start = i + 1;
+            }
+        }
     }
 
     /// <summary>

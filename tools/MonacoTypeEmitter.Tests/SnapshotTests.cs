@@ -164,4 +164,24 @@ public class SnapshotTests
 
         SnapshotAssert.MatchesVerified("TypePredicate_Position", files["Position.cs"]);
     }
+
+    [Fact]
+    public void HyphenatedQuoted_IAccessibilityOptions()
+    {
+        var model = EmitterTestHelper.LoadModel(
+            EmitterTestHelper.GetTestInputPath("hyphenated-quoted-property.json"));
+        var files = EmitterTestHelper.EmitToMemory(model);
+
+        // Should produce IAccessibilityOptions.cs + AccessibilityOptions.cs
+        Assert.Equal(2, files.Count);
+        Assert.True(files.ContainsKey("Editor/IAccessibilityOptions.cs"),
+            $"Expected 'Editor/IAccessibilityOptions.cs' but got: {string.Join(", ", files.Keys)}");
+
+        // Verify hyphenated property is PascalCased and has JsonPropertyName
+        var content = files["Editor/IAccessibilityOptions.cs"];
+        Assert.Contains("AriaLabel", content);
+        Assert.Contains("[JsonPropertyName(\"aria-label\")]", content);
+
+        SnapshotAssert.MatchesVerified("HyphenatedQuoted_IAccessibilityOptions", files["Editor/IAccessibilityOptions.cs"]);
+    }
 }

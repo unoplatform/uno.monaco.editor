@@ -51,6 +51,31 @@
               "overloads": []
             },
             {
+              "name": "isIPositionDollar",
+              "documentation": "Test if `$node` is an `IPosition` (dollar-prefixed parameter).",
+              "typeParameters": [],
+              "parameters": [
+                {
+                  "name": "$node",
+                  "type": { "kind": "primitive", "name": "any" },
+                  "isOptional": false,
+                  "isRestParameter": false
+                }
+              ],
+              "returnType": { "kind": "intrinsic", "text": "$node is IPosition" },
+              "isStatic": true,
+              "overloads": []
+            },
+            {
+              "name": "isPositionLike",
+              "documentation": "Test if `this` is a `Position`-like object.",
+              "typeParameters": [],
+              "parameters": [],
+              "returnType": { "kind": "intrinsic", "text": "this is IPosition" },
+              "isStatic": false,
+              "overloads": []
+            },
+            {
               "name": "equals",
               "documentation": "Test if position `a` equals position `b`.",
               "typeParameters": [],

@@ -72,7 +72,8 @@ public static class TypeMapper
 
     /// <summary>
     /// Detects whether intrinsic text represents a TypeScript type predicate (type guard).
-    /// Pattern: a simple identifier, followed by " is ", followed by a type name.
+    /// Pattern: a TS identifier (including <c>$</c>, <c>_</c>, or <c>this</c>),
+    /// followed by " is ", followed by a type name.
     /// </summary>
     internal static bool IsTypePredicatePattern(string text)
     {
@@ -80,9 +81,13 @@ public static class TypeMapper
         if (isIndex < 1)
             return false;
 
-        // The part before " is " must be a simple identifier (the parameter name)
+        // The part before " is " must be a valid TS identifier (letters, digits, _, $) or "this"
         var paramPart = text[..isIndex];
-        if (paramPart.Length == 0 || !paramPart.All(c => char.IsLetterOrDigit(c) || c == '_'))
+        if (paramPart.Length == 0)
+            return false;
+
+        if (paramPart != "this" &&
+            !paramPart.All(c => char.IsLetterOrDigit(c) || c == '_' || c == '$'))
             return false;
 
         // The part after " is " must be non-empty (the type name)
