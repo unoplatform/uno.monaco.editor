@@ -1,6 +1,6 @@
-Monaco Editor UWP
-=================
-A *Windows Runtime Component* wrapper around the web-based [Monaco Editor](https://microsoft.github.io/monaco-editor/).  This allows the Monaco Editor to be more easily consumed directly in XAML for C# UWP based projects.
+Monaco Editor for Uno Platform
+==============================
+An [Uno Platform](https://platform.uno/) wrapper around the web-based [Monaco Editor](https://microsoft.github.io/monaco-editor/).  This allows the Monaco Editor to be consumed directly in XAML for C# projects targeting WebAssembly (browserwasm) and Desktop (Skia).
 
 This project is not affiliated with the Monaco team and is provided for convenience.  Please direct issues related to the use of this control wrapper to this repository.
 
@@ -75,13 +75,16 @@ There are some common caveats though called out here:
 
 Build Notes
 -----------
-Built using Visual Studio 2019 for Windows 10 17763 and above.
+Requires the **.NET 10 SDK**.  The project targets `net10.0-browserwasm` and `net10.0-desktop`.
 
-The **released** complete Monaco v0.21.3 build is used as a reference, this is not included in this repository and can be downloaded from the [Monaco site](https://microsoft.github.io/monaco-editor/).  The contents of its uncompressed 'package' directory should be placed in the *MonacoEditorComponent/monaco-editor* directory.  The `install-dependencies.ps1` PowerShell script can install this for you automatically.
+The vendored Monaco editor distribution is not included in this repository and can be downloaded from the [Monaco site](https://microsoft.github.io/monaco-editor/).  The contents of its uncompressed 'package' directory should be placed in the *MonacoEditorComponent/monaco-editor* directory.  The `install-dependencies.ps1` PowerShell script can install this for you automatically.
 
-This component currently won't move beyond Monaco v0.22.3 as it is the last version compatible with the UWP WebView component running the Legacy Microsoft Edge engine. However, that version seems to have other issues running in Edge as well, so we have last tested with v0.21.3. In the future we'll investigate moving to WebView2.
-
-In order to re-generate C# typings from a version of Monaco, see the GenerateMonacoTypings Node.js project [readme here](GenerateMonacoTypings/README.md).
+To build:
+```bash
+pwsh ./install-dependencies.ps1
+dotnet restore MonacoEditorComponent.slnx
+dotnet build MonacoEditorComponent.slnx --no-restore
+```
 
 License
 -------
