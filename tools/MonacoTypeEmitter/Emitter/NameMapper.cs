@@ -1,8 +1,5 @@
 #nullable enable
 
-using System.Globalization;
-using System.Text;
-
 namespace MonacoTypeEmitter.Emitter;
 
 /// <summary>

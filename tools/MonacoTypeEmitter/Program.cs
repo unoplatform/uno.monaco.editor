@@ -16,15 +16,39 @@ for (int i = 0; i < args.Length; i++)
     switch (args[i])
     {
         case "--input" or "-i":
+            if (i + 1 >= args.Length)
+            {
+                Console.Error.WriteLine("Error: --input requires a file path argument");
+                PrintUsage();
+                return 1;
+            }
             inputPath = args[++i];
             break;
         case "--output" or "-o":
+            if (i + 1 >= args.Length)
+            {
+                Console.Error.WriteLine("Error: --output requires a directory path argument");
+                PrintUsage();
+                return 1;
+            }
             outputPath = args[++i];
             break;
         case "--ignore-file":
+            if (i + 1 >= args.Length)
+            {
+                Console.Error.WriteLine("Error: --ignore-file requires a file path argument");
+                PrintUsage();
+                return 1;
+            }
             ignoreFile = args[++i];
             break;
         case "--repo-root":
+            if (i + 1 >= args.Length)
+            {
+                Console.Error.WriteLine("Error: --repo-root requires a directory path argument");
+                PrintUsage();
+                return 1;
+            }
             repoRoot = args[++i];
             break;
         case "--validate":
@@ -155,7 +179,9 @@ static string? FindRepoRoot(string startPath)
     var dir = Directory.Exists(startPath) ? startPath : Path.GetDirectoryName(startPath);
     while (dir is not null)
     {
-        if (Directory.Exists(Path.Combine(dir, ".git")))
+        var gitPath = Path.Combine(dir, ".git");
+        // Support both regular repos (.git directory) and worktrees (.git file)
+        if (Directory.Exists(gitPath) || File.Exists(gitPath))
             return dir;
         dir = Path.GetDirectoryName(dir);
     }

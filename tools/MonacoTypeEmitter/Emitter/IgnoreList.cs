@@ -50,9 +50,9 @@ public sealed class IgnoreList
     }
 
     /// <summary>
-    /// Validates that all entries in the ignore list resolve to actual files
+    /// Validates that all entries in the ignore list resolve to existing files
     /// within the given repository root. Returns a list of entries that do not
-    /// resolve to a unique file.
+    /// resolve to an existing file.
     /// </summary>
     public List<string> Validate(string repoRoot)
     {
