@@ -1105,7 +1105,7 @@ public sealed class CSharpEmitter
         {
             "primitive" when returnType.Name is "string" => "A string value.",
             "primitive" when returnType.Name is "number" => "A numeric value.",
-            "primitive" when returnType.Name is "boolean" => "true if the condition is met; otherwise, false.",
+            "primitive" when returnType.Name is "boolean" => "A boolean value.",
             "reference" when returnType.Name is "Promise" or "PromiseLike" or "Thenable"
                 => $"A task representing the asynchronous operation.",
             "reference" => $"A {returnType.Name} instance.",
