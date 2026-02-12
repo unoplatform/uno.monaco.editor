@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace Monaco.Editor
 {
     /// <summary>
-    /// https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.imarkerdata.html
+    /// <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor_editor_api.editor.IMarkerData.html">monaco.editor.IMarkerData</see>
     /// </summary>
     public sealed class MarkerData : IMarkerData
     {

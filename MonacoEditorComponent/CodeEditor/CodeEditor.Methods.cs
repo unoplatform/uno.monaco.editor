@@ -19,7 +19,7 @@ namespace Monaco
     /// Contains Monaco <c>IEditor</c> method implementations exposed as async helpers on the control.
     /// </summary>
     /// <remarks>
-    /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor.ICodeEditor.html">ICodeEditor</see>
+    /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor_editor_api.editor.ICodeEditor.html">ICodeEditor</see>
     /// for the upstream Monaco API surface.
     /// </remarks>
     public partial class CodeEditor
@@ -368,7 +368,7 @@ namespace Monaco
         /// </summary>
         /// <param name="newDecorations">The replacement decoration set.</param>
         /// <remarks>
-        /// Wraps Monaco <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor.ICodeEditor.html#deltaDecorations">editor.deltaDecorations</see>.
+        /// Wraps Monaco <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor_editor_api.editor.ICodeEditor.html#deltaDecorations">editor.deltaDecorations</see>.
         /// Prefer the <see cref="Decorations"/> property for data-bound management.
         /// </remarks>
         private async Task DeltaDecorationsHelperAsync(IModelDeltaDecoration[] newDecorations)

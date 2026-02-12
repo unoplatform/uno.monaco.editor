@@ -110,10 +110,10 @@ This release contains several breaking changes. Follow these steps to migrate fr
 
 ### Added
 
-- [CodeAction](https://microsoft.github.io/monaco-editor/api/modules/monaco.languages.html#registercodeactionprovider) language service support
-- [CodeLens](https://microsoft.github.io/monaco-editor/api/modules/monaco.languages.html#registercodelensprovider) language service support (onDidChange not supported)
-- [ColorProvider](https://microsoft.github.io/monaco-editor/api/modules/monaco.languages.html#registercolorprovider) language service support
-- [FindMatches](https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.itextmodel.html#findmatches) model methods
+- [CodeAction](https://microsoft.github.io/monaco-editor/typedoc/functions/editor_editor_api.languages.registerCodeActionProvider.html) language service support
+- [CodeLens](https://microsoft.github.io/monaco-editor/typedoc/functions/editor_editor_api.languages.registerCodeLensProvider.html) language service support (onDidChange not supported)
+- [ColorProvider](https://microsoft.github.io/monaco-editor/typedoc/functions/editor_editor_api.languages.registerColorProvider.html) language service support
+- [FindMatches](https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor_editor_api.editor.ITextModel.html) model methods
 - Converter script to generate typings from Monaco (thanks to @hez2010)
 - Expose `ReadOnly` property
 
@@ -171,8 +171,8 @@ This release contains several breaking changes. Follow these steps to migrate fr
 ### Added
 
 - Initial language provider APIs:
-  - [CompletionItem](https://microsoft.github.io/monaco-editor/api/modules/monaco.languages.html#registercompletionitemprovider) (IntelliSense, Snippets, etc.)
-  - [Hover](https://microsoft.github.io/monaco-editor/api/modules/monaco.languages.html#registerhoverprovider)
+  - [CompletionItem](https://microsoft.github.io/monaco-editor/typedoc/functions/editor_editor_api.languages.registerCompletionItemProvider.html) (IntelliSense, Snippets, etc.)
+  - [Hover](https://microsoft.github.io/monaco-editor/typedoc/functions/editor_editor_api.languages.registerHoverProvider.html)
 - `install-dependencies.ps1` script to pull down required Monaco reference
 - Test app loads content from file and provides info on things to try
 
@@ -221,7 +221,7 @@ This release contains several breaking changes. Follow these steps to migrate fr
 
 ### Added
 
-- Support for [Markers](https://microsoft.github.io/monaco-editor/api/modules/monaco.editor.html#setmodelmarkers)
+- Support for [Markers](https://microsoft.github.io/monaco-editor/typedoc/functions/editor_editor_api.editor.setModelMarkers.html)
 - Opening/intercepting URIs typed in the editor
 - `InternalException` event for better pre-release error information
 
@@ -234,9 +234,9 @@ This release contains several breaking changes. Follow these steps to migrate fr
 
 ### Added
 
-- Support for [Action](https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.istandalonecodeeditor.html#addaction) and [Command](https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.istandalonecodeeditor.html#addcommand) editor extensions
-- [IEditorOptions](https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.ieditoroptions.html) support through `CodeEditor.Options` property with primary-level property auto-update
-- Initial single [IModel](https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.imodel.html) support through `CodeEditor.GetModel()`
+- Support for [Action](https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor_editor_api.editor.IStandaloneCodeEditor.html) and [Command](https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor_editor_api.editor.IStandaloneCodeEditor.html) editor extensions
+- [IEditorOptions](https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor_editor_api.editor.IEditorOptions.html) support through `CodeEditor.Options` property with primary-level property auto-update
+- Initial single [IModel](https://microsoft.github.io/monaco-editor/typedoc/types/editor_editor_api.editor.IModel.html) support through `CodeEditor.GetModel()`
 - Support to retrieve `SelectedText`
 - Use minified Monaco library and build for Any CPU
 

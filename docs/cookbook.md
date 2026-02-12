@@ -61,7 +61,7 @@ private void Editor_Loaded(object sender, RoutedEventArgs e)
 }
 ```
 
-The `CodeLanguage` property accepts any [Monaco language identifier](https://microsoft.github.io/monaco-editor/typedoc/modules/languages.html) such as `"csharp"`, `"javascript"`, `"python"`, `"xml"`, `"json"`, etc.
+The `CodeLanguage` property accepts any [Monaco language identifier](https://microsoft.github.io/monaco-editor/typedoc/modules/editor_editor_api.languages.html) such as `"csharp"`, `"javascript"`, `"python"`, `"xml"`, `"json"`, etc.
 
 You can also determine the language from a file extension:
 

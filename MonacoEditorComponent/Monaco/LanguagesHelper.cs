@@ -14,7 +14,7 @@ namespace Monaco
     /// </summary>
     /// <remarks>
     /// Obtain an instance from <see cref="CodeEditor.Languages"/>. Do not construct directly.
-    /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/modules/languages.html">monaco.languages</see>.
+    /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/modules/editor_editor_api.languages.html">monaco.languages</see>.
     /// </remarks>
     [method: Obsolete("Use <Editor Instance>.Languages.* instead of constructing your own LanguagesHelper.")]
     [method: EditorBrowsable(EditorBrowsableState.Never)]

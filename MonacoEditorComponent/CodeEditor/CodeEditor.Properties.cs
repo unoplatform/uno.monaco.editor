@@ -16,7 +16,7 @@ namespace Monaco
         /// completion, hover, code-action, and code-lens providers.
         /// </summary>
         /// <remarks>
-        /// Wraps <see href="https://microsoft.github.io/monaco-editor/typedoc/modules/languages.html">monaco.languages</see>.
+        /// Wraps <see href="https://microsoft.github.io/monaco-editor/typedoc/modules/editor_editor_api.languages.html">monaco.languages</see>.
         /// </remarks>
         public LanguagesHelper Languages { get; }
 

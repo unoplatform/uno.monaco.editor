@@ -4,7 +4,7 @@ using Monaco.Helpers;
 namespace Monaco.Editor
 {
     /// <summary>
-    /// https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.iwordatposition.html
+    /// <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor_editor_api.editor.IWordAtPosition.html">monaco.editor.IWordAtPosition</see>
     /// </summary>
     [JsonConverter(typeof(InterfaceToClassConverter<IWordAtPosition, WordAtPosition>))]
     public interface IWordAtPosition

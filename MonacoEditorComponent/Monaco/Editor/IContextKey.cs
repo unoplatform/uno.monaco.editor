@@ -1,7 +1,7 @@
 ﻿namespace Monaco.Editor
 {
     /// <summary>
-    /// https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.icontextkey.html
+    /// <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor_editor_api.editor.IContextKey.html">monaco.editor.IContextKey</see>
     /// 
     /// Supports bools only as Windows Runtime Type doesn't support generics.
     /// </summary>

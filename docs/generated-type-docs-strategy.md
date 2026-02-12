@@ -204,14 +204,14 @@ Modify `CSharpEmitter.WriteDocComment()` and related methods:
 
    | Kind | Namespace | URL pattern |
    |------|-----------|-------------|
-   | interface | `monaco.editor` | `https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor.{TypeName}.html` |
-   | interface | `monaco.languages` | `https://microsoft.github.io/monaco-editor/typedoc/interfaces/languages.{TypeName}.html` |
-   | interface | `monaco` | `https://microsoft.github.io/monaco-editor/typedoc/interfaces/{TypeName}.html` |
-   | enum | `monaco.editor` | `https://microsoft.github.io/monaco-editor/typedoc/enums/editor.{TypeName}.html` |
-   | enum | `monaco.languages` | `https://microsoft.github.io/monaco-editor/typedoc/enums/languages.{TypeName}.html` |
-   | enum | `monaco` | `https://microsoft.github.io/monaco-editor/typedoc/enums/{TypeName}.html` |
-   | class | `monaco` | `https://microsoft.github.io/monaco-editor/typedoc/classes/{TypeName}.html` |
-   | type alias | (any) | `https://microsoft.github.io/monaco-editor/typedoc/types/{ns}.{TypeName}.html` |
+   | interface | `monaco.editor` | `https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor_editor_api.editor.{TypeName}.html` |
+   | interface | `monaco.languages` | `https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor_editor_api.languages.{TypeName}.html` |
+   | interface | `monaco` | `https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor_editor_api.{TypeName}.html` |
+   | enum | `monaco.editor` | `https://microsoft.github.io/monaco-editor/typedoc/enums/editor_editor_api.editor.{TypeName}.html` |
+   | enum | `monaco.languages` | `https://microsoft.github.io/monaco-editor/typedoc/enums/editor_editor_api.languages.{TypeName}.html` |
+   | enum | `monaco` | `https://microsoft.github.io/monaco-editor/typedoc/enums/editor_editor_api.{TypeName}.html` |
+   | class | `monaco` | `https://microsoft.github.io/monaco-editor/typedoc/classes/editor_editor_api.{TypeName}.html` |
+   | type alias | (any) | `https://microsoft.github.io/monaco-editor/typedoc/types/editor_editor_api.{ns}.{TypeName}.html` |
 
    The emitter should construct links based on the source namespace and symbol kind
    from the intermediate model. If a specific URL pattern cannot be determined (e.g.,

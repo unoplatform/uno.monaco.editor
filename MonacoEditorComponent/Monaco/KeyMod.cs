@@ -3,7 +3,7 @@
 namespace Monaco
 {
     /// <summary>
-    /// https://microsoft.github.io/monaco-editor/api/classes/monaco.keymod.html
+    /// <see href="https://microsoft.github.io/monaco-editor/typedoc/classes/editor_editor_api.KeyMod.html">monaco.KeyMod</see>
     /// </summary>
     public sealed class KeyMod
     {

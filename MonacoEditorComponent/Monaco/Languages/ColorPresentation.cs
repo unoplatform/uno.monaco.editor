@@ -5,7 +5,7 @@ namespace Monaco.Languages
 {
     /// <summary>
     /// String representations for a color.
-    /// <seealso href="https://microsoft.github.io/monaco-editor/api/interfaces/monaco.languages.icolorpresentation.html">monaco.languages.IColorPresentation</seealso>
+    /// <seealso href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor_editor_api.languages.IColorPresentation.html">monaco.languages.IColorPresentation</seealso>
     /// </summary>
     public sealed class ColorPresentation(string label)
     {

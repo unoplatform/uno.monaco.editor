@@ -6,8 +6,8 @@ namespace Monaco.Editor;
 
 /// <summary>
 /// Helper to access IModel interface methods off of CodeEditor object.
-/// https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.imodel.html
-/// https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.itextmodel.html
+/// <see href="https://microsoft.github.io/monaco-editor/typedoc/types/editor_editor_api.editor.IModel.html">monaco.editor.IModel</see>,
+/// <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor_editor_api.editor.ITextModel.html">monaco.editor.ITextModel</see>
 /// </summary>
 public sealed class ModelHelper(CodeEditor editor) : IModel
 {
