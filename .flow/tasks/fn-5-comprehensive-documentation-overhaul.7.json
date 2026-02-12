@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-12T04:45:44.198083Z",
+  "depends_on": [
+    "fn-5-comprehensive-documentation-overhaul.3",
+    "fn-5-comprehensive-documentation-overhaul.4"
+  ],
+  "epic": "fn-5-comprehensive-documentation-overhaul",
+  "id": "fn-5-comprehensive-documentation-overhaul.7",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-5-comprehensive-documentation-overhaul.7.md",
+  "status": "todo",
+  "title": "Write getting started guide and API cookbook",
+  "updated_at": "2026-02-12T04:48:24.457541Z"
+}

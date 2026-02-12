@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-12T04:45:43.549235Z",
+  "depends_on": [],
+  "epic": "fn-5-comprehensive-documentation-overhaul",
+  "id": "fn-5-comprehensive-documentation-overhaul.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-5-comprehensive-documentation-overhaul.5.md",
+  "status": "todo",
+  "title": "Add XML documentation to hand-written public APIs",
+  "updated_at": "2026-02-12T04:47:44.473691Z"
+}
