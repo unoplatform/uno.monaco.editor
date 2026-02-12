@@ -2,10 +2,12 @@
 
 > **Branch**: `ralph-20260211-093916-012f`
 > **Base SHA**: `fc42320b13ea6cd5ecc32a7ff172c005bc61e630` (merge-base with `main`)
-> **Head SHA**: `99ff9c5df7f092909be40d313bf58f55348f136b`
-> **Commits**: 150
-> **Diff summary**: 526 files changed, 37,520 insertions, 71,918 deletions
-> **Monaco version**: 0.52.2 (declared `^0.52.2` in `package.json`)
+> **Snapshot cutoff**: `99ff9c5` (fn-4 completion, pre-documentation commits)
+> **Implementation commits**: 150 (at snapshot cutoff; documentation commits follow)
+> **Diff summary at cutoff**: 526 files changed, 37,520 insertions, 71,918 deletions
+> **Monaco version**: 0.52.2 (resolved from `^0.52.2` in `package.json`; planning specs reference `0.54.0` which was the version at spec-writing time)
+>
+> *Note: This guide is itself part of the branch. Stats above reflect the implementation cutoff before documentation epic fn-5 began.*
 
 ---
 
@@ -47,6 +49,9 @@ This branch delivers four epics of work that collectively transform `uno.monaco.
 | `ICodeEditorPresenter` interface extracted | Casting to concrete types will break | Program against `ICodeEditorPresenter` |
 | Platform-asymmetric APIs throw `PlatformNotSupportedException` on Desktop | `AddActionAsync`, `AddCommandAsync` fail at runtime on Desktop Skia | Guard with `OperatingSystem.IsBrowser()` or catch the exception |
 | `MonacoJsonContext` source-gen context required for AOT | Direct `JsonSerializer.Serialize<T>()` without context fails in AOT | Use `MonacoJsonContext.Default` or register types in your own context |
+| `CommandHandler` delegate receives `JsonElement` instead of `JObject` | Command handler callbacks that inspect arguments via `JObject` APIs will break | Use `JsonElement.GetProperty()`, `.GetString()`, etc. instead of JObject indexers |
+| Newtonsoft.Json transitive dependency removed | Projects relying on Newtonsoft being provided transitively must add their own reference | Add `<PackageReference Include="Newtonsoft.Json" />` if still needed |
+| Custom Newtonsoft `JsonConverter` subclasses no longer recognized | Converters extending `Newtonsoft.Json.JsonConverter` are not used by STJ | Rewrite as `System.Text.Json.Serialization.JsonConverter<T>` implementations |
 | Nerdbank.GitVersioning version: `6.5.0-dev.{height}` | NuGet version scheme changed | No action needed; informational |
 
 ---
@@ -128,13 +133,13 @@ This branch delivers four epics of work that collectively transform `uno.monaco.
 | `.github/actions/nuget-uno-publish/action.yml` | NuGet publish action updates |
 | `.github/actions/tag-release/action.yml` | Release tagging changes |
 
-**Review focus**: The CI workflow now has multiple jobs (build, WASM tests, desktop tests, coverage merge). Desktop tests are marked `continue-on-error` because headless CI runners lack a GUI for WebView2.
+**Review focus**: The CI workflow now has multiple jobs (build, WASM tests, desktop tests, coverage merge). The desktop-tests job filters out `DesktopCDP` and `WasmPlaywright` test traits via `--filter-not-trait`, running only unit tests on Windows. No DesktopCDP integration tests are currently gated in CI because headless runners lack the GUI environment WebView2 requires.
 
 ---
 
 ### fn-4: Type Generation Pipeline
 
-**Goal**: Replace the broken T4-based type generator with a new two-stage pipeline: ts-morph TypeScript extractor producing intermediate JSON, and a .NET CLI emitter producing C# source files.
+**Goal**: Replace the broken TypedocConverter/PowerShell type generator with a new two-stage pipeline: ts-morph TypeScript extractor producing intermediate JSON, and a .NET CLI emitter producing C# source files.
 
 **Key commits** (chronological):
 - `323d8ee` — ts-morph Monaco type extractor (TypeScript)
@@ -278,7 +283,7 @@ Follow `git log main..HEAD --oneline` in reverse order. The commits are organize
 
 | Area | Risk | Mitigation |
 |------|------|------------|
-| CI workflow | Job failures on new runner images | `continue-on-error` on desktop tests; macOS ARM job added |
+| CI workflow | Job failures on new runner images | Desktop tests filter out DesktopCDP/WasmPlaywright traits; macOS ARM job added |
 | Package rename | Consumers not finding package | Documented as breaking change |
 
 ---
@@ -315,7 +320,7 @@ Follow `git log main..HEAD --oneline` in reverse order. The commits are organize
 
 2. **Desktop `AddActionAsync` / `AddCommandAsync`**: These throw `PlatformNotSupportedException` on Desktop Skia. The JSON-RPC bridge does not yet support the callback registration pattern these APIs require.
 
-3. **Desktop tests marked `continue-on-error`**: Headless CI runners do not have a GUI, and WebView2 requires a display context. Desktop tests pass locally but may fail in CI.
+3. **Desktop integration tests excluded from CI**: The `desktop-tests` job filters out `DesktopCDP` and `WasmPlaywright` test traits because headless CI runners lack the GUI environment WebView2 requires. Only unit tests run in the desktop-tests CI job. DesktopCDP integration tests pass locally but are not gated in CI.
 
 4. **SYSLIB1031 suppression**: STJ source generator diagnostics cannot be suppressed via `#pragma` (they are emitted on generated files). Suppressed at project level with a documented rationale and a safety test.
 
@@ -355,7 +360,7 @@ Use the severity labels from the dotnet/runtime 3-step review pattern:
 - [ ] All CI jobs install required workloads (`wasm-tools`)
 - [ ] Playwright browser install uses correct driver path
 - [ ] Coverage merge step collects from all test jobs
-- [ ] Desktop tests are `continue-on-error` (expected to fail headless)
+- [ ] Desktop tests filter out `DesktopCDP` and `WasmPlaywright` traits (headless CI limitation)
 
 ### fn-4: Type Generation
 
