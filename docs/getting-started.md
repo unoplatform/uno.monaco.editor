@@ -253,6 +253,6 @@ Check that the editor has keyboard focus. Use `Editor.Focus(FocusState.Programma
 
 ## Next Steps
 
-- **[API Cookbook](cookbook.md)** -- 12 recipe-style examples for common scenarios
+- **[API Cookbook](cookbook.md)** -- 15 recipe-style examples for common scenarios
 - **[Architecture](architecture.md)** -- deep dive into the dual-platform interop model
 - **[Monaco Editor documentation](https://microsoft.github.io/monaco-editor/typedoc/index.html)** -- upstream TypeScript API reference
