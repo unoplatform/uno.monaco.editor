@@ -17,6 +17,7 @@ The uno.monaco.editor codebase has undergone 4 epics of significant refactoring:
 6. **XML Documentation Strategy — Generated Monaco Types** — Decide and document strategy (emitter-driven vs post-process) with frozen fn-4 output baseline
 7. **Getting Started Guide & API Cookbook** — Step-by-step tutorials, common scenarios, validated code examples
 8. **XML Documentation Implementation — Generated Monaco Types** — Execute chosen strategy from task 6, regenerate and validate docs
+9. **Broken Link Audit** — Fix ~30+ broken Monaco API URLs (`/api/` → `/typedoc/`) across README, CHANGELOG, and C# XML comments; verify all external links resolve
 
 ## Approach
 
@@ -28,6 +29,8 @@ The uno.monaco.editor codebase has undergone 4 epics of significant refactoring:
 - Cross-reference upstream Monaco TypeDoc API where applicable (`<see href="..."/>`)
 - Platform-asymmetric APIs (e.g., `AddActionAsync` throws `PlatformNotSupportedException` on desktop) documented with explicit platform notes
 - **Monaco version verification**: Before any task references the Monaco version, verify from root `package.json` (declared: `^0.52.2`) and `node_modules/monaco-editor/package.json` (resolved version) — never hard-code without checking
+- **Project maturity**: The project is NOT in alpha. Remove all "early alpha" or "alpha state" language from README and any other documentation. The project is a stable wrapper around Monaco Editor.
+- **Link integrity**: All external URLs (especially Monaco API references) must be verified. The old `/api/` docs are fully removed (404); use `/typedoc/` equivalents.
 
 ## Coordination
 
@@ -61,6 +64,8 @@ dotnet build MonacoEditorComponent.slnx --no-restore
 - [ ] Getting started guide with validated code examples for WASM and Desktop
 - [ ] API cookbook covers: set text/language, listen to changes, register providers, add decorations/markers
 - [ ] fn-4.7 spec updated to remove absorbed README scope
+- [ ] All external URLs verified — no broken links in markdown or C# XML comments
+- [ ] No "alpha state" language in any documentation
 
 ## References
 

@@ -48,3 +48,10 @@ Fix the test runner TypeLoadException that crashes CI on all platforms by updati
 - [ ] Local `dotnet test` passes for MonacoTypeEmitter.Tests
 - [ ] Changes pushed to active PR branch
 - [ ] All required CI checks on active PR are green (Build, Build macOS ARM, Desktop Tests, Coverage Report)
+
+## Done summary
+Resolved CI TypeLoadException by removing redundant Microsoft.NET.Test.Sdk (conflicted with xunit.v3.mtp-v2's bundled MTP v2), updating xunit.v3.mtp-v2 to 3.2.2 and CodeCoverage to 18.4.1, and adding TrxReport 2.0.2 across both test projects.
+## Evidence
+- Commits: bf53dfd1c716ec07618cdf2327684ef6f8851d89
+- Tests: dotnet build MonacoEditorComponent.slnx --no-restore, dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -- --filter-not-trait Category=DesktopCDP, dotnet test --project tools/MonacoTypeEmitter.Tests/MonacoTypeEmitter.Tests.csproj
+- PRs:
