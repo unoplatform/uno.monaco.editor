@@ -35,9 +35,8 @@ Also add to the "Development Workflow" validation checklist:
 - [ ] Development Workflow checklist updated to include CI verification step
 - [ ] CI still passes after AGENTS.md update is pushed
 ## Done summary
-TBD
-
+Added CI Verification Policy section to AGENTS.md with CI job structure table, known limitations (Desktop CDP and WASM Playwright exclusions), gh pr checks examples, and failure workflow. Updated Development Workflow checklist with step 4 for CI verification.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: ccd362f291c023fa480c1775a28d57cc50ee5f79
+- Tests: documentation-only change, no test commands needed
 - PRs:
