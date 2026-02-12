@@ -16,9 +16,16 @@ public class SmokeTests
 {
     /// <summary>
     /// Full pipeline smoke test: load real model.json from extractor output,
-    /// emit C# files, then compile the enum subset (which has no external dependencies
-    /// and no edge-case identifier issues) in an isolated temp project.
+    /// emit C# files, then compile the enum subset in an isolated temp project.
     /// This validates the full parse -> emit -> compile pipeline.
+    ///
+    /// Compilation scope: Enums are compiled because they are self-contained (no cross-type
+    /// dependencies). Full model compilation is not feasible because Monaco's TypeScript API
+    /// includes exotic identifiers ($ prefixes, dot-separated property names, 'is' as method
+    /// names) that produce invalid C# -- these are known emitter limitations documented in the
+    /// model. The serialization attribute chain (InterfaceToClassConverter, JsonStringEnumConverter,
+    /// JsonPropertyName) is validated separately by FullPipeline_SerializationAttributes_Present
+    /// and the WireFormatCompatibility_FullAttributeChain round-trip test.
     /// </summary>
     [Fact]
     public void FullPipeline_EmitAndCompileEnums()
@@ -135,11 +142,17 @@ public class SmokeTests
     }
 
     /// <summary>
-    /// Validates that emitted types include the correct serialization infrastructure:
-    /// JsonPropertyName attributes for camelCase wire format, InterfaceToClassConverter
-    /// for interface-typed properties, and JsonStringEnumConverter for string enums.
-    /// This validates the converter/context serialization subset without requiring
-    /// compilation of the full model (which has exotic TS identifiers).
+    /// Validates that emitted types include the correct serialization infrastructure
+    /// required for JSON round-trip fidelity with MonacoJsonContext:
+    /// - InterfaceToClassConverter on I-prefix interfaces (enables deserialization)
+    /// - JsonStringEnumConverter + EnumMember on string enum type aliases
+    /// - Concrete sealed classes implementing their interface counterparts
+    /// - Correct absence of JsonStringEnumConverter on numeric enums
+    ///
+    /// This validates the converter/context serialization contract that
+    /// SerializationContractTests exercises at runtime. The emitter's responsibility
+    /// is producing code with the correct attributes; the runtime behavior is
+    /// verified by the existing SerializationContractTests suite (~40 tests).
     /// </summary>
     [Fact]
     public void FullPipeline_SerializationAttributes_Present()

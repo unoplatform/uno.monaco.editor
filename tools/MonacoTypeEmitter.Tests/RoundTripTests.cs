@@ -208,8 +208,15 @@ public partial class RoundTripTests
     /// <summary>
     /// Verifies the emitted TextEditorCursorStyle enum has the correct numeric values
     /// matching the Monaco API (Line=1, Block=2, Underline=3, LineThin=4, BlockOutline=5, UnderlineThin=6).
-    /// This is the underlying numeric enum for cursor styles; the string enum CursorStyle
-    /// is a hand-tuned type alias in the real repo.
+    ///
+    /// CursorStyle coverage rationale: The repo's CursorStyle is a hand-tuned string enum
+    /// (block, line, underline, etc.) on the ignore list. In the Monaco TS API, cursor styles
+    /// are represented by both:
+    ///   - TextEditorCursorStyle (numeric enum: Line=1, Block=2, etc.) -- emittable
+    ///   - CursorStyle (type alias: "block"|"line"|"underline"|...) -- hand-tuned, on ignore list
+    /// This test validates the numeric enum path. The string enum emission path (same
+    /// JsonStringEnumConverter+EnumMember pattern used by CursorStyle) is covered by
+    /// BuiltinTheme_EmittedValues_AreStringEnum and WireFormatCompatibility_FullAttributeChain.
     /// </summary>
     [Fact]
     public void TextEditorCursorStyle_EmittedValues_MatchMonacoApi()
@@ -234,6 +241,48 @@ public partial class RoundTripTests
 
         // Must NOT have JsonStringEnumConverter (it's a numeric enum)
         Assert.DoesNotContain("JsonStringEnumConverter", content);
+
+        // Member names must match what SerializationContractTests expects
+        // (Block, Line, Underline map to CursorStyle values block, line, underline)
+        Assert.Contains("public enum TextEditorCursorStyle", content);
+    }
+
+    /// <summary>
+    /// Validates that the string enum emission path (used by CursorStyle in the real repo)
+    /// produces correct JsonStringEnumConverter + EnumMember attributes with hyphenated wire
+    /// values. Uses BuiltinTheme as the validation target because CursorStyle is on the
+    /// ignore list (hand-tuned with custom constructor). Both use the same emission code path
+    /// in CSharpEmitter.EmitTypeAliasEnum.
+    /// </summary>
+    [Fact]
+    public void StringEnumEmissionPath_MatchesCursorStylePattern()
+    {
+        var model = EmitterTestHelper.LoadModel(EmitterTestHelper.GetFullModelPath());
+        var files = EmitterTestHelper.EmitToMemory(model);
+
+        // BuiltinTheme exercises the same code path as CursorStyle:
+        // both are type aliases with string literal unions, emitted via EmitTypeAliasEnum
+        var content = files.First(f =>
+            f.Key.EndsWith("BuiltinTheme.cs", StringComparison.OrdinalIgnoreCase)).Value;
+
+        // Must have JsonConverter attribute (same as CursorStyle in the repo)
+        Assert.Contains("[JsonConverter(typeof(JsonStringEnumConverter<BuiltinTheme>))]", content);
+
+        // Must have per-member JsonStringEnumMemberName (exact wire values)
+        Assert.Contains("[JsonStringEnumMemberName(\"vs\")]", content);
+        Assert.Contains("[JsonStringEnumMemberName(\"vs-dark\")]", content);
+        Assert.Contains("[JsonStringEnumMemberName(\"hc-black\")]", content);
+        Assert.Contains("[JsonStringEnumMemberName(\"hc-light\")]", content);
+
+        // Must have EnumMember for non-STJ serializers
+        Assert.Contains("[EnumMember(Value = \"vs\")]", content);
+        Assert.Contains("[EnumMember(Value = \"vs-dark\")]", content);
+
+        // PascalCase member names with hyphenated wire values -- same pattern as CursorStyle
+        // (CursorStyle has Block/BlockOutline/Line/LineThin/Underline/UnderlineThin
+        //  with wire values block/block-outline/line/line-thin/underline/underline-thin)
+        Assert.Contains("VsDark", content);
+        Assert.Contains("HcBlack", content);
     }
 
     /// <summary>
