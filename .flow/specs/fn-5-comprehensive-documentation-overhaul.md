@@ -9,13 +9,14 @@ The uno.monaco.editor codebase has undergone 4 epics of significant refactoring:
 
 ## Scope
 
-1. **PR Reviewer Guide** — Reading order and context for the massive refactoring PR (current branch → main)
-2. **CHANGELOG** — Rewrite to Keep a Changelog format; document all breaking changes from 2.0.0-dev.60; note Monaco version shipped (0.54.0)
+1. **PR Reviewer Guide** — Reading order and context for the massive refactoring PR (current branch → main), pinned to exact commit range
+2. **CHANGELOG** — Rewrite to Keep a Changelog format; document all breaking changes from 2.0.0-dev.60; verify and note Monaco version shipped
 3. **Architecture Design Docs** — Mermaid diagrams for dual-platform interop (WASM JSExport vs Desktop JSON-RPC), lifecycle state machine, presenter pattern, serialization layer
 4. **README Major Rewrite** — NuGet README standards, platform matrix, getting started, feature overview (absorbs fn-4.7 README scope)
-5. **XML Documentation — Hand-written Code** — Full XML docs on CodeEditor partials, presenter types, bridge layer, serialization, helpers, extensions
-6. **XML Documentation — Generated Monaco Types** — XML docs on emitter output (details TBD after fn-4 completes)
-7. **Getting Started Guide & API Cookbook** — Step-by-step tutorials, common scenarios, code examples
+5. **XML Documentation — Hand-written Code** — Full XML docs on all hand-written public APIs; discovery pass to ensure 0 undocumented symbols; enforced via CS1591
+6. **XML Documentation Strategy — Generated Monaco Types** — Decide and document strategy (emitter-driven vs post-process) with frozen fn-4 output baseline
+7. **Getting Started Guide & API Cookbook** — Step-by-step tutorials, common scenarios, validated code examples
+8. **XML Documentation Implementation — Generated Monaco Types** — Execute chosen strategy from task 6, regenerate and validate docs
 
 ## Approach
 
@@ -26,17 +27,21 @@ The uno.monaco.editor codebase has undergone 4 epics of significant refactoring:
 - PR reviewer guide follows dotnet/runtime 3-step review pattern with severity labels
 - Cross-reference upstream Monaco TypeDoc API where applicable (`<see href="..."/>`)
 - Platform-asymmetric APIs (e.g., `AddActionAsync` throws `PlatformNotSupportedException` on desktop) documented with explicit platform notes
+- **Monaco version verification**: Before any task references the Monaco version, verify from `MonacoEditorComponent/monaco-editor/` or `package.json` — never hard-code without checking
 
 ## Coordination
 
-- **fn-4 dependency**: This epic runs after fn-4 completes. Task fn-5.6 (generated type XML docs) needs fn-4.5 emitter output to be stable.
-- **fn-4.7 absorbed**: README updates from fn-4.7 are absorbed into fn-5.4. Task fn-4.7 should skip README changes or be updated to exclude them.
+- **fn-4 dependency**: This epic runs after fn-4 completes. Tasks fn-5.6 and fn-5.8 (generated type XML docs) need fn-4.5 emitter output to be stable.
+- **fn-4.7 absorbed**: README updates from fn-4.7 are absorbed into fn-5.4. **Action required**: Update fn-4.7 spec to remove README scope and note it is handled by fn-5.4. This prevents duplicate work.
 - **Package rename**: Document the NuGet ID change from `Monaco.Editor` to `Uno.Monaco.Editor` as a breaking change.
 
 ## Quick commands
 
 ```bash
-# Validate XML doc coverage after changes
+# Verify Monaco version from source of truth
+cat MonacoEditorComponent/monaco-editor/package.json | grep version
+
+# Validate XML doc coverage after changes (enforces CS1591)
 dotnet build MonacoEditorComponent.slnx /warnaserror:CS1591
 
 # Build to verify docs don't break compilation
@@ -45,14 +50,16 @@ dotnet build MonacoEditorComponent.slnx --no-restore
 
 ## Acceptance
 
-- [ ] PR reviewer guide exists and covers all 4 epics of refactoring with reading order
+- [ ] PR reviewer guide exists and covers all 4 epics with reading order, pinned to exact commit range (base SHA, head SHA)
 - [ ] CHANGELOG.md follows Keep a Changelog 1.1.0 format with all changes from 2.0.0-dev.60
 - [ ] Architecture docs exist with Mermaid diagrams for: dual-platform interop flow, lifecycle state machine, presenter pattern, serialization layer
 - [ ] README.md rewritten with: platform matrix, getting started, NuGet install, feature overview, badges
-- [ ] All hand-written public members have XML docs (`<summary>`, `<param>`, `<returns>` minimum)
-- [ ] Generated Monaco types have XML docs (after fn-4.5 emitter completes)
+- [ ] 0 undocumented hand-written public symbols; verified via `dotnet build /warnaserror:CS1591`
+- [ ] Generated Monaco type XML doc strategy decided and documented
+- [ ] Generated Monaco types have XML docs (after strategy execution)
 - [ ] Getting started guide with working code examples for WASM and Desktop targets
 - [ ] API cookbook covers: set text/language, listen to changes, register providers, add decorations/markers
+- [ ] fn-4.7 spec updated to remove absorbed README scope
 
 ## References
 

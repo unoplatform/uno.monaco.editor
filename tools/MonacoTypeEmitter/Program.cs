@@ -100,6 +100,7 @@ if (repoRoot is null)
 }
 
 // Load ignore file
+var ignoreFileExplicit = ignoreFile is not null;
 ignoreFile ??= Path.Combine(Path.GetDirectoryName(typeof(Program).Assembly.Location) ?? ".",
     ".generator-ignore");
 
@@ -109,6 +110,18 @@ if (!File.Exists(ignoreFile))
     var toolDir = FindToolDirectory();
     if (toolDir is not null)
         ignoreFile = Path.Combine(toolDir, ".generator-ignore");
+}
+
+if (!File.Exists(ignoreFile))
+{
+    if (ignoreFileExplicit)
+    {
+        Console.Error.WriteLine($"Error: Specified ignore file not found: {ignoreFile}");
+        return 1;
+    }
+
+    Console.Error.WriteLine("Warning: No .generator-ignore file found. All types will be emitted.");
+    Console.Error.WriteLine("  Use --ignore-file to specify one, or create one next to the tool.");
 }
 
 var ignoreList = IgnoreList.Load(ignoreFile);

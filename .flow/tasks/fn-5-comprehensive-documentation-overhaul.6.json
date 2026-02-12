@@ -3,14 +3,12 @@
   "claim_note": "",
   "claimed_at": null,
   "created_at": "2026-02-12T04:45:43.829085Z",
-  "depends_on": [
-    "fn-5-comprehensive-documentation-overhaul.5"
-  ],
+  "depends_on": [],
   "epic": "fn-5-comprehensive-documentation-overhaul",
   "id": "fn-5-comprehensive-documentation-overhaul.6",
   "priority": null,
   "spec_path": ".flow/tasks/fn-5-comprehensive-documentation-overhaul.6.md",
   "status": "todo",
   "title": "Add XML documentation to generated Monaco types",
-  "updated_at": "2026-02-12T04:48:06.163072Z"
+  "updated_at": "2026-02-12T04:59:31.348392Z"
 }

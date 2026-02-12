@@ -290,11 +290,12 @@ public sealed class CSharpEmitter
         var extendsClause = "";
         if (iface.Extends.Count > 0)
         {
-            var baseTypes = iface.Extends.Select(e => e.Name).ToList();
+            var baseTypes = iface.Extends.Select(FormatTypeReference).ToList();
             extendsClause = $" : {string.Join(", ", baseTypes)}";
         }
 
-        sb.AppendLine($"    public interface {iface.Name}{extendsClause}");
+        var declTypeParams = FormatTypeParameters(iface.TypeParameters);
+        sb.AppendLine($"    public interface {iface.Name}{declTypeParams}{extendsClause}");
         sb.AppendLine("    {");
 
         foreach (var prop in iface.Properties)
@@ -428,13 +429,14 @@ public sealed class CSharpEmitter
         var baseClause = "";
         var bases = new List<string>();
         if (cls.Extends is not null)
-            bases.Add(cls.Extends.Name);
+            bases.Add(FormatTypeReference(cls.Extends));
         foreach (var impl in cls.Implements)
-            bases.Add(impl.Name);
+            bases.Add(FormatTypeReference(impl));
         if (bases.Count > 0)
             baseClause = $" : {string.Join(", ", bases)}";
 
-        sb.AppendLine($"    public sealed class {cls.Name}{baseClause}");
+        var declTypeParams = FormatTypeParameters(cls.TypeParameters);
+        sb.AppendLine($"    public sealed class {cls.Name}{declTypeParams}{baseClause}");
         sb.AppendLine("    {");
 
         foreach (var prop in cls.Properties)
@@ -519,6 +521,18 @@ public sealed class CSharpEmitter
         return string.Join(", ", parameters.Select(p =>
         {
             var type = TypeMapper.ToCSharpType(p.Type);
+
+            if (p.IsRestParameter)
+            {
+                // TS rest param `...args: T[]` maps to `params T[] args`.
+                // The mapped type is already T[], so use it directly.
+                // If not already an array, wrap in [].
+                // Do NOT apply optional/nullable for rest params (they accept zero elements).
+                if (type.EndsWith("[]"))
+                    return $"params {type} {EscapeCSharpKeyword(p.Name)}";
+                return $"params {type}[] {EscapeCSharpKeyword(p.Name)}";
+            }
+
             if (p.IsOptional && !type.EndsWith("?"))
             {
                 if (TypeMapper.IsValueType(type) || TypeMapper.IsEnumType(type, _knownEnumNames))
@@ -526,8 +540,6 @@ public sealed class CSharpEmitter
                 else
                     type += "?";
             }
-            if (p.IsRestParameter)
-                return $"params {type}[] {EscapeCSharpKeyword(p.Name)}";
             return $"{type} {EscapeCSharpKeyword(p.Name)}";
         }));
     }
@@ -538,6 +550,19 @@ public sealed class CSharpEmitter
             return "";
 
         return $"<{string.Join(", ", typeParams.Select(tp => tp.Name))}>";
+    }
+
+    /// <summary>
+    /// Formats a TypeReference (e.g., extends/implements) with its type arguments.
+    /// For example: "IDisposable" or "IComparer&lt;T&gt;".
+    /// </summary>
+    private static string FormatTypeReference(TypeReference typeRef)
+    {
+        if (typeRef.TypeArguments.Count == 0)
+            return typeRef.Name;
+
+        var typeArgs = string.Join(", ", typeRef.TypeArguments.Select(ta => TypeMapper.ToCSharpType(ta)));
+        return $"{typeRef.Name}<{typeArgs}>";
     }
 
     private static string EscapeCSharpKeyword(string name)

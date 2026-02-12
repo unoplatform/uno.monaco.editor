@@ -4,7 +4,8 @@
   "claimed_at": null,
   "created_at": "2026-02-12T04:45:43.055526Z",
   "depends_on": [
-    "fn-5-comprehensive-documentation-overhaul.3"
+    "fn-5-comprehensive-documentation-overhaul.3",
+    "fn-5-comprehensive-documentation-overhaul.2"
   ],
   "epic": "fn-5-comprehensive-documentation-overhaul",
   "id": "fn-5-comprehensive-documentation-overhaul.4",
@@ -12,5 +13,5 @@
   "spec_path": ".flow/tasks/fn-5-comprehensive-documentation-overhaul.4.md",
   "status": "todo",
   "title": "Major README rewrite with platform matrix and getting started",
-  "updated_at": "2026-02-12T04:47:17.594700Z"
+  "updated_at": "2026-02-12T04:59:15.201226Z"
 }
