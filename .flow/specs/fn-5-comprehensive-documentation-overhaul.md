@@ -27,21 +27,22 @@ The uno.monaco.editor codebase has undergone 4 epics of significant refactoring:
 - PR reviewer guide follows dotnet/runtime 3-step review pattern with severity labels
 - Cross-reference upstream Monaco TypeDoc API where applicable (`<see href="..."/>`)
 - Platform-asymmetric APIs (e.g., `AddActionAsync` throws `PlatformNotSupportedException` on desktop) documented with explicit platform notes
-- **Monaco version verification**: Before any task references the Monaco version, verify from `MonacoEditorComponent/monaco-editor/` or `package.json` — never hard-code without checking
+- **Monaco version verification**: Before any task references the Monaco version, verify from root `package.json` (declared: `^0.52.2`) and `node_modules/monaco-editor/package.json` (resolved version) — never hard-code without checking
 
 ## Coordination
 
-- **fn-4 dependency**: This epic runs after fn-4 completes. Tasks fn-5.6 and fn-5.8 (generated type XML docs) need fn-4.5 emitter output to be stable.
-- **fn-4.7 absorbed**: README updates from fn-4.7 are absorbed into fn-5.4. **Action required**: Update fn-4.7 spec to remove README scope and note it is handled by fn-5.4. This prevents duplicate work.
+- **fn-4 dependency**: This epic runs after fn-4 completes. Tasks fn-5.6 and fn-5.8 need fn-4.5 emitter output to be stable.
+- **fn-4.7 absorbed**: README updates from fn-4.7 are absorbed into fn-5.4. **Action required**: Update fn-4.7 spec to remove README scope.
 - **Package rename**: Document the NuGet ID change from `Monaco.Editor` to `Uno.Monaco.Editor` as a breaking change.
 
 ## Quick commands
 
 ```bash
 # Verify Monaco version from source of truth
-cat MonacoEditorComponent/monaco-editor/package.json | grep version
+cat package.json | grep monaco-editor
+cat node_modules/monaco-editor/package.json | grep '"version"'
 
-# Validate XML doc coverage after changes (enforces CS1591)
+# Validate XML doc coverage (enforces CS1591)
 dotnet build MonacoEditorComponent.slnx /warnaserror:CS1591
 
 # Build to verify docs don't break compilation
@@ -50,14 +51,14 @@ dotnet build MonacoEditorComponent.slnx --no-restore
 
 ## Acceptance
 
-- [ ] PR reviewer guide exists and covers all 4 epics with reading order, pinned to exact commit range (base SHA, head SHA)
+- [ ] PR reviewer guide exists and covers all 4 epics with reading order, pinned to exact commit range
 - [ ] CHANGELOG.md follows Keep a Changelog 1.1.0 format with all changes from 2.0.0-dev.60
-- [ ] Architecture docs exist with Mermaid diagrams for: dual-platform interop flow, lifecycle state machine, presenter pattern, serialization layer
+- [ ] Architecture docs exist with Mermaid diagrams for: dual-platform interop, lifecycle, presenter pattern, serialization
 - [ ] README.md rewritten with: platform matrix, getting started, NuGet install, feature overview, badges
 - [ ] 0 undocumented hand-written public symbols; verified via `dotnet build /warnaserror:CS1591`
 - [ ] Generated Monaco type XML doc strategy decided and documented
-- [ ] Generated Monaco types have XML docs (after strategy execution)
-- [ ] Getting started guide with working code examples for WASM and Desktop targets
+- [ ] Generated Monaco types have XML docs (after strategy execution in task 8)
+- [ ] Getting started guide with validated code examples for WASM and Desktop
 - [ ] API cookbook covers: set text/language, listen to changes, register providers, add decorations/markers
 - [ ] fn-4.7 spec updated to remove absorbed README scope
 

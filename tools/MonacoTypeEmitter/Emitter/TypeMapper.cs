@@ -91,12 +91,11 @@ public static class TypeMapper
             _ => name
         };
 
-        // Handle type arguments for known generic types
+        // Preserve type arguments for non-collapsed reference types
         if (typeInfo.TypeArguments is { Count: > 0 } && mapped == name)
         {
-            // Don't emit generic arguments for types that are
-            // not generic in C# (most Monaco types are concrete)
-            return mapped;
+            var typeArgs = string.Join(", ", typeInfo.TypeArguments.Select(ta => ToCSharpTypeCore(ta)));
+            return $"{mapped}<{typeArgs}>";
         }
 
         return mapped;
