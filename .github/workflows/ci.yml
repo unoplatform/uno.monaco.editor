@@ -96,7 +96,7 @@ jobs:
           [Microsoft.Playwright.Program]::Main(@("install", "--with-deps", "chromium"))
 
       - name: Run tests
-        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_DIR }}" --no-build --coverage --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=DesktopCDP" --report-xunit --report-xunit-filename test-results.xml
+        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_DIR }}" --no-build --coverage --coverage-output-format cobertura --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=DesktopCDP" --report-xunit --report-xunit-filename test-results.xml
 
       - name: Upload test artifacts
         if: always()
@@ -162,7 +162,7 @@ jobs:
       # WASM Playwright tests are covered by the ubuntu and macOS jobs.
       # This job validates the desktop build compiles on Windows and runs unit tests.
       - name: Run unit tests
-        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release --no-build --coverage --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=DesktopCDP" --filter-not-trait "Category=WasmPlaywright" --report-xunit --report-xunit-filename desktop-test-results.xml
+        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release --no-build --coverage --coverage-output-format cobertura --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=DesktopCDP" --filter-not-trait "Category=WasmPlaywright" --report-xunit --report-xunit-filename desktop-test-results.xml
 
       - name: Upload test artifacts
         if: always()
@@ -230,7 +230,7 @@ jobs:
       # WASM Playwright tests are already covered by the ubuntu job.
       # macOS ARM validates builds + unit tests; exclude DesktopCDP (headless) and WasmPlaywright (slow startup on ARM).
       - name: Run tests
-        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release --no-build --coverage --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=DesktopCDP" --filter-not-trait "Category=WasmPlaywright" --report-xunit --report-xunit-filename test-results.xml
+        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release --no-build --coverage --coverage-output-format cobertura --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=DesktopCDP" --filter-not-trait "Category=WasmPlaywright" --report-xunit --report-xunit-filename test-results.xml
 
       - name: Upload test artifacts
         if: always()
