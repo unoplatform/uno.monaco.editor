@@ -39,9 +39,8 @@
 - [ ] Editor visually resizes when browser window changes in WASM (manual verification note)
 
 ## Done summary
-TBD
-
+Replaced WASM LayoutUpdated resize handler with ResizeObserver, removed dead RefreshLayout P/Invoke and TS function end-to-end (C# presenter, TS helpers, globalThis export), and added 4 reflection-based regression tests guarding against reintroduction.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 99ff9c5df7f092909be40d313bf58f55348f136b
+- Tests: dotnet build MonacoEditorComponent.slnx --no-restore -m:1, MonacoEditorComponent.Tests -class MonacoEditorComponent.Tests.WasmResizeRegressionTests (4 passed)
 - PRs:

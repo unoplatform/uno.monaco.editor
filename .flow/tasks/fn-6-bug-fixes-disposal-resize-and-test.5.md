@@ -23,10 +23,14 @@
 Every bug MUST have at least one test. Tests marked `[Skip]` must have documented justification.
 
 #### Task .1 (Resize) Tests:
-| Bug | Test | Type |
-|-----|------|------|
-| BUG 1 | Verify WasmCodeEditorPresenter no longer uses LayoutUpdated | Unit (reflection/mock) |
-| BUG 1 | Verify ResizeObserver is set up in TS (via C#-observable path) | Integration (skip if no browser) |
+<!-- Updated by plan-sync: fn-6.1 already delivered 4 regression tests in WasmResizeRegressionTests (NoLayoutUpdatedSubscription, NoRefreshLayoutPInvoke, NoRefreshLayoutTsExport, ResizeObserverInDisposeEditor). These are DONE and should not be re-created. -->
+| Bug | Test | Type | Status |
+|-----|------|------|--------|
+| BUG 1 | Verify WasmCodeEditorPresenter no longer uses LayoutUpdated | Unit (reflection) | DONE in fn-6.1 |
+| BUG 1 | Verify NativeMethods.RefreshLayout P/Invoke removed | Unit (reflection) | DONE in fn-6.1 |
+| BUG 1 | Verify refreshLayout not exported to globalThis | Unit (reflection) | DONE in fn-6.1 |
+| BUG 1 | Verify disposeEditor disconnects ResizeObserver (not window resize listener) | Unit (reflection) | DONE in fn-6.1 |
+| BUG 1 | Verify ResizeObserver is set up in TS (via C#-observable path) | Integration (skip if no browser) | Pending |
 
 #### Task .2 (Lifecycle) Tests:
 | Bug | Test | Type |

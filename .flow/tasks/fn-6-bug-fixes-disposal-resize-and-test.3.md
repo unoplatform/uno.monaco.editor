@@ -22,7 +22,8 @@
 
 8. **document.body.style.overflow** (BUG 22): `asyncCallbackHelpers.ts:187` sets `document.body.style.overflow = 'hidden'` on every editor init, never restored on dispose. Affects page layout globally.
 
-9. **BrowserHtmlElement DOM node never removed** (BUG 26): `WasmCodeEditorPresenter` creates `BrowserHtmlElement` (line 31) but never removes it from the DOM on unload/dispose. The lambda `LayoutUpdated` handler can never be unsubscribed.
+9. **BrowserHtmlElement DOM node never removed** (BUG 26): `WasmCodeEditorPresenter` creates `BrowserHtmlElement` (line 31) but never removes it from the DOM on unload/dispose.
+<!-- Updated by plan-sync: fn-6.1 removed the LayoutUpdated handler entirely (replaced with ResizeObserver in TS), so the stale "LayoutUpdated handler can never be unsubscribed" concern no longer applies -->
 
 10. **IThemeListener missing IDisposable** (BUG 27): `IThemeListener.cs` has no `IDisposable` contract despite both implementations needing cleanup.
 

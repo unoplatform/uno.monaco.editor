@@ -12,7 +12,7 @@
   "plan_review_status": "ship",
   "plan_reviewed_at": "2026-02-11T22:18:03.870329Z",
   "spec_path": ".flow/specs/fn-4-modernize-ci-add-code-coverage-and.md",
-  "status": "open",
+  "status": "done",
   "title": "Modernize CI, add code coverage, and replace broken type generator",
-  "updated_at": "2026-02-12T09:18:57.765403Z"
+  "updated_at": "2026-02-12T10:52:43.576232Z"
 }
