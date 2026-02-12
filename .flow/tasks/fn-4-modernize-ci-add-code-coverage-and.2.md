@@ -33,9 +33,8 @@ Delete the entire `build/` directory (4 legacy files from Azure DevOps era, none
 - [ ] README.md "Build Notes": no VS 2019, no Legacy Edge, no Monaco v0.22.3 limitation
 
 ## Done summary
-TBD
-
+Deleted the entire build/ directory (4 legacy Azure DevOps files: sign-package.ps1, SignClient.json, Install-WindowsSdkISO.ps1, templates/gitversion-run.yml) and modernized README.md to replace UWP "Windows Runtime Component" framing with Uno Platform targeting browserwasm and desktop, updating Build Notes to require .NET 10 SDK with no VS 2019/Legacy Edge/Monaco v0.22.3 references.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: ac1392f1267be7f8dc4fbbb6860952159a43ff82
+- Tests: grep scan for build/ references in .github/**, README.md, AGENTS.md
 - PRs:
