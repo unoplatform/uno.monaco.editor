@@ -120,3 +120,6 @@ Uno SDK GenerateLibraryLayout=true breaks standard <None Pack="true"/> NuGet REA
 
 ## 2026-02-12 manual [pitfall]
 Blanket .editorconfig suppression in a directory affects hand-written files too -- use file glob overrides (e.g. [LanguagesHelper*.cs]) to re-enable diagnostics for specific hand-written files within otherwise-suppressed generated directories
+
+## 2026-02-12 manual [pitfall]
+Monaco namespace defines its own Uri type -- documentation examples and user code that use Uri with 'using Monaco' must fully qualify System.Uri to avoid ambiguity

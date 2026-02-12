@@ -43,3 +43,10 @@ Write a comprehensive getting started guide and API cookbook for uno.monaco.edit
 - [ ] Cross-references to architecture docs and upstream Monaco TypeDoc API
 - [ ] Troubleshooting section covers common setup issues
 - [ ] `MonacoEditorTestApp` builds for both targets with documented instructions
+
+## Done summary
+Added comprehensive getting started guide (docs/getting-started.md) with prerequisites, installation, first editor tutorials for WASM and Desktop, common configuration, and troubleshooting. Added API cookbook (docs/cookbook.md) with 15 recipe-style examples covering text/language, content changes, options, completion/hover/code-lens/color providers, decorations, markers, actions, commands, cursor position, line navigation, link handling, and model operations. Updated README.md to link to new docs.
+## Evidence
+- Commits: 3549e1f, a66957a
+- Tests: dotnet build MonacoEditorComponent.slnx --no-restore
+- PRs:
