@@ -1,0 +1,13 @@
+{
+  "branch_name": "fn-9-fixdesktop-jsonrpc-startlistening",
+  "created_at": "2026-02-12T16:50:45.418654Z",
+  "depends_on_epics": [],
+  "id": "fn-9-fixdesktop-jsonrpc-startlistening",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/fn-9-fixdesktop-jsonrpc-startlistening.md",
+  "status": "open",
+  "title": "fix(desktop): JsonRpc StartListening called before target registration",
+  "updated_at": "2026-02-12T16:50:45.418953Z"
+}

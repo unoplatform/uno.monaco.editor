@@ -7,6 +7,21 @@ namespace Monaco
 
     public sealed partial class LanguagesHelper
     {
+        /// <summary>
+        /// Returns the Monaco language identifier for the given file extension, filename, or path.
+        /// </summary>
+        /// <param name="extension">
+        /// A bare extension (e.g. <c>"cs"</c>), dotted extension (<c>".cs"</c>),
+        /// filename (<c>"Program.cs"</c>), or full path (<c>"src/Program.cs"</c>).
+        /// </param>
+        /// <returns>
+        /// The Monaco language identifier (e.g. <c>"csharp"</c>), or <c>"plaintext"</c>
+        /// when no mapping exists.
+        /// </returns>
+        /// <remarks>
+        /// On WASM this delegates to the Monaco JavaScript runtime via JSImport.
+        /// On desktop a C#-side lookup table provides an equivalent mapping.
+        /// </remarks>
 #pragma warning disable CA1822 // Mark members as static
         public string GetCodeLanguageFromExtension(string extension)
         {
