@@ -73,8 +73,11 @@ jobs:
           rm -rf "${{ env.ARTIFACTS_DIR }}"
           mkdir -p "${{ env.ARTIFACTS_DIR }}/log"
 
-      - name: Build solution
-        run: dotnet build MonacoEditorComponent.slnx -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_DIR }}" /bl:"${{ env.ARTIFACTS_DIR }}/log/build.binlog"
+      - name: Build library
+        run: dotnet build MonacoEditorComponent/MonacoEditorComponent.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_DIR }}" /bl:"${{ env.ARTIFACTS_DIR }}/log/build.binlog"
+
+      - name: Build test project
+        run: dotnet build MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_DIR }}"
 
       - name: Build WASM test app
         run: dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_DIR }}"
@@ -182,8 +185,11 @@ jobs:
       - name: Install npm dependencies and build Monaco bundles
         run: npm install && npm run build
 
-      - name: Build solution
-        run: dotnet build MonacoEditorComponent.slnx -c Release
+      - name: Build library
+        run: dotnet build MonacoEditorComponent/MonacoEditorComponent.csproj -c Release
+
+      - name: Build test project
+        run: dotnet build MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release
 
       - name: Build WASM test app
         run: dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm -c Release

@@ -18,6 +18,9 @@ package-lock.json
 # esbuild config (source file, not build output)
 !MonacoEditorComponent/ts-helpermethods/esbuild.config.mjs
 
+# WASM bootstrapper (required by Uno.Resizetizer during build)
+!MonacoEditorTestApp/Platforms/WebAssembly/WasmScripts/AppManifest.js
+
 # esbuild output (regenerated from source via npm run build)
 MonacoEditorComponent/WasmScripts/uno-monaco-helpers.css
 MonacoEditorComponent/WasmScripts/workers/

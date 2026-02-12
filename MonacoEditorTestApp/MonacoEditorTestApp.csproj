@@ -60,9 +60,5 @@
 		</PropertyGroup>
 	</Target>
 
-	<!-- Override Uno.Resizetizer GenerateUnoSplashWasm target which fails on CI
-	     because its WASM task (GenerateWasmSplashAssets) errors even with no
-	     UnoSplashScreen items. This no-op override prevents the MSB4181 error. -->
-	<Target Name="GenerateUnoSplashWasm" />
 
 </Project>
