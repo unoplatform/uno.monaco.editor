@@ -605,7 +605,7 @@ public sealed class CSharpEmitter
         var assignments = new List<(string propName, string paramName)>();
         foreach (var param in ctor.Parameters)
         {
-            var csharpParamName = EscapeCSharpKeyword(param.Name);
+            var csharpParamName = EscapeCSharpKeyword(NameMapper.ToCSharpParameterName(param.Name));
             var propName = NameMapper.ToCSharpPropertyName(param.Name);
             if (propLookup.ContainsKey(propName))
             {
@@ -641,11 +641,11 @@ public sealed class CSharpEmitter
 
         if (isInterface)
         {
-            sb.AppendLine($"{indent}{valueType} this[{keyType} {EscapeCSharpKeyword(idx.KeyName)}] {{ {accessor} }}");
+            sb.AppendLine($"{indent}{valueType} this[{keyType} {EscapeCSharpKeyword(NameMapper.ToCSharpParameterName(idx.KeyName))}] {{ {accessor} }}");
         }
         else
         {
-            sb.AppendLine($"{indent}public {valueType} this[{keyType} {EscapeCSharpKeyword(idx.KeyName)}] {{ {accessor} }}");
+            sb.AppendLine($"{indent}public {valueType} this[{keyType} {EscapeCSharpKeyword(NameMapper.ToCSharpParameterName(idx.KeyName))}] {{ {accessor} }}");
         }
         sb.AppendLine();
     }
@@ -681,6 +681,7 @@ public sealed class CSharpEmitter
         return string.Join(", ", parameters.Select(p =>
         {
             var type = TypeMapper.ToCSharpType(p.Type);
+            var paramName = EscapeCSharpKeyword(NameMapper.ToCSharpParameterName(p.Name));
 
             if (p.IsRestParameter)
             {
@@ -689,8 +690,8 @@ public sealed class CSharpEmitter
                 // If not already an array, wrap in [].
                 // Do NOT apply optional/nullable for rest params (they accept zero elements).
                 if (type.EndsWith("[]"))
-                    return $"params {type} {EscapeCSharpKeyword(p.Name)}";
-                return $"params {type}[] {EscapeCSharpKeyword(p.Name)}";
+                    return $"params {type} {paramName}";
+                return $"params {type}[] {paramName}";
             }
 
             if (p.IsOptional && !type.EndsWith("?"))
@@ -700,7 +701,7 @@ public sealed class CSharpEmitter
                 else
                     type += "?";
             }
-            return $"{type} {EscapeCSharpKeyword(p.Name)}";
+            return $"{type} {paramName}";
         }));
     }
 
@@ -1067,7 +1068,7 @@ public sealed class CSharpEmitter
             if (string.IsNullOrWhiteSpace(param.Documentation))
                 continue;
 
-            var paramName = EscapeCSharpKeyword(param.Name);
+            var paramName = EscapeCSharpKeyword(NameMapper.ToCSharpParameterName(param.Name));
             // Remove @ prefix for XML doc param name (C# uses the unescaped name in docs)
             if (paramName.StartsWith("@"))
                 paramName = paramName[1..];

@@ -42,6 +42,18 @@ public static class NameMapper
     }
 
     /// <summary>
+    /// Converts a TypeScript parameter name to a valid C# camelCase parameter name.
+    /// Strips exotic characters (<c>$</c>, quotes, etc.) without PascalCasing.
+    /// </summary>
+    public static string ToCSharpParameterName(string tsName)
+    {
+        var sanitized = SanitizeIdentifier(tsName);
+        // Parameters should be camelCase; SanitizeIdentifier may PascalCase segments
+        // from splitting, so lowercase the first character.
+        return ToCamelCase(sanitized);
+    }
+
+    /// <summary>
     /// Returns the original TypeScript wire name for a property, stripping
     /// surrounding quotes if present. Used for <c>[JsonPropertyName]</c> attributes.
     /// </summary>

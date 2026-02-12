@@ -37,7 +37,7 @@ namespace Monaco
         /// Test if `$node` is an `IPosition` (dollar-prefixed parameter).
         /// </summary>
         /// <returns>True if the argument satisfies the TypeScript type predicate <c>$node is IPosition</c>.</returns>
-        public static bool IsIPositionDollar(object $node) => throw new NotImplementedException();
+        public static bool IsIPositionDollar(object node) => throw new NotImplementedException();
 
         /// <summary>
         /// Test if `this` is a `Position`-like object.
