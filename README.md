@@ -98,8 +98,8 @@ public sealed partial class MainPage : Page
 
 - **[Architecture](docs/architecture.md)** -- internal design, dual-platform interop, lifecycle state machine, and serialization layer
 - **[Changelog](CHANGELOG.md)** -- release history, breaking changes, and migration guide
-- **Getting Started Guide** *(coming soon)* -- step-by-step tutorials for WASM and Desktop targets
-- **API Cookbook** *(coming soon)* -- common scenarios: set text/language, listen to changes, register providers, add decorations
+- **[Getting Started Guide](docs/getting-started.md)** -- step-by-step tutorials for WASM and Desktop targets
+- **[API Cookbook](docs/cookbook.md)** -- common scenarios: set text/language, listen to changes, register providers, add decorations
 
 The `MonacoEditorTestApp` project in this repository provides a working playground with examples of text binding, language providers, decorations, markers, and theme switching.
 
