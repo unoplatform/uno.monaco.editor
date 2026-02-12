@@ -99,7 +99,7 @@ jobs:
         run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_DIR }}" --no-build --coverage --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=DesktopCDP" --report-xunit --report-xunit-filename test-results.xml
 
       - name: Upload test artifacts
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-artifacts-ubuntu
@@ -165,7 +165,7 @@ jobs:
         run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release --no-build --coverage --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=DesktopCDP" --filter-not-trait "Category=WasmPlaywright" --report-xunit --report-xunit-filename desktop-test-results.xml
 
       - name: Upload test artifacts
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-artifacts-windows
@@ -231,7 +231,7 @@ jobs:
         run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release --no-build --coverage --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=DesktopCDP" --report-xunit --report-xunit-filename test-results.xml
 
       - name: Upload test artifacts
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-artifacts-macos
