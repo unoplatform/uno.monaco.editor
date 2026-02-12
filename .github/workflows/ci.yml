@@ -140,6 +140,9 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Install workloads
+        run: dotnet workload install wasm-tools
+
       - name: Install npm dependencies and build Monaco bundles
         run: npm install && npm run build
 
