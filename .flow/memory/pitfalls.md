@@ -114,3 +114,6 @@ Process.StandardOutput.ReadToEnd() before StandardError.ReadToEnd() can deadlock
 
 ## 2026-02-12 manual [pitfall]
 dotnet test --coverage produces binary .coverage files by default; add --coverage-output-format cobertura to get .cobertura.xml for ReportGenerator
+
+## 2026-02-12 manual [pitfall]
+Uno SDK GenerateLibraryLayout=true breaks standard <None Pack="true"/> NuGet README inclusion; use _PackageFiles target injection via BeforeTargets=GenerateNuspec instead

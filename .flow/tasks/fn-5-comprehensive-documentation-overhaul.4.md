@@ -48,3 +48,9 @@ Remove: "early alpha" language, stale API listings, wrong NuGet package name.
 - [ ] `dotnet pack MonacoEditorComponent/MonacoEditorComponent.csproj -c Release` succeeds with README in package
 - [ ] fn-4.7 spec updated to remove README scope (note: "absorbed into fn-5.4")
 - [ ] fn-4.7 README scope covered (build instructions for .NET 10, dual targets, no VS 2019/Legacy Edge)
+## Done summary
+Major README rewrite following NuGet README standards: added platform support matrix, getting started guide with XAML/C# example, build-from-source instructions for both targets, badges, and Monaco version section. Added PackageReadmeFile and _IncludeReadmeInPackage target to csproj for NuGet package inclusion. Updated fn-4.7 spec to note README scope absorbed into fn-5.4.
+## Evidence
+- Commits: 3080fb9, fb24cfd, de1a312
+- Tests: dotnet build MonacoEditorComponent.slnx --no-restore, dotnet pack MonacoEditorComponent/MonacoEditorComponent.csproj -c Release
+- PRs:
