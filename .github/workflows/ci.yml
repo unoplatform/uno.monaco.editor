@@ -177,10 +177,12 @@ jobs:
           [Reflection.Assembly]::Load([System.IO.File]::ReadAllBytes($pwDll)) | Out-Null
           [Microsoft.Playwright.Program]::Main(@("install", "--with-deps", "chromium"))
 
-      # Windows has WebView2 and a display, so DesktopCDP tests run here.
+      # DesktopCDP tests require a GUI environment with WebView2; GitHub Actions
+      # Windows runners timeout on fixture initialization (15s). Exclude until
+      # a self-hosted runner with display support is available.
       # WASM Playwright tests are covered by the ubuntu job.
-      - name: Run tests (unit + DesktopCDP)
-        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release --no-build --coverage --coverage-output-format cobertura --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=WasmPlaywright" --report-xunit --report-xunit-filename desktop-test-results.xml
+      - name: Run tests (unit only)
+        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release --no-build --coverage --coverage-output-format cobertura --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=WasmPlaywright" --filter-not-trait "Category=DesktopCDP" --report-xunit --report-xunit-filename desktop-test-results.xml
 
       - name: Upload test artifacts
         if: always()
