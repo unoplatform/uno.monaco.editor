@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-12T05:29:37.981366Z",
+  "depends_on": [
+    "fn-6-bug-fixes-disposal-resize-and-test.3",
+    "fn-6-bug-fixes-disposal-resize-and-test.4"
+  ],
+  "epic": "fn-6-bug-fixes-disposal-resize-and-test",
+  "id": "fn-6-bug-fixes-disposal-resize-and-test.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-6-bug-fixes-disposal-resize-and-test.5.md",
+  "status": "todo",
+  "title": "Add unit tests for lifecycle disposal and data correctness",
+  "updated_at": "2026-02-12T05:47:47.765053Z"
+}

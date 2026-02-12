@@ -290,5 +290,8 @@ test-artifacts/
 GenerateMonacoTypings/output/
 GenerateMonacoTypings/.temp/
 
+# Snapshot test received files (generated on mismatch, never committed)
+*.received.cs
+
 # Claude Code local settings
 .claude/

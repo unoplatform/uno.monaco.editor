@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "sourceFile": "test.d.ts",
+  "extractedAt": "2026-01-01T00:00:00.000Z",
+  "namespaces": [
+    {
+      "name": "monaco",
+      "interfaces": [],
+      "enums": [
+        {
+          "name": "MarkerSeverity",
+          "documentation": "Marker severity levels.",
+          "isStringEnum": false,
+          "members": [
+            { "name": "Hint", "value": 1 },
+            { "name": "Info", "value": 2 },
+            { "name": "Warning", "value": 4 },
+            { "name": "Error", "value": 8 }
+          ]
+        }
+      ],
+      "typeAliases": [],
+      "classes": [],
+      "functions": []
+    }
+  ]
+}

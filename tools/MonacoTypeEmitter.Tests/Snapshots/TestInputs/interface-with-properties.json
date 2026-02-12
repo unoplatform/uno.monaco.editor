@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "sourceFile": "test.d.ts",
+  "extractedAt": "2026-01-01T00:00:00.000Z",
+  "namespaces": [
+    {
+      "name": "monaco",
+      "interfaces": [
+        {
+          "name": "IPosition",
+          "documentation": "A position in the editor.",
+          "typeParameters": [],
+          "extends": [],
+          "properties": [
+            {
+              "name": "lineNumber",
+              "documentation": "line number (starts at 1)",
+              "type": { "kind": "primitive", "name": "number" },
+              "isOptional": false,
+              "isReadonly": true
+            },
+            {
+              "name": "column",
+              "documentation": "column (the first character in a line is between column 1 and column 2)",
+              "type": { "kind": "primitive", "name": "number" },
+              "isOptional": false,
+              "isReadonly": true
+            }
+          ],
+          "methods": [],
+          "indexSignatures": [],
+          "callSignatures": []
+        }
+      ],
+      "enums": [],
+      "typeAliases": [],
+      "classes": [],
+      "functions": []
+    }
+  ]
+}

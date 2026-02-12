@@ -1,0 +1,18 @@
+{
+  "branch_name": "fn-6-bug-fixes-disposal-resize-and-test",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-02-12T05:28:15.255594Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "fn-6-bug-fixes-disposal-resize-and-test",
+  "next_task": 1,
+  "plan_review_status": "needs_work",
+  "plan_reviewed_at": "2026-02-12T05:44:52.585514Z",
+  "spec_path": ".flow/specs/fn-6-bug-fixes-disposal-resize-and-test.md",
+  "status": "open",
+  "title": "Bug fixes, disposal, resize, and test coverage",
+  "updated_at": "2026-02-12T05:46:21.026860Z"
+}

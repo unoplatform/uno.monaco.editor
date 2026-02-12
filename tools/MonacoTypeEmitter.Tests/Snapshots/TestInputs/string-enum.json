@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "sourceFile": "test.d.ts",
+  "extractedAt": "2026-01-01T00:00:00.000Z",
+  "namespaces": [
+    {
+      "name": "monaco.editor",
+      "interfaces": [],
+      "enums": [],
+      "typeAliases": [
+        {
+          "name": "CursorStyle",
+          "documentation": "Control the cursor style.",
+          "typeParameters": [],
+          "type": {
+            "kind": "union",
+            "types": [
+              { "kind": "literal", "value": "block" },
+              { "kind": "literal", "value": "block-outline" },
+              { "kind": "literal", "value": "line" },
+              { "kind": "literal", "value": "line-thin" },
+              { "kind": "literal", "value": "underline" },
+              { "kind": "literal", "value": "underline-thin" }
+            ]
+          }
+        }
+      ],
+      "classes": [],
+      "functions": []
+    }
+  ]
+}
