@@ -1,7 +1,4 @@
 {
-  "assignee": null,
-  "claim_note": "",
-  "claimed_at": null,
   "created_at": "2026-02-11T20:36:26.525850Z",
   "depends_on": [
     "fn-3-merge-ralph-branch-add-macos-arm-ci-and.1"
@@ -12,5 +9,5 @@
   "spec_path": ".flow/tasks/fn-3-merge-ralph-branch-add-macos-arm-ci-and.4.md",
   "status": "todo",
   "title": "Update PR #38 metadata and monitor CI to green",
-  "updated_at": "2026-02-11T20:50:18.211933Z"
+  "updated_at": "2026-02-12T02:13:06.558179Z"
 }
