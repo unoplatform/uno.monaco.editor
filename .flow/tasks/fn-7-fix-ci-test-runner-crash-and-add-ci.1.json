@@ -8,7 +8,7 @@
   "id": "fn-7-fix-ci-test-runner-crash-and-add-ci.1",
   "priority": null,
   "spec_path": ".flow/tasks/fn-7-fix-ci-test-runner-crash-and-add-ci.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Fix test package versions and verify CI green",
   "updated_at": "2026-02-12T15:19:13.876374Z"
 }

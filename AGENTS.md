@@ -90,7 +90,7 @@ The CI pipeline (`.github/workflows/ci.yml`) runs the following jobs on pull req
 | Job | Runner | What it validates |
 |-----|--------|-------------------|
 | **Build** | `ubuntu-latest` | Library build, test build, WASM app build, Playwright browser tests, code coverage |
-| **Build (macOS ARM)** | `macos-26` | Library build, test build, WASM + desktop app builds, Playwright browser tests, code coverage |
+| **Build (macOS ARM)** | `macos-26` | Library build, test build, WASM + desktop app builds, unit tests, code coverage |
 | **Desktop Tests (Windows)** | `windows-latest` | Desktop build compilation, unit tests (depends on Build) |
 | **Coverage Report** | `ubuntu-latest` | Merges coverage from all platforms (depends on all test jobs) |
 
@@ -99,7 +99,7 @@ Additional jobs (Sign, Publish Dev, Publish Production) run only on pushes to `m
 ### Known CI limitations
 
 - **Desktop CDP tests** are excluded from all CI runners (`--filter-not-trait "Category=DesktopCDP"`). WebView2 CDP tests require a GUI environment; GitHub Actions runners are headless, so these tests timeout on fixture initialization. They must be validated locally.
-- **WASM Playwright tests** are excluded from the Windows Desktop Tests job (`--filter-not-trait "Category=WasmPlaywright"`) since that job focuses on desktop compilation and unit tests.
+- **WASM Playwright tests** are excluded from the Windows Desktop Tests job and the macOS ARM job (`--filter-not-trait "Category=WasmPlaywright"`). Ubuntu covers WASM Playwright tests; macOS ARM validates builds and unit tests only (the static file server startup is too slow on ARM runners).
 
 ### How to verify
 

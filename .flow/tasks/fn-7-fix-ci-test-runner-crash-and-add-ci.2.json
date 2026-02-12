@@ -8,7 +8,7 @@
   "id": "fn-7-fix-ci-test-runner-crash-and-add-ci.2",
   "priority": null,
   "spec_path": ".flow/tasks/fn-7-fix-ci-test-runner-crash-and-add-ci.2.md",
-  "status": "todo",
+  "status": "done",
   "title": "Add CI verification policy to AGENTS.md",
   "updated_at": "2026-02-12T15:11:15.702429Z"
 }
