@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 
 using Microsoft.UI.Dispatching;
@@ -134,6 +135,13 @@ namespace Monaco
                 }
 
                 Debug.WriteLine($"DesktopCodeEditorPresenter.Launch({GetHashCode():X8})");
+
+                // Verify WebKitGTK is available before attempting WebView2 initialization on Linux.
+                // EnsureCoreWebView2Async may fail silently or throw cryptic errors without it.
+                if (OperatingSystem.IsLinux())
+                {
+                    EnsureWebKitGtkAvailable();
+                }
 
                 await _webView.EnsureCoreWebView2Async();
 
@@ -389,6 +397,35 @@ namespace Monaco
             }
 
             return contentRoot;
+        }
+
+        /// <summary>
+        /// Verifies that WebKitGTK runtime libraries are available on Linux.
+        /// Uno Platform's WebView2 on X11 requires libwebkit2gtk (4.1 or 4.0).
+        /// Throws with actionable install instructions if the library is not found.
+        /// </summary>
+        /// <exception cref="PlatformNotSupportedException">Thrown when WebKitGTK is not installed.</exception>
+        private static void EnsureWebKitGtkAvailable()
+        {
+            // Try 4.1 first (Ubuntu 24.04+), then fall back to 4.0 (Ubuntu 22.04)
+            if (NativeLibrary.TryLoad("libwebkit2gtk-4.1.so.0", typeof(DesktopCodeEditorPresenter).Assembly, null, out var handle1))
+            {
+                NativeLibrary.Free(handle1);
+                return;
+            }
+
+            if (NativeLibrary.TryLoad("libwebkit2gtk-4.0.so.37", typeof(DesktopCodeEditorPresenter).Assembly, null, out var handle2))
+            {
+                NativeLibrary.Free(handle2);
+                return;
+            }
+
+            throw new PlatformNotSupportedException(
+                "WebKitGTK runtime library not found. Monaco Editor requires WebKitGTK on Linux.\n\n" +
+                "Install it with:\n" +
+                "  Ubuntu 24.04+: sudo apt install libgtk-3-0t64 libwebkit2gtk-4.1-0\n" +
+                "  Ubuntu 22.04:  sudo apt install libwebkit2gtk-4.0-37\n\n" +
+                "See https://platform.uno/docs/articles/controls/WebView.html#x11-specifics");
         }
 
         /// <summary>

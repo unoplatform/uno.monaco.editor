@@ -65,6 +65,11 @@ jobs:
       - name: Install workloads
         run: dotnet workload install wasm-tools wasm-tools-net9
 
+      - name: Install WebKitGTK (Linux WebView2 runtime)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -yq --no-install-recommends libgtk-3-0t64 libwebkit2gtk-4.1-0
+
       - name: Install npm dependencies and build Monaco bundles
         run: npm install && npm run build
 
