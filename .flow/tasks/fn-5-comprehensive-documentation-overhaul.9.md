@@ -72,8 +72,10 @@ Navigate the TypeDoc site to find the correct replacement URL for each reference
 - Task fn-5.4 (README rewrite) will fully replace README content — but CHANGELOG and C# source links are NOT covered by any other task
 - Task fn-5.5 (XML docs) added new docs to hand-written APIs using the correct TypeDoc URL pattern (e.g., `https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor.ICodeEditor.html`). CodeEditor files no longer have old `/api/` URLs. Remaining old `/api/` URLs are exclusively in `Monaco/` generated type files.
 - Task fn-5.7 (getting started + cookbook) already used the correct TypeDoc URL pattern (`/typedoc/`) in all new docs. No old `/api/` URLs were introduced.
+- Task fn-5.8 (XML documentation for generated types) enhanced the emitter with TypeDoc URL generation but regenerated files were reverted (commit 6e7fee0) due to pre-existing emitter edge case bugs. Monaco/ files still contain old `/api/` URLs and need manual fixing.
 <!-- Updated by plan-sync: fn-5.5 already used TypeDoc URLs in CodeEditor; old /api/ URLs remain only in Monaco/ generated files -->
 <!-- Updated by plan-sync: fn-5.7 created docs/getting-started.md and docs/cookbook.md using correct TypeDoc URLs; no stale URLs introduced -->
+<!-- Updated by plan-sync: fn-5.8 attempted to regenerate Monaco files with new TypeDoc URLs but reverted due to emitter edge case bugs; old /api/ URLs remain in place for fn-5.9 to fix -->
 
 ## Acceptance
 - [ ] All old `/api/` Monaco URLs replaced with working TypeDoc equivalents (or TypeDoc index fallback)
