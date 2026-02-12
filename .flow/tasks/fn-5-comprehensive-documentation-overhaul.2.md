@@ -44,3 +44,10 @@ Rewrite the existing `changelog.md` to follow [Keep a Changelog 1.1.0](https://k
 - [ ] ISO 8601 dates on all version entries
 - [ ] Comparison links at bottom of file
 - [ ] "Sergvice" typo fixed
+
+## Done summary
+Rewrote changelog.md to CHANGELOG.md in Keep a Changelog 1.1.0 format, documenting all changes from Monaco.Editor 2.0.0-dev.60 through the current unreleased Uno.Monaco.Editor with categorized sections (Added/Changed/Deprecated/Removed/Fixed/Security), a comprehensive migration guide for breaking changes, verified Monaco Editor version 0.52.2, and reformatted historical entries v0.1-v0.9.
+## Evidence
+- Commits: 2888375, 2f5ea80, f1af4c5
+- Tests: documentation-only change, no tests required
+- PRs:
