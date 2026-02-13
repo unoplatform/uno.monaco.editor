@@ -166,7 +166,13 @@ namespace Monaco
             {
                 try
                 {
-                    await _view.InvokeScriptAsync("createMonacoEditor(null, 'editor-container', '')");
+                    // Use void operator so ExecuteScriptAsync returns immediately without
+                    // awaiting the async Promise. createMonacoEditor() calls JSON-RPC back
+                    // to C# (getJsonValueAsync, getCurrentThemeNameAsync, etc.) and awaiting
+                    // the Promise via ExecuteScriptAsync can deadlock if WebView2 serializes
+                    // script execution and message dispatch on the same thread.
+                    // The "Loaded" callback fires asynchronously when init completes.
+                    await _view.InvokeScriptAsync("void createMonacoEditor(null, 'editor-container', '')");
                     Debug.WriteLine("WebView_NavigationCompleted: createMonacoEditor invoked on desktop");
                 }
                 catch (Exception ex)

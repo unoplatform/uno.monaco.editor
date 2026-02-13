@@ -141,6 +141,7 @@ jobs:
     name: Desktop Tests (Windows)
     runs-on: windows-latest
     needs: build
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
