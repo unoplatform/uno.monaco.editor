@@ -37,10 +37,18 @@ With `UseArtifactsOutput=true`, build output goes to `artifacts/bin/MonacoEditor
 - Replace `Microsoft.Playwright` with `Microsoft.Playwright.Xunit.v3` in `Directory.Packages.props`
 - Remove the `IncludeAssets` and `PrivateAssets` attributes from the csproj PackageReference
 - Remove the misleading comment about reverting from Xunit.v3
+- **Standardize artifacts path across all 3 CI jobs:** Currently Ubuntu passes explicit `-p:ArtifactsPath="${{ env.ARTIFACTS_DIR }}"` but Windows/macOS don't. Add `-p:ArtifactsPath` to Windows and macOS build steps too, using a job-level env var so all paths are derived from one source.
 - Update all 3 "Install Playwright browsers" steps in `.github/workflows/ci.yml`:
-  - Ubuntu job: uses `-p:ArtifactsPath="${{ env.ARTIFACTS_DIR }}"` so script is at `${{ env.ARTIFACTS_DIR }}/bin/MonacoEditorComponent.Tests/release/playwright.ps1`
-  - Windows job: default artifacts path, script at `artifacts/bin/MonacoEditorComponent.Tests/release/playwright.ps1`
-  - macOS job: default artifacts path, script at `artifacts/bin/MonacoEditorComponent.Tests/release/playwright.ps1`
+  - All 3 jobs: derive `playwright.ps1` path from the same artifacts env var: `$env:ARTIFACTS_PATH/bin/MonacoEditorComponent.Tests/release/playwright.ps1`
+  - Ubuntu job: `ARTIFACTS_PATH=${{ env.ARTIFACTS_DIR }}`
+  - Windows job: `ARTIFACTS_PATH=artifacts` (or explicit `-p:ArtifactsPath`)
+  - macOS job: `ARTIFACTS_PATH=artifacts` (or explicit `-p:ArtifactsPath`)
+- Each CI step must include a `Test-Path` guard before invoking `playwright.ps1`:
+  ```pwsh
+  $scriptPath = "$env:ARTIFACTS_PATH/bin/MonacoEditorComponent.Tests/release/playwright.ps1"
+  if (-not (Test-Path $scriptPath)) { throw "playwright.ps1 not found at $scriptPath — verify build output path" }
+  pwsh $scriptPath install --with-deps chromium
+  ```
 - Remove `PLAYWRIGHT_DRIVER_SEARCH_PATH` env var setup (no longer needed when build targets run properly)
 - Verify `dotnet build` succeeds for the test project
 - The existing `WasmAppFixture` and `DesktopAppFixture` will continue to work since they manually create `IPlaywright` (the base classes are optional, not mandatory)
@@ -58,6 +66,9 @@ With `UseArtifactsOutput=true`, build output goes to `artifacts/bin/MonacoEditor
 - [ ] No `IncludeAssets` or `PrivateAssets` attributes on the Playwright PackageReference
 - [ ] Misleading "reverted from Xunit.v3" comment removed
 - [ ] All 3 CI "Install Playwright browsers" steps use `playwright.ps1` from the build output directory (no manual DLL loading)
+- [ ] Each CI step has explicit `Test-Path` guard before invoking `playwright.ps1`
+- [ ] All 3 CI jobs use explicit `-p:ArtifactsPath` for build steps (no implicit defaults)
+- [ ] Playwright script path derived from shared env var (no hardcoded path drift)
 - [ ] No `PLAYWRIGHT_DRIVER_SEARCH_PATH` env var hacks in CI
 - [ ] `dotnet build MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj` succeeds
 - [ ] Existing test fixtures (`WasmAppFixture`, `DesktopAppFixture`) still compile and work

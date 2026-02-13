@@ -35,24 +35,56 @@ This causes the entire Monaco editor to be destroyed and recreated on each tab s
 Many calls (`updateStyle`, `updateDecorations`, `getLanguages`, `addCommand`, etc.) execute before the Monaco bridge is ready. The code guards with `if (_initialized && _view is not null)` but properties are set during the XAML load cycle before initialization completes.
 
 **Size:** M
-**Files:** `MonacoEditorComponent/Helpers/ParentAccessorDesktop.cs`, `MonacoEditorComponent/Bridge/BridgeContracts.cs`, `MonacoEditorComponent/CodeEditor/DesktopCodeEditorPresenter.cs`, `MonacoEditorComponent/CodeEditor/CodeEditor.cs`, `MonacoEditorComponent/Helpers/ThemeListenerDesktop.cs`, `MonacoEditorComponent/Helpers/KeyboardListenerDesktop.cs`, `MonacoEditorComponent/Helpers/DebugLoggerDesktop.cs`
+**Files:** `MonacoEditorComponent/Helpers/ParentAccessorDesktop.cs`, `MonacoEditorComponent/Bridge/BridgeContracts.cs`, `MonacoEditorComponent/CodeEditor/DesktopCodeEditorPresenter.cs`, `MonacoEditorComponent/CodeEditor/CodeEditor.cs`, `MonacoEditorComponent/Helpers/ThemeListenerDesktop.cs`, `MonacoEditorComponent/Helpers/KeyboardListenerDesktop.cs`, `MonacoEditorComponent/Helpers/DebugLoggerDesktop.cs`, `MonacoEditorComponent/DesktopContent/bridge-protocol.md`, `MonacoEditorComponent.Tests/DesktopAppFixture.cs` (add cursor-based log query API)
 
 ## Approach
 
-**Bug 1 fix — two options (investigate both):**
-- Option A: Change `[JsonRpcMethod]` signatures to use individual parameters: `OnSetValue(string name, JsonElement value)` instead of `OnSetValue(SetValueParams p)`. This matches StreamJsonRpc's named-params dispatch.
-- Option B: Keep typed params but configure StreamJsonRpc to deserialize the entire params object as a single positional arg. Check if there's a StreamJsonRpc option for this.
-- Verify the fix by running existing `JsonRpcTargetDispatchTests` and `JsonRpcWireCompatibilityTests`
+**Bug 1 fix — Strategy A (LOCKED):**
+- Change ALL `[JsonRpcMethod]` handler signatures from single typed record params to individual named parameters matching the JSON field names:
+  - `OnSetValue(SetValueParams p)` → `OnSetValue(string name, JsonElement value)`
+  - `OnSetValueWithType(SetValueWithTypeParams p)` → `OnSetValueWithType(string name, JsonElement value, string typeName)`
+  - `OnCallAction(CallActionParams p)` → `OnCallAction(string name)`
+  - `OnCallActionWithParameters(CallActionWithParametersParams p)` → `OnCallActionWithParameters(string name, JsonElement parameters)`
+  - `OnCallEvent(CallEventParams p)` → `OnCallEvent(string name, JsonElement parameters)`
+  - `OnGetJsonValue(GetJsonValueParams p)` → `OnGetJsonValue(string name)`
+  - `OnBridgeReady(BridgeReadyParams p)` → `OnBridgeReady(int protocolVersion)`
+  - `OnEditorReady(EditorReadyParams p)` → `OnEditorReady(int protocolVersion)`
+  - `OnLog(LogParams p)` → `OnLog(string level, string message)` (in `DebugLoggerDesktop.cs`)
+  - `OnKeyDown(KeyDownParams p)` → `OnKeyDown(int keyCode, bool ctrlKey, bool shiftKey, bool altKey, bool metaKey)` (in `KeyboardListenerDesktop.cs`)
+  - `OnGetThemeProperty(GetThemePropertyParams p)` → `OnGetThemeProperty(string name)` (in `ThemeListenerDesktop.cs`)
+- Remove ALL unused DTO records from `BridgeContracts.cs` (SetValueParams, SetValueWithTypeParams, CallActionParams, CallActionWithParametersParams, CallEventParams, GetJsonValueParams, BridgeReadyParams, EditorReadyParams, LogParams, KeyDownParams, GetThemePropertyParams). Keep only `LifecycleUpdateParams` (C#→JS, still used).
+- Update `JsonRpcTargetDispatchTests` and `JsonRpcWireCompatibilityTests` to match new signatures
+- Verify with existing + updated tests
 
-**Bug 2 fix:**
-- The `CodeEditor_Unloaded` handler at `CodeEditor.cs:243` aggressively resets state. For tab-switch scenarios, the editor should survive Unloaded/Loaded cycles without full teardown.
-- Consider: skip teardown if the control will be re-loaded shortly (debounce or check `IsLoaded` before tearing down)
-- Or: preserve the presenter and WebView2 across unload/load cycles; only teardown on Dispose
+**Bug 2 fix — Deferred teardown with cancellation (LOCKED):**
+- Add a `CancellationTokenSource? _unloadCts` field to `CodeEditor`
+- `CodeEditor_Unloaded`: create CTS, schedule deferred teardown (e.g., `Task.Delay(100, ct)` then teardown). Do NOT set `_initialized = false` immediately.
+- `CodeEditor_Loaded`: if `_unloadCts` is pending, cancel it and skip teardown entirely. Re-subscribe event handlers only.
+- Hard teardown (full state reset): only in `Dispose()` and `OnApplyTemplate()` when replacing the presenter.
+- **Soft unload event subscription handling:**
+  - `CodeEditor_Unloaded` (soft): unsubscribe `Window.SizeChanged` only (prevents accumulation). Do NOT unsubscribe `Options.PropertyChanged`, `Decorations.VectorChanged`, `Markers.VectorChanged` — these must survive soft cycles.
+  - `CodeEditor_Loaded` (soft, after cancel): re-subscribe `Window.SizeChanged` only. Verify existing subscriptions for Options/Decorations/Markers are still active (no duplicates).
+  - Hard teardown: unsubscribe ALL handlers (Options, Decorations, Markers, Window.SizeChanged).
+- **Subscription count diagnostics (stdout-based, gated, no RPC changes):** `CodeEditor` itself (in the library) emits structured `Console.WriteLine($"DIAG_SUB_COUNTS:{_sizeChangedSubCount},{_optionsSubCount},{_decorationsSubCount},{_markersSubCount}")` on each Loaded/Unloaded event transition, gated behind `MONACO_DIAGNOSTICS=1`. The counters are simple `int` fields incremented on subscribe, decremented on unsubscribe. DesktopCDP tests read process stdout (fixture sets env var) after tab-switch simulation and assert expected counts (e.g., "DIAG_SUB_COUNTS:1,1,1,1" when loaded).
+- **Invariants:**
+  - `_initialized` is only set to `false` during hard teardown (Dispose/template replacement)
+  - `_model` is preserved across soft unload/load cycles
+  - Bridge target registration count remains stable (no duplicate registrations)
+  - `Window.SizeChanged` subscription count: 0 when unloaded, 1 when loaded
+  - `Options.PropertyChanged` subscription count: always exactly 1 while editor exists
+  - `Decorations.VectorChanged` subscription count: always exactly 1 while editor exists
+  - `Markers.VectorChanged` subscription count: always exactly 1 while editor exists
 
-**Bug 3 fix:**
-- Queue operations that arrive before initialization into a pending queue
-- Replay the queue once `_initialized` becomes true
-- Or: defer property change callbacks until after initialization completes
+**Bug 3 fix — No separate queue (LOCKED):**
+- All property values live in DependencyProperties and are replayed via `ApplyInitialPropertyValues()` when initialization completes
+- No separate queue needed — the DP system already holds the latest values
+- Verify that `ApplyInitialPropertyValues()` covers all properties that can be set before init (Text, CodeLanguage, Theme, ReadOnly, HasGlyphMargin, Options, Decorations, Markers)
+- Gate all diagnostic `Console.WriteLine` behind `MONACO_DIAGNOSTICS` env var: `if (Environment.GetEnvironmentVariable("MONACO_DIAGNOSTICS") == "1") Console.WriteLine(...)`. This avoids permanent production console noise while enabling Release-testable diagnostics when CI/test sets the env var.
+- Change "before initialized" warnings from `Debug.WriteLine` to gated `Console.WriteLine` so they appear in stdout when `MONACO_DIAGNOSTICS=1`
+- Emit a distinct `Console.WriteLine("INIT_COMPLETE")` marker (gated) at the exact point where `_initialized` becomes `true`. This is the canonical boundary for warning assertions.
+- Also change `editor/ready` and `bridge/ready` handshake log lines from `Debug.WriteLine` to gated `Console.WriteLine`
+- `DesktopAppFixture` sets `MONACO_DIAGNOSTICS=1` on the test app process before launch
+- After init completes, zero "before initialized" warnings should appear for subsequent calls (testable in Release via process stdout: scan for "before initialized" after the "INIT_COMPLETE" line)
 
 ## Key context
 - `ParentAccessorDesktop.cs:271-310` — all `[JsonRpcMethod]` handlers with typed record params
@@ -63,12 +95,21 @@ Many calls (`updateStyle`, `updateDecorations`, `getLanguages`, `addCommand`, et
 - Overlaps with fn-6.2 (initialization race condition) — this task addresses the symptoms needed for testing; fn-6.2 can do a deeper architectural fix later
 - StreamJsonRpc named params dispatch: https://github.com/microsoft/vs-streamjsonrpc/issues/48
 ## Acceptance
-- [ ] All `parentAccessor/*` and `bridge/ready` JsonRpc methods dispatch correctly (no "arguments do not match" warnings)
+- [ ] ALL bridge methods dispatch correctly: zero "arguments do not match" warnings for ALL methods (`parentAccessor/*`, `bridge/ready`, `editor/ready`, `theme/getProperty`, `debug/log`, `keyboard/keyDown`)
+- [ ] ALL `[JsonRpcMethod]` handlers across ALL files use individual named params (ParentAccessorDesktop, DesktopCodeEditorPresenter, ThemeListenerDesktop, DebugLoggerDesktop, KeyboardListenerDesktop)
+- [ ] ALL unused DTO records removed from `BridgeContracts.cs` (only `LifecycleUpdateParams` retained)
+- [ ] `BridgeSerializerContext` updated: remove `[JsonSerializable]` entries for deleted DTOs
+- [ ] `bridge-protocol.md` updated: parameter schemas for all 11 methods reflect named-parameter signatures (not DTO-style)
 - [ ] Property roundtrip works: setting Text from JS arrives in C#, setting CodeLanguage from C# arrives in JS
-- [ ] Tab switching does not cause rapid Editor_Unloaded/CodeEditor_Loaded cycling
+- [ ] Tab switching stable for 5 consecutive tab-away/tab-back cycles: `_initialized` stays true, `_model` preserved, `DIAG_SUB_COUNTS` remains `1,1,1,1` after each re-load, no `INIT_COMPLETE` reappears after the initial one
+- [ ] Soft unload preserves Options/Decorations/Markers subscriptions; only Window.SizeChanged is toggled. Verified via: `CodeEditor` (library) emits gated `DIAG_SUB_COUNTS:{N},{N},{N},{N}` on Loaded/Unloaded transitions (gated behind `MONACO_DIAGNOSTICS=1`). Tests use fixture's cursor-based log API to parse stdout and assert counts (1,1,1,1 when loaded)
 - [ ] Editor preserves its state (text content, language, theme) across tab switches
-- [ ] "Tried to call X before initialized" warnings eliminated or significantly reduced
-- [ ] Existing unit tests pass: `JsonRpcTargetDispatchTests`, `JsonRpcWireCompatibilityTests`, `BridgeEncodingTests`
+- [ ] All library diagnostic `Console.WriteLine` calls gated behind `MONACO_DIAGNOSTICS=1` env var (no production console noise)
+- [ ] `DesktopAppFixture` sets `MONACO_DIAGNOSTICS=1` on the test app process environment before launch
+- [ ] Fixture includes cursor-based log query API: `GetLogCursor()`, `WaitForLogLineAfterAsync(cursor, pattern, timeout)`, `GetLinesAfter(cursor)` (added in this task, used by tasks 8 and 9)
+- [ ] Zero "before initialized" warnings after Monaco init completes. Library emits gated `INIT_COMPLETE` at the exact point `_initialized` becomes true. Test uses cursor API to find `INIT_COMPLETE`, then asserts no "before initialized" in lines after it
+- [ ] `ApplyInitialPropertyValues()` covers all DP-backed properties (Text, CodeLanguage, Theme, ReadOnly, HasGlyphMargin, Options, Decorations, Markers)
+- [ ] Existing unit tests pass: `JsonRpcTargetDispatchTests`, `JsonRpcWireCompatibilityTests`, `BridgeEncodingTests` (updated for new signatures)
 - [ ] Desktop test app launches, shows text content, applies theme, and displays syntax highlighting
 - [ ] App exit code is 0 (not 0xffffffff) on clean shutdown
 ## Done summary

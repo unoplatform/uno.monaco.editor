@@ -14,13 +14,13 @@ Two agent loops ran concurrently and fn-5.8's emitter regeneration was reverted 
 4. **Add WSL2 launch profile** — Create `.vscode/launch.json` (if absent) and add launchSettings.json profile with `DISPLAY=:0` and `GDK_GL=gles` environment variables for Skia Desktop under WSL2
 5. **Update documentation** — Update AGENTS.md CI limitations section, docs/generated-type-docs-strategy.md (mark complete; defer TypeDoc URL pattern drift as tracked follow-up), and CHANGELOG.md
 6. **Unified script invocation and full WASM/desktop parity** — Create a single `InvokeMethodAsync` on `ICodeEditorPresenter` that encapsulates element resolution per-platform. Migrate all callers, remove the leaky `element` global from `WebViewExtensions.cs`, remove ALL `PlatformNotSupportedException` guards from the public `CodeEditor` API (`AddActionAsync`, `AddCommandAsync`, any others). Update all docs that say "WASM only". Add explicit Linux and WSL2-on-Win11 prerequisites to getting-started.md. After this task, every public API works identically on both platforms.
-7. **Fix Playwright package installation** — Replace incorrect `Microsoft.Playwright` + ExcludeAssets hacks with official `Microsoft.Playwright.Xunit.v3` per https://playwright.dev/dotnet/docs/intro
-8. **Fix desktop bridge initialization bugs** — Fix JsonRpc argument mismatch (bridge/ready, parentAccessor/* methods), fix Editor_Unloaded/Loaded flickering on tab switch, fix "before initialized" warning spam
-9. **Comprehensive C# bridge integration tests** — Add tests that verify CodeEditor C# properties and methods work through the bridge (text, language, commands, actions, themes, decorations, markers, folding, readOnly). Current tests only test JS APIs directly — the automated test suite must NOT rely on the manual test app for correctness.
+7. **Fix Playwright package installation** — Replace incorrect `Microsoft.Playwright` + ExcludeAssets hacks with official `Microsoft.Playwright.Xunit.v3` per https://playwright.dev/dotnet/docs/intro. Standardize build output paths across all 3 CI jobs and add explicit `Test-Path` guard before invoking `playwright.ps1`.
+8. **Fix desktop bridge initialization bugs** — **Strategy A (locked):** Change all `[JsonRpcMethod]` handler signatures from single typed record params to individual named parameters matching the JSON field names (e.g., `OnSetValue(string name, JsonElement value)` instead of `OnSetValue(SetValueParams p)`). This matches StreamJsonRpc named-params dispatch. Remove unused DTO records from `BridgeContracts.cs`. **Lifecycle policy (locked):** `CodeEditor_Unloaded` defers teardown behind a `CancellationTokenSource`; if `CodeEditor_Loaded` fires before teardown completes, cancel and skip teardown. Hard teardown only on `Dispose()` or template replacement in `OnApplyTemplate()`. Invariants: `_initialized` is only set to `false` during hard teardown; `_model` is preserved across soft unload/load cycles; bridge target registration count remains stable. **Pre-init calls:** No separate queue — all property values live in DependencyProperties and are replayed via `ApplyInitialPropertyValues()` on init completion. Acceptance: zero "arguments do not match" warnings in process log; zero "before initialized" warnings after init completes.
+9. **Comprehensive C# bridge integration tests** — Add tests that verify CodeEditor C# properties and methods work through the bridge: text roundtrip, language switching, AddCommandAsync/AddActionAsync callbacks, theme switching, markers via SetModelMarkersAsync, ReadOnly toggle, syntax highlighting CSS verification, code folding ranges, SelectedText roundtrip, custom language registration, HasGlyphMargin DOM verification, and decorations CSS style injection.
 
 ## Parallelism
 
-fn-10.1 → fn-10.2 must be strictly sequential (both touch emitter tests/snapshots). fn-10.3, fn-10.4, and fn-10.6 can run in parallel with each other and with fn-10.1. fn-10.7 is independent. fn-10.8 depends on fn-10.7. fn-10.9 depends on fn-10.8. fn-10.5 depends on all.
+fn-10.1 → fn-10.2 must be strictly sequential (both touch emitter tests/snapshots). fn-10.3, fn-10.4, and fn-10.6 can run in parallel with each other and with fn-10.1. fn-10.7 → fn-10.8 → fn-10.9 must be strictly sequential (Playwright fix → bridge fix → bridge tests). fn-10.5 depends on all others.
 
 ## Quick commands
 
@@ -56,9 +56,12 @@ gh pr checks --watch
 - [ ] ALL `PlatformNotSupportedException` removed from `CodeEditor` public API — full WASM/desktop parity
 - [ ] Docs updated: no "WASM only" notes remain; Linux/WSL2 prerequisites documented in getting-started.md
 - [ ] Playwright package uses `Microsoft.Playwright.Xunit.v3` per official docs (no ExcludeAssets hacks)
-- [ ] Desktop bridge JsonRpc dispatch works (no "arguments do not match" warnings)
-- [ ] Desktop app stable on tab switch (no flickering/rapid Loaded/Unloaded cycling)
-- [ ] Comprehensive C# bridge integration tests pass (text, language, commands, themes, decorations, markers, folding)
+- [ ] All 3 CI jobs use `playwright.ps1` from build output with `Test-Path` guard (no DLL reflection hacks)
+- [ ] Desktop bridge JsonRpc dispatch works: zero "arguments do not match" warnings in process log
+- [ ] All `[JsonRpcMethod]` handlers use individual named params (no typed record wrappers); unused DTOs removed from BridgeContracts.cs
+- [ ] Desktop app stable on tab switch: for 5 consecutive tab-away/tab-back cycles, `_initialized` remains true, `_model` preserved, `DIAG_SUB_COUNTS` remains `1,1,1,1` after each re-load, and no `INIT_COMPLETE` marker reappears after the initial one
+- [ ] Zero "before initialized" warnings after Monaco init completes (pre-init calls replayed via `ApplyInitialPropertyValues`)
+- [ ] Comprehensive C# bridge integration tests pass (text, language, commands, actions, themes, markers, readOnly, syntax highlighting CSS, folding ranges, selectedText, custom language registration, hasGlyphMargin, decorations CSS)
 - [ ] All CI jobs pass on the PR
 
 ## References
