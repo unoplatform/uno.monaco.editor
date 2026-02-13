@@ -1,7 +1,5 @@
 using System.Diagnostics;
 
-using Monaco.Bridge;
-
 using StreamJsonRpc;
 
 namespace Monaco.Helpers;
@@ -25,8 +23,8 @@ internal sealed class DebugLoggerDesktop : IDebugLogger
     // ============================================================
 
     [JsonRpcMethod("debug/log")]
-    public void OnLog(LogParams p)
+    public void OnLog(string level, string message)
     {
-        Log($"[{p.Level}] {p.Message}");
+        Log($"[{level}] {message}");
     }
 }

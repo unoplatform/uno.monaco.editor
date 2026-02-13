@@ -1,5 +1,3 @@
-using Monaco.Bridge;
-
 using StreamJsonRpc;
 
 namespace Monaco.Helpers;
@@ -41,8 +39,8 @@ internal sealed class KeyboardListenerDesktop : IKeyboardListener
     // ============================================================
 
     [JsonRpcMethod("keyboard/keyDown")]
-    public void OnKeyDown(KeyDownParams p)
+    public void OnKeyDown(int keyCode, bool ctrlKey, bool shiftKey, bool altKey, bool metaKey)
     {
-        KeyDown(p.KeyCode, p.CtrlKey, p.ShiftKey, p.AltKey, p.MetaKey);
+        KeyDown(keyCode, ctrlKey, shiftKey, altKey, metaKey);
     }
 }

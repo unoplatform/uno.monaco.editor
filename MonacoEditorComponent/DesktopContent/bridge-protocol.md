@@ -61,22 +61,22 @@ C# can now safely invoke editor methods (getValue, updateOptions, etc.).
 
 | Method | Params | Description |
 |--------|--------|-------------|
-| `bridge/ready` | `BridgeReadyParams` | JSON-RPC transport initialized (bundle load) |
-| `editor/ready` | `EditorReadyParams` | Monaco editor instance created and ready |
-| `parentAccessor/setValue` | `SetValueParams` | Property change from JS |
-| `parentAccessor/setValueWithType` | `SetValueWithTypeParams` | Typed property change |
-| `parentAccessor/callAction` | `CallActionParams` | Invoke named action |
-| `parentAccessor/callActionWithParameters` | `CallActionWithParametersParams` | Invoke action with args |
-| `debug/log` | `LogParams` | Debug log message |
-| `keyboard/keyDown` | `KeyDownParams` | Keyboard event |
+| `bridge/ready` | `{ protocolVersion: number }` | JSON-RPC transport initialized (bundle load) |
+| `editor/ready` | `{ protocolVersion: number }` | Monaco editor instance created and ready |
+| `parentAccessor/setValue` | `{ name: string, value: any }` | Property change from JS |
+| `parentAccessor/setValueWithType` | `{ name: string, value: any, typeName: string }` | Typed property change |
+| `parentAccessor/callAction` | `{ name: string }` | Invoke named action |
+| `parentAccessor/callActionWithParameters` | `{ name: string, parameters: any }` | Invoke action with args |
+| `debug/log` | `{ level: string, message: string }` | Debug log message |
+| `keyboard/keyDown` | `{ keyCode: number, ctrlKey: boolean, shiftKey: boolean, altKey: boolean, metaKey: boolean }` | Keyboard event |
 
 ### Requests (response expected)
 
 | Method | Params | Returns | Description |
 |--------|--------|---------|-------------|
-| `parentAccessor/callEvent` | `CallEventParams` | `string?` | Invoke event handler, return result |
-| `parentAccessor/getJsonValue` | `GetJsonValueParams` | `string` | Get property value as JSON |
-| `theme/getProperty` | `GetThemePropertyParams` | `string` | Get theme property |
+| `parentAccessor/callEvent` | `{ name: string, parameters: any }` | `string?` | Invoke event handler, return result |
+| `parentAccessor/getJsonValue` | `{ name: string }` | `string` | Get property value as JSON |
+| `theme/getProperty` | `{ name: string }` | `string` | Get theme property |
 
 ## C# to JS Methods
 
@@ -98,60 +98,48 @@ Most C# to JS calls continue to use `InvokeScriptAsync` (eval-style) for WASM co
 
 ## Parameter Schemas
 
+C# handlers use individual named parameters matching the JSON field names.
+StreamJsonRpc's named-params dispatch maps top-level JSON fields directly to
+C# method parameter names.
+
 ```typescript
-// JS to C# parameter types
-interface BridgeReadyParams {
-    protocolVersion: number;  // Must be 1
-}
+// JS to C# parameter types (named params, not wrapped DTOs)
 
-interface EditorReadyParams {
-    protocolVersion: number;  // Must be 1
-}
+// bridge/ready: C# handler OnBridgeReady(int protocolVersion)
+// params: { protocolVersion: 1 }
 
-interface SetValueParams {
-    name: string;
-    value: any;  // JsonElement on C# side
-}
+// editor/ready: C# handler OnEditorReady(int protocolVersion)
+// params: { protocolVersion: 1 }
 
-interface SetValueWithTypeParams {
-    name: string;
-    value: any;
-    typeName: string;
-}
+// parentAccessor/setValue: C# handler OnSetValue(string name, JsonElement value)
+// params: { name: string, value: any }
 
-interface CallActionParams {
-    name: string;
-}
+// parentAccessor/setValueWithType: C# handler OnSetValueWithType(string name, JsonElement value, string typeName)
+// params: { name: string, value: any, typeName: string }
 
-interface CallActionWithParametersParams {
-    name: string;
-    parameters: any;  // Structured JSON: array, object, or primitive
-}
+// parentAccessor/callAction: C# handler OnCallAction(string name)
+// params: { name: string }
 
-interface CallEventParams {
-    name: string;
-    parameters: any;
-}
+// parentAccessor/callActionWithParameters: C# handler OnCallActionWithParameters(string name, JsonElement parameters)
+// params: { name: string, parameters: any }
+
+// parentAccessor/callEvent: C# handler OnCallEvent(string name, JsonElement parameters)
+// params: { name: string, parameters: any }
 // Returns: string | null
 
-interface GetJsonValueParams {
-    name: string;
-}
+// parentAccessor/getJsonValue: C# handler OnGetJsonValue(string name)
+// params: { name: string }
 // Returns: string
 
-interface GetThemePropertyParams {
-    name: string;  // "currentThemeName" | "isHighContrast"
-}
+// theme/getProperty: C# handler OnGetThemeProperty(string name)
+// params: { name: string }
 // Returns: string
 
-interface LogParams {
-    level: string;
-    message: string;
-}
+// debug/log: C# handler OnLog(string level, string message)
+// params: { level: string, message: string }
 
-interface KeyDownParams {
-    event: any;  // Key event JSON
-}
+// keyboard/keyDown: C# handler OnKeyDown(int keyCode, bool ctrlKey, bool shiftKey, bool altKey, bool metaKey)
+// params: { keyCode: number, ctrlKey: boolean, shiftKey: boolean, altKey: boolean, metaKey: boolean }
 ```
 
 ## Request/Response Handling

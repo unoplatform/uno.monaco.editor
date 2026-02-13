@@ -43,6 +43,20 @@ namespace Monaco
         private ModelHelper? _model;
         private CssStyleBroker? _cssBroker;
 
+        /// <summary>
+        /// Cancellation source for deferred unload teardown. When the control is
+        /// unloaded, teardown is deferred behind a short delay. If the control is
+        /// reloaded before the delay completes, the CTS is cancelled and teardown
+        /// is skipped, preserving editor state across tab switches.
+        /// </summary>
+        private CancellationTokenSource? _unloadCts;
+
+        // Subscription count diagnostics (gated behind MONACO_DIAGNOSTICS=1).
+        private int _sizeChangedSubCount;
+        private int _optionsSubCount;
+        private int _decorationsSubCount;
+        private int _markersSubCount;
+
         /// <inheritdoc />
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -183,6 +197,29 @@ namespace Monaco
 
         private void CodeEditor_Loaded(object sender, RoutedEventArgs e)
         {
+            // If a deferred teardown is pending from a previous Unloaded event,
+            // cancel it and skip teardown -- the control was reloaded (e.g., tab switch).
+            if (_unloadCts is not null)
+            {
+                _unloadCts.Cancel();
+                _unloadCts.Dispose();
+                _unloadCts = null;
+
+                // Soft reload: re-subscribe only Window.SizeChanged (the only handler
+                // removed in the soft unload path). All other subscriptions survive.
+                Unloaded -= CodeEditor_Unloaded;
+                Unloaded += CodeEditor_Unloaded;
+
+                if (Window.Current is not null)
+                {
+                    Window.Current.SizeChanged += OnWindowSizeChanged;
+                    _sizeChangedSubCount++;
+                }
+
+                EmitSubscriptionDiagnostics("Loaded(soft)");
+                return;
+            }
+
             if (OperatingSystem.IsBrowser())
             {
                 LoadedPartial();
@@ -204,7 +241,7 @@ namespace Monaco
                 ReadOnly = Options.ReadOnly.Value;
             }
 
-            Debug.WriteLine($"CodeEditor_Loaded [{_model}] [{_view}] ({GetHashCode():x8})");
+            DesktopCodeEditorPresenter.DiagnosticLog($"CodeEditor_Loaded [{_model}] [{_view}] ({GetHashCode():x8})");
 
             // Do this the 2nd time around.
             if (_model == null && _view != null)
@@ -213,11 +250,15 @@ namespace Monaco
 
                 Options.PropertyChanged -= Options_PropertyChanged;
                 Options.PropertyChanged += Options_PropertyChanged;
+                _optionsSubCount = 1;
 
                 Decorations.VectorChanged -= Decorations_VectorChanged;
                 Decorations.VectorChanged += Decorations_VectorChanged;
+                _decorationsSubCount = 1;
+
                 Markers.VectorChanged -= Markers_VectorChanged;
                 Markers.VectorChanged += Markers_VectorChanged;
+                _markersSubCount = 1;
 
                 // Note: _initialized is NOT set here. It is set only when the
                 // lifecycle reaches Loaded (in CodeEditorLoaded or WebView_NavigationCompleted)
@@ -229,7 +270,10 @@ namespace Monaco
                 if (Window.Current is not null)
                 {
                     Window.Current.SizeChanged += OnWindowSizeChanged;
+                    _sizeChangedSubCount = 1;
                 }
+
+                EmitSubscriptionDiagnostics("Loaded(init)");
             }
         }
 
@@ -249,19 +293,56 @@ namespace Monaco
             // across unload/load cycles and is only replaced in OnApplyTemplate().
             // Detaching here without reattaching in CodeEditor_Loaded would leave
             // the editor non-functional after reload.
-            Debug.WriteLine("Setting initialized - false");
-            _initialized = false;
 
-            // Unsubscribe Window.SizeChanged to prevent handler accumulation across load/unload cycles.
+            // Soft unload: only unsubscribe Window.SizeChanged (prevents accumulation).
+            // Do NOT unsubscribe Options.PropertyChanged, Decorations.VectorChanged,
+            // Markers.VectorChanged -- these must survive soft cycles.
             if (Window.Current is not null)
             {
                 Window.Current.SizeChanged -= OnWindowSizeChanged;
+                _sizeChangedSubCount--;
             }
 
-            Decorations.VectorChanged -= Decorations_VectorChanged;
-            Markers.VectorChanged -= Markers_VectorChanged;
+            EmitSubscriptionDiagnostics("Unloaded");
 
+            // Defer teardown behind a short delay. If CodeEditor_Loaded fires
+            // before the delay completes, cancel and skip teardown entirely.
+            _unloadCts?.Cancel();
+            _unloadCts?.Dispose();
+            _unloadCts = new CancellationTokenSource();
+            var cts = _unloadCts;
+
+            _ = DeferredTeardownAsync(cts.Token);
+        }
+
+        /// <summary>
+        /// Performs a deferred hard teardown after a short delay. If the control is
+        /// reloaded before the delay completes, the cancellation token is triggered
+        /// and teardown is skipped.
+        /// </summary>
+        private async Task DeferredTeardownAsync(CancellationToken ct)
+        {
+            try
+            {
+                await Task.Delay(100, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                // Control was reloaded -- skip teardown.
+                DesktopCodeEditorPresenter.DiagnosticLog("DeferredTeardown: cancelled (control reloaded)");
+                return;
+            }
+
+            // Hard teardown: control was not reloaded within the grace period.
+            DesktopCodeEditorPresenter.DiagnosticLog("DeferredTeardown: executing hard teardown");
+            _initialized = false;
+
+            Decorations.VectorChanged -= Decorations_VectorChanged;
+            _decorationsSubCount--;
+            Markers.VectorChanged -= Markers_VectorChanged;
+            _markersSubCount--;
             Options.PropertyChanged -= Options_PropertyChanged;
+            _optionsSubCount--;
 
             TeardownWebObjects();
             _model = null;
@@ -270,7 +351,12 @@ namespace Monaco
         /// <inheritdoc />
         protected override void OnApplyTemplate()
         {
-            Console.WriteLine("OnApplyTemplate()");
+            DesktopCodeEditorPresenter.DiagnosticLog("OnApplyTemplate()");
+
+            // Cancel any pending deferred teardown.
+            _unloadCts?.Cancel();
+            _unloadCts?.Dispose();
+            _unloadCts = null;
 
             if (_view != null)
             {
@@ -278,15 +364,25 @@ namespace Monaco
                 _view.NavigationCompleted -= WebView_NavigationCompleted;
                 _view.NewWindowRequested -= WebView_NewWindowRequested;
                 _view.Loaded -= WebView_DOMContentLoaded;
-                Debug.WriteLine("Setting initialized - false");
+
+                // Hard teardown: template replacement creates a new presenter.
                 _initialized = false;
 
                 if (Window.Current is not null)
                 {
                     Window.Current.SizeChanged -= OnWindowSizeChanged;
+                    _sizeChangedSubCount = 0;
                 }
 
+                Decorations.VectorChanged -= Decorations_VectorChanged;
+                _decorationsSubCount = 0;
+                Markers.VectorChanged -= Markers_VectorChanged;
+                _markersSubCount = 0;
+                Options.PropertyChanged -= Options_PropertyChanged;
+                _optionsSubCount = 0;
+
                 TeardownWebObjects();
+                _model = null;
             }
 
             // Create the correct presenter at runtime via OperatingSystem.IsBrowser()
@@ -355,9 +451,7 @@ namespace Monaco
             }
             else
             {
-#if DEBUG
-                Debug.WriteLine("WARNING: Tried to call '" + script + "' before initialized.");
-#endif
+                DesktopCodeEditorPresenter.DiagnosticLog("WARNING: Tried to call '" + script + "' before initialized.");
             }
 
             return default;
@@ -417,9 +511,7 @@ namespace Monaco
             }
             else
             {
-#if DEBUG
-                Debug.WriteLine("WARNING: Tried to call " + method + " before initialized.");
-#endif
+                DesktopCodeEditorPresenter.DiagnosticLog("WARNING: Tried to call " + method + " before initialized.");
             }
 
             return default;
@@ -431,11 +523,45 @@ namespace Monaco
         }
 
         /// <summary>
+        /// Emits subscription count diagnostics to stdout when <c>MONACO_DIAGNOSTICS=1</c>.
+        /// Format: <c>DIAG_SUB_COUNTS:{sizeChanged},{options},{decorations},{markers}</c>
+        /// </summary>
+        private void EmitSubscriptionDiagnostics(string context)
+        {
+            DesktopCodeEditorPresenter.DiagnosticLog(
+                $"DIAG_SUB_COUNTS:{_sizeChangedSubCount},{_optionsSubCount},{_decorationsSubCount},{_markersSubCount} [{context}]");
+        }
+
+        /// <summary>
         /// Releases managed resources held by the editor, including the CSS style broker
         /// and the parent accessor bridge.
         /// </summary>
         public new void Dispose()
         {
+            // Cancel any pending deferred teardown.
+            _unloadCts?.Cancel();
+            _unloadCts?.Dispose();
+            _unloadCts = null;
+
+            // Hard teardown: unsubscribe ALL handlers.
+            _initialized = false;
+
+            if (Window.Current is not null)
+            {
+                Window.Current.SizeChanged -= OnWindowSizeChanged;
+                _sizeChangedSubCount = 0;
+            }
+
+            Decorations.VectorChanged -= Decorations_VectorChanged;
+            _decorationsSubCount = 0;
+            Markers.VectorChanged -= Markers_VectorChanged;
+            _markersSubCount = 0;
+            Options.PropertyChanged -= Options_PropertyChanged;
+            _optionsSubCount = 0;
+
+            TeardownWebObjects();
+            _model = null;
+
             _cssBroker?.Dispose();
             _cssBroker = null;
             if (_parentAccessor is IDisposable disposable)

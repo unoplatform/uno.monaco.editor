@@ -378,6 +378,9 @@ namespace Monaco
             // applying initial properties.
             _initialized = true;
 
+            // Emit canonical init-complete marker for diagnostics.
+            DesktopCodeEditorPresenter.DiagnosticLog("INIT_COMPLETE");
+
             // Make sure inner editor is focused
             await SendScriptAsync("EditorContext.getEditorForElement(element).editor.focus();");
 
@@ -406,21 +409,33 @@ namespace Monaco
         /// </summary>
         private async Task ApplyInitialPropertyValues()
         {
-            // 1. Apply language and options first
+            // 1. Apply language and options first (includes ReadOnly, GlyphMargin)
             if (!string.IsNullOrEmpty(CodeLanguage))
             {
                 await InvokeScriptAsync("updateLanguage", CodeLanguage);
             }
 
+            // Ensure Options reflect current DP values before sending.
+            Options.Language = CodeLanguage;
+            Options.ReadOnly = ReadOnly;
+            Options.GlyphMargin = HasGlyphMargin;
+
             await InvokeScriptAsync("updateOptions", Options);
 
-            // 2. Apply content after language is configured.
+            // 2. Apply theme
+            var themeName = RequestedTheme == ElementTheme.Default
+                ? _themeListener?.CurrentThemeName ?? "Light"
+                : RequestedTheme.ToString();
+            var isHighContrast = _themeListener?.IsHighContrast ?? false;
+            await InvokeScriptAsync("changeTheme", [themeName, isHighContrast.ToString()]);
+
+            // 3. Apply content after language is configured.
             // Always send values (including empty string) so Monaco state is
             // synchronized on reload -- skipping empty would leave stale content.
             await InvokeScriptAsync("updateContent", Text ?? string.Empty);
             await InvokeScriptAsync("updateSelectedContent", SelectedText ?? string.Empty);
 
-            // 3. Apply decorations and markers last
+            // 4. Apply decorations and markers last
             if (Decorations != null && Decorations.Count > 0)
             {
                 await DeltaDecorationsHelperAsync([.. Decorations]);

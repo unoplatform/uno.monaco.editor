@@ -5,8 +5,6 @@ using CommunityToolkit.WinUI;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 
-using Monaco.Bridge;
-
 using StreamJsonRpc;
 
 using Windows.UI.ViewManagement;
@@ -47,9 +45,9 @@ internal sealed class ThemeListenerDesktop : IThemeListener, IDisposable
     // ============================================================
 
     [JsonRpcMethod("theme/getProperty")]
-    public string OnGetThemeProperty(GetThemePropertyParams p)
+    public string OnGetThemeProperty(string name)
     {
-        return p.Name switch
+        return name switch
         {
             "currentThemeName" => CurrentThemeName,
             "isHighContrast" => IsHighContrast.ToString(),

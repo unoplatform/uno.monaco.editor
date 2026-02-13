@@ -614,6 +614,19 @@ namespace Monaco
         }
 
         /// <summary>
+        /// Writes a diagnostic message to stdout when the <c>MONACO_DIAGNOSTICS</c>
+        /// environment variable is set to <c>"1"</c>. Used for Release-testable
+        /// diagnostics that do not appear in production output.
+        /// </summary>
+        internal static void DiagnosticLog(string message)
+        {
+            if (Environment.GetEnvironmentVariable("MONACO_DIAGNOSTICS") == "1")
+            {
+                Console.WriteLine(message);
+            }
+        }
+
+        /// <summary>
         /// JSON-RPC target for bridge/ready and editor/ready handshake notifications.
         /// </summary>
         private sealed class BridgeHandshakeTarget
@@ -623,27 +636,27 @@ namespace Monaco
             public BridgeHandshakeTarget(DesktopCodeEditorPresenter presenter) => _presenter = presenter;
 
             [JsonRpcMethod("bridge/ready")]
-            public void OnBridgeReady(BridgeReadyParams p)
+            public void OnBridgeReady(int protocolVersion)
             {
-                if (p.ProtocolVersion != ExpectedProtocolVersion)
+                if (protocolVersion != ExpectedProtocolVersion)
                 {
-                    Debug.WriteLine($"DesktopCodeEditorPresenter: bridge/ready protocol version mismatch (expected={ExpectedProtocolVersion}, got={p.ProtocolVersion})");
+                    DiagnosticLog($"DesktopCodeEditorPresenter: bridge/ready protocol version mismatch (expected={ExpectedProtocolVersion}, got={protocolVersion})");
                     return;
                 }
 
-                Debug.WriteLine("DesktopCodeEditorPresenter: bridge/ready received, JSON-RPC transport established");
+                DiagnosticLog("DesktopCodeEditorPresenter: bridge/ready received, JSON-RPC transport established");
             }
 
             [JsonRpcMethod("editor/ready")]
-            public void OnEditorReady(EditorReadyParams p)
+            public void OnEditorReady(int protocolVersion)
             {
-                if (p.ProtocolVersion != ExpectedProtocolVersion)
+                if (protocolVersion != ExpectedProtocolVersion)
                 {
-                    Debug.WriteLine($"DesktopCodeEditorPresenter: editor/ready protocol version mismatch (expected={ExpectedProtocolVersion}, got={p.ProtocolVersion})");
+                    DiagnosticLog($"DesktopCodeEditorPresenter: editor/ready protocol version mismatch (expected={ExpectedProtocolVersion}, got={protocolVersion})");
                     return;
                 }
 
-                Debug.WriteLine("DesktopCodeEditorPresenter: editor/ready received, Monaco editor initialized");
+                DiagnosticLog("DesktopCodeEditorPresenter: editor/ready received, Monaco editor initialized");
             }
         }
     }

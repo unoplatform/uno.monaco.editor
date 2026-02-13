@@ -66,11 +66,10 @@ public sealed class JsonRpcWireCompatibilityTests : IDisposable
         Assert.Equal("bridge/ready", request.Method);
         Assert.True(request.IsNotification, "bridge/ready should be a notification (no id)");
 
-        // Verify the raw params can be deserialized to BridgeReadyParams.
+        // Verify the raw params contain the expected named parameters.
         var paramsJson = ExtractParams(json);
-        var bridgeReady = JsonSerializer.Deserialize(paramsJson, BridgeSerializerContext.Default.BridgeReadyParams);
-        Assert.NotNull(bridgeReady);
-        Assert.Equal(1, bridgeReady!.ProtocolVersion);
+        using var doc = JsonDocument.Parse(paramsJson);
+        Assert.Equal(1, doc.RootElement.GetProperty("protocolVersion").GetInt32());
     }
 
     [Fact]
@@ -87,11 +86,11 @@ public sealed class JsonRpcWireCompatibilityTests : IDisposable
         Assert.Equal("parentAccessor/setValue", request.Method);
         Assert.True(request.IsNotification);
 
+        // Verify the raw params contain the expected named parameters.
         var paramsJson = ExtractParams(json);
-        var setValue = JsonSerializer.Deserialize(paramsJson, BridgeSerializerContext.Default.SetValueParams);
-        Assert.NotNull(setValue);
-        Assert.Equal("Text", setValue!.Name);
-        Assert.Equal("hello", setValue.Value.GetString());
+        using var doc = JsonDocument.Parse(paramsJson);
+        Assert.Equal("Text", doc.RootElement.GetProperty("name").GetString());
+        Assert.Equal("hello", doc.RootElement.GetProperty("value").GetString());
     }
 
     [Fact]
@@ -108,11 +107,11 @@ public sealed class JsonRpcWireCompatibilityTests : IDisposable
         Assert.Equal("debug/log", request.Method);
         Assert.True(request.IsNotification);
 
+        // Verify the raw params contain the expected named parameters.
         var paramsJson = ExtractParams(json);
-        var logParams = JsonSerializer.Deserialize(paramsJson, BridgeSerializerContext.Default.LogParams);
-        Assert.NotNull(logParams);
-        Assert.Equal("info", logParams!.Level);
-        Assert.Equal("Editor initialized", logParams.Message);
+        using var doc = JsonDocument.Parse(paramsJson);
+        Assert.Equal("info", doc.RootElement.GetProperty("level").GetString());
+        Assert.Equal("Editor initialized", doc.RootElement.GetProperty("message").GetString());
     }
 
     [Fact]
@@ -129,14 +128,14 @@ public sealed class JsonRpcWireCompatibilityTests : IDisposable
         Assert.Equal("keyboard/keyDown", request.Method);
         Assert.True(request.IsNotification);
 
+        // Verify the raw params contain the expected named parameters.
         var paramsJson = ExtractParams(json);
-        var keyDown = JsonSerializer.Deserialize(paramsJson, BridgeSerializerContext.Default.KeyDownParams);
-        Assert.NotNull(keyDown);
-        Assert.Equal(65, keyDown!.KeyCode);
-        Assert.True(keyDown.CtrlKey);
-        Assert.False(keyDown.ShiftKey);
-        Assert.False(keyDown.AltKey);
-        Assert.False(keyDown.MetaKey);
+        using var doc = JsonDocument.Parse(paramsJson);
+        Assert.Equal(65, doc.RootElement.GetProperty("keyCode").GetInt32());
+        Assert.True(doc.RootElement.GetProperty("ctrlKey").GetBoolean());
+        Assert.False(doc.RootElement.GetProperty("shiftKey").GetBoolean());
+        Assert.False(doc.RootElement.GetProperty("altKey").GetBoolean());
+        Assert.False(doc.RootElement.GetProperty("metaKey").GetBoolean());
     }
 
     [Fact]
@@ -220,15 +219,16 @@ public sealed class JsonRpcWireCompatibilityTests : IDisposable
     }
 
     [Fact]
-    public async Task RoundTrip_BridgeReady_FormatterConsistency()
+    public void RoundTrip_LifecycleUpdateParams_FormatterConsistency()
     {
-        // Serialize a BridgeReadyParams, then verify the bytes deserialize back.
-        var original = new BridgeReadyParams(1);
-        var serialized = JsonSerializer.Serialize(original, BridgeSerializerContext.Default.BridgeReadyParams);
-        var deserialized = JsonSerializer.Deserialize(serialized, BridgeSerializerContext.Default.BridgeReadyParams);
+        // Serialize a LifecycleUpdateParams, then verify the bytes deserialize back.
+        var original = new LifecycleUpdateParams(1, 0);
+        var serialized = JsonSerializer.Serialize(original, BridgeSerializerContext.Default.LifecycleUpdateParams);
+        var deserialized = JsonSerializer.Deserialize(serialized, BridgeSerializerContext.Default.LifecycleUpdateParams);
 
         Assert.NotNull(deserialized);
-        Assert.Equal(original.ProtocolVersion, deserialized!.ProtocolVersion);
+        Assert.Equal(original.Loading, deserialized!.Loading);
+        Assert.Equal(original.Loaded, deserialized.Loaded);
     }
 
     /// <summary>

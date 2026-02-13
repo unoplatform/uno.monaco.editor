@@ -63,7 +63,8 @@ public sealed class JsonRpcTargetDispatchTests : IAsyncLifetime
     [Fact]
     public async Task Notification_DispatchesToTarget()
     {
-        await _clientRpc!.NotifyAsync("parentAccessor/callAction", new { name = "testAction" });
+        // Use NotifyWithParameterObjectAsync to send named params matching individual C# parameters.
+        await _clientRpc!.NotifyWithParameterObjectAsync("parentAccessor/callAction", new { name = "testAction" });
 
         // Wait for async dispatch with deterministic signaling.
         Assert.True(
@@ -75,7 +76,7 @@ public sealed class JsonRpcTargetDispatchTests : IAsyncLifetime
     [Fact]
     public async Task Request_ReturnsValue()
     {
-        var result = await _clientRpc!.InvokeAsync<string>(
+        var result = await _clientRpc!.InvokeWithParameterObjectAsync<string>(
             "parentAccessor/getJsonValue",
             new { name = "TestProperty" });
 
@@ -86,7 +87,7 @@ public sealed class JsonRpcTargetDispatchTests : IAsyncLifetime
     public async Task Request_CallEvent_ReturnsResult()
     {
         using var doc = JsonDocument.Parse("[\"arg1\",\"arg2\"]");
-        var result = await _clientRpc!.InvokeAsync<string>(
+        var result = await _clientRpc!.InvokeWithParameterObjectAsync<string>(
             "parentAccessor/callEvent",
             new { name = "testEvent", parameters = doc.RootElement });
 
@@ -96,7 +97,7 @@ public sealed class JsonRpcTargetDispatchTests : IAsyncLifetime
     [Fact]
     public async Task Notification_BridgeReady_Dispatches()
     {
-        await _clientRpc!.NotifyAsync("bridge/ready", new { protocolVersion = 1 });
+        await _clientRpc!.NotifyWithParameterObjectAsync("bridge/ready", new { protocolVersion = 1 });
 
         // Wait for async dispatch with deterministic signaling.
         Assert.True(
@@ -123,29 +124,29 @@ public sealed class JsonRpcTargetDispatchTests : IAsyncLifetime
         public TaskCompletionSource<bool> BridgeReadySignal { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         [JsonRpcMethod("parentAccessor/callAction")]
-        public void OnCallAction(CallActionDto p)
+        public void OnCallAction(string name)
         {
-            CalledActions.Add(p.Name);
+            CalledActions.Add(name);
             ActionCalledSignal.TrySetResult(true);
         }
 
         [JsonRpcMethod("parentAccessor/getJsonValue")]
-        public string OnGetJsonValue(GetJsonValueDto p)
+        public string OnGetJsonValue(string name)
         {
-            return $"{{\"{p.Name}\":true}}";
+            return $"{{\"{name}\":true}}";
         }
 
         [JsonRpcMethod("parentAccessor/callEvent")]
-        public string OnCallEvent(CallEventDto p)
+        public string OnCallEvent(string name, JsonElement parameters)
         {
             return "event-result";
         }
 
         [JsonRpcMethod("bridge/ready")]
-        public void OnBridgeReady(BridgeReadyDto p)
+        public void OnBridgeReady(int protocolVersion)
         {
             BridgeReadyReceived = true;
-            BridgeReadyProtocolVersion = p.ProtocolVersion;
+            BridgeReadyProtocolVersion = protocolVersion;
             BridgeReadySignal.TrySetResult(true);
         }
     }
@@ -211,14 +212,14 @@ public sealed class JsonRpcTargetDispatchTests : IAsyncLifetime
         }));
         clientRpc.StartListening();
 
-        // Dispatch to first target
-        await clientRpc.NotifyAsync("bridge/ready", new { protocolVersion = 1 });
+        // Dispatch to first target (use named params for individual-parameter dispatch)
+        await clientRpc.NotifyWithParameterObjectAsync("bridge/ready", new { protocolVersion = 1 });
         Assert.True(
             await target1.BridgeReadySignal.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken),
             "bridge/ready not dispatched to first target");
 
-        // Dispatch to second target
-        await clientRpc.NotifyAsync("secondary/ping", new { value = "hello" });
+        // Dispatch to second target (SecondaryTarget still uses DTO-style single param)
+        await clientRpc.NotifyWithParameterObjectAsync("secondary/ping", new { value = "hello" });
         Assert.True(
             await target2.PingSignal.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken),
             "secondary/ping not dispatched to second target");
@@ -232,14 +233,12 @@ public sealed class JsonRpcTargetDispatchTests : IAsyncLifetime
         public TaskCompletionSource<bool> PingSignal { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         [JsonRpcMethod("secondary/ping")]
-        public void OnPing(SecondaryPingDto p)
+        public void OnPing(string value)
         {
-            LastPingValue = p.Value;
+            LastPingValue = value;
             PingSignal.TrySetResult(true);
         }
     }
-
-    private record SecondaryPingDto(string Value);
 
     /// <summary>
     /// Regression: StreamJsonRpc rejects targets with custom delegate events
@@ -347,9 +346,4 @@ public sealed class JsonRpcTargetDispatchTests : IAsyncLifetime
         }
     }
 
-    // DTOs used by the mock target (match bridge-protocol.md schemas).
-    private record CallActionDto(string Name);
-    private record GetJsonValueDto(string Name);
-    private record CallEventDto(string Name, JsonElement Parameters);
-    private record BridgeReadyDto(int ProtocolVersion);
 }

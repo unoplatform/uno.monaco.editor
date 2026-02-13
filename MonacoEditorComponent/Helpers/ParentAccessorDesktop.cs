@@ -8,7 +8,6 @@ using CommunityToolkit.WinUI;
 
 using Microsoft.UI.Dispatching;
 
-using Monaco.Bridge;
 using Monaco.Serialization;
 
 using StreamJsonRpc;
@@ -269,44 +268,44 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
     // ============================================================
 
     [JsonRpcMethod("parentAccessor/setValue")]
-    public async Task OnSetValue(SetValueParams p)
+    public async Task OnSetValue(string name, JsonElement value)
     {
         // Extract the string value from the JsonElement.
-        var value = ExtractStringValue(p.Value);
-        await SetValue(p.Name, value);
+        var stringValue = ExtractStringValue(value);
+        await SetValue(name, stringValue);
     }
 
     [JsonRpcMethod("parentAccessor/setValueWithType")]
-    public async Task OnSetValueWithType(SetValueWithTypeParams p)
+    public async Task OnSetValueWithType(string name, JsonElement value, string typeName)
     {
-        var value = ExtractStringValue(p.Value);
-        await SetValue(p.Name, value, p.TypeName);
+        var stringValue = ExtractStringValue(value);
+        await SetValue(name, stringValue, typeName);
     }
 
     [JsonRpcMethod("parentAccessor/callAction")]
-    public void OnCallAction(CallActionParams p)
+    public void OnCallAction(string name)
     {
-        CallAction(p.Name);
+        CallAction(name);
     }
 
     [JsonRpcMethod("parentAccessor/callActionWithParameters")]
-    public void OnCallActionWithParameters(CallActionWithParametersParams p)
+    public void OnCallActionWithParameters(string name, JsonElement parameters)
     {
-        var parameters = ConvertJsonElementToStringArray(p.Parameters);
-        CallActionWithParameters(p.Name, parameters);
+        var paramArray = ConvertJsonElementToStringArray(parameters);
+        CallActionWithParameters(name, paramArray);
     }
 
     [JsonRpcMethod("parentAccessor/callEvent")]
-    public async Task<string?> OnCallEvent(CallEventParams p)
+    public async Task<string?> OnCallEvent(string name, JsonElement parameters)
     {
-        var parameters = ConvertJsonElementToStringArray(p.Parameters);
-        return await CallEvent(p.Name, parameters);
+        var paramArray = ConvertJsonElementToStringArray(parameters);
+        return await CallEvent(name, paramArray);
     }
 
     [JsonRpcMethod("parentAccessor/getJsonValue")]
-    public string OnGetJsonValue(GetJsonValueParams p)
+    public string OnGetJsonValue(string name)
     {
-        return GetJsonValue(p.Name);
+        return GetJsonValue(name);
     }
 
     // ============================================================

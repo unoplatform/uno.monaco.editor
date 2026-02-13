@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Text.RegularExpressions;
 
 using Microsoft.Playwright;
 
@@ -45,6 +46,10 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     private int _cdpPort;
     private CancellationTokenSource? _logCaptureCts;
 
+    // In-memory log lines for cursor-based query API.
+    private readonly List<string> _logLines = [];
+    private readonly object _logLock = new();
+
     /// <summary>The Playwright page connected to the Monaco WebView2 content.</summary>
     public IPage Page { get; private set; } = null!;
 
@@ -88,6 +93,7 @@ public sealed class DesktopAppFixture : IAsyncLifetime
             {
                 ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = $"--remote-debugging-port={_cdpPort}",
                 ["WEBVIEW2_USER_DATA_FOLDER"] = _userDataFolder,
+                ["MONACO_DIAGNOSTICS"] = "1",
             },
         };
 
@@ -164,6 +170,74 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         if (!string.IsNullOrEmpty(_userDataFolder) && Directory.Exists(_userDataFolder))
         {
             try { Directory.Delete(_userDataFolder, recursive: true); } catch { /* best-effort */ }
+        }
+    }
+
+    // ============================================================
+    // Cursor-based log query API
+    // ============================================================
+
+    /// <summary>
+    /// Returns a cursor (index) representing the current end of the log buffer.
+    /// Lines added after this cursor are "new" from the caller's perspective.
+    /// </summary>
+    public int GetLogCursor()
+    {
+        lock (_logLock)
+        {
+            return _logLines.Count;
+        }
+    }
+
+    /// <summary>
+    /// Waits for a log line matching <paramref name="pattern"/> (regex) to appear
+    /// after the given <paramref name="cursor"/> position. Returns the matching line.
+    /// </summary>
+    /// <param name="cursor">The cursor position returned by <see cref="GetLogCursor"/>.</param>
+    /// <param name="pattern">A regex pattern to match against log lines.</param>
+    /// <param name="timeoutMs">Maximum time to wait in milliseconds.</param>
+    /// <returns>The first matching log line after the cursor.</returns>
+    /// <exception cref="TimeoutException">Thrown if no matching line appears within the timeout.</exception>
+    public async Task<string> WaitForLogLineAfterAsync(int cursor, string pattern, int timeoutMs = 10_000)
+    {
+        var regex = new Regex(pattern, RegexOptions.Compiled);
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+
+        while (DateTime.UtcNow < deadline)
+        {
+            lock (_logLock)
+            {
+                for (int i = cursor; i < _logLines.Count; i++)
+                {
+                    if (regex.IsMatch(_logLines[i]))
+                    {
+                        return _logLines[i];
+                    }
+                }
+            }
+
+            await Task.Delay(50);
+        }
+
+        // Build diagnostic message with available lines.
+        var availableLines = GetLinesAfter(cursor);
+        throw new TimeoutException(
+            $"No log line matching '{pattern}' appeared within {timeoutMs}ms after cursor {cursor}.\n" +
+            $"Lines after cursor ({availableLines.Count}):\n" +
+            string.Join("\n", availableLines.Take(50)));
+    }
+
+    /// <summary>
+    /// Returns all log lines captured after the given <paramref name="cursor"/> position.
+    /// </summary>
+    /// <param name="cursor">The cursor position returned by <see cref="GetLogCursor"/>.</param>
+    /// <returns>A list of log lines after the cursor.</returns>
+    public List<string> GetLinesAfter(int cursor)
+    {
+        lock (_logLock)
+        {
+            if (cursor >= _logLines.Count) return [];
+            return _logLines.GetRange(cursor, _logLines.Count - cursor);
         }
     }
 
@@ -328,7 +402,7 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
     }
 
-    private static async Task CaptureProcessOutputAsync(Process process, string logPath, CancellationToken cancellationToken)
+    private async Task CaptureProcessOutputAsync(Process process, string logPath, CancellationToken cancellationToken)
     {
         try
         {
@@ -341,7 +415,12 @@ public sealed class DesktopAppFixture : IAsyncLifetime
                 while (!cancellationToken.IsCancellationRequested &&
                        (line = await process.StandardOutput.ReadLineAsync(cancellationToken)) is not null)
                 {
-                    await logWriter.WriteLineAsync(($"[stdout] {line}").AsMemory(), cancellationToken);
+                    var formattedLine = $"[stdout] {line}";
+                    lock (_logLock)
+                    {
+                        _logLines.Add(formattedLine);
+                    }
+                    await logWriter.WriteLineAsync(formattedLine.AsMemory(), cancellationToken);
                     await logWriter.FlushAsync(cancellationToken);
                 }
             }, cancellationToken);
@@ -351,7 +430,12 @@ public sealed class DesktopAppFixture : IAsyncLifetime
                 while (!cancellationToken.IsCancellationRequested &&
                        (line = await process.StandardError.ReadLineAsync(cancellationToken)) is not null)
                 {
-                    await logWriter.WriteLineAsync(($"[stderr] {line}").AsMemory(), cancellationToken);
+                    var formattedLine = $"[stderr] {line}";
+                    lock (_logLock)
+                    {
+                        _logLines.Add(formattedLine);
+                    }
+                    await logWriter.WriteLineAsync(formattedLine.AsMemory(), cancellationToken);
                     await logWriter.FlushAsync(cancellationToken);
                 }
             }, cancellationToken);
