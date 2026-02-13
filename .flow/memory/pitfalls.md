@@ -129,3 +129,6 @@ Provider registration and all InvokeScriptAsync calls require EditorLoaded, not 
 
 ## 2026-02-12 manual [pitfall]
 Monaco TypeDoc site uses editor_editor_api module path prefix (not editor) in URLs -- the old editor.{Type} pattern was silently broken by a TypeDoc regeneration; always curl -s -o /dev/null -w '%{http_code}' to verify TypeDoc URLs resolve before committing
+
+## 2026-02-13 manual [pitfall]
+Playwright build targets (CopyPlaywrightFilesToOutput) create assembly-named subdirectory in output, causing MSB3024 when UseArtifactsOutput=true and OutputType=Exe. Must suppress with ExcludeAssets=build;buildTransitive on the package reference.

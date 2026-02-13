@@ -74,8 +74,8 @@ With `UseArtifactsOutput=true`, build output goes to `artifacts/bin/MonacoEditor
 - [ ] Existing test fixtures (`WasmAppFixture`, `DesktopAppFixture`) still compile and work
 
 ## Done summary
-Replaced Microsoft.Playwright with Microsoft.Playwright.Xunit.v3 as the primary test adapter package, suppressed build target conflicts with UseArtifactsOutput via ExcludeAssets, standardized -p:ArtifactsPath across all 3 CI jobs, and updated Playwright browser install to use staged playwright.ps1 from NuGet cache with Test-Path guards.
+Replaced Microsoft.Playwright with Microsoft.Playwright.Xunit.v3 as the primary test adapter package, suppressed conflicting Playwright build targets via ExcludeAssets on the transitive Microsoft.Playwright reference (MSB3024 with UseArtifactsOutput). Standardized ARTIFACTS_PATH across all 3 CI jobs. Extracted Playwright browser install into a reusable composite action (.github/actions/install-playwright/) with pinned version resolution from NuGet cache. All 182 unit tests pass. Review verdict: SHIP.
 ## Evidence
-- Commits: bc4d89e18d7a771c9c4f19a4b89e03e667e25a50
-- Tests: dotnet build MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release, dotnet test --project MonacoEditorComponent.Tests/ -- --filter-not-trait Category=DesktopCDP --filter-not-trait Category=WasmPlaywright (182 passed)
+- Commits: bc4d89e, 61258e7, 3cdd367
+- Tests: dotnet build MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release (0 errors), dotnet test --project MonacoEditorComponent.Tests/ -- --filter-not-trait Category=DesktopCDP --filter-not-trait Category=WasmPlaywright (182 passed)
 - PRs:
