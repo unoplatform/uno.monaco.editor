@@ -164,19 +164,26 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any) =>
 
     // Set theme -- async on desktop (JSON-RPC with timeout), sync on WASM (JSExport)
     // Use direct accessor/theme calls to avoid circular dependency with otherScriptsToBeOrganized
-    let theme: any = await editorContext.Accessor.getJsonValueAsync("RequestedTheme");
-    theme = {
-        "0": "Default",
-        "1": "Light",
-        "2": "Dark"
-    }[theme];
+    // Wrapped in try-catch so editor init completes even if theme RPC stalls (CI cold-start).
+    try {
+        let theme: any = await editorContext.Accessor.getJsonValueAsync("RequestedTheme");
+        theme = {
+            "0": "Default",
+            "1": "Light",
+            "2": "Dark"
+        }[theme];
 
-    if (theme == "Default") {
-        theme = await (editorContext as any).Theme.getCurrentThemeNameAsync();
+        if (theme == "Default") {
+            theme = await (editorContext as any).Theme.getCurrentThemeNameAsync();
+        }
+
+        const isHighContrast = await (editorContext as any).Theme.getIsHighContrastAsync();
+        changeTheme(element, theme, isHighContrast as any);
+    } catch (err) {
+        console.warn('[initializeMonacoEditor] Theme initialization failed, using defaults:', err);
+        // Apply default light theme so the editor is usable even if RPC failed.
+        changeTheme(element, 'Light', 'false');
     }
-
-    const isHighContrast = await (editorContext as any).Theme.getIsHighContrastAsync();
-    changeTheme(element, theme, isHighContrast as any);
 
     // Track parent element size changes via ResizeObserver for deterministic cleanup.
     // This replaces the old window "resize" listener that fired on every window resize
@@ -323,9 +330,14 @@ export const createMonacoEditor = async (managedOwner: any, elementId: string, b
     await ParentAccessor.setup();
     await ThemeListener.setup();
 
-    await initializeMonacoEditor(managedOwner, document.getElementById(elementId));
+    try {
+        await initializeMonacoEditor(managedOwner, document.getElementById(elementId));
+    } catch (err) {
+        console.error('[createMonacoEditor] initializeMonacoEditor failed:', err);
+    }
 
-    // Emit editor/ready notification on desktop after Monaco init completes
+    // Emit editor/ready notification on desktop after Monaco init completes.
+    // Sent even on partial init failure so the C# side can proceed.
     if (_isDesktop) {
         getConnection().sendNotification('editor/ready', { protocolVersion: 1 });
     }
