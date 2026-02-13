@@ -369,11 +369,8 @@ namespace Monaco
         private async Task DeferredTeardownAsync(CancellationToken ct)
         {
             const int deferredTeardownDelayMs = 1200;
-            try
-            {
-                await Task.Delay(deferredTeardownDelayMs, ct);
-            }
-            catch (OperationCanceledException)
+            await Task.Delay(deferredTeardownDelayMs);
+            if (ct.IsCancellationRequested)
             {
                 // Control was reloaded -- skip teardown.
                 DesktopCodeEditorPresenter.DiagnosticLog("DeferredTeardown: cancelled (control reloaded)");
