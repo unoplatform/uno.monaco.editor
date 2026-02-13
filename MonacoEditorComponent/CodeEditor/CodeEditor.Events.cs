@@ -131,6 +131,9 @@ namespace Monaco
 
         private async void WebView_NavigationCompleted(ICodeEditorPresenter? sender, PresenterNavigationCompletedEventArgs? args)
         {
+            DesktopCodeEditorPresenter.DiagnosticLog(
+                $"WebView_NavigationCompleted: IsSuccess={args?.IsSuccess}, IsLoaded={IsLoaded}, " +
+                $"lifecycle={_lifecycleState}, initialized={_initialized}, isDesktop={_view is DesktopCodeEditorPresenter}");
 #if DEBUG
             Debug.WriteLine($"Navigation completed - {args?.IsSuccess}");
 #endif
@@ -138,7 +141,7 @@ namespace Monaco
             // Guard against late callbacks after unload.
             if (!IsLoaded)
             {
-                Debug.WriteLine("WebView_NavigationCompleted: control not loaded, ignoring.");
+                DesktopCodeEditorPresenter.DiagnosticLog("WebView_NavigationCompleted: control not loaded, ignoring.");
                 return;
             }
 
@@ -146,7 +149,7 @@ namespace Monaco
             // advance the lifecycle to Loaded.
             if (args is { IsSuccess: false })
             {
-                Debug.WriteLine("Navigation failed — not advancing lifecycle.");
+                DesktopCodeEditorPresenter.DiagnosticLog("WebView_NavigationCompleted: navigation failed, not advancing lifecycle.");
                 return;
             }
 
@@ -172,15 +175,21 @@ namespace Monaco
                     // the Promise via ExecuteScriptAsync can deadlock if WebView2 serializes
                     // script execution and message dispatch on the same thread.
                     // The "Loaded" callback fires asynchronously when init completes.
+                    DesktopCodeEditorPresenter.DiagnosticLog("WebView_NavigationCompleted: invoking createMonacoEditor...");
                     await _view.InvokeScriptAsync("void createMonacoEditor(null, 'editor-container', '')");
-                    Debug.WriteLine("WebView_NavigationCompleted: createMonacoEditor invoked on desktop");
+                    DesktopCodeEditorPresenter.DiagnosticLog("WebView_NavigationCompleted: createMonacoEditor invoked on desktop");
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"WebView_NavigationCompleted: createMonacoEditor failed: {ex}");
+                    DesktopCodeEditorPresenter.DiagnosticLog($"WebView_NavigationCompleted: createMonacoEditor failed: {ex}");
                     InternalException?.Invoke(this, ex);
                 }
                 return;
+            }
+            else
+            {
+                DesktopCodeEditorPresenter.DiagnosticLog(
+                    $"WebView_NavigationCompleted: skipped createMonacoEditor (guard failed)");
             }
 
             // WASM path: NavigationCompleted does not fire on WASM (BrowserHtmlElement
