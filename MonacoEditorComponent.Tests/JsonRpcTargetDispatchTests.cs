@@ -218,7 +218,7 @@ public sealed class JsonRpcTargetDispatchTests : IAsyncLifetime
             await target1.BridgeReadySignal.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken),
             "bridge/ready not dispatched to first target");
 
-        // Dispatch to second target (SecondaryTarget still uses DTO-style single param)
+        // Dispatch to second target (named-parameter dispatch)
         await clientRpc.NotifyWithParameterObjectAsync("secondary/ping", new { value = "hello" });
         Assert.True(
             await target2.PingSignal.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken),
