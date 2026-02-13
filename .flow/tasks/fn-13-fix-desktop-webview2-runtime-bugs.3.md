@@ -33,9 +33,8 @@ Fix two remaining issues:
 - [ ] Existing selection-based tests (if any) continue to pass
 - [ ] TS helpers build clean (`npm run build`)
 ## Done summary
-TBD
-
+Added null/collapsed selection guard in updateSelectedContent.ts to prevent NullReferenceException when SetSelectedText is invoked with no active selection, wrapped Editor_Loading async void body in try-catch for defensive error handling, and added IsEditorLoaded check in ButtonSetSelectedText_Click to demonstrate correct API usage patterns.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: ab3d5656a34fb569ae980ed0494d10e0cfb33ebd
+- Tests: npm run build (TS helpers), dotnet build MonacoEditorComponent.slnx --no-restore, dotnet test --project MonacoEditorComponent.Tests --filter-not-trait Category=WasmPlaywright --filter-not-trait Category=DesktopCDP (182 passed), dotnet test --project tools/MonacoTypeEmitter.Tests (24 passed)
 - PRs:
