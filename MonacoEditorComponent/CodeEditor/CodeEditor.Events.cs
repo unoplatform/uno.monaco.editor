@@ -214,6 +214,32 @@ namespace Monaco
             TransitionLifecycle(EditorLifecycleState.Loaded);
         }
 
+        /// <summary>
+        /// Re-bootstraps Monaco on an existing WebView2 that is already navigated to
+        /// editor.html. Called when the presenter is reused after a hard teardown
+        /// (bridge was torn down but WebView2 is still healthy). The bridge has already
+        /// been restored via <see cref="InitialiseWebObjects"/> before this is called.
+        /// </summary>
+        private async Task RebootstrapMonacoAsync()
+        {
+            if (_view is not DesktopCodeEditorPresenter desktopPresenter)
+            {
+                return;
+            }
+
+            DesktopCodeEditorPresenter.DiagnosticLog("RebootstrapMonacoAsync: invoking createMonacoEditor...");
+            try
+            {
+                await desktopPresenter.InvokeScriptAsync("void createMonacoEditor(null, 'editor-container', '')");
+                DesktopCodeEditorPresenter.DiagnosticLog("RebootstrapMonacoAsync: createMonacoEditor invoked");
+            }
+            catch (Exception ex)
+            {
+                DesktopCodeEditorPresenter.DiagnosticLog($"RebootstrapMonacoAsync: createMonacoEditor failed: {ex}");
+                InternalException?.Invoke(this, ex);
+            }
+        }
+
         internal IParentAccessor? _parentAccessor;
         private IKeyboardListener? _keyboardListener;
         private IDebugLogger? _debugLogger;

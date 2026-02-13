@@ -220,6 +220,32 @@ namespace Monaco
                 return;
             }
 
+            // Soft reload without pending CTS: the presenter is healthy, the
+            // lifecycle is not Unloaded, and subscriptions are intact (_model != null).
+            // This happens when OnApplyTemplate reused the existing presenter and
+            // CodeEditor_Loaded fires afterward during a normal tab switch.
+            // Skip full init — subscriptions and bridge objects are still alive.
+            if (_view != null
+                && _model != null
+                && _lifecycleState != EditorLifecycleState.Unloaded
+                && IsPresenterHealthy())
+            {
+                DesktopCodeEditorPresenter.DiagnosticLog(
+                    $"CodeEditor_Loaded: soft reload (lifecycle={_lifecycleState}, presenter={_view.GetHashCode():x8})");
+
+                Unloaded -= CodeEditor_Unloaded;
+                Unloaded += CodeEditor_Unloaded;
+
+                if (Window.Current is not null)
+                {
+                    Window.Current.SizeChanged += OnWindowSizeChanged;
+                    _sizeChangedSubCount++;
+                }
+
+                EmitSubscriptionDiagnostics("Loaded(soft-reuse)");
+                return;
+            }
+
             if (OperatingSystem.IsBrowser())
             {
                 LoadedPartial();
@@ -333,6 +359,17 @@ namespace Monaco
                 return;
             }
 
+            // Race guard: verify the control is still unloaded before tearing down.
+            // If CodeEditor_Loaded already fired (but did not cancel the CTS due to
+            // a timing race), skip teardown to avoid destroying a re-initializing presenter.
+            if (IsLoaded)
+            {
+                DesktopCodeEditorPresenter.DiagnosticLog("DeferredTeardown: control is loaded, skipping teardown");
+                _unloadCts?.Dispose();
+                _unloadCts = null;
+                return;
+            }
+
             // Hard teardown: control was not reloaded within the grace period.
             DesktopCodeEditorPresenter.DiagnosticLog("DeferredTeardown: executing hard teardown");
 
@@ -354,18 +391,94 @@ namespace Monaco
             _model = null;
         }
 
+        /// <summary>
+        /// Returns true when the existing desktop presenter is healthy and can be
+        /// reused across unload/load cycles (e.g., tab switches). A healthy presenter
+        /// has CoreWebView2 initialized and is not disposed.
+        /// WASM presenters are always considered non-reusable (they are lightweight
+        /// and stateless).
+        /// </summary>
+        private bool IsPresenterHealthy()
+        {
+            if (_view is DesktopCodeEditorPresenter desktop)
+            {
+                return desktop.IsCoreWebView2Initialized;
+            }
+
+            return false;
+        }
+
         /// <inheritdoc />
         protected override void OnApplyTemplate()
         {
-            DesktopCodeEditorPresenter.DiagnosticLog("OnApplyTemplate()");
+            DesktopCodeEditorPresenter.DiagnosticLog(
+                $"OnApplyTemplate() _view={_view?.GetHashCode():x8} healthy={IsPresenterHealthy()} lifecycle={_lifecycleState}");
 
-            // Cancel any pending deferred teardown.
+            // Cancel any pending deferred teardown — we are being re-applied.
             _unloadCts?.Cancel();
             _unloadCts?.Dispose();
             _unloadCts = null;
 
+            var viewHost = GetTemplateChild("View") as ContentPresenter
+                ?? throw new InvalidOperationException(
+                    "CodeEditor template must contain a ContentPresenter named 'View'. " +
+                    "Ensure Generic.xaml defines <ContentPresenter x:Name=\"View\" />.");
+
+            // ---- Reuse path: presenter is healthy, just reassign to ContentPresenter ----
+            if (_view != null && IsPresenterHealthy())
+            {
+                DesktopCodeEditorPresenter.DiagnosticLog(
+                    $"OnApplyTemplate: reusing presenter {_view.GetHashCode():x8} lifecycle={_lifecycleState}");
+
+                // The ContentPresenter may have lost its Content reference during the
+                // unload/re-template cycle. Re-assign the same instance — this does
+                // not trigger a new WebView2 creation.
+                if (viewHost.Content != _view)
+                {
+                    viewHost.Content = _view;
+                }
+
+                // If hard teardown already ran (lifecycle is Unloaded), the bridge
+                // objects were torn down. Restore them by re-running InitialiseWebObjects
+                // which will set up the JsonRpc bridge on the existing presenter.
+                if (_lifecycleState == EditorLifecycleState.Unloaded && _initializedPresenter == null)
+                {
+                    DesktopCodeEditorPresenter.DiagnosticLog(
+                        "OnApplyTemplate: restoring bridge after hard teardown");
+
+                    if (!InitialiseWebObjects())
+                    {
+                        // Bridge restoration failed — fall through to full teardown/create path
+                        // by NOT returning. The reuse attempt failed.
+                        DesktopCodeEditorPresenter.DiagnosticLog(
+                            "OnApplyTemplate: bridge restoration failed, will recreate presenter");
+                    }
+                    else
+                    {
+                        // Bridge restored successfully. The presenter's WebView2 is already
+                        // at editor.html, so NavigationCompleted won't fire again.
+                        // Manually re-bootstrap Monaco by invoking createMonacoEditor.
+                        // InitialiseWebObjects transitioned lifecycle to Loading, so
+                        // CodeEditorLoaded (the "Loaded" callback) will handle the rest.
+                        _ = RebootstrapMonacoAsync();
+
+                        base.OnApplyTemplate();
+                        return;
+                    }
+                }
+                else
+                {
+                    base.OnApplyTemplate();
+                    return;
+                }
+            }
+
+            // ---- Full teardown path: first init or presenter is unhealthy ----
             if (_view != null)
             {
+                DesktopCodeEditorPresenter.DiagnosticLog(
+                    $"OnApplyTemplate: tearing down unhealthy presenter {_view.GetHashCode():x8}");
+
                 _view.NavigationStarting -= WebView_NavigationStarting;
                 _view.NavigationCompleted -= WebView_NavigationCompleted;
                 _view.NewWindowRequested -= WebView_NewWindowRequested;
@@ -392,40 +505,32 @@ namespace Monaco
             }
 
             // Create the correct presenter at runtime via OperatingSystem.IsBrowser()
-            var viewHost = GetTemplateChild("View") as ContentPresenter
-                ?? throw new InvalidOperationException(
-                    "CodeEditor template must contain a ContentPresenter named 'View'. " +
-                    "Ensure Generic.xaml defines <ContentPresenter x:Name=\"View\" />.");
-
-            if (viewHost != null)
+            ICodeEditorPresenter presenter;
+            if (OperatingSystem.IsBrowser())
             {
-                ICodeEditorPresenter presenter;
-                if (OperatingSystem.IsBrowser())
-                {
-                    presenter = new WasmCodeEditorPresenter();
-                }
-                else
-                {
-                    presenter = new DesktopCodeEditorPresenter();
-                }
+                presenter = new WasmCodeEditorPresenter();
+            }
+            else
+            {
+                presenter = new DesktopCodeEditorPresenter();
+            }
 
-                viewHost.Content = presenter;
-                _view = presenter;
-                _view.ParentCodeEditor = this;
+            viewHost.Content = presenter;
+            _view = presenter;
+            _view.ParentCodeEditor = this;
 
-                _view.NavigationStarting -= WebView_NavigationStarting;
-                _view.NavigationStarting += WebView_NavigationStarting;
-                _view.NavigationCompleted += WebView_NavigationCompleted;
-                _view.NewWindowRequested += WebView_NewWindowRequested;
+            _view.NavigationStarting -= WebView_NavigationStarting;
+            _view.NavigationStarting += WebView_NavigationStarting;
+            _view.NavigationCompleted += WebView_NavigationCompleted;
+            _view.NewWindowRequested += WebView_NewWindowRequested;
 
-                if (_view.IsLoaded)
-                {
-                    WebView_DOMContentLoaded(_view, new());
-                }
-                else
-                {
-                    _view.Loaded += WebView_DOMContentLoaded;
-                }
+            if (_view.IsLoaded)
+            {
+                WebView_DOMContentLoaded(_view, new());
+            }
+            else
+            {
+                _view.Loaded += WebView_DOMContentLoaded;
             }
 
             base.OnApplyTemplate();
