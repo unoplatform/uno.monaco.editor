@@ -11,10 +11,14 @@
 
 	<ItemGroup>
 		<PackageReference Include="xunit.v3.mtp-v2" />
-		<!-- Playwright build/buildTransitive targets copy node driver files into a subdirectory
-		     that conflicts with the exe output file on macOS/Linux (UseArtifactsOutput + OutputType=Exe).
-		     CI installs the Playwright driver post-build via a dedicated step. -->
-		<PackageReference Include="Microsoft.Playwright.Xunit.v3" ExcludeAssets="build;buildTransitive;native" />
+		<!-- Playwright runtime is referenced for integration tests.
+		     Build/buildTransitive assets are excluded to prevent the Playwright targets
+		     from copying node driver files into a subdirectory that conflicts with the
+		     exe output file on macOS/Linux (UseArtifactsOutput + OutputType=Exe).
+		     CI installs the Playwright driver post-build via a dedicated step.
+		     Note: Microsoft.Playwright.Xunit.v3 was reverted to Microsoft.Playwright because
+		     the TestAdapter brought by Xunit.v3 causes fixture disposal hangs on CI. -->
+		<PackageReference Include="Microsoft.Playwright" IncludeAssets="compile;runtime" PrivateAssets="contentFiles;build;buildTransitive;analyzers;native" />
 		<PackageReference Include="StreamJsonRpc" />
 		<PackageReference Include="Nerdbank.Streams" />
 		<PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" PrivateAssets="all" />
