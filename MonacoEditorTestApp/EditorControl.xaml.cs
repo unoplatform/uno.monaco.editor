@@ -232,10 +232,52 @@ namespace MonacoEditorTestApp
             await Editor.AddActionAsync(new TestAction());
         }
 
-        private void Editor_Loaded(object sender, RoutedEventArgs e)
+        private async void Editor_Loaded(object sender, RoutedEventArgs e)
         {
             // Ready for Display
+
+            // Test harness: when MONACO_DIAGNOSTICS=1, set known property values
+            // and register test commands/actions so CDP integration tests can verify
+            // the C# bridge round-trip without any library modifications.
+            if (Environment.GetEnvironmentVariable("MONACO_DIAGNOSTICS") != "1")
+            {
+                return;
+            }
+
+            try
+            {
+                // Set known text and language from the C# side to prove the
+                // DP -> SendScriptAsync -> JS path works end-to-end.
+                Editor.Text = "// test-init-text";
+                Editor.CodeLanguage = "javascript";
+                Console.WriteLine("TEST_INIT_PROPS:text=// test-init-text,lang=javascript");
+
+                // Register a test command (no keybinding) whose callback logs to stdout.
+                var commandId = await Editor.AddCommandAsync(0, (args) =>
+                {
+                    Console.WriteLine($"TEST_CALLBACK:{_testCommandName}:invoked");
+                });
+                _testCommandName = commandId ?? "unknown";
+
+                // Register a test action whose callback logs to stdout.
+                const string testActionId = "testCdpAction";
+                await Editor.AddActionAsync(new CdpTestAction(testActionId, () =>
+                {
+                    Console.WriteLine($"TEST_CALLBACK:Action{testActionId}:invoked");
+                }));
+
+                Console.WriteLine($"TEST_HARNESS:commandId={_testCommandName},actionId={testActionId}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"TEST_HARNESS_ERROR:{ex.Message}");
+            }
         }
+
+        /// <summary>
+        /// Stores the command name returned by AddCommandAsync for test correlation.
+        /// </summary>
+        private string _testCommandName = "unknown";
 
         private void Editor_OpenLinkRequest(CodeEditor sender, OpenLinkRequestedEventArgs args)
         {

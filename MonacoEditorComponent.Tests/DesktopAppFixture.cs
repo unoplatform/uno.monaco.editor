@@ -174,6 +174,43 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     }
 
     // ============================================================
+    // Editor state reset helper
+    // ============================================================
+
+    /// <summary>
+    /// Resets the editor to the known initial state matching the host-initiated startup values
+    /// (<c>Text = "// test-init-text"</c>, <c>CodeLanguage = "javascript"</c>, theme = "vs").
+    /// Call at the start of each test (not teardown) so failures are immediately visible.
+    /// </summary>
+    public async Task ResetEditorStateAsync()
+    {
+        await Page.EvaluateAsync("""
+            () => {
+                const editor = monaco.editor.getEditors()[0];
+                // Reset text
+                editor.setValue('// test-init-text');
+                // Reset language
+                const model = editor.getModel();
+                if (model) {
+                    monaco.editor.setModelLanguage(model, 'javascript');
+                    // Clear markers
+                    monaco.editor.setModelMarkers(model, 'test', []);
+                    monaco.editor.setModelMarkers(model, 'CodeEditor', []);
+                }
+                // Reset theme
+                monaco.editor.setTheme('vs');
+                // Reset decorations
+                editor.deltaDecorations(
+                    editor.getModel().getAllDecorations().map(d => d.id),
+                    []
+                );
+                // Reset read-only
+                editor.updateOptions({ readOnly: false, glyphMargin: true });
+            }
+            """);
+    }
+
+    // ============================================================
     // Cursor-based log query API
     // ============================================================
 
