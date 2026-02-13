@@ -85,7 +85,20 @@ namespace Monaco
 
         private static void OnIsEditorLoadedChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
+            if (d is CodeEditor editor)
+            {
+                editor.UpdatePresenterVisibility();
+            }
+        }
 
+        private void UpdatePresenterVisibility()
+        {
+            if (_view is UIElement presenterElement)
+            {
+                var isVisible = IsEditorLoaded;
+                presenterElement.Opacity = isVisible ? 1d : 0d;
+                presenterElement.IsHitTestVisible = isVisible;
+            }
         }
 
         /// <summary>
@@ -349,9 +362,10 @@ namespace Monaco
         /// </summary>
         private async Task DeferredTeardownAsync(CancellationToken ct)
         {
+            const int deferredTeardownDelayMs = 1200;
             try
             {
-                await Task.Delay(100, ct);
+                await Task.Delay(deferredTeardownDelayMs, ct);
             }
             catch (OperationCanceledException)
             {
@@ -455,6 +469,7 @@ namespace Monaco
                 {
                     viewHost.Content = _view;
                 }
+                UpdatePresenterVisibility();
 
                 // If hard teardown already ran (lifecycle is Unloaded), the bridge
                 // objects were torn down. Restore them by re-running InitialiseWebObjects
@@ -479,6 +494,7 @@ namespace Monaco
                         // InitialiseWebObjects transitioned lifecycle to Loading, so
                         // CodeEditorLoaded (the "Loaded" callback) will handle the rest.
                         RebootstrapMonacoAsync();
+                        UpdatePresenterVisibility();
 
                         base.OnApplyTemplate();
                         return;
@@ -486,6 +502,7 @@ namespace Monaco
                 }
                 else
                 {
+                    UpdatePresenterVisibility();
                     base.OnApplyTemplate();
                     return;
                 }
@@ -536,6 +553,7 @@ namespace Monaco
             viewHost.Content = presenter;
             _view = presenter;
             _view.ParentCodeEditor = this;
+            UpdatePresenterVisibility();
 
             _view.NavigationStarting -= WebView_NavigationStarting;
             _view.NavigationStarting += WebView_NavigationStarting;

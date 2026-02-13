@@ -24,6 +24,7 @@ namespace MonacoEditorTestApp
     public sealed partial class EditorControl : UserControl
     {
         private readonly StandaloneEditorConstructionOptions options;
+        private bool _hoverProviderRegistered;
         public string CodeContent
         {
             get { return (string)GetValue(CodeContentProperty); }
@@ -241,6 +242,19 @@ namespace MonacoEditorTestApp
 
         private async void Editor_Loaded(object sender, RoutedEventArgs e)
         {
+            if (!_hoverProviderRegistered)
+            {
+                try
+                {
+                    await Editor.Languages.RegisterHoverProviderAsync("csharp", new EditorHoverProvider());
+                    _hoverProviderRegistered = true;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Editor_Loaded hover registration failed: {ex}");
+                }
+            }
+
             // Ready for Display
 
             // Test harness: when MONACO_DIAGNOSTICS=1, set known property values
