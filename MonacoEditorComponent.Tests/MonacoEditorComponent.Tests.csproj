@@ -12,11 +12,10 @@
 	<ItemGroup>
 		<PackageReference Include="xunit.v3.mtp-v2" />
 		<PackageReference Include="Microsoft.Playwright.Xunit.v3" />
-		<!-- Suppress Microsoft.Playwright build/buildTransitive targets that copy .playwright/ and
-		     playwright.ps1 into a subdirectory named after the assembly, conflicting with the
-		     executable on macOS/Linux when UseArtifactsOutput is active.
-		     CI installs Playwright browsers via the NuGet global cache instead. -->
-		<PackageReference Include="Microsoft.Playwright" ExcludeAssets="build;buildTransitive;native" />
+		<!-- Suppress Playwright build targets that conflict with UseArtifactsOutput.
+		     The targets create an assembly-named subdirectory that collides with the exe
+		     output on macOS/Linux (MSB3024). CI installs browsers from NuGet cache. -->
+		<PackageReference Include="Microsoft.Playwright" ExcludeAssets="build;buildTransitive" />
 		<PackageReference Include="StreamJsonRpc" />
 		<PackageReference Include="Nerdbank.Streams" />
 		<PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" PrivateAssets="all" />

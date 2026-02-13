@@ -74,9 +74,8 @@ With `UseArtifactsOutput=true`, build output goes to `artifacts/bin/MonacoEditor
 - [ ] Existing test fixtures (`WasmAppFixture`, `DesktopAppFixture`) still compile and work
 
 ## Done summary
-TBD
-
+Replaced Microsoft.Playwright with Microsoft.Playwright.Xunit.v3 as the primary test adapter package, suppressed build target conflicts with UseArtifactsOutput via ExcludeAssets, standardized -p:ArtifactsPath across all 3 CI jobs, and updated Playwright browser install to use staged playwright.ps1 from NuGet cache with Test-Path guards.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: bc4d89e18d7a771c9c4f19a4b89e03e667e25a50
+- Tests: dotnet build MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release, dotnet test --project MonacoEditorComponent.Tests/ -- --filter-not-trait Category=DesktopCDP --filter-not-trait Category=WasmPlaywright (182 passed)
 - PRs:
