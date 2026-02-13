@@ -132,3 +132,9 @@ Monaco TypeDoc site uses editor_editor_api module path prefix (not editor) in UR
 
 ## 2026-02-13 manual [pitfall]
 Playwright build targets (CopyPlaywrightFilesToOutput) create assembly-named subdirectory in output, causing MSB3024 when UseArtifactsOutput=true and OutputType=Exe. Must suppress with ExcludeAssets=build;buildTransitive on the package reference.
+
+## 2026-02-13 manual [pitfall]
+Deferred teardown with CancellationTokenSource: when the delay expires and hard teardown executes, the CTS field must be cleared (set to null) so subsequent lifecycle events do not misclassify the state as "pending teardown" and skip re-initialization.
+
+## 2026-02-13 manual [pitfall]
+When two concurrent Task.Run lambdas share a StreamWriter, wrap writes in a SemaphoreSlim -- StreamWriter is not thread-safe and concurrent WriteLineAsync calls can corrupt output or throw.

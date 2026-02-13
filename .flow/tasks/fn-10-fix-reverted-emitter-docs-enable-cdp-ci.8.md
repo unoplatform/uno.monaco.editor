@@ -113,9 +113,8 @@ Many calls (`updateStyle`, `updateDecorations`, `getLanguages`, `addCommand`, et
 - [ ] Desktop test app launches, shows text content, applies theme, and displays syntax highlighting
 - [ ] App exit code is 0 (not 0xffffffff) on clean shutdown
 ## Done summary
-TBD
-
+Fixed three desktop bridge initialization bugs: (1) changed all [JsonRpcMethod] handlers from DTO params to individual named parameters matching StreamJsonRpc dispatch, (2) added deferred teardown with CancellationTokenSource to prevent editor lifecycle flickering on tab switch, (3) gated diagnostic Console.WriteLine calls behind MONACO_DIAGNOSTICS=1 env var. Review fixes: cleared _unloadCts after hard teardown and synchronized StreamWriter in test fixture.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 8c993fa, c02a52a, bf2724c
+- Tests: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj --filter-not-trait Category=DesktopCDP --filter-not-trait Category=WasmPlaywright --no-build, dotnet test --project tools/MonacoTypeEmitter.Tests/MonacoTypeEmitter.Tests.csproj --no-build
 - PRs:
