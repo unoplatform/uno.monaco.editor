@@ -1,7 +1,7 @@
 {
   "branch_name": "fn-13-fix-desktop-webview2-runtime-bugs",
-  "completion_review_status": "unknown",
-  "completion_reviewed_at": null,
+  "completion_review_status": null,
+  "completion_reviewed_at": "2026-02-13T17:35:44.838595Z",
   "created_at": "2026-02-13T14:44:44.205099Z",
   "default_impl": null,
   "default_review": null,
@@ -14,5 +14,5 @@
   "spec_path": ".flow/specs/fn-13-fix-desktop-webview2-runtime-bugs.md",
   "status": "open",
   "title": "Fix desktop WebView2 runtime bugs (flickering, text loss, NullRef, JSON-RPC timeout)",
-  "updated_at": "2026-02-13T15:49:48.502214Z"
+  "updated_at": "2026-02-13T17:36:00.385269Z"
 }

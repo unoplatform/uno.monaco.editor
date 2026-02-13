@@ -1,0 +1,19 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-13T18:14:15.179398Z",
+  "depends_on": [
+    "fn-13-fix-desktop-webview2-runtime-bugs.1",
+    "fn-13-fix-desktop-webview2-runtime-bugs.2",
+    "fn-13-fix-desktop-webview2-runtime-bugs.3",
+    "fn-13-fix-desktop-webview2-runtime-bugs.6"
+  ],
+  "epic": "fn-13-fix-desktop-webview2-runtime-bugs",
+  "id": "fn-13-fix-desktop-webview2-runtime-bugs.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-13-fix-desktop-webview2-runtime-bugs.5.md",
+  "status": "todo",
+  "title": "Add tests for presenter lifecycle, deadlock fix, serialization, and null selection guard",
+  "updated_at": "2026-02-13T18:14:15.179542Z"
+}

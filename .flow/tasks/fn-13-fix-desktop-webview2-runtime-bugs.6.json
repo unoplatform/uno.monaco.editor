@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-13T18:21:52.373651Z",
+  "depends_on": [
+    "fn-13-fix-desktop-webview2-runtime-bugs.1"
+  ],
+  "epic": "fn-13-fix-desktop-webview2-runtime-bugs",
+  "id": "fn-13-fix-desktop-webview2-runtime-bugs.6",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-13-fix-desktop-webview2-runtime-bugs.6.md",
+  "status": "todo",
+  "title": "Fix remaining init flicker: add deep tracing, fix theme/background timing",
+  "updated_at": "2026-02-13T18:21:52.373824Z"
+}
