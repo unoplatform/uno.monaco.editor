@@ -17,14 +17,14 @@ public sealed class JsonElementConversionTests
     // ============================================================
 
     [Fact]
-    public void Array_ElementWiseGetRawText()
+    public void Array_ElementWiseConversion()
     {
         using var doc = JsonDocument.Parse("""["a","b"]""");
         var result = ParentAccessorDesktop.ConvertJsonElementToStringArray(doc.RootElement);
 
         Assert.Equal(2, result.Length);
-        Assert.Equal("\"a\"", result[0]);
-        Assert.Equal("\"b\"", result[1]);
+        Assert.Equal("a", result[0]);
+        Assert.Equal("b", result[1]);
     }
 
     [Fact]
@@ -94,7 +94,7 @@ public sealed class JsonElementConversionTests
 
         Assert.Equal(4, result.Length);
         Assert.Equal("1", result[0]);
-        Assert.Equal("\"two\"", result[1]);
+        Assert.Equal("two", result[1]);
         Assert.Equal("[3,4]", result[2]);
         Assert.Equal("""{"five":5}""", result[3]);
     }

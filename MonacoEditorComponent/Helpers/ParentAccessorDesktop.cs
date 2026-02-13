@@ -413,14 +413,15 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
 
     /// <summary>
     /// Converts a <see cref="JsonElement"/> to a string array using deterministic mapping:
-    /// Array: element-wise GetRawText(), String: single-element, Null/Undefined: empty,
-    /// other: single-element GetRawText().
+    /// Array: element-wise conversion (string elements use GetString(), others use GetRawText()),
+    /// String: single-element, Null/Undefined: empty, other: single-element GetRawText().
     /// </summary>
     internal static string[] ConvertJsonElementToStringArray(JsonElement element)
     {
         return element.ValueKind switch
         {
-            JsonValueKind.Array => [.. element.EnumerateArray().Select(e => e.GetRawText())],
+            JsonValueKind.Array => [.. element.EnumerateArray().Select(
+                e => e.ValueKind == JsonValueKind.String ? (e.GetString() ?? string.Empty) : e.GetRawText())],
             JsonValueKind.String => [element.GetString() ?? string.Empty],
             JsonValueKind.Null or JsonValueKind.Undefined => [],
             _ => [element.GetRawText()],

@@ -25,6 +25,8 @@ namespace Monaco
     {
         private readonly WebView2 _webView;
         private bool _isCoreWebView2Initialized;
+        private bool _isLaunchInProgress;
+        private bool _isHostVisibleRequested;
         private WebView2JsonRpcMessageHandler? _messageHandler;
         private JsonRpc? _jsonRpc;
         private string? _desktopContentRoot;
@@ -44,12 +46,19 @@ namespace Monaco
             _webView = new WebView2
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
-                VerticalAlignment = VerticalAlignment.Stretch
+                VerticalAlignment = VerticalAlignment.Stretch,
+                Visibility = Visibility.Collapsed
             };
 
             Content = _webView;
 
             Debug.WriteLine("DesktopCodeEditorPresenter()");
+        }
+
+        internal void SetHostVisible(bool isVisible)
+        {
+            _isHostVisibleRequested = isVisible;
+            ApplyHostVisibility(forceVisibleForInitialization: _isLaunchInProgress && !_isCoreWebView2Initialized);
         }
 
         /// <inheritdoc />
@@ -78,6 +87,15 @@ namespace Monaco
         /// Used by Task 5 to determine if JsonRpc can be attached.
         /// </summary>
         internal bool IsCoreWebView2Initialized => _isCoreWebView2Initialized;
+        internal bool IsLaunchInProgress => _isLaunchInProgress;
+
+        private void ApplyHostVisibility(bool forceVisibleForInitialization = false)
+        {
+            var shouldBeVisible = forceVisibleForInitialization || _isHostVisibleRequested;
+            _webView.Visibility = shouldBeVisible ? Visibility.Visible : Visibility.Collapsed;
+            _webView.Opacity = _isHostVisibleRequested ? 1d : 0d;
+            _webView.IsHitTestVisible = _isHostVisibleRequested;
+        }
 
         /// <inheritdoc />
         public string ElementId => "desktop-" + GetHashCode().ToString("X8");
@@ -136,6 +154,15 @@ namespace Monaco
                     Debug.WriteLine("DesktopCodeEditorPresenter.Launch: already initialized, skipping");
                     return;
                 }
+
+                if (_isLaunchInProgress)
+                {
+                    Debug.WriteLine("DesktopCodeEditorPresenter.Launch: already in progress, skipping");
+                    return;
+                }
+
+                _isLaunchInProgress = true;
+                ApplyHostVisibility(forceVisibleForInitialization: true);
 
                 Debug.WriteLine($"DesktopCodeEditorPresenter.Launch({GetHashCode():X8})");
 
@@ -208,6 +235,11 @@ namespace Monaco
 
                 // Re-throw so callers (CodeEditor) can detect failure and abort lifecycle.
                 throw;
+            }
+            finally
+            {
+                _isLaunchInProgress = false;
+                ApplyHostVisibility();
             }
         }
 
