@@ -96,8 +96,10 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
                     { name: 'Text', value: '"bridge-driven text"' })
                 """);
 
-            // Wait briefly for the C# property change to propagate back to Monaco.
-            await Task.Delay(500);
+            // Wait deterministically for the C# property change to propagate back to Monaco.
+            await _fixture.Page.WaitForFunctionAsync(
+                "() => monaco.editor.getEditors()[0].getValue() === 'bridge-driven text'",
+                null, new PageWaitForFunctionOptions { Timeout = 5000 });
 
             // Verify the text arrived in Monaco (C# set it via updateContent).
             var text = await _fixture.Page.EvaluateAsync<string>(
@@ -135,7 +137,13 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
                     { name: 'CodeLanguage', value: '"xml"' })
                 """);
 
-            await Task.Delay(500);
+            // Wait deterministically for C# side to accept the change.
+            await _fixture.Page.WaitForFunctionAsync("""
+                async () => {
+                    const result = await window.__jsonRpc.sendRequest('parentAccessor/getJsonValue', { name: 'CodeLanguage' });
+                    return result && result.includes('xml');
+                }
+                """, null, new PageWaitForFunctionOptions { Timeout = 5000 });
 
             // Verify C# side accepted the change by reading back via bridge.
             var jsonLang = await _fixture.Page.EvaluateAsync<string>(
@@ -150,7 +158,7 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
     }
 
     // ============================================================
-    // Custom language registration (via bridge eval path)
+    // Custom language registration (C# harness -> Monaco)
     // ============================================================
 
     [Fact]
@@ -160,43 +168,36 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
         _currentTestName = nameof(CustomLanguage_RegisterAndVerifyAvailable);
         try
         {
-            await _fixture.ResetEditorStateAsync();
+            // The C# test harness in EditorControl.xaml.cs calls
+            // Editor.Languages.RegisterAsync({ Id = "test-csproj-lang" })
+            // at startup via the C# LanguagesHelper API. Verify the stdout marker
+            // proves the C# registration path executed.
+            var langMarker = await _fixture.WaitForLogLineAfterAsync(
+                0, @"TEST_HARNESS_LANG:registered=test-csproj-lang", 30_000);
+            Assert.Contains("TEST_HARNESS_LANG", langMarker);
 
-            // Register a custom language via the same code path that
-            // LanguagesHelper.RegisterAsync uses (InvokeScriptAsync -> eval).
-            // The C# method calls InvokeScriptAsync("monaco.languages.register", language)
-            // which resolves to eval() in the WebView2. We invoke the same JS path.
-            await _fixture.Page.EvaluateAsync("""
-                () => monaco.languages.register({
-                    id: 'test-csproj-lang',
-                    extensions: ['.csproj'],
-                    aliases: ['CSProj']
-                })
-                """);
+            // Verify Monaco has the language registered.
+            var registered = await _fixture.Page.WaitForFunctionAsync("""
+                () => {
+                    const langs = monaco.languages.getLanguages();
+                    return langs.some(l => l.id === 'test-csproj-lang');
+                }
+                """, null, new PageWaitForFunctionOptions { Timeout = 5000 });
 
-            // Then switch the editor to this language via the bridge to verify
-            // the C# CodeLanguage DP accepts it.
+            Assert.NotNull(registered);
+
+            // Switch the editor to the custom language via bridge and verify C# accepted it.
             await _fixture.Page.EvaluateAsync("""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
                     { name: 'CodeLanguage', value: '"test-csproj-lang"' })
                 """);
 
-            await Task.Delay(500);
-
-            // Verify via bridge getJsonValue that C# accepted the custom language.
-            var jsonLang = await _fixture.Page.EvaluateAsync<string>(
-                "() => window.__jsonRpc.sendRequest('parentAccessor/getJsonValue', { name: 'CodeLanguage' })");
-            Assert.Contains("test-csproj-lang", jsonLang);
-
-            // Verify Monaco also reflects it.
-            var registered = await _fixture.Page.EvaluateAsync<bool>("""
-                () => {
-                    const langs = monaco.languages.getLanguages();
-                    return langs.some(l => l.id === 'test-csproj-lang');
+            await _fixture.Page.WaitForFunctionAsync("""
+                async () => {
+                    const result = await window.__jsonRpc.sendRequest('parentAccessor/getJsonValue', { name: 'CodeLanguage' });
+                    return result && result.includes('test-csproj-lang');
                 }
-                """);
-
-            Assert.True(registered, "Custom language 'test-csproj-lang' should be registered in Monaco.");
+                """, null, new PageWaitForFunctionOptions { Timeout = 5000 });
         }
         catch
         {
@@ -307,31 +308,39 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
         _currentTestName = nameof(ThemeSwitching_BridgeDriven);
         try
         {
-            await _fixture.ResetEditorStateAsync();
+            // The C# test harness in EditorControl.xaml.cs sets
+            // Editor.RequestedTheme = ElementTheme.Dark at startup via the C# DP path.
+            // Verify the stdout marker proves the C# theme-switch path executed.
+            var themeMarker = await _fixture.WaitForLogLineAfterAsync(
+                0, @"TEST_HARNESS_THEME:set=Dark", 30_000);
+            Assert.Contains("TEST_HARNESS_THEME", themeMarker);
 
-            // The C# bridge sets themes via InvokeScriptAsync("changeTheme", [...]),
-            // which calls the global changeTheme(element, name, isHighContrast) function.
-            // We invoke the same function directly to exercise the same code path.
-            await _fixture.Page.EvaluateAsync("""
-                () => changeTheme(document.getElementById('editor-container'), 'Dark', 'false')
-                """);
-
-            await Task.Delay(300);
+            // Wait deterministically for the DOM to reflect the dark theme.
+            await _fixture.Page.WaitForFunctionAsync("""
+                () => {
+                    const el = document.querySelector('.monaco-editor');
+                    if (!el) return false;
+                    return el.classList.contains('vs-dark')
+                        || (document.body.getAttribute('data-vscode-theme-name') || '').includes('dark');
+                }
+                """, null, new PageWaitForFunctionOptions { Timeout = 5000 });
 
             // Verify the DOM reflects dark theme.
             var hasDarkClass = await _fixture.Page.EvaluateAsync<bool>(
                 "() => document.querySelector('.monaco-editor')?.classList.contains('vs-dark') ?? false");
 
-            var hasThemeAttr = await _fixture.Page.EvaluateAsync<bool>(
-                "() => (document.body.getAttribute('data-vscode-theme-name') || '').includes('dark')");
+            Assert.True(hasDarkClass,
+                "Expected dark theme class after C# RequestedTheme = Dark.");
 
-            Assert.True(hasDarkClass || hasThemeAttr,
-                "Expected dark theme class or attribute after switching to vs-dark.");
-
-            // Reset theme via the same bridge function path.
+            // Now test bridge-driven theme reset: switch back via bridge notification.
+            // The bridge path sends a changeTheme call through the same C# DP mechanism.
             await _fixture.Page.EvaluateAsync("""
                 () => changeTheme(document.getElementById('editor-container'), 'Light', 'false')
                 """);
+
+            await _fixture.Page.WaitForFunctionAsync(
+                "() => !document.querySelector('.monaco-editor')?.classList.contains('vs-dark')",
+                null, new PageWaitForFunctionOptions { Timeout = 5000 });
         }
         catch
         {
@@ -365,11 +374,15 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
                     { name: 'Text', value: '"function hello() { return 42; }"' })
                 """);
 
-            // Wait for bridge propagation and tokenization.
-            await Task.Delay(1500);
-
-            // Verify that syntax token CSS classes are present in the DOM.
+            // Wait deterministically for bridge propagation and tokenization.
             // Monaco tokenizes code and applies CSS classes like 'mtk1', 'mtk{N}'.
+            await _fixture.Page.WaitForFunctionAsync("""
+                () => {
+                    const tokens = document.querySelectorAll('.view-line span[class*="mtk"]');
+                    return tokens.length > 0;
+                }
+                """, null, new PageWaitForFunctionOptions { Timeout = 10_000 });
+
             var hasTokenClasses = await _fixture.Page.EvaluateAsync<bool>("""
                 () => {
                     const tokens = document.querySelectorAll('.view-line span[class*="mtk"]');
@@ -398,19 +411,54 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
         _currentTestName = nameof(Markers_SetViaBridgeAndVerify);
         try
         {
+            // The C# test harness in EditorControl.xaml.cs calls
+            // Editor.SetModelMarkersAsync("testHarness", [...]) at startup via the C# API.
+            // Verify the stdout marker proves the C# marker-setting path executed.
+            var markersMarker = await _fixture.WaitForLogLineAfterAsync(
+                0, @"TEST_HARNESS_MARKERS:set=harness-marker", 30_000);
+            Assert.Contains("TEST_HARNESS_MARKERS", markersMarker);
+
+            // Wait deterministically for the markers to be visible in Monaco.
+            await _fixture.Page.WaitForFunctionAsync("""
+                () => {
+                    const model = monaco.editor.getEditors()[0].getModel();
+                    const markers = monaco.editor.getModelMarkers({ resource: model.uri });
+                    return markers.some(m => m.message === 'harness-marker');
+                }
+                """, null, new PageWaitForFunctionOptions { Timeout = 5000 });
+
+            // Verify marker data set by the C# SetModelMarkersAsync API.
+            var markerData = await _fixture.Page.EvaluateAsync<string>("""
+                () => {
+                    const model = monaco.editor.getEditors()[0].getModel();
+                    const markers = monaco.editor.getModelMarkers({ resource: model.uri });
+                    const harnessMarker = markers.find(m => m.message === 'harness-marker');
+                    if (!harnessMarker) return 'none';
+                    return JSON.stringify({
+                        message: harnessMarker.message,
+                        severity: harnessMarker.severity,
+                        source: harnessMarker.source
+                    });
+                }
+                """);
+
+            Assert.Contains("harness-marker", markerData);
+            Assert.Contains("testHarness", markerData); // Source matches C# owner
+            Assert.Contains("4", markerData); // MarkerSeverity.Warning = 4
+
+            // Also test bridge-driven marker addition to verify round-trip.
             await _fixture.ResetEditorStateAsync();
 
-            // Set text content via the C# bridge (parentAccessor/setValue -> Text DP).
             await _fixture.Page.EvaluateAsync("""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
                     { name: 'Text', value: '"let x = 1;\\nlet y = 2;"' })
                 """);
 
-            await Task.Delay(500);
+            await _fixture.Page.WaitForFunctionAsync(
+                "() => monaco.editor.getEditors()[0].getValue().includes('let x')",
+                null, new PageWaitForFunctionOptions { Timeout = 5000 });
 
-            // SetModelMarkersAsync internally calls SendScriptAsync which is the bridge
-            // eval path. We call the same global function to mirror the C# code path:
-            // SendScriptAsync("monaco.editor.setModelMarkers(...)").
+            // Add a bridge-driven marker via the same JS API that SetModelMarkersAsync calls.
             await _fixture.Page.EvaluateAsync("""
                 () => {
                     const model = monaco.editor.getEditors()[0].getModel();
@@ -423,29 +471,17 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
                 }
                 """);
 
-            // Verify marker data roundtrips via the same API that GetModelMarkersAsync uses.
-            var markerData = await _fixture.Page.EvaluateAsync<string>("""
+            var bridgeMarkerData = await _fixture.Page.EvaluateAsync<string>("""
                 () => {
                     const model = monaco.editor.getEditors()[0].getModel();
                     const markers = monaco.editor.getModelMarkers({ resource: model.uri });
-                    if (markers.length === 0) return 'none';
-                    return JSON.stringify({
-                        message: markers[0].message,
-                        severity: markers[0].severity
-                    });
+                    const m = markers.find(m => m.message === 'Bridge test marker');
+                    if (!m) return 'none';
+                    return JSON.stringify({ message: m.message, severity: m.severity });
                 }
                 """);
 
-            Assert.Contains("Bridge test marker", markerData);
-            Assert.Contains("8", markerData); // MarkerSeverity.Error = 8
-
-            // Cleanup.
-            await _fixture.Page.EvaluateAsync("""
-                () => {
-                    const model = monaco.editor.getEditors()[0].getModel();
-                    monaco.editor.setModelMarkers(model, 'test', []);
-                }
-                """);
+            Assert.Contains("Bridge test marker", bridgeMarkerData);
         }
         catch
         {
@@ -465,6 +501,29 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
         _currentTestName = nameof(Decorations_SetViaBridgeAndVerifyCss);
         try
         {
+            // The C# test harness in EditorControl.xaml.cs adds a decoration via
+            // Editor.Decorations.Add(...) at startup through the C# Decorations collection.
+            // Verify the stdout marker proves the C# decoration path executed.
+            var decoMarker = await _fixture.WaitForLogLineAfterAsync(
+                0, @"TEST_HARNESS_DECORATIONS:added=1", 30_000);
+            Assert.Contains("TEST_HARNESS_DECORATIONS", decoMarker);
+
+            // Wait deterministically for the decoration to appear in the DOM.
+            // The C# harness adds a CssInlineStyle with ForegroundColor = Red, which
+            // generates a dynamic CSS class name. Verify that decorations exist beyond
+            // the baseline Monaco decorations.
+            await _fixture.Page.WaitForFunctionAsync("""
+                () => {
+                    const editor = monaco.editor.getEditors()[0];
+                    const model = editor.getModel();
+                    if (!model) return false;
+                    const decos = model.getAllDecorations();
+                    // Filter out built-in decorations (those with empty className/inlineClassName).
+                    return decos.some(d => d.options && (d.options.inlineClassName || d.options.className));
+                }
+                """, null, new PageWaitForFunctionOptions { Timeout = 5000 });
+
+            // Also test bridge-driven decoration addition via deltaDecorations.
             await _fixture.ResetEditorStateAsync();
 
             // Set text via the C# bridge so preconditions flow through the bridge path.
@@ -473,10 +532,11 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
                     { name: 'Text', value: '"Line 1\\nLine 2\\nLine 3"' })
                 """);
 
-            await Task.Delay(500);
+            await _fixture.Page.WaitForFunctionAsync(
+                "() => monaco.editor.getEditors()[0].getValue().includes('Line 1')",
+                null, new PageWaitForFunctionOptions { Timeout = 5000 });
 
-            // DeltaDecorationsHelperAsync internally calls InvokeScriptAsync("updateDecorations", ...)
-            // which is the bridge eval path. We call the same global function to mirror it.
+            // Add decoration via JS deltaDecorations (same path as DeltaDecorationsHelperAsync).
             var addedIds = await _fixture.Page.EvaluateAsync<string[]>("""
                 () => {
                     const editor = monaco.editor.getEditors()[0];
@@ -490,28 +550,17 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
             Assert.NotNull(addedIds);
             Assert.NotEmpty(addedIds);
 
-            // Verify the decoration's CSS class is injected in the DOM.
+            // Wait deterministically for the decoration CSS class in the DOM.
+            await _fixture.Page.WaitForFunctionAsync("""
+                () => document.querySelectorAll('.bridge-test-decoration').length > 0
+                """, null, new PageWaitForFunctionOptions { Timeout = 5000 });
+
             var hasCssClass = await _fixture.Page.EvaluateAsync<bool>("""
-                () => {
-                    const elements = document.querySelectorAll('.bridge-test-decoration');
-                    return elements.length > 0;
-                }
+                () => document.querySelectorAll('.bridge-test-decoration').length > 0
                 """);
 
             Assert.True(hasCssClass,
                 "Expected .bridge-test-decoration CSS class in DOM after adding decoration.");
-
-            // Cleanup.
-            if (addedIds.Length > 0)
-            {
-                var idsJson = System.Text.Json.JsonSerializer.Serialize(addedIds);
-                await _fixture.Page.EvaluateAsync($$"""
-                    () => {
-                        const editor = monaco.editor.getEditors()[0];
-                        editor.deltaDecorations({{idsJson}}, []);
-                    }
-                    """);
-            }
         }
         catch
         {
@@ -546,16 +595,26 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
                     { name: 'Text', value: '"{{foldableCode}}"' })
                 """);
 
-            // Wait for bridge propagation and language service folding computation.
-            await Task.Delay(2000);
+            // Wait deterministically for the text to propagate.
+            await _fixture.Page.WaitForFunctionAsync(
+                "() => monaco.editor.getEditors()[0].getValue().includes('function foo')",
+                null, new PageWaitForFunctionOptions { Timeout = 5000 });
 
             // Ensure folding is enabled via the editor options.
             await _fixture.Page.EvaluateAsync(
                 "() => monaco.editor.getEditors()[0].updateOptions({ folding: true })");
 
-            await Task.Delay(500);
+            // Wait deterministically for folding indicators or fold action to be available.
+            await _fixture.Page.WaitForFunctionAsync("""
+                () => {
+                    const editor = monaco.editor.getEditors()[0];
+                    const foldingElements = document.querySelectorAll('.codicon-folding-expanded, .codicon-folding-collapsed, .cldr.folding');
+                    if (foldingElements.length > 0) return true;
+                    const action = editor.getAction('editor.foldAll');
+                    return action !== null && action !== undefined;
+                }
+                """, null, new PageWaitForFunctionOptions { Timeout = 10_000 });
 
-            // Check that folding ranges exist via DOM indicators or fold action.
             var hasFolding = await _fixture.Page.EvaluateAsync<bool>("""
                 () => {
                     const editor = monaco.editor.getEditors()[0];
@@ -595,9 +654,11 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
                     { name: 'ReadOnly', value: '"True"' })
                 """);
 
-            await Task.Delay(500);
+            // Wait deterministically for the readOnly option to propagate.
+            await _fixture.Page.WaitForFunctionAsync(
+                "() => monaco.editor.getEditors()[0].getOptions().get(monaco.editor.EditorOption.readOnly) === true",
+                null, new PageWaitForFunctionOptions { Timeout = 5000 });
 
-            // Verify the editor options reflect read-only state.
             var isReadOnly = await _fixture.Page.EvaluateAsync<bool>(
                 "() => monaco.editor.getEditors()[0].getOptions().get(monaco.editor.EditorOption.readOnly)");
 
@@ -609,7 +670,10 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
                     { name: 'ReadOnly', value: '"False"' })
                 """);
 
-            await Task.Delay(500);
+            // Wait deterministically for the readOnly option to propagate.
+            await _fixture.Page.WaitForFunctionAsync(
+                "() => monaco.editor.getEditors()[0].getOptions().get(monaco.editor.EditorOption.readOnly) === false",
+                null, new PageWaitForFunctionOptions { Timeout = 5000 });
 
             var isReadOnlyAfterReset = await _fixture.Page.EvaluateAsync<bool>(
                 "() => monaco.editor.getEditors()[0].getOptions().get(monaco.editor.EditorOption.readOnly)");
@@ -654,9 +718,11 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
                     { name: 'HasGlyphMargin', value: '"False"' })
                 """);
 
-            await Task.Delay(500);
+            // Wait deterministically for the glyphMargin option to propagate.
+            await _fixture.Page.WaitForFunctionAsync(
+                "() => monaco.editor.getEditors()[0].getOptions().get(monaco.editor.EditorOption.glyphMargin) === false",
+                null, new PageWaitForFunctionOptions { Timeout = 5000 });
 
-            // Verify glyph margin option is now disabled.
             var glyphMarginAfter = await _fixture.Page.EvaluateAsync<bool>(
                 "() => monaco.editor.getEditors()[0].getOptions().get(monaco.editor.EditorOption.glyphMargin)");
 
@@ -688,9 +754,15 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
         {
             await _fixture.ResetEditorStateAsync();
 
-            // Set known text content.
-            await _fixture.Page.EvaluateAsync(
-                "() => monaco.editor.getEditors()[0].setValue('Hello World Test Content')");
+            // Set known text content via bridge.
+            await _fixture.Page.EvaluateAsync("""
+                () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
+                    { name: 'Text', value: '"Hello World Test Content"' })
+                """);
+
+            await _fixture.Page.WaitForFunctionAsync(
+                "() => monaco.editor.getEditors()[0].getValue() === 'Hello World Test Content'",
+                null, new PageWaitForFunctionOptions { Timeout = 5000 });
 
             // Set a selection from JS and verify it reaches C# via the bridge.
             await _fixture.Page.EvaluateAsync("""
@@ -700,10 +772,21 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
                 }
                 """);
 
-            // Read SelectedText back via bridge (C# tracks selections via onDidChangeCursorSelection).
-            // Give the bridge a moment to propagate the selection change.
-            await Task.Delay(500);
+            // Verify the JS->C# leg: read SelectedText via bridge getJsonValue.
+            // C# tracks selections via onDidChangeCursorSelection event -> parentAccessor/setValue.
+            // The getJsonValue reads the C# DP value back through the bridge.
+            await _fixture.Page.WaitForFunctionAsync("""
+                async () => {
+                    const result = await window.__jsonRpc.sendRequest('parentAccessor/getJsonValue', { name: 'SelectedText' });
+                    return result && result.includes('Hello');
+                }
+                """, null, new PageWaitForFunctionOptions { Timeout = 5000 });
 
+            var selectedTextFromBridge = await _fixture.Page.EvaluateAsync<string>(
+                "() => window.__jsonRpc.sendRequest('parentAccessor/getJsonValue', { name: 'SelectedText' })");
+            Assert.Contains("Hello", selectedTextFromBridge);
+
+            // Also verify from the JS side.
             var selectedText = await _fixture.Page.EvaluateAsync<string>("""
                 () => {
                     const editor = monaco.editor.getEditors()[0];
@@ -720,7 +803,10 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
                     { name: 'SelectedText', value: '"Replaced"' })
                 """);
 
-            await Task.Delay(500);
+            // Wait deterministically for the replacement to take effect.
+            await _fixture.Page.WaitForFunctionAsync(
+                "() => monaco.editor.getEditors()[0].getValue().includes('Replaced')",
+                null, new PageWaitForFunctionOptions { Timeout = 5000 });
 
             // Verify the selected text was replaced in the editor.
             var textAfterReplace = await _fixture.Page.EvaluateAsync<string>(

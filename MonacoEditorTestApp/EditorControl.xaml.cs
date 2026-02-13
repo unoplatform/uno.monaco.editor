@@ -272,6 +272,42 @@ namespace MonacoEditorTestApp
                     Console.WriteLine($"TEST_CALLBACK:Action{testActionId}:invoked");
                 }));
 
+                // Register a custom language via C# LanguagesHelper API.
+                await Editor.Languages.RegisterAsync(new Monaco.Languages.ILanguageExtensionPoint
+                {
+                    Id = "test-csproj-lang"
+                });
+                Console.WriteLine("TEST_HARNESS_LANG:registered=test-csproj-lang");
+
+                // Set markers via C# SetModelMarkersAsync to prove the C# -> JS path.
+                await Editor.SetModelMarkersAsync("testHarness", [
+                    new Monaco.Editor.MarkerData
+                    {
+                        StartLineNumber = 1, StartColumn = 1,
+                        EndLineNumber = 1, EndColumn = 5,
+                        Message = "harness-marker",
+                        Severity = Monaco.MarkerSeverity.Warning,
+                        Source = "testHarness"
+                    }
+                ]);
+                Console.WriteLine("TEST_HARNESS_MARKERS:set=harness-marker");
+
+                // Add a decoration via C# Decorations collection to prove the C# -> JS path.
+                Editor.Decorations.Add(new Monaco.Editor.IModelDeltaDecoration(
+                    new Monaco.Range(1, 1, 1, 5),
+                    new Monaco.Editor.IModelDecorationOptions
+                    {
+                        InlineClassName = new Monaco.Helpers.CssInlineStyle
+                        {
+                            ForegroundColor = Microsoft.UI.Colors.Red
+                        }
+                    }));
+                Console.WriteLine("TEST_HARNESS_DECORATIONS:added=1");
+
+                // Switch theme via C# RequestedTheme to prove the DP -> changeTheme path.
+                Editor.RequestedTheme = Microsoft.UI.Xaml.ElementTheme.Dark;
+                Console.WriteLine("TEST_HARNESS_THEME:set=Dark");
+
                 Console.WriteLine($"TEST_HARNESS:commandId={commandId},actionId={testActionId}");
             }
             catch (Exception ex)
