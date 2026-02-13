@@ -94,7 +94,7 @@ namespace Monaco
 
         private void UpdatePresenterVisibility()
         {
-            var isVisible = IsEditorLoaded && IsLoaded;
+            var isVisible = IsEditorLoaded;
 
             if (_view is DesktopCodeEditorPresenter desktopPresenter)
             {
