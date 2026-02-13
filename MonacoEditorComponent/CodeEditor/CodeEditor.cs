@@ -93,9 +93,15 @@ namespace Monaco
 
         private void UpdatePresenterVisibility()
         {
+            var isVisible = IsEditorLoaded;
+
+            if (_view is DesktopCodeEditorPresenter desktopPresenter)
+            {
+                desktopPresenter.SetHostVisible(isVisible);
+            }
+
             if (_view is UIElement presenterElement)
             {
-                var isVisible = IsEditorLoaded;
                 presenterElement.Opacity = isVisible ? 1d : 0d;
                 presenterElement.IsHitTestVisible = isVisible;
             }

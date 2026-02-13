@@ -44,12 +44,19 @@ namespace Monaco
             _webView = new WebView2
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
-                VerticalAlignment = VerticalAlignment.Stretch
+                VerticalAlignment = VerticalAlignment.Stretch,
+                Visibility = Visibility.Collapsed
             };
 
             Content = _webView;
 
             Debug.WriteLine("DesktopCodeEditorPresenter()");
+        }
+
+        internal void SetHostVisible(bool isVisible)
+        {
+            _webView.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
+            _webView.IsHitTestVisible = isVisible;
         }
 
         /// <inheritdoc />

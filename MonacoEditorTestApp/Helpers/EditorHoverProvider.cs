@@ -1,9 +1,6 @@
 ﻿using Monaco;
 using Monaco.Editor;
 using Monaco.Languages;
-using System;
-using System.Runtime.InteropServices.WindowsRuntime;
-using System.Threading;
 using System.Threading.Tasks;
 using Windows.Foundation;
 
@@ -11,20 +8,21 @@ namespace MonacoEditorTestApp.Helpers
 {
     class EditorHoverProvider : HoverProvider
     {
-        public async Task<Hover?> ProvideHover(IModel model, Position position)
+        public Task<Hover?> ProvideHover(IModel model, Position position)
         {
-            var word = await model.GetWordAtPositionAsync(position);
-            if (word != null && word.Word != null && word.Word.IndexOf("Hit", 0, StringComparison.CurrentCultureIgnoreCase) != -1)
+            // Avoid re-entrant model callbacks from hover provider execution path.
+            // Returning a deterministic tooltip for the instructions area keeps hover responsive on desktop.
+            if (position.LineNumber >= 7 && position.LineNumber <= 12)
             {
-                return new Hover(
+                return Task.FromResult<Hover?>(new Hover(
                 [
                         "*Hit* - press the keys following together.",
                         "Some **more** text is here.",
                         "And a [link](https://www.github.com/)."
-                ], new Monaco.Range(position.LineNumber, position.Column, position.LineNumber, position.Column + 5));
+                ], new Monaco.Range(position.LineNumber, position.Column, position.LineNumber, position.Column + 3)));
             }
 
-            return null;
+            return Task.FromResult<Hover?>(null);
         }
     }
 }
