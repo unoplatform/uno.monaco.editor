@@ -120,17 +120,7 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
                 return "null";
             }
 
-            try
-            {
-                return JsonSerializer.Serialize(obj, obj.GetType(), MonacoJsonContext.Relaxed.Options);
-            }
-            catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException)
-            {
-                throw new InvalidOperationException(
-                    $"Type '{obj.GetType().FullName}' is not registered in MonacoJsonContext. " +
-                    "Register it as a [JsonSerializable] attribute on MonacoJsonContext to enable AOT-safe serialization.",
-                    ex);
-            }
+            return SerializePropertyValue(obj);
         }
 
         return "null";
@@ -158,17 +148,7 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
                     return;
                 }
 
-                try
-                {
-                    result = JsonSerializer.Serialize(obj, obj.GetType(), MonacoJsonContext.Relaxed.Options);
-                }
-                catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException)
-                {
-                    throw new InvalidOperationException(
-                        $"Type '{obj.GetType().FullName}' is not registered in MonacoJsonContext. " +
-                        "Register it as a [JsonSerializable] attribute on MonacoJsonContext to enable AOT-safe serialization.",
-                        ex);
-                }
+                result = SerializePropertyValue(obj);
             }
         });
 
@@ -394,5 +374,29 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
             JsonValueKind.Null or JsonValueKind.Undefined => [],
             _ => [element.GetRawText()],
         };
+    }
+
+    /// <summary>
+    /// Serializes a property value to JSON. Tries the AOT-safe <see cref="MonacoJsonContext"/>
+    /// first, then falls back to reflection-based serialization for framework types
+    /// (e.g., <c>ElementTheme</c>) that are not registered in the source-generated context.
+    /// </summary>
+    /// <remarks>
+    /// Desktop runs as native code (not AOT-WASM), so the reflection fallback is safe.
+    /// This avoids polluting <see cref="MonacoJsonContext"/> with WinUI/Uno framework types.
+    /// </remarks>
+    private static string SerializePropertyValue(object obj)
+    {
+        try
+        {
+            return JsonSerializer.Serialize(obj, obj.GetType(), MonacoJsonContext.Relaxed.Options);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException)
+        {
+            // Type not in source-generated context -- fall back to reflection serializer
+            // with the same naming/escaping conventions.
+            Debug.WriteLine($"ParentAccessorDesktop: Falling back to reflection serializer for type '{obj.GetType().FullName}'");
+            return JsonSerializer.Serialize(obj, obj.GetType(), MonacoJsonContext.FallbackOptions);
+        }
     }
 }

@@ -109,6 +109,7 @@ namespace Monaco.Serialization;
 internal partial class MonacoJsonContext : JsonSerializerContext
 {
     private static MonacoJsonContext? _relaxedInstance;
+    private static JsonSerializerOptions? _fallbackOptions;
 
     /// <summary>
     /// Gets a singleton instance configured with <see cref="JavaScriptEncoder.UnsafeRelaxedJsonEscaping"/>
@@ -117,7 +118,27 @@ internal partial class MonacoJsonContext : JsonSerializerContext
     internal static MonacoJsonContext Relaxed =>
         _relaxedInstance ??= new MonacoJsonContext(CreateRelaxedOptions());
 
+    /// <summary>
+    /// Gets reflection-based <see cref="JsonSerializerOptions"/> with the same naming/escaping
+    /// conventions as <see cref="Relaxed"/>. Used as a fallback for framework types (e.g.,
+    /// <c>ElementTheme</c>) that are not registered in the source-generated context.
+    /// Safe on desktop (native code); WASM callers should not use this path.
+    /// </summary>
+    internal static JsonSerializerOptions FallbackOptions =>
+        _fallbackOptions ??= CreateFallbackOptions();
+
     private static JsonSerializerOptions CreateRelaxedOptions()
+    {
+        var options = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        };
+        return options;
+    }
+
+    private static JsonSerializerOptions CreateFallbackOptions()
     {
         var options = new JsonSerializerOptions
         {
