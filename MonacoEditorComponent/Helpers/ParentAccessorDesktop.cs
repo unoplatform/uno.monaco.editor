@@ -91,8 +91,17 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
 
     public async Task<object?> GetValue(string name)
     {
-        object? result = null;
+        if (_queue.HasThreadAccess)
+        {
+            if (_parent.TryGetTarget(out var tobj))
+            {
+                var propinfo = _typeinfo.GetProperty(name);
+                return propinfo?.GetValue(tobj);
+            }
+            return null;
+        }
 
+        object? result = null;
         await _queue.EnqueueAsync(() =>
         {
             if (_parent.TryGetTarget(out var tobj))
@@ -100,7 +109,7 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
                 var propinfo = _typeinfo.GetProperty(name);
                 result = propinfo?.GetValue(tobj);
             }
-        });
+        }).ConfigureAwait(false);
 
         return result;
     }
@@ -130,35 +139,44 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
     /// Async version of <see cref="GetJsonValue"/> that dispatches through the
     /// <see cref="DispatcherQueue"/> to ensure DependencyProperty access occurs
     /// on the UI thread. Called by the JSON-RPC handler <see cref="OnGetJsonValue"/>.
+    /// With <see cref="StreamJsonRpc.JsonRpc.SynchronizationContext"/> set, RPC handlers
+    /// already run on the UI thread, so the <see cref="DispatcherQueue.HasThreadAccess"/>
+    /// guard executes the fast path directly without dispatch overhead.
     /// </summary>
     public async Task<string> GetJsonValueAsync(string name)
     {
-        string result = "null";
+        if (_queue.HasThreadAccess)
+        {
+            return GetJsonValue(name);
+        }
 
+        string result = "null";
         await _queue.EnqueueAsync(() =>
         {
-            if (_parent.TryGetTarget(out var tobj))
-            {
-                var propinfo = _typeinfo.GetProperty(name);
-                var obj = propinfo?.GetValue(tobj);
-
-                if (obj is null)
-                {
-                    result = "null";
-                    return;
-                }
-
-                result = SerializePropertyValue(obj);
-            }
-        });
+            result = GetJsonValue(name);
+        }).ConfigureAwait(false);
 
         return result;
     }
 
     public async Task<object?> GetChildValue(string name, string child)
     {
-        object? result = null;
+        if (_queue.HasThreadAccess)
+        {
+            if (_parent.TryGetTarget(out var tobj))
+            {
+                var propinfo = _typeinfo.GetProperty(name);
+                var prop = propinfo?.GetValue(tobj);
+                if (prop is not null)
+                {
+                    var childinfo = prop.GetType().GetProperty(child);
+                    return childinfo?.GetValue(prop);
+                }
+            }
+            return null;
+        }
 
+        object? result = null;
         await _queue.EnqueueAsync(() =>
         {
             if (_parent.TryGetTarget(out var tobj))
@@ -171,61 +189,76 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
                     result = childinfo?.GetValue(prop);
                 }
             }
-        });
+        }).ConfigureAwait(false);
 
         return result;
     }
 
     public async Task SetValue(string name, object newValue)
     {
-        await _queue.EnqueueAsync(() =>
+        if (_queue.HasThreadAccess)
         {
-            if (_parent.TryGetTarget(out var tobj))
-            {
-                var propinfo = _typeinfo.GetProperty(name);
-                tobj.IsSettingValue = true;
+            SetValueDirect(name, newValue);
+            return;
+        }
 
-                try
-                {
-                    // Desktop values arrive as clean JSON via JSON-RPC -- no Desanitize needed.
-                    propinfo?.SetValue(tobj, newValue);
-                }
-                finally
-                {
-                    tobj.IsSettingValue = false;
-                }
-            }
-        });
+        await _queue.EnqueueAsync(() => SetValueDirect(name, newValue)).ConfigureAwait(false);
     }
 
     public async Task SetValue(string name, string newValue, string type)
     {
-        await _queue.EnqueueAsync(() =>
+        if (_queue.HasThreadAccess)
         {
-            if (_parent.TryGetTarget(out var tobj))
+            SetValueWithTypeDirect(name, newValue, type);
+            return;
+        }
+
+        await _queue.EnqueueAsync(() => SetValueWithTypeDirect(name, newValue, type)).ConfigureAwait(false);
+    }
+
+    private void SetValueDirect(string name, object newValue)
+    {
+        if (_parent.TryGetTarget(out var tobj))
+        {
+            var propinfo = _typeinfo.GetProperty(name);
+            tobj.IsSettingValue = true;
+            try
             {
-                var propinfo = _typeinfo.GetProperty(name);
-
-                if (!_typeInfoMap.TryGetValue(type, out var jsonTypeInfo))
-                {
-                    throw new InvalidOperationException(
-                        $"Type '{type}' is not registered for deserialization. " +
-                        "Register it in MonacoJsonContext or call RegisterTypeInfo.");
-                }
-
-                var obj = JsonSerializer.Deserialize(newValue, jsonTypeInfo);
-
-                tobj.IsSettingValue = true;
-                try
-                {
-                    propinfo?.SetValue(tobj, obj);
-                }
-                finally
-                {
-                    tobj.IsSettingValue = false;
-                }
+                // Desktop values arrive as clean JSON via JSON-RPC -- no Desanitize needed.
+                propinfo?.SetValue(tobj, newValue);
             }
-        });
+            finally
+            {
+                tobj.IsSettingValue = false;
+            }
+        }
+    }
+
+    private void SetValueWithTypeDirect(string name, string newValue, string type)
+    {
+        if (_parent.TryGetTarget(out var tobj))
+        {
+            var propinfo = _typeinfo.GetProperty(name);
+
+            if (!_typeInfoMap.TryGetValue(type, out var jsonTypeInfo))
+            {
+                throw new InvalidOperationException(
+                    $"Type '{type}' is not registered for deserialization. " +
+                    "Register it in MonacoJsonContext or call RegisterTypeInfo.");
+            }
+
+            var obj = JsonSerializer.Deserialize(newValue, jsonTypeInfo);
+
+            tobj.IsSettingValue = true;
+            try
+            {
+                propinfo?.SetValue(tobj, obj);
+            }
+            finally
+            {
+                tobj.IsSettingValue = false;
+            }
+        }
     }
 
     public bool CallAction(string name)
@@ -233,10 +266,14 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
         if (_actions is not null &&
             _actions.TryGetValue(name, out Action? value))
         {
-            _queue.EnqueueAsync(() =>
+            if (_queue.HasThreadAccess)
             {
                 value?.Invoke();
-            });
+            }
+            else
+            {
+                _queue.EnqueueAsync(() => value?.Invoke());
+            }
             return true;
         }
 
@@ -247,10 +284,14 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
     {
         if (_actionParameters.TryGetValue(name, out Action<string[]>? value))
         {
-            _queue.EnqueueAsync(() =>
+            if (_queue.HasThreadAccess)
             {
                 value?.Invoke(parameters);
-            });
+            }
+            else
+            {
+                _queue.EnqueueAsync(() => value?.Invoke(parameters));
+            }
             return true;
         }
 
@@ -259,22 +300,32 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
 
     public async Task<string?> CallEvent(string name, string[] parameters)
     {
-        string? result = null;
+        if (_queue.HasThreadAccess)
+        {
+            return await CallEventDirect(name, parameters).ConfigureAwait(false);
+        }
 
+        string? result = null;
         await _queue.EnqueueAsync(async () =>
         {
-            if (_events is not null
-                && _events.TryGetValue(name, out Func<string[], Task<string>?>? value))
-            {
-                var task = value?.Invoke(parameters);
-                if (task is not null)
-                {
-                    result = await task;
-                }
-            }
-        });
+            result = await CallEventDirect(name, parameters).ConfigureAwait(false);
+        }).ConfigureAwait(false);
 
         return result;
+    }
+
+    private async Task<string?> CallEventDirect(string name, string[] parameters)
+    {
+        if (_events is not null
+            && _events.TryGetValue(name, out Func<string[], Task<string>?>? value))
+        {
+            var task = value?.Invoke(parameters);
+            if (task is not null)
+            {
+                return await task.ConfigureAwait(false);
+            }
+        }
+        return null;
     }
 
     public void Dispose()
@@ -294,14 +345,14 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
     {
         // Extract the string value from the JsonElement.
         var stringValue = ExtractStringValue(value);
-        await SetValue(name, stringValue);
+        await SetValue(name, stringValue).ConfigureAwait(false);
     }
 
     [JsonRpcMethod("parentAccessor/setValueWithType")]
     public async Task OnSetValueWithType(string name, JsonElement value, string typeName)
     {
         var stringValue = ExtractStringValue(value);
-        await SetValue(name, stringValue, typeName);
+        await SetValue(name, stringValue, typeName).ConfigureAwait(false);
     }
 
     [JsonRpcMethod("parentAccessor/callAction")]
@@ -322,22 +373,22 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
     public async Task<string?> OnCallEvent(string name, JsonElement parameters)
     {
         var paramArray = ConvertJsonElementToStringArray(parameters);
-        return await CallEvent(name, paramArray);
+        return await CallEvent(name, paramArray).ConfigureAwait(false);
     }
 
     [JsonRpcMethod("parentAccessor/getJsonValue")]
     public async Task<string> OnGetJsonValue(string name)
     {
-        DesktopCodeEditorPresenter.DiagnosticLog($"OnGetJsonValue: name={name}");
+        Debug.WriteLine($"OnGetJsonValue: name={name}, HasThreadAccess={_queue.HasThreadAccess}");
         try
         {
-            var result = await GetJsonValueAsync(name);
-            DesktopCodeEditorPresenter.DiagnosticLog($"OnGetJsonValue: name={name}, result={result}");
+            var result = await GetJsonValueAsync(name).ConfigureAwait(false);
+            Debug.WriteLine($"OnGetJsonValue: name={name}, result={result}");
             return result;
         }
         catch (Exception ex)
         {
-            DesktopCodeEditorPresenter.DiagnosticLog($"OnGetJsonValue: name={name}, error={ex}");
+            Debug.WriteLine($"OnGetJsonValue: name={name}, error={ex}");
             throw;
         }
     }

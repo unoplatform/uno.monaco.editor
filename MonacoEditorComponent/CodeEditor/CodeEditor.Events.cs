@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Reflection;
+using System.Text.Json;
 
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
@@ -7,6 +8,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 
 using Monaco.Helpers;
+using Monaco.Serialization;
 
 using Windows.Foundation;
 
@@ -176,8 +178,12 @@ namespace Monaco
                 // asynchronously when init completes.
                 // ContinueWith preserves error handling that would be lost with
                 // a bare fire-and-forget (_ = ...).
+                // Build initial state to push to JS -- eliminates async RPC round-trips.
+                var initialState = BuildInitialStateJson();
+                var escapedState = JsonSerializer.Serialize(initialState);
+
                 DesktopCodeEditorPresenter.DiagnosticLog("WebView_NavigationCompleted: invoking createMonacoEditor (fire-and-forget)...");
-                _ = _view.InvokeScriptAsync("void createMonacoEditor(null, 'editor-container', '')")
+                _ = _view.InvokeScriptAsync($"void createMonacoEditor(null, 'editor-container', '', {escapedState})")
                     .ContinueWith(t =>
                     {
                         if (t.IsFaulted)
@@ -228,6 +234,42 @@ namespace Monaco
         }
 
         /// <summary>
+        /// Builds a JSON string containing the initial editor state (theme, text,
+        /// language, options) that C# pushes to <c>createMonacoEditor</c> on desktop.
+        /// This eliminates async RPC round-trips during init -- JS uses the provided
+        /// values directly instead of calling back to C# for each property.
+        /// </summary>
+        private string BuildInitialStateJson()
+        {
+            var themeName = RequestedTheme == ElementTheme.Default
+                ? _themeListener?.CurrentThemeName ?? "Light"
+                : RequestedTheme.ToString();
+            var isHighContrast = _themeListener?.IsHighContrast ?? false;
+            var requestedTheme = (int)RequestedTheme;
+
+            // Build a JSON object with all the state JS needs at init time.
+            // Using raw JSON construction to avoid needing another STJ context.
+            var text = Text ?? string.Empty;
+            var language = CodeLanguage ?? "plaintext";
+            var readOnly = ReadOnly;
+
+            // Use FallbackOptions (reflection-based) since anonymous types are not registered
+            // in MonacoJsonContext. Safe on desktop (native code, not AOT-WASM).
+            var json = JsonSerializer.Serialize(new
+            {
+                requestedTheme,
+                themeName,
+                isHighContrast,
+                text,
+                language,
+                readOnly
+            }, MonacoJsonContext.FallbackOptions);
+
+            Debug.WriteLine($"BuildInitialStateJson: {json}");
+            return json;
+        }
+
+        /// <summary>
         /// Re-bootstraps Monaco on an existing WebView2 that is already navigated to
         /// editor.html. Called when the presenter is reused after a hard teardown
         /// (bridge was torn down but WebView2 is still healthy). The bridge has already
@@ -240,11 +282,15 @@ namespace Monaco
                 return;
             }
 
+            // Build initial state to push to JS -- eliminates async RPC round-trips.
+            var initialState = BuildInitialStateJson();
+            var escapedState = JsonSerializer.Serialize(initialState);
+
             // Fire-and-forget with ContinueWith for the same deadlock avoidance
             // as WebView_NavigationCompleted — createMonacoEditor calls back to C#
             // via JSON-RPC which needs the UI thread.
             DesktopCodeEditorPresenter.DiagnosticLog("RebootstrapMonacoAsync: invoking createMonacoEditor (fire-and-forget)...");
-            _ = desktopPresenter.InvokeScriptAsync("void createMonacoEditor(null, 'editor-container', '')")
+            _ = desktopPresenter.InvokeScriptAsync($"void createMonacoEditor(null, 'editor-container', '', {escapedState})")
                 .ContinueWith(t =>
                 {
                     if (t.IsFaulted)
@@ -443,6 +489,8 @@ namespace Monaco
 
         private async void CodeEditorLoaded()
         {
+            Debug.WriteLine($"CodeEditorLoaded: IsLoaded={IsLoaded}, state={_lifecycleState}, HasThreadAccess={_queue?.HasThreadAccess}");
+
             // Guard against late callback after unload. This is invoked via
             // ParentAccessor.CallAction("Loaded") which can be queued/delayed.
             if (!IsLoaded || _lifecycleState != EditorLifecycleState.Loading)
@@ -458,28 +506,31 @@ namespace Monaco
             // applying initial properties.
             _initialized = true;
 
-            // Emit canonical init-complete marker for diagnostics.
-            DesktopCodeEditorPresenter.DiagnosticLog("INIT_COMPLETE");
+            // Emit canonical init-complete marker for diagnostics (always visible).
+            Debug.WriteLine("INIT_COMPLETE");
 
-            // Make sure inner editor is focused
-            await SendScriptAsync("EditorContext.getEditorForElement(element).editor.focus();");
-
+            // Layout first to ensure the editor dimensions are correct.
             await SendScriptAsync("EditorContext.getEditorForElement(element).editor.layout();");
 
             // Apply all current property values in the correct order
             // This ensures properties set before IsEditorLoaded=true take effect
             await ApplyInitialPropertyValues();
 
-            // If we're supposed to have focus, make sure we try and refocus on our now loaded webview.
+            // Use lifecycle state machine for exactly-once semantics.
+            // Transition BEFORE focus to prevent focus ping-pong during init.
+            TransitionLifecycle(EditorLifecycleState.Loaded);
+
+            // Defer focus until after init is fully complete to avoid focus ping-pong.
+            // Only focus if this CodeEditor is the currently focused element.
 #pragma warning disable CS0618 // Type or member is obsolete
             if (FocusManager.GetFocusedElement() == this)
             {
+                await SendScriptAsync("EditorContext.getEditorForElement(element).editor.focus();");
                 _view.Focus(FocusState.Programmatic);
             }
 #pragma warning restore CS0618 // Type or member is obsolete
 
-            // Use lifecycle state machine for exactly-once semantics
-            TransitionLifecycle(EditorLifecycleState.Loaded);
+            Debug.WriteLine("CodeEditorLoaded: complete");
         }
 
         /// <summary>

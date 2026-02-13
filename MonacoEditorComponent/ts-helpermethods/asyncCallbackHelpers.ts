@@ -132,12 +132,52 @@ function registerDesktopHandlers(editorContext: EditorContext): Disposable[] {
 }
 
 /**
- * Initialize the Monaco editor instance.
- * On desktop, all property reads and theme queries are async (JSON-RPC with timeouts).
- * On WASM, they remain synchronous (JSExport).
+ * Initial state pushed from C# on desktop to eliminate async RPC round-trips.
+ * When provided, JS uses these values directly instead of calling back to C#.
  */
-export const initializeMonacoEditor = async (managedOwner: any, element: any) => {
-    var opt = {};
+interface InitialState {
+    requestedTheme: number;
+    themeName: string;
+    isHighContrast: boolean;
+    text: string;
+    language: string;
+    readOnly: boolean;
+}
+
+/**
+ * Initialize the Monaco editor instance.
+ * On desktop with initialState provided, theme/text/language are applied synchronously
+ * from the pushed values -- no async RPC round-trips needed.
+ * On WASM (or desktop without initialState), property reads use the existing paths.
+ */
+export const initializeMonacoEditor = async (managedOwner: any, element: any, initialState?: InitialState) => {
+    // When initial state is provided, pass theme + language + readOnly to monaco.editor.create()
+    // so the editor renders correctly from the first frame.
+    var opt: any = {};
+    let initialThemeName: string | null = null;
+    let initialIsHighContrast = false;
+
+    if (initialState) {
+        console.log(`[initializeMonacoEditor] Using pushed initial state: theme=${initialState.themeName}, lang=${initialState.language}`);
+
+        // Determine Monaco theme ID from initial state
+        initialIsHighContrast = initialState.isHighContrast;
+        initialThemeName = initialState.themeName;
+
+        let monacoTheme = 'vs';
+        if (initialIsHighContrast) {
+            monacoTheme = 'hc-black';
+        } else if (initialThemeName === 'Dark') {
+            monacoTheme = 'vs-dark';
+        }
+
+        opt = {
+            theme: monacoTheme,
+            language: initialState.language || 'plaintext',
+            readOnly: initialState.readOnly || false,
+            value: initialState.text || '',
+        };
+    }
 
     const editor = monaco.editor.create(element, opt);
     var editorContext = EditorContext.registerEditorForElement(element, editor);
@@ -162,54 +202,58 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any) =>
         }
     });
 
-    // Set theme -- async on desktop (JSON-RPC with timeout), sync on WASM (JSExport)
-    // Use direct accessor/theme calls to avoid circular dependency with otherScriptsToBeOrganized
-    // Wrapped in try-catch so editor init completes even if theme RPC stalls (CI cold-start).
-    // Diagnostic logging measures per-call and cumulative getJsonValueAsync latency on desktop.
-    try {
-        const themeInitStart = performance.now();
+    // Apply theme: if initial state was provided (desktop), theme is already applied via
+    // monaco.editor.create options -- skip async RPC round-trips entirely.
+    // Otherwise (WASM or fallback), use the existing async path.
+    if (!initialState) {
+        // Set theme -- async on desktop (JSON-RPC with timeout), sync on WASM (JSExport)
+        // Wrapped in try-catch so editor init completes even if theme RPC stalls (CI cold-start).
+        try {
+            const themeInitStart = performance.now();
 
-        const t0 = performance.now();
-        let theme: any = await editorContext.Accessor.getJsonValueAsync("RequestedTheme");
-        const t1 = performance.now();
-        if (_isDesktop) {
-            console.log(`[initializeMonacoEditor] getJsonValueAsync("RequestedTheme"): ${(t1 - t0).toFixed(1)}ms, result=${theme}`);
-        }
-
-        theme = {
-            "0": "Default",
-            "1": "Light",
-            "2": "Dark"
-        }[theme];
-
-        if (theme == "Default") {
-            const t2 = performance.now();
-            theme = await (editorContext as any).Theme.getCurrentThemeNameAsync();
-            const t3 = performance.now();
+            const t0 = performance.now();
+            let theme: any = await editorContext.Accessor.getJsonValueAsync("RequestedTheme");
+            const t1 = performance.now();
             if (_isDesktop) {
-                console.log(`[initializeMonacoEditor] getCurrentThemeNameAsync: ${(t3 - t2).toFixed(1)}ms, result=${theme}`);
+                console.log(`[initializeMonacoEditor] getJsonValueAsync("RequestedTheme"): ${(t1 - t0).toFixed(1)}ms, result=${theme}`);
             }
-        }
 
-        const t4 = performance.now();
-        const isHighContrast = await (editorContext as any).Theme.getIsHighContrastAsync();
-        const t5 = performance.now();
-        if (_isDesktop) {
-            console.log(`[initializeMonacoEditor] getIsHighContrastAsync: ${(t5 - t4).toFixed(1)}ms, result=${isHighContrast}`);
-        }
+            theme = {
+                "0": "Default",
+                "1": "Light",
+                "2": "Dark"
+            }[theme];
 
-        changeTheme(element, theme, isHighContrast as any);
+            if (theme == "Default") {
+                const t2 = performance.now();
+                theme = await (editorContext as any).Theme.getCurrentThemeNameAsync();
+                const t3 = performance.now();
+                if (_isDesktop) {
+                    console.log(`[initializeMonacoEditor] getCurrentThemeNameAsync: ${(t3 - t2).toFixed(1)}ms, result=${theme}`);
+                }
+            }
 
-        const themeInitEnd = performance.now();
-        const cumulativeMs = themeInitEnd - themeInitStart;
-        if (_isDesktop) {
-            console.log(`[initializeMonacoEditor] Theme init cumulative: ${cumulativeMs.toFixed(1)}ms` +
-                (cumulativeMs > 16 ? ' (EXCEEDS 16ms frame budget)' : ''));
+            const t4 = performance.now();
+            const isHighContrast = await (editorContext as any).Theme.getIsHighContrastAsync();
+            const t5 = performance.now();
+            if (_isDesktop) {
+                console.log(`[initializeMonacoEditor] getIsHighContrastAsync: ${(t5 - t4).toFixed(1)}ms, result=${isHighContrast}`);
+            }
+
+            changeTheme(element, theme, isHighContrast as any);
+
+            const themeInitEnd = performance.now();
+            const cumulativeMs = themeInitEnd - themeInitStart;
+            if (_isDesktop) {
+                console.log(`[initializeMonacoEditor] Theme init cumulative: ${cumulativeMs.toFixed(1)}ms` +
+                    (cumulativeMs > 16 ? ' (EXCEEDS 16ms frame budget)' : ''));
+            }
+        } catch (err) {
+            console.warn('[initializeMonacoEditor] Theme initialization failed, using defaults:', err);
+            changeTheme(element, 'Light', 'false');
         }
-    } catch (err) {
-        console.warn('[initializeMonacoEditor] Theme initialization failed, using defaults:', err);
-        // Apply default light theme so the editor is usable even if RPC failed.
-        changeTheme(element, 'Light', 'false');
+    } else {
+        console.log(`[initializeMonacoEditor] Skipped async theme init -- using pushed initial state`);
     }
 
     // Track parent element size changes via ResizeObserver for deterministic cleanup.
@@ -343,7 +387,7 @@ export const callParentActionWithParameters = (element: any, name: string, param
         parameters != null && parameters.length > 0 ? stringifyForMarshalling(parameters[0]) : null as any,
         parameters != null && parameters.length > 1 ? stringifyForMarshalling(parameters[1]) : null as any);
 
-export const createMonacoEditor = async (managedOwner: any, elementId: string, basePath: string) => {
+export const createMonacoEditor = async (managedOwner: any, elementId: string, basePath: string, initialStateJson?: string) => {
     // Ensure a single <style id="dynamic"> element exists (editor.html already provides one on desktop)
     if (!document.getElementById('dynamic')) {
         var head = document.head || document.getElementsByTagName('head')[0];
@@ -352,13 +396,24 @@ export const createMonacoEditor = async (managedOwner: any, elementId: string, b
         head.appendChild(style);
     }
 
+    // Parse initial state if provided (pushed from C# on desktop).
+    let initialState: InitialState | undefined;
+    if (initialStateJson) {
+        try {
+            initialState = JSON.parse(initialStateJson) as InitialState;
+            console.log(`[createMonacoEditor] Parsed initial state: theme=${initialState.themeName}`);
+        } catch (err) {
+            console.warn('[createMonacoEditor] Failed to parse initial state JSON:', err);
+        }
+    }
+
     await DebugLoggerImpl.setup();
     await KeyboardListenerImpl.setup();
     await ParentAccessor.setup();
     await ThemeListener.setup();
 
     try {
-        await initializeMonacoEditor(managedOwner, document.getElementById(elementId));
+        await initializeMonacoEditor(managedOwner, document.getElementById(elementId), initialState);
     } catch (err) {
         console.error('[createMonacoEditor] initializeMonacoEditor failed:', err);
     }

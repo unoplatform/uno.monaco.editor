@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Threading;
 
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
@@ -598,6 +599,14 @@ namespace Monaco
 
             _messageHandler = new WebView2JsonRpcMessageHandler(this, formatter);
             _jsonRpc = new JsonRpc(_messageHandler);
+
+            // Set the SynchronizationContext so all RPC method handlers run on the
+            // UI thread directly. This eliminates the need for _queue.EnqueueAsync
+            // in every handler (getJsonValue, callAction, setValue, etc.).
+            // CreateBridgeTargets is called from InitialiseWebObjects which runs on
+            // the UI thread, so SynchronizationContext.Current is the UI context.
+            _jsonRpc.SynchronizationContext = SynchronizationContext.Current;
+            Debug.WriteLine($"DesktopCodeEditorPresenter: JsonRpc.SynchronizationContext set (non-null={SynchronizationContext.Current is not null})");
 
             // Register the initialization handshake targets directly on the presenter.
             // StartListening is deferred to CreateBridgeTargets after all targets are registered.

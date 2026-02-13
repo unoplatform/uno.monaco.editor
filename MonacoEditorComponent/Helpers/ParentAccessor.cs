@@ -94,22 +94,32 @@ namespace Monaco.Helpers
         /// <returns></returns>
         public async Task<string?> CallEvent(string name, string[] parameters)
         {
-            string? result = null;
+            if (_queue.HasThreadAccess)
+            {
+                return await CallEventDirectAsync(name, parameters).ConfigureAwait(false);
+            }
 
+            string? result = null;
             await _queue.EnqueueAsync(async () =>
             {
-                if (events is not null
-                    && events.TryGetValue(name, out Func<string[], Task<string>?>? value))
-                {
-                    var task = value?.Invoke(parameters);
-                    if (task != null)
-                    {
-                        result = await task;
-                    }
-                }
-            });
+                result = await CallEventDirectAsync(name, parameters).ConfigureAwait(false);
+            }).ConfigureAwait(false);
 
             return result;
+        }
+
+        private async Task<string?> CallEventDirectAsync(string name, string[] parameters)
+        {
+            if (events is not null
+                && events.TryGetValue(name, out Func<string[], Task<string>?>? value))
+            {
+                var task = value?.Invoke(parameters);
+                if (task != null)
+                {
+                    return await task.ConfigureAwait(false);
+                }
+            }
+            return null;
         }
 
         /// <summary>
@@ -142,11 +152,14 @@ namespace Monaco.Helpers
             if (actions is not null &&
                 actions.TryGetValue(name, out Action? value))
             {
-                // TODO: Not sure if this a problem too?
-                _queue.EnqueueAsync(() =>
+                if (_queue.HasThreadAccess)
                 {
                     value?.Invoke();
-                });
+                }
+                else
+                {
+                    _queue.EnqueueAsync(() => value?.Invoke());
+                }
                 return true;
             }
 
@@ -163,10 +176,14 @@ namespace Monaco.Helpers
         {
             if (action_parameters.TryGetValue(name, out Action<string[]>? value))
             {
-                _queue.EnqueueAsync(() =>
+                if (_queue.HasThreadAccess)
                 {
                     value?.Invoke(parameters);
-                });
+                }
+                else
+                {
+                    _queue.EnqueueAsync(() => value?.Invoke(parameters));
+                }
                 return true;
             }
 
@@ -180,8 +197,17 @@ namespace Monaco.Helpers
         /// <returns>Property Value or null.</returns>
         public async Task<object?> GetValue(string name)
         {
-            object? result = null;
+            if (_queue.HasThreadAccess)
+            {
+                if (parent.TryGetTarget(out var tobj))
+                {
+                    var propinfo = typeinfo.GetProperty(name);
+                    return propinfo?.GetValue(tobj);
+                }
+                return null;
+            }
 
+            object? result = null;
             await _queue.EnqueueAsync(() =>
             {
                 if (parent.TryGetTarget(out var tobj))
@@ -189,7 +215,7 @@ namespace Monaco.Helpers
                     var propinfo = typeinfo.GetProperty(name);
                     result = propinfo?.GetValue(tobj);
                 }
-            });
+            }).ConfigureAwait(false);
 
             return result;
         }
@@ -232,7 +258,7 @@ namespace Monaco.Helpers
 
         /// <summary>
         /// Returns the winrt primative object value for a child property off of the specified Property.
-        /// 
+        ///
         /// Useful for providing complex types to users of Parent but still access primatives in JavaScript.
         /// </summary>
         /// <param name="name">Parent Property name.</param>
@@ -240,13 +266,26 @@ namespace Monaco.Helpers
         /// <returns>Value of Child Property or null.</returns>
         public async Task<object?> GetChildValue(string name, string child)
         {
-            object? result = null;
+            if (_queue.HasThreadAccess)
+            {
+                if (parent.TryGetTarget(out var tobj))
+                {
+                    var propinfo = typeinfo.GetProperty(name);
+                    var prop = propinfo?.GetValue(tobj);
+                    if (prop != null)
+                    {
+                        var childinfo = prop.GetType().GetProperty(child);
+                        return childinfo?.GetValue(prop);
+                    }
+                }
+                return null;
+            }
 
+            object? result = null;
             await _queue.EnqueueAsync(() =>
             {
                 if (parent.TryGetTarget(out var tobj))
                 {
-                    // TODO: Support params for multi-level digging?
                     var propinfo = typeinfo.GetProperty(name);
                     var prop = propinfo?.GetValue(tobj);
                     if (prop != null)
@@ -255,7 +294,7 @@ namespace Monaco.Helpers
                         result = childinfo?.GetValue(prop);
                     }
                 }
-            });
+            }).ConfigureAwait(false);
 
             return result;
         }
@@ -267,26 +306,13 @@ namespace Monaco.Helpers
         /// <param name="newValue">Value to set.</param>
         public async Task SetValue(string name, object newValue)
         {
-            await _queue.EnqueueAsync(() =>
+            if (_queue.HasThreadAccess)
             {
-                if (parent.TryGetTarget(out var tobj))
-                {
-                    var propinfo = typeinfo.GetProperty(name); // TODO: Cache these?
-                    tobj.IsSettingValue = true;
+                SetValueDirect(name, newValue);
+                return;
+            }
 
-                    try
-                    {
-                        // Desanitization is handled at the JSExport boundary
-                        // (ManagedSetValue in ParentAccessor.wasm.cs). Do not
-                        // desanitize here -- callers pass already-decoded values.
-                        propinfo?.SetValue(tobj, newValue);
-                    }
-                    finally
-                    {
-                        tobj.IsSettingValue = false;
-                    }
-                }
-            });
+            await _queue.EnqueueAsync(() => SetValueDirect(name, newValue)).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -298,32 +324,60 @@ namespace Monaco.Helpers
         /// <param name="type">Type name (fully-qualified or short name).</param>
         public async Task SetValue(string name, string newValue, string type)
         {
-            await _queue.EnqueueAsync(() =>
+            if (_queue.HasThreadAccess)
             {
-                if (parent.TryGetTarget(out var tobj))
+                SetValueWithTypeDirect(name, newValue, type);
+                return;
+            }
+
+            await _queue.EnqueueAsync(() => SetValueWithTypeDirect(name, newValue, type)).ConfigureAwait(false);
+        }
+
+        private void SetValueDirect(string name, object newValue)
+        {
+            if (parent.TryGetTarget(out var tobj))
+            {
+                var propinfo = typeinfo.GetProperty(name);
+                tobj.IsSettingValue = true;
+                try
                 {
-                    var propinfo = typeinfo.GetProperty(name);
-
-                    if (!_typeInfoMap.TryGetValue(type, out var jsonTypeInfo))
-                    {
-                        throw new InvalidOperationException(
-                            $"Type '{type}' is not registered for deserialization. " +
-                            "Register it in MonacoJsonContext or call RegisterTypeInfo.");
-                    }
-
-                    var obj = JsonSerializer.Deserialize(newValue, jsonTypeInfo);
-
-                    tobj.IsSettingValue = true;
-                    try
-                    {
-                        propinfo?.SetValue(tobj, obj);
-                    }
-                    finally
-                    {
-                        tobj.IsSettingValue = false;
-                    }
+                    // Desanitization is handled at the JSExport boundary
+                    // (ManagedSetValue in ParentAccessor.wasm.cs). Do not
+                    // desanitize here -- callers pass already-decoded values.
+                    propinfo?.SetValue(tobj, newValue);
                 }
-            });
+                finally
+                {
+                    tobj.IsSettingValue = false;
+                }
+            }
+        }
+
+        private void SetValueWithTypeDirect(string name, string newValue, string type)
+        {
+            if (parent.TryGetTarget(out var tobj))
+            {
+                var propinfo = typeinfo.GetProperty(name);
+
+                if (!_typeInfoMap.TryGetValue(type, out var jsonTypeInfo))
+                {
+                    throw new InvalidOperationException(
+                        $"Type '{type}' is not registered for deserialization. " +
+                        "Register it in MonacoJsonContext or call RegisterTypeInfo.");
+                }
+
+                var obj = JsonSerializer.Deserialize(newValue, jsonTypeInfo);
+
+                tobj.IsSettingValue = true;
+                try
+                {
+                    propinfo?.SetValue(tobj, obj);
+                }
+                finally
+                {
+                    tobj.IsSettingValue = false;
+                }
+            }
         }
 
         /// <summary>

@@ -67,6 +67,17 @@ internal sealed class ThemeListenerDesktop : IThemeListener, IDisposable
 
     private async void Settings_ColorValuesChanged(UISettings sender, object args)
     {
+        if (_queue.HasThreadAccess)
+        {
+            if (CurrentTheme != Application.Current.RequestedTheme ||
+                IsHighContrast != _accessible.HighContrast)
+            {
+                Debug.WriteLine("ThemeListenerDesktop: Color Values Changed");
+                UpdateProperties();
+            }
+            return;
+        }
+
         await _queue.EnqueueAsync(() =>
         {
             if (CurrentTheme != Application.Current.RequestedTheme ||
@@ -75,7 +86,7 @@ internal sealed class ThemeListenerDesktop : IThemeListener, IDisposable
                 Debug.WriteLine("ThemeListenerDesktop: Color Values Changed");
                 UpdateProperties();
             }
-        });
+        }).ConfigureAwait(false);
     }
 
     private void UpdateProperties()
