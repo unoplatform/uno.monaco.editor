@@ -202,6 +202,7 @@ public sealed class DesktopAppFixture : IAsyncLifetime
                     monaco.editor.setModelMarkers(model, 'test', []);
                     monaco.editor.setModelMarkers(model, 'CodeEditor', []);
                     monaco.editor.setModelMarkers(model, 'testHarness', []);
+                    monaco.editor.setModelMarkers(model, 'cdpTest', []);
                 }
                 // Reset theme
                 monaco.editor.setTheme('vs');

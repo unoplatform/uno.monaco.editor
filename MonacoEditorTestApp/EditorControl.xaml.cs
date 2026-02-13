@@ -308,6 +308,43 @@ namespace MonacoEditorTestApp
                 Editor.RequestedTheme = Microsoft.UI.Xaml.ElementTheme.Dark;
                 Console.WriteLine("TEST_HARNESS_THEME:set=Dark");
 
+                // Register on-demand test actions that tests can trigger from Playwright
+                // to invoke C# APIs. This ensures tests drive mutations through the C# bridge
+                // path rather than calling JS APIs directly.
+                const string setMarkersActionId = "testSetMarkers";
+                await Editor.AddActionAsync(new CdpTestAction(setMarkersActionId, () =>
+                {
+                    // Fire-and-forget: SetModelMarkersAsync goes through the C# bridge
+                    // (SendScriptAsync -> JS monaco.editor.setModelMarkers). The stdout
+                    // marker confirms the C# API was invoked; the test verifies Monaco state.
+                    _ = Editor.SetModelMarkersAsync("cdpTest", [
+                        new Monaco.Editor.MarkerData
+                        {
+                            StartLineNumber = 1, StartColumn = 1,
+                            EndLineNumber = 1, EndColumn = 5,
+                            Message = "on-demand-marker",
+                            Severity = Monaco.MarkerSeverity.Error,
+                            Source = "cdpTest"
+                        }
+                    ]).ContinueWith(_ =>
+                        Console.WriteLine("TEST_HARNESS_MARKERS_ONDEMAND:set=on-demand-marker"));
+                }));
+
+                const string addDecorationActionId = "testAddDecoration";
+                await Editor.AddActionAsync(new CdpTestAction(addDecorationActionId, () =>
+                {
+                    Editor.Decorations.Add(new Monaco.Editor.IModelDeltaDecoration(
+                        new Monaco.Range(1, 1, 1, 7),
+                        new Monaco.Editor.IModelDecorationOptions
+                        {
+                            InlineClassName = new Monaco.Helpers.CssInlineStyle
+                            {
+                                ForegroundColor = Microsoft.UI.Colors.Blue
+                            }
+                        }));
+                    Console.WriteLine("TEST_HARNESS_DECORATIONS_ONDEMAND:added=1");
+                }));
+
                 Console.WriteLine($"TEST_HARNESS:commandId={commandId},actionId={testActionId}");
 
                 // Final readiness marker: all async setup is complete.

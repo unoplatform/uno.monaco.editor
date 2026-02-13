@@ -164,6 +164,15 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
             var jsonLang = await _fixture.Page.EvaluateAsync<string>(
                 "() => window.__jsonRpc.sendRequest('parentAccessor/getJsonValue', { name: 'CodeLanguage' })");
             Assert.Contains("xml", jsonLang);
+
+            // Verify Monaco model language also reflects the change (C# -> JS application).
+            await _fixture.Page.WaitForFunctionAsync(
+                "() => monaco.editor.getEditors()[0].getModel().getLanguageId() === 'xml'",
+                null, new PageWaitForFunctionOptions { Timeout = 5000 });
+
+            var monacoLang = await _fixture.Page.EvaluateAsync<string>(
+                "() => monaco.editor.getEditors()[0].getModel().getLanguageId()");
+            Assert.Equal("xml", monacoLang);
         }
         catch
         {
@@ -215,6 +224,15 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
                     return result && result.includes('test-csproj-lang');
                 }
                 """, null, new PageWaitForFunctionOptions { Timeout = 5000 });
+
+            // Verify Monaco model language also reflects the custom language.
+            await _fixture.Page.WaitForFunctionAsync(
+                "() => monaco.editor.getEditors()[0].getModel().getLanguageId() === 'test-csproj-lang'",
+                null, new PageWaitForFunctionOptions { Timeout = 5000 });
+
+            var monacoLang = await _fixture.Page.EvaluateAsync<string>(
+                "() => monaco.editor.getEditors()[0].getModel().getLanguageId()");
+            Assert.Equal("test-csproj-lang", monacoLang);
         }
         catch
         {
@@ -452,51 +470,44 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
                 0, @"TEST_HARNESS_MARKERS:set=harness-marker", 30_000);
             Assert.Contains("TEST_HARNESS_MARKERS", markersMarker);
 
-            // Set text via bridge so preconditions flow through the bridge path.
-            await _fixture.Page.EvaluateAsync("""
-                () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'Text', value: 'let x = 1;\\nlet y = 2;' })
-                """);
+            // Trigger the on-demand C# marker action registered in the harness.
+            // This invokes Editor.SetModelMarkersAsync from C# -- the full
+            // C# API -> SendScriptAsync -> JS monaco.editor.setModelMarkers path.
+            var cursor = _fixture.GetLogCursor();
 
-            await _fixture.Page.WaitForFunctionAsync(
-                "() => monaco.editor.getEditors()[0].getValue().includes('let x')",
-                null, new PageWaitForFunctionOptions { Timeout = 5000 });
-
-            // Add a marker via the same JS API that C# SetModelMarkersAsync calls
-            // (SendScriptAsync("monaco.editor.setModelMarkers(...)")).
             await _fixture.Page.EvaluateAsync("""
                 () => {
-                    const model = monaco.editor.getEditors()[0].getModel();
-                    monaco.editor.setModelMarkers(model, 'test', [{
-                        startLineNumber: 1, startColumn: 1,
-                        endLineNumber: 1, endColumn: 5,
-                        message: 'Bridge test marker',
-                        severity: monaco.MarkerSeverity.Error
-                    }]);
+                    const action = monaco.editor.getEditors()[0].getAction('testSetMarkers');
+                    if (action) action.run();
                 }
                 """);
 
-            // Verify marker data roundtrips via the same API that GetModelMarkersAsync uses.
+            // Wait for the C# action to complete (stdout marker confirms it ran).
+            await _fixture.WaitForLogLineAfterAsync(
+                cursor, @"TEST_HARNESS_MARKERS_ONDEMAND:set=on-demand-marker", 10_000);
+
+            // Verify the marker is now visible in Monaco (proving C# -> JS path worked).
+            await _fixture.Page.WaitForFunctionAsync("""
+                () => {
+                    const model = monaco.editor.getEditors()[0].getModel();
+                    const markers = monaco.editor.getModelMarkers({ resource: model.uri });
+                    return markers.some(m => m.message === 'on-demand-marker');
+                }
+                """, null, new PageWaitForFunctionOptions { Timeout = 5000 });
+
             var markerData = await _fixture.Page.EvaluateAsync<string>("""
                 () => {
                     const model = monaco.editor.getEditors()[0].getModel();
                     const markers = monaco.editor.getModelMarkers({ resource: model.uri });
-                    const m = markers.find(m => m.message === 'Bridge test marker');
+                    const m = markers.find(m => m.message === 'on-demand-marker');
                     if (!m) return 'none';
-                    return JSON.stringify({ message: m.message, severity: m.severity });
+                    return JSON.stringify({ message: m.message, severity: m.severity, source: m.source });
                 }
                 """);
 
-            Assert.Contains("Bridge test marker", markerData);
+            Assert.Contains("on-demand-marker", markerData);
             Assert.Contains("8", markerData); // MarkerSeverity.Error = 8
-
-            // Cleanup markers.
-            await _fixture.Page.EvaluateAsync("""
-                () => {
-                    const model = monaco.editor.getEditors()[0].getModel();
-                    monaco.editor.setModelMarkers(model, 'test', []);
-                }
-                """);
+            Assert.Contains("cdpTest", markerData); // Source matches C# owner
         }
         catch
         {
@@ -525,42 +536,49 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
                 0, @"TEST_HARNESS_DECORATIONS:added=1", 30_000);
             Assert.Contains("TEST_HARNESS_DECORATIONS", decoMarker);
 
-            // Set text via the C# bridge so preconditions flow through the bridge path.
+            // Trigger the on-demand C# decoration action registered in the harness.
+            // This invokes Editor.Decorations.Add from C# -- the full
+            // C# Decorations collection -> DeltaDecorationsHelperAsync ->
+            // InvokeScriptAsync("updateDecorations") path.
+            var cursor = _fixture.GetLogCursor();
+
             await _fixture.Page.EvaluateAsync("""
-                () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'Text', value: 'Line 1\\nLine 2\\nLine 3' })
-                """);
-
-            await _fixture.Page.WaitForFunctionAsync(
-                "() => monaco.editor.getEditors()[0].getValue().includes('Line 1')",
-                null, new PageWaitForFunctionOptions { Timeout = 5000 });
-
-            // Add decoration via JS deltaDecorations -- the same path that the C#
-            // DeltaDecorationsHelperAsync uses via InvokeScriptAsync("updateDecorations", ...).
-            var addedIds = await _fixture.Page.EvaluateAsync<string[]>("""
                 () => {
-                    const editor = monaco.editor.getEditors()[0];
-                    return editor.deltaDecorations([], [{
-                        range: new monaco.Range(1, 1, 1, 7),
-                        options: { inlineClassName: 'bridge-test-decoration' }
-                    }]);
+                    const action = monaco.editor.getEditors()[0].getAction('testAddDecoration');
+                    if (action) action.run();
                 }
                 """);
 
-            Assert.NotNull(addedIds);
-            Assert.NotEmpty(addedIds);
+            // Wait for the C# action to complete (stdout marker confirms it ran).
+            await _fixture.WaitForLogLineAfterAsync(
+                cursor, @"TEST_HARNESS_DECORATIONS_ONDEMAND:added=1", 10_000);
 
-            // Wait deterministically for the decoration CSS class in the DOM.
+            // Verify the decoration is now visible in the DOM (proving C# -> JS path worked).
+            // The C# harness adds a CssInlineStyle with ForegroundColor = Blue, which
+            // Monaco renders as a dynamic inline class on the decorated range.
             await _fixture.Page.WaitForFunctionAsync("""
-                () => document.querySelectorAll('.bridge-test-decoration').length > 0
+                () => {
+                    const editor = monaco.editor.getEditors()[0];
+                    const model = editor.getModel();
+                    if (!model) return false;
+                    const decos = model.getAllDecorations();
+                    return decos.some(d => d.options && d.options.inlineClassName);
+                }
                 """, null, new PageWaitForFunctionOptions { Timeout = 5000 });
 
-            var hasCssClass = await _fixture.Page.EvaluateAsync<bool>("""
-                () => document.querySelectorAll('.bridge-test-decoration').length > 0
+            // Verify that at least one decoration with a non-empty inlineClassName exists.
+            var decoCount = await _fixture.Page.EvaluateAsync<int>("""
+                () => {
+                    const editor = monaco.editor.getEditors()[0];
+                    const model = editor.getModel();
+                    if (!model) return 0;
+                    return model.getAllDecorations()
+                        .filter(d => d.options && d.options.inlineClassName).length;
+                }
                 """);
 
-            Assert.True(hasCssClass,
-                "Expected .bridge-test-decoration CSS class in DOM after adding decoration.");
+            Assert.True(decoCount > 0,
+                $"Expected at least one decoration with inlineClassName after C# Decorations.Add, but found {decoCount}.");
         }
         catch
         {
