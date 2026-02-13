@@ -139,9 +139,8 @@ WASM path unchanged.
 - [ ] Solution builds clean for both net10.0-desktop and net10.0-browserwasm targets
 
 ## Done summary
-TBD
-
+Fixed desktop init threading model by setting JsonRpc.SynchronizationContext to the UI thread (eliminating 15+ redundant _queue.EnqueueAsync dispatch hops), added HasThreadAccess guards with ConfigureAwait(false) throughout the bridge layer, pushed initial state (theme/text/language/readOnly) from C# to createMonacoEditor to eliminate 3 async RPC round-trips, added prefers-color-scheme CSS to prevent white flash, and deferred editor.focus() to prevent focus ping-pong during init.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 4fd012b2b18f94265f7b70f251699567f0a7bacb
+- Tests: dotnet test --project MonacoEditorComponent.Tests --filter-not-trait Category=DesktopCDP --filter-not-trait Category=WasmPlaywright (182 passed), dotnet build MonacoEditorComponent.slnx (0 warnings, 0 errors), npm run build (ts-helpermethods)
 - PRs:

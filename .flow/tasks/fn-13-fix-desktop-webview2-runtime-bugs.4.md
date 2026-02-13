@@ -1,7 +1,7 @@
 # fn-13-fix-desktop-webview2-runtime-bugs.4 Push to remote and verify CI passes
 
 ## Description
-Push all fn-13 commits to remote and verify CI passes. The branch has 6 unpushed commits from tasks 1-3. Per AGENTS.md CI Verification Policy, nothing is done until CI is green.
+Push all fn-13 commits to remote and verify CI passes. The branch has unpushed commits from tasks 1-3 and 6. Per AGENTS.md CI Verification Policy, nothing is done until CI is green.
 
 **Size:** S
 **Files:** None (CI verification only)
