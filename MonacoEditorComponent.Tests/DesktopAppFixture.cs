@@ -132,17 +132,27 @@ public sealed class DesktopAppFixture : IAsyncLifetime
             _logCaptureCts = null;
         }
 
-        if (_browser is not null)
-        {
-            try { await _browser.CloseAsync(); } catch { /* best-effort cleanup */ }
-        }
-
+        // Kill the app process FIRST so the browser close doesn't wait for it.
+        // On Windows, Playwright browser.CloseAsync can hang indefinitely if the
+        // underlying CDP target (WebView2) is unresponsive. Killing the process
+        // before closing the browser ensures deterministic cleanup.
         if (_appProcess is { HasExited: false })
         {
             try
             {
                 _appProcess.Kill(entireProcessTree: true);
                 await _appProcess.WaitForExitAsync(new CancellationTokenSource(5000).Token);
+            }
+            catch { /* best-effort cleanup */ }
+        }
+
+        if (_browser is not null)
+        {
+            try
+            {
+                // Use a timeout to prevent hanging if the browser close is blocked.
+                using var closeCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                await _browser.CloseAsync().WaitAsync(closeCts.Token);
             }
             catch { /* best-effort cleanup */ }
         }
