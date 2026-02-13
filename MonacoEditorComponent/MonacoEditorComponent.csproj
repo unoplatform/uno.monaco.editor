@@ -104,6 +104,23 @@
 		</ItemGroup>
 	</Target>
 
+	<!-- Rebuild Monaco JS bundles when TypeScript sources change -->
+	<ItemGroup>
+		<MonacoBundleInput Include="ts-helpermethods\**\*.ts" />
+		<MonacoBundleInput Include="ts-helpermethods\esbuild.config.mjs" />
+		<MonacoBundleInput Include="..\package.json" />
+		<MonacoBundleInput Include="..\package-lock.json" />
+	</ItemGroup>
+
+	<Target Name="BuildMonacoBundlesWhenSourcesChange"
+		BeforeTargets="CoreCompile"
+		Inputs="@(MonacoBundleInput)"
+		Outputs="WasmScripts\uno-monaco-helpers.js;DesktopContent\uno-monaco-helpers.js">
+		<Message Importance="high" Text="Monaco TypeScript sources changed — rebuilding JS bundles..." />
+		<Exec Command="npm install" WorkingDirectory="$(MSBuildThisFileDirectory).." StandardOutputImportance="low" Condition="!Exists('$(MSBuildThisFileDirectory)..\node_modules')" />
+		<Exec Command="node MonacoEditorComponent/ts-helpermethods/esbuild.config.mjs" WorkingDirectory="$(MSBuildThisFileDirectory).." />
+	</Target>
+
 	<!-- Auto-restore Monaco JS bundles when missing (clean checkout) -->
 	<Target Name="RestoreMonacoBundles"
 		BeforeTargets="CoreCompile"
