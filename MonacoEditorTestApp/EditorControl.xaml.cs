@@ -309,6 +309,10 @@ namespace MonacoEditorTestApp
                 Console.WriteLine("TEST_HARNESS_THEME:set=Dark");
 
                 Console.WriteLine($"TEST_HARNESS:commandId={commandId},actionId={testActionId}");
+
+                // Final readiness marker: all async setup is complete.
+                // Tests must wait for this before executing.
+                Console.WriteLine("TEST_HARNESS_READY");
             }
             catch (Exception ex)
             {

@@ -668,7 +668,7 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
             // Set ReadOnly = true via the bridge notification.
             await _fixture.Page.EvaluateAsync("""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'ReadOnly', value: 'True' })
+                    { name: 'ReadOnly', value: true })
                 """);
 
             // Wait deterministically for the readOnly option to propagate.
@@ -684,7 +684,7 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
             // Reset: set ReadOnly = false.
             await _fixture.Page.EvaluateAsync("""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'ReadOnly', value: 'False' })
+                    { name: 'ReadOnly', value: false })
                 """);
 
             // Wait deterministically for the readOnly option to propagate.
@@ -717,39 +717,60 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
         {
             await _fixture.ResetEditorStateAsync();
 
-            // Verify glyph margin is visible (initial state has glyphMargin=true).
-            var hasGlyphMargin = await _fixture.Page.EvaluateAsync<bool>("""
+            // Verify glyph margin DOM node is present and has non-zero width initially.
+            await _fixture.Page.WaitForFunctionAsync("""
                 () => {
-                    const margin = document.querySelector('.margin-view-overlays');
-                    const option = monaco.editor.getEditors()[0]
-                        .getOptions().get(monaco.editor.EditorOption.glyphMargin);
-                    return option === true || (margin !== null && margin.offsetWidth > 0);
+                    const glyph = document.querySelector('.glyph-margin');
+                    return glyph && glyph.offsetWidth > 0;
                 }
-                """);
+                """, null, new PageWaitForFunctionOptions { Timeout = 5000 });
 
-            Assert.True(hasGlyphMargin, "Expected glyph margin to be visible initially.");
+            var glyphWidthBefore = await _fixture.Page.EvaluateAsync<int>(
+                "() => document.querySelector('.glyph-margin')?.offsetWidth ?? 0");
+            Assert.True(glyphWidthBefore > 0,
+                $"Expected glyph margin DOM node with non-zero width initially, but got {glyphWidthBefore}px.");
 
             // Disable glyph margin via bridge.
             await _fixture.Page.EvaluateAsync("""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'HasGlyphMargin', value: 'False' })
+                    { name: 'HasGlyphMargin', value: false })
                 """);
 
-            // Wait deterministically for the glyphMargin option to propagate.
-            await _fixture.Page.WaitForFunctionAsync(
-                "() => monaco.editor.getEditors()[0].getOptions().get(monaco.editor.EditorOption.glyphMargin) === false",
-                null, new PageWaitForFunctionOptions { Timeout = 5000 });
+            // Wait deterministically for the glyph margin DOM to collapse.
+            await _fixture.Page.WaitForFunctionAsync("""
+                () => {
+                    const glyph = document.querySelector('.glyph-margin');
+                    return !glyph || glyph.offsetWidth === 0;
+                }
+                """, null, new PageWaitForFunctionOptions { Timeout = 5000 });
 
-            var glyphMarginAfter = await _fixture.Page.EvaluateAsync<bool>(
+            var glyphWidthAfter = await _fixture.Page.EvaluateAsync<int>(
+                "() => document.querySelector('.glyph-margin')?.offsetWidth ?? 0");
+            Assert.Equal(0, glyphWidthAfter);
+
+            // Also verify editor option is consistent with DOM.
+            var optionAfter = await _fixture.Page.EvaluateAsync<bool>(
                 "() => monaco.editor.getEditors()[0].getOptions().get(monaco.editor.EditorOption.glyphMargin)");
+            Assert.False(optionAfter, "Expected glyphMargin option to be false after bridge disable.");
 
-            Assert.False(glyphMarginAfter, "Expected glyph margin to be disabled after setting HasGlyphMargin=false via bridge.");
-
-            // Restore glyph margin.
+            // Restore glyph margin via bridge.
             await _fixture.Page.EvaluateAsync("""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'HasGlyphMargin', value: 'True' })
+                    { name: 'HasGlyphMargin', value: true })
                 """);
+
+            // Verify DOM node reappears with non-zero width.
+            await _fixture.Page.WaitForFunctionAsync("""
+                () => {
+                    const glyph = document.querySelector('.glyph-margin');
+                    return glyph && glyph.offsetWidth > 0;
+                }
+                """, null, new PageWaitForFunctionOptions { Timeout = 5000 });
+
+            var glyphWidthRestored = await _fixture.Page.EvaluateAsync<int>(
+                "() => document.querySelector('.glyph-margin')?.offsetWidth ?? 0");
+            Assert.True(glyphWidthRestored > 0,
+                $"Expected glyph margin DOM node to reappear with non-zero width, but got {glyphWidthRestored}px.");
         }
         catch
         {

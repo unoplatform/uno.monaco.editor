@@ -138,3 +138,6 @@ Deferred teardown with CancellationTokenSource: when the delay expires and hard 
 
 ## 2026-02-13 manual [pitfall]
 When two concurrent Task.Run lambdas share a StreamWriter, wrap writes in a SemaphoreSlim -- StreamWriter is not thread-safe and concurrent WriteLineAsync calls can corrupt output or throw.
+
+## 2026-02-13 manual [pitfall]
+CDP test fixtures must wait for ALL async harness setup (not just Monaco readiness) before allowing tests to run -- add a final ready marker at the end of the harness init and block fixture InitializeAsync until it appears.

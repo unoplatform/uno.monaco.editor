@@ -126,6 +126,11 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         await Page.WaitForFunctionAsync(
             "() => typeof monaco !== 'undefined' && monaco.editor.getEditors().length > 0",
             null, new PageWaitForFunctionOptions { Timeout = MonacoReadyTimeoutMs });
+
+        // 10. Wait for the test harness to complete all async setup (command/action
+        // registration, language registration, markers, decorations, theme switching).
+        // The harness emits TEST_HARNESS_READY as its final stdout marker.
+        await WaitForLogLineAfterAsync(0, @"TEST_HARNESS_READY", MonacoReadyTimeoutMs);
     }
 
     public async ValueTask DisposeAsync()
