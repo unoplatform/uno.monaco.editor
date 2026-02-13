@@ -48,9 +48,24 @@ Fix three related issues in the desktop JSON-RPC bridge and initialization path:
 - [ ] Existing WASM functionality not regressed
 - [ ] Solution builds clean
 ## Done summary
-TBD
+## Done Summary
 
+Fixed three related bugs in the desktop JSON-RPC bridge and initialization path:
+
+### 1. JSON-RPC theme init deadlock (Bug 5)
+Replaced `await _view.InvokeScriptAsync("void createMonacoEditor(...)")` with a fire-and-forget pattern using `ContinueWith(TaskScheduler.FromCurrentSynchronizationContext())` in both `WebView_NavigationCompleted` and `RebootstrapMonacoAsync`. This prevents the UI thread from blocking while JS calls back to C# via `getJsonValueAsync`/`getCurrentThemeNameAsync` through `DispatcherQueue.EnqueueAsync`. Error handling is preserved via `InternalException` event.
+
+Added a 30-second timeout monitor (`MonitorInitTimeoutAsync`) that detects and reports if `CodeEditorLoaded` never fires after `createMonacoEditor` is invoked — covers script failures, Monaco crashes, or bridge disconnects.
+
+### 2. Text loading (Bug 2)
+Verified that Task 1's lifecycle fix resolves this naturally. `CodeEditorLoaded` → `ApplyInitialPropertyValues()` pushes `Text` to Monaco via `updateContent`, regardless of when `Text` was set on the DP. No additional code needed.
+
+### 3. ElementTheme serialization (Bug 7)
+Added `[JsonSerializable(typeof(Microsoft.UI.Xaml.ElementTheme))]` to `MonacoJsonContext`. The source-generated serializer now handles `ElementTheme` directly — no reflection fallback needed. The fallback path in `ParentAccessorDesktop.SerializePropertyValue` is retained as a safety net for other framework types.
+
+### 4. Diagnostic logging
+Added performance timing for each `getJsonValueAsync` round-trip during theme initialization in `asyncCallbackHelpers.ts`. Logs per-call latency and cumulative time, with a warning when cumulative time exceeds 16ms (one frame budget).
 ## Evidence
 - Commits:
-- Tests:
+- Tests: 182 unit tests pass (excluding Playwright browser tests on macOS ARM)
 - PRs:

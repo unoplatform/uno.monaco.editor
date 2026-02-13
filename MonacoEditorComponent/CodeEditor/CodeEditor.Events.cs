@@ -167,23 +167,36 @@ namespace Monaco
                 && _lifecycleState == EditorLifecycleState.Loading
                 && !_initialized)
             {
-                try
-                {
-                    // Use void operator so ExecuteScriptAsync returns immediately without
-                    // awaiting the async Promise. createMonacoEditor() calls JSON-RPC back
-                    // to C# (getJsonValueAsync, getCurrentThemeNameAsync, etc.) and awaiting
-                    // the Promise via ExecuteScriptAsync can deadlock if WebView2 serializes
-                    // script execution and message dispatch on the same thread.
-                    // The "Loaded" callback fires asynchronously when init completes.
-                    DesktopCodeEditorPresenter.DiagnosticLog("WebView_NavigationCompleted: invoking createMonacoEditor...");
-                    await _view.InvokeScriptAsync("void createMonacoEditor(null, 'editor-container', '')");
-                    DesktopCodeEditorPresenter.DiagnosticLog("WebView_NavigationCompleted: createMonacoEditor invoked on desktop");
-                }
-                catch (Exception ex)
-                {
-                    DesktopCodeEditorPresenter.DiagnosticLog($"WebView_NavigationCompleted: createMonacoEditor failed: {ex}");
-                    InternalException?.Invoke(this, ex);
-                }
+                // Fire-and-forget: createMonacoEditor() calls JSON-RPC back to C#
+                // (getJsonValueAsync, getCurrentThemeNameAsync, etc.) which needs
+                // DispatcherQueue.EnqueueAsync on the UI thread. Awaiting
+                // InvokeScriptAsync here would deadlock because the UI thread is
+                // blocked waiting for ExecuteScriptAsync to complete while JS is
+                // trying to call back into C#. The "Loaded" callback fires
+                // asynchronously when init completes.
+                // ContinueWith preserves error handling that would be lost with
+                // a bare fire-and-forget (_ = ...).
+                DesktopCodeEditorPresenter.DiagnosticLog("WebView_NavigationCompleted: invoking createMonacoEditor (fire-and-forget)...");
+                _ = _view.InvokeScriptAsync("void createMonacoEditor(null, 'editor-container', '')")
+                    .ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                        {
+                            DesktopCodeEditorPresenter.DiagnosticLog(
+                                $"WebView_NavigationCompleted: createMonacoEditor failed: {t.Exception}");
+                            InternalException?.Invoke(this, t.Exception!.InnerException ?? t.Exception);
+                        }
+                        else
+                        {
+                            DesktopCodeEditorPresenter.DiagnosticLog(
+                                "WebView_NavigationCompleted: createMonacoEditor invoked on desktop");
+                        }
+                    }, TaskScheduler.FromCurrentSynchronizationContext());
+
+                // Timeout fallback: if CodeEditorLoaded never fires (script failure,
+                // Monaco crash, etc.), surface a diagnostic error after 30 seconds.
+                _ = MonitorInitTimeoutAsync();
+
                 return;
             }
             else
@@ -220,23 +233,55 @@ namespace Monaco
         /// (bridge was torn down but WebView2 is still healthy). The bridge has already
         /// been restored via <see cref="InitialiseWebObjects"/> before this is called.
         /// </summary>
-        private async Task RebootstrapMonacoAsync()
+        private void RebootstrapMonacoAsync()
         {
             if (_view is not DesktopCodeEditorPresenter desktopPresenter)
             {
                 return;
             }
 
-            DesktopCodeEditorPresenter.DiagnosticLog("RebootstrapMonacoAsync: invoking createMonacoEditor...");
-            try
+            // Fire-and-forget with ContinueWith for the same deadlock avoidance
+            // as WebView_NavigationCompleted — createMonacoEditor calls back to C#
+            // via JSON-RPC which needs the UI thread.
+            DesktopCodeEditorPresenter.DiagnosticLog("RebootstrapMonacoAsync: invoking createMonacoEditor (fire-and-forget)...");
+            _ = desktopPresenter.InvokeScriptAsync("void createMonacoEditor(null, 'editor-container', '')")
+                .ContinueWith(t =>
+                {
+                    if (t.IsFaulted)
+                    {
+                        DesktopCodeEditorPresenter.DiagnosticLog(
+                            $"RebootstrapMonacoAsync: createMonacoEditor failed: {t.Exception}");
+                        InternalException?.Invoke(this, t.Exception!.InnerException ?? t.Exception);
+                    }
+                    else
+                    {
+                        DesktopCodeEditorPresenter.DiagnosticLog("RebootstrapMonacoAsync: createMonacoEditor invoked");
+                    }
+                }, TaskScheduler.FromCurrentSynchronizationContext());
+
+            // Timeout fallback for re-bootstrap path too.
+            _ = MonitorInitTimeoutAsync();
+        }
+
+        /// <summary>
+        /// Timeout fallback: if CodeEditorLoaded never fires within 30 seconds
+        /// after createMonacoEditor was invoked, surface a diagnostic error.
+        /// This detects script failures, Monaco crashes, or bridge disconnects
+        /// that prevent the "Loaded" callback from firing.
+        /// </summary>
+        private async Task MonitorInitTimeoutAsync()
+        {
+            const int timeoutMs = 30_000;
+            var startState = _lifecycleState;
+            await Task.Delay(timeoutMs);
+
+            // Only report if we're still stuck in Loading (not yet Loaded or Unloaded).
+            if (_lifecycleState == EditorLifecycleState.Loading && startState == EditorLifecycleState.Loading)
             {
-                await desktopPresenter.InvokeScriptAsync("void createMonacoEditor(null, 'editor-container', '')");
-                DesktopCodeEditorPresenter.DiagnosticLog("RebootstrapMonacoAsync: createMonacoEditor invoked");
-            }
-            catch (Exception ex)
-            {
-                DesktopCodeEditorPresenter.DiagnosticLog($"RebootstrapMonacoAsync: createMonacoEditor failed: {ex}");
-                InternalException?.Invoke(this, ex);
+                var msg = $"Monaco editor initialization timed out after {timeoutMs}ms. " +
+                    "CodeEditorLoaded callback was never received. Check browser console for errors.";
+                DesktopCodeEditorPresenter.DiagnosticLog($"INIT_TIMEOUT: {msg}");
+                InternalException?.Invoke(this, new TimeoutException(msg));
             }
         }
 

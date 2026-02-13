@@ -78,6 +78,8 @@ namespace Monaco.Serialization;
 [JsonSerializable(typeof(WorkspaceEdit))]
 [JsonSerializable(typeof(WorkspaceTextEdit))]
 [JsonSerializable(typeof(ILanguageExtensionPoint))]
+// --- Framework types used in property serialization ---
+[JsonSerializable(typeof(Microsoft.UI.Xaml.ElementTheme))]
 // --- Deserialization helper types ---
 [JsonSerializable(typeof(object))]
 [JsonSerializable(typeof(string))]

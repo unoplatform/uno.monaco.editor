@@ -165,8 +165,17 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any) =>
     // Set theme -- async on desktop (JSON-RPC with timeout), sync on WASM (JSExport)
     // Use direct accessor/theme calls to avoid circular dependency with otherScriptsToBeOrganized
     // Wrapped in try-catch so editor init completes even if theme RPC stalls (CI cold-start).
+    // Diagnostic logging measures per-call and cumulative getJsonValueAsync latency on desktop.
     try {
+        const themeInitStart = performance.now();
+
+        const t0 = performance.now();
         let theme: any = await editorContext.Accessor.getJsonValueAsync("RequestedTheme");
+        const t1 = performance.now();
+        if (_isDesktop) {
+            console.log(`[initializeMonacoEditor] getJsonValueAsync("RequestedTheme"): ${(t1 - t0).toFixed(1)}ms, result=${theme}`);
+        }
+
         theme = {
             "0": "Default",
             "1": "Light",
@@ -174,11 +183,29 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any) =>
         }[theme];
 
         if (theme == "Default") {
+            const t2 = performance.now();
             theme = await (editorContext as any).Theme.getCurrentThemeNameAsync();
+            const t3 = performance.now();
+            if (_isDesktop) {
+                console.log(`[initializeMonacoEditor] getCurrentThemeNameAsync: ${(t3 - t2).toFixed(1)}ms, result=${theme}`);
+            }
         }
 
+        const t4 = performance.now();
         const isHighContrast = await (editorContext as any).Theme.getIsHighContrastAsync();
+        const t5 = performance.now();
+        if (_isDesktop) {
+            console.log(`[initializeMonacoEditor] getIsHighContrastAsync: ${(t5 - t4).toFixed(1)}ms, result=${isHighContrast}`);
+        }
+
         changeTheme(element, theme, isHighContrast as any);
+
+        const themeInitEnd = performance.now();
+        const cumulativeMs = themeInitEnd - themeInitStart;
+        if (_isDesktop) {
+            console.log(`[initializeMonacoEditor] Theme init cumulative: ${cumulativeMs.toFixed(1)}ms` +
+                (cumulativeMs > 16 ? ' (EXCEEDS 16ms frame budget)' : ''));
+        }
     } catch (err) {
         console.warn('[initializeMonacoEditor] Theme initialization failed, using defaults:', err);
         // Apply default light theme so the editor is usable even if RPC failed.

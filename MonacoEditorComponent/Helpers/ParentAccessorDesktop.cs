@@ -379,11 +379,13 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
     /// <summary>
     /// Serializes a property value to JSON. Tries the AOT-safe <see cref="MonacoJsonContext"/>
     /// first, then falls back to reflection-based serialization for framework types
-    /// (e.g., <c>ElementTheme</c>) that are not registered in the source-generated context.
+    /// that are not registered in the source-generated context.
     /// </summary>
     /// <remarks>
-    /// Desktop runs as native code (not AOT-WASM), so the reflection fallback is safe.
-    /// This avoids polluting <see cref="MonacoJsonContext"/> with WinUI/Uno framework types.
+    /// <c>ElementTheme</c> is now registered in <see cref="MonacoJsonContext"/> and will
+    /// serialize via the source-generated path. The reflection fallback is retained as a
+    /// safety net for any other framework types that may appear. Desktop runs as native
+    /// code (not AOT-WASM), so the reflection fallback is safe.
     /// </remarks>
     private static string SerializePropertyValue(object obj)
     {

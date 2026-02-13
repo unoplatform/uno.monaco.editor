@@ -65,9 +65,8 @@ Investigate whether a deferral mechanism for DP change handlers (inspired by `IS
 - [ ] Existing desktop CDP tests pass (no regression)
 - [ ] Solution builds clean for both net10.0-desktop and net10.0-browserwasm targets
 ## Done summary
-TBD
-
+Fix OnApplyTemplate to retain healthy DesktopCodeEditorPresenter across unload/load cycles instead of unconditionally destroying and recreating it. Added IsPresenterHealthy guard, DeferredTeardownAsync IsLoaded race check, soft-reload detection in CodeEditor_Loaded, and bridge restoration with RebootstrapMonacoAsync for post-hard-teardown presenter reuse. BeginInit/EndInit investigation concluded existing guards are sufficient.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 60b6465406ec6579e8146493c7883111f46aea8a
+- Tests: dotnet build MonacoEditorComponent.slnx --no-restore, dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj --filter-not-trait Category=WasmPlaywright --filter-not-trait Category=DesktopCdp, dotnet test --project tools/MonacoTypeEmitter.Tests/MonacoTypeEmitter.Tests.csproj
 - PRs:

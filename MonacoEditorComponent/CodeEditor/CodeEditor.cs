@@ -460,7 +460,7 @@ namespace Monaco
                         // Manually re-bootstrap Monaco by invoking createMonacoEditor.
                         // InitialiseWebObjects transitioned lifecycle to Loading, so
                         // CodeEditorLoaded (the "Loaded" callback) will handle the rest.
-                        _ = RebootstrapMonacoAsync();
+                        RebootstrapMonacoAsync();
 
                         base.OnApplyTemplate();
                         return;
