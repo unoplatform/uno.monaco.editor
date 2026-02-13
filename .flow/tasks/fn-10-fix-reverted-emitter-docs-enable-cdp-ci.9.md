@@ -10,38 +10,40 @@ The user requires **comprehensive automated testing through the C# bridge** to v
 2. **JavaScript integration tests** — existing `DesktopIntegrationTests` that test Monaco JS API directly (already exist, keep them)
 3. **C# bridge integration tests** — NEW: test the full C#↔JS roundtrip through the bridge protocol, verifying that C# CodeEditor properties and methods work end-to-end on desktop
 
-### Must-have test scenarios (bridge-critical, stable assertions):
+### Test scenarios for layer 3 (C# bridge integration):
 
 **Text & content:**
 - Set `Text` property from C# side, verify it arrives in Monaco (read back via JS `getValue()`)
 - Set text from JS side, verify C# `Text` property updates via bridge notification
+- Verify `SelectedText` property roundtrips
 
-**Language switching:**
+**Language detection & registration:**
 - Set `CodeLanguage = "csharp"`, verify Monaco recognizes it as C# (check `getModel().getLanguageId()`)
 - Set `CodeLanguage = "xml"`, verify language switch
+- Register a custom language association (e.g., `.csproj` files treated as XML) via `Languages` helper
+- Verify `getLanguages()` returns available languages including registered ones
 
 **Actions & commands:**
 - Register a command via `AddCommandAsync`, trigger it from JS, verify C# callback fires
-- Register an action via `AddActionAsync`, verify it's registered in Monaco
+- Register an action via `AddActionAsync`, verify it appears in command palette data
+- Test custom action callback roundtrip (JS triggers action → C# handler executes)
 
-**Theme switching:**
+**Theme & styling:**
 - Set theme via `CodeEditorTheme` property from C#, verify DOM reflects the change
+- Verify syntax highlighting CSS classes are present after language is set
 
-**Markers:**
+**Decorations & markers:**
 - Add markers via `SetModelMarkersAsync`, verify they appear in Monaco marker data
+- Set decorations via `Decorations` observable collection, verify CSS styles injected
 - Verify marker data roundtrips (severity, message, position)
+
+**Code folding:**
+- Load multi-line content with foldable regions, verify folding ranges exist via Monaco API
+- Verify fold/unfold operations work
 
 **Editor options:**
 - Set `ReadOnly = true`, verify editor is read-only in Monaco
-
-### Additional test scenarios (previously deferred, now required):
-
-- Syntax highlighting CSS token class assertions — verify theme applies visible token styling
-- Code folding range assertions — verify folding ranges are registered and queryable
-- `SelectedText` roundtrip — set selection from C#, verify in JS and vice versa
-- Custom language registration via `Languages` helper — register a language, verify it's available
-- `HasGlyphMargin` DOM verification — toggle glyph margin, verify DOM reflects it
-- Decorations CSS style injection verification — add decorations, verify CSS classes appear in DOM
+- Toggle `HasGlyphMargin`, verify DOM glyph margin appears/disappears
 
 **Size:** M
 **Files:**
@@ -107,28 +109,28 @@ The user requires **comprehensive automated testing through the C# bridge** to v
 - The existing `DesktopIntegrationTests` (JS-only) should remain as a separate test class
 - Tests run in the "DesktopCDP" collection so they share the fixture (single app launch)
 - User explicitly said: "it may not need to test every single api, as that's a lot, but it needs to test the major features to make sure things proxy and work right"
-## Acceptance (must-have — all required for SHIP)
+## Acceptance
 - [ ] New `DesktopBridgeIntegrationTests` class exists with C# bridge roundtrip tests
 - [ ] Host-initiated property proof: test asserts `TEST_INIT_PROPS:text=// test-init-text,lang=javascript` marker exists in stdout (searched from cursor 0, not current cursor — startup markers are one-time emissions). This is the primary proof that the C# `EditorLoaded` DP→SendScriptAsync→JS path executed. Monaco value verification (`getValue()`, `getLanguageId()`) is secondary confirmation.
 - [ ] Text property roundtrip: bridge-driven (`parentAccessor/setValue`) AND host-initiated (verified via `TEST_INIT_PROPS` marker + Monaco `getValue()`)
 - [ ] CodeLanguage roundtrip: host-initiated (verified via `TEST_INIT_PROPS` marker + Monaco `getLanguageId()`), AND bridge-driven language switch
+- [ ] Custom language registration: register a language association via `Languages` helper, verify it's available in `getLanguages()`
 - [ ] AddCommandAsync: test app registers command via C# `AddCommandAsync` in `EditorLoaded`, logs command ID to stdout (`TEST_HARNESS:commandId={id}`). Test parses the actual ID from stdout, triggers from JS via `editor.trigger('test', parsedCommandId)`, then `fixture.WaitForLogLineAfterAsync(cursor, $"TEST_CALLBACK:{parsedCommandId}:invoked")` to verify callback fired. No hardcoded IDs — tests use whatever ID `AddCommandAsync` returns.
 - [ ] AddActionAsync: test app registers action via C# `AddActionAsync` in `EditorLoaded` with known ID (e.g., `actionId = "testAction"`). Callback logs `Console.WriteLine($"TEST_CALLBACK:Action{actionId}:invoked")`. Test parses `actionId` from `TEST_HARNESS:` line, triggers from JS via `editor.getAction('{actionId}').run()`, then `WaitForLogLineAfterAsync(cursor, $"TEST_CALLBACK:Action{actionId}:invoked")`. No hardcoded callback tokens — tests derive all tokens from parsed IDs
 - [ ] Test harness in `MonacoEditorTestApp/MainPage.xaml.cs` uses `Console.WriteLine` for callback logging (works in Release). No custom RPC endpoints, no allowlist changes, no library modifications
 - [ ] Theme switching: set theme via bridge, verify DOM class changes
+- [ ] Syntax highlighting: verify CSS token classes present after setting a language
 - [ ] Markers: set via bridge, verify they appear in Monaco marker data
+- [ ] Decorations: set via bridge, verify CSS styles injected in DOM
+- [ ] Code folding: load foldable content, verify folding ranges exist
 - [ ] ReadOnly: toggle via bridge, verify editor readOnly state in Monaco
+- [ ] HasGlyphMargin: toggle from C#, verify DOM reflects glyph margin presence
+- [ ] SelectedText roundtrip: set selection from C# side, verify in JS; set from JS, verify in C#
 - [ ] All existing DesktopIntegrationTests (JS-only) continue to pass
 - [ ] All tests tagged with `[Trait("Category", "DesktopCDP")]`
 - [ ] Tests are independent and do not depend on execution order
 - [ ] Fixture includes reset helper for test independence (reset text, language, theme between tests)
 - [ ] Tests use fixture's cursor-based log API (added in task 8) for per-test stdout assertion scoping
-- [ ] Syntax highlighting: verify theme applies visible token CSS classes in the editor DOM
-- [ ] Code folding: verify folding ranges are registered and queryable via Monaco API
-- [ ] SelectedText roundtrip: set selection from C# side, verify in JS; set from JS, verify in C#
-- [ ] Custom language registration: register a language via `Languages` helper, verify it appears in `getLanguages()`
-- [ ] HasGlyphMargin: toggle from C#, verify DOM reflects glyph margin presence
-- [ ] Decorations: add decorations via C# API, verify CSS classes appear in editor DOM
 ## Done summary
 TBD
 
