@@ -134,6 +134,9 @@ internal sealed class WebView2JsonRpcMessageHandler : IJsonRpcMessageHandler, ID
         var json = e.MessageJson;
         if (string.IsNullOrEmpty(json)) return;
 
+        // Diagnostic logging for CI debugging (only when MONACO_DIAGNOSTICS=1).
+        DesktopCodeEditorPresenter.DiagnosticLog($"OnMessageReceived: len={json.Length}, prefix={json[..Math.Min(100, json.Length)]}...");
+
         // Security: payload size limit using actual UTF-8 byte count.
         var byteCount = Encoding.UTF8.GetByteCount(json);
         if (byteCount > MaxPayloadSizeBytes)

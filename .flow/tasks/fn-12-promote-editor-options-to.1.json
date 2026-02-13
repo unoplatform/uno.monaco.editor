@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-13T08:52:16.780371Z",
+  "depends_on": [],
+  "epic": "fn-12-promote-editor-options-to",
+  "id": "fn-12-promote-editor-options-to.1",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-12-promote-editor-options-to.1.md",
+  "status": "todo",
+  "title": "Regenerate auto-generated C# types from Monaco 0.52.2 model.json",
+  "updated_at": "2026-02-13T08:52:43.186277Z"
+}

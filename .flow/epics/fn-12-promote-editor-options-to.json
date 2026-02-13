@@ -1,0 +1,21 @@
+{
+  "branch_name": "fn-12-promote-editor-options-to",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-02-13T08:51:20.086792Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [
+    "fn-10-fix-reverted-emitter-docs-enable-cdp-ci",
+    "fn-6-bug-fixes-disposal-resize-and-test"
+  ],
+  "id": "fn-12-promote-editor-options-to",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/fn-12-promote-editor-options-to.md",
+  "status": "open",
+  "title": "Promote editor options to DependencyProperties and sync types to Monaco 0.52.2",
+  "updated_at": "2026-02-13T08:52:12.351507Z"
+}

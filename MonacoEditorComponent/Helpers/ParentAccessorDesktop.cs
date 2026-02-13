@@ -327,6 +327,7 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
     [JsonRpcMethod("parentAccessor/callAction")]
     public void OnCallAction(string name)
     {
+        DesktopCodeEditorPresenter.DiagnosticLog($"OnCallAction: name={name}");
         CallAction(name);
     }
 
@@ -347,7 +348,18 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
     [JsonRpcMethod("parentAccessor/getJsonValue")]
     public async Task<string> OnGetJsonValue(string name)
     {
-        return await GetJsonValueAsync(name);
+        DesktopCodeEditorPresenter.DiagnosticLog($"OnGetJsonValue: name={name}");
+        try
+        {
+            var result = await GetJsonValueAsync(name);
+            DesktopCodeEditorPresenter.DiagnosticLog($"OnGetJsonValue: name={name}, result={result}");
+            return result;
+        }
+        catch (Exception ex)
+        {
+            DesktopCodeEditorPresenter.DiagnosticLog($"OnGetJsonValue: name={name}, error={ex}");
+            throw;
+        }
     }
 
     // ============================================================

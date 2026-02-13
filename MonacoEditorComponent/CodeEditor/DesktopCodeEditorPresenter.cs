@@ -258,8 +258,11 @@ namespace Monaco
         {
             if (!_isCoreWebView2Initialized || _webView.CoreWebView2 is null)
             {
+                DiagnosticLog("PostWebMessageAsync: CoreWebView2 not initialized");
                 throw new InvalidOperationException("CoreWebView2 is not initialized. Call Launch() first.");
             }
+
+            DiagnosticLog($"PostWebMessageAsync: HasThreadAccess={_webView.DispatcherQueue.HasThreadAccess}, len={json.Length}");
 
             // CoreWebView2.PostWebMessageAsJson must be called on the UI thread.
             // StreamJsonRpc dispatches WriteAsync from a thread-pool thread, so we
@@ -267,6 +270,7 @@ namespace Monaco
             if (_webView.DispatcherQueue.HasThreadAccess)
             {
                 _webView.CoreWebView2.PostWebMessageAsJson(json);
+                DiagnosticLog("PostWebMessageAsync: sent (UI thread)");
                 return Task.CompletedTask;
             }
 
@@ -276,14 +280,17 @@ namespace Monaco
                 try
                 {
                     _webView.CoreWebView2.PostWebMessageAsJson(json);
+                    DiagnosticLog("PostWebMessageAsync: sent (dispatched)");
                     tcs.SetResult();
                 }
                 catch (Exception ex)
                 {
+                    DiagnosticLog($"PostWebMessageAsync: error in dispatch: {ex.Message}");
                     tcs.SetException(ex);
                 }
             }))
             {
+                DiagnosticLog("PostWebMessageAsync: TryEnqueue failed");
                 tcs.SetException(new InvalidOperationException(
                     "Failed to enqueue PostWebMessageAsJson on the DispatcherQueue."));
             }
