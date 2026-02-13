@@ -205,6 +205,17 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any, in
             readOnly: initialState.readOnly || false,
             value: initialState.text || '',
         };
+    } else if (_isDesktop) {
+        // Desktop fallback when initial state payload is missing/invalid:
+        // avoid async bridge round-trips during init and choose a best-effort theme.
+        const prefersDark = typeof window.matchMedia === 'function'
+            && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        opt = {
+            theme: prefersDark ? 'vs-dark' : 'vs',
+            language: 'plaintext',
+            readOnly: false,
+            value: '',
+        };
     }
 
     const editor = monaco.editor.create(element, opt);
@@ -230,10 +241,15 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any, in
         }
     });
 
-    // Apply theme: if initial state was provided (desktop), theme is already applied via
-    // monaco.editor.create options -- skip async RPC round-trips entirely.
-    // Otherwise (WASM or fallback), use the existing async path.
+    // Apply theme:
+    // - Desktop with initial state: theme already applied in monaco.editor.create options.
+    // - Desktop without initial state: use local fallback theme (already applied in options).
+    // - WASM without initial state: use existing async property path.
     if (!initialState) {
+        if (_isDesktop) {
+            console.warn('[initializeMonacoEditor] Missing pushed initial state on desktop; using local fallback theme');
+        }
+        else {
         // Set theme -- async on desktop (JSON-RPC with timeout), sync on WASM (JSExport)
         // Wrapped in try-catch so editor init completes even if theme RPC stalls (CI cold-start).
         try {
@@ -279,6 +295,7 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any, in
         } catch (err) {
             console.warn('[initializeMonacoEditor] Theme initialization failed, using defaults:', err);
             changeTheme(element, 'Light', 'false');
+        }
         }
     } else {
         console.log(`[initializeMonacoEditor] Skipped async theme init -- using pushed initial state`);
@@ -400,7 +417,7 @@ export const callParentActionWithParameters = (element: any, name: string, param
         parameters != null && parameters.length > 0 ? stringifyForMarshalling(parameters[0]) : null as any,
         parameters != null && parameters.length > 1 ? stringifyForMarshalling(parameters[1]) : null as any);
 
-export const createMonacoEditor = async (managedOwner: any, elementId: string, basePath: string, initialStateJson?: string) => {
+export const createMonacoEditor = async (managedOwner: any, elementId: string, basePath: string, initialStatePayload?: InitialState | string) => {
     // Ensure a single <style id="dynamic"> element exists (editor.html already provides one on desktop)
     if (!document.getElementById('dynamic')) {
         var head = document.head || document.getElementsByTagName('head')[0];
@@ -409,15 +426,21 @@ export const createMonacoEditor = async (managedOwner: any, elementId: string, b
         head.appendChild(style);
     }
 
-    // Parse initial state if provided (pushed from C# on desktop).
+    // Parse/normalize initial state if provided (pushed from C# on desktop).
+    // Supports both JSON object payload (preferred) and JSON string payload (legacy).
     let initialState: InitialState | undefined;
-    if (initialStateJson) {
-        try {
-            initialState = JSON.parse(initialStateJson) as InitialState;
-            console.log(`[createMonacoEditor] Parsed initial state: theme=${initialState.themeName}`);
-        } catch (err) {
-            console.warn('[createMonacoEditor] Failed to parse initial state JSON:', err);
+    if (typeof initialStatePayload === 'string') {
+        if (initialStatePayload.length > 0) {
+            try {
+                initialState = JSON.parse(initialStatePayload) as InitialState;
+                console.log(`[createMonacoEditor] Parsed initial state (string): theme=${initialState.themeName}`);
+            } catch (err) {
+                console.warn('[createMonacoEditor] Failed to parse initial state JSON string:', err);
+            }
         }
+    } else if (initialStatePayload && typeof initialStatePayload === 'object') {
+        initialState = initialStatePayload as InitialState;
+        console.log(`[createMonacoEditor] Parsed initial state (object): theme=${initialState.themeName}`);
     }
 
     await DebugLoggerImpl.setup();

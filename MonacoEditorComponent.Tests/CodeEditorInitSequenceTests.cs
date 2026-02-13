@@ -86,4 +86,15 @@ public sealed class CodeEditorInitSequenceTests
 
         Assert.False(shouldForward);
     }
+
+    [Fact]
+    public void BuildCreateMonacoEditorScript_EmbedsInitialStateAsJsonStringLiteral()
+    {
+        const string initialStateJson = "{\"requestedTheme\":0,\"themeName\":\"Light\",\"isHighContrast\":false,\"text\":\"abc\",\"language\":\"plaintext\",\"readOnly\":false}";
+        var escapedState = System.Text.Json.JsonSerializer.Serialize(initialStateJson);
+        var script = CodeEditor.BuildCreateMonacoEditorScript(escapedState);
+
+        Assert.Contains("createMonacoEditor", script);
+        Assert.Contains(escapedState, script);
+    }
 }

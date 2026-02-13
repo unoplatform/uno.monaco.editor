@@ -539,6 +539,88 @@ public sealed class DesktopIntegrationTests : IAsyncLifetime
             throw;
         }
     }
+
+    // ============================================================
+    // fn-13 coverage: Presenter lifecycle — single editor instance
+    // ============================================================
+
+    /// <summary>
+    /// Verifies that after full initialization, there is exactly one Monaco editor
+    /// instance (not multiple from re-creation). Before fn-13.1, <c>OnApplyTemplate()</c>
+    /// created a new presenter on each template application, resulting in multiple
+    /// editor instances. The fix reuses the existing presenter when healthy.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "DesktopCDP")]
+    public async Task PresenterLifecycle_SingleEditorInstance()
+    {
+        _currentTestName = nameof(PresenterLifecycle_SingleEditorInstance);
+        try
+        {
+            var editorCount = await _fixture.Page.EvaluateAsync<int>(
+                "() => monaco.editor.getEditors().length");
+
+            Assert.Equal(1, editorCount);
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Verifies that the editor completes initialization without the init timeout
+    /// firing. The fn-13.2 fix adds a 30-second timeout fallback for
+    /// <c>CodeEditorLoaded</c>. If init completes normally, the timeout should
+    /// never appear in the logs.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "DesktopCDP")]
+    public async Task PresenterLifecycle_NoInitTimeout()
+    {
+        _currentTestName = nameof(PresenterLifecycle_NoInitTimeout);
+        try
+        {
+            // Check that INIT_TIMEOUT never appeared in the process logs.
+            // This would indicate that CodeEditorLoaded was never received.
+            var lines = _fixture.GetLinesAfter(0);
+            var hasTimeout = lines.Any(l => l.Contains("INIT_TIMEOUT"));
+
+            Assert.False(hasTimeout,
+                "INIT_TIMEOUT should not appear in logs -- " +
+                "CodeEditorLoaded callback should fire within 30 seconds.");
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Verifies that the INIT_COMPLETE diagnostic marker appears in the process
+    /// logs exactly once, confirming that <c>CodeEditorLoaded</c> fired exactly
+    /// once during initialization. Multiple firings would indicate lifecycle bugs.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "DesktopCDP")]
+    public async Task PresenterLifecycle_InitCompleteOnce()
+    {
+        _currentTestName = nameof(PresenterLifecycle_InitCompleteOnce);
+        try
+        {
+            var lines = _fixture.GetLinesAfter(0);
+            var initCompleteCount = lines.Count(l => l.Contains("INIT_COMPLETE"));
+
+            Assert.Equal(1, initCompleteCount);
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
 }
 
 /// <summary>

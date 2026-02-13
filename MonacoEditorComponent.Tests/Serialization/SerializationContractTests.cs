@@ -1,5 +1,6 @@
 using System;
 using System.Text.Json;
+using Microsoft.UI.Xaml;
 using Monaco;
 using Monaco.Editor;
 using Monaco.Helpers;
@@ -1212,6 +1213,148 @@ public class SerializationContractTests
         Assert.Equal(3u, selection.SelectionStartColumn);
         Assert.Equal(10u, selection.PositionLineNumber);
         Assert.Equal(8u, selection.PositionColumn);
+    }
+
+    #endregion
+
+    #region ElementTheme serialization — fn-13 desktop bridge contract
+
+    /// <summary>
+    /// Verifies that <c>ElementTheme</c> can be serialized via <c>MonacoJsonContext.Relaxed.Options</c>
+    /// without throwing <c>NotSupportedException</c>. Before fn-13.2, ElementTheme was not registered
+    /// in the source-generated context and serialization fell back to reflection, which fails in AOT.
+    /// </summary>
+    [Fact]
+    public void Golden_ElementTheme_SerializesAsNumericValue()
+    {
+        var theme = ElementTheme.Dark;
+        var json = JsonSerializer.Serialize(theme, MonacoJsonContext.Relaxed.Options);
+
+        // ElementTheme.Dark = 2 — should serialize as a numeric integer
+        Assert.Equal("2", json);
+    }
+
+    [Fact]
+    public void Golden_ElementTheme_AllValues_SerializeCorrectly()
+    {
+        // Verify all three ElementTheme values have correct numeric wire format
+        Assert.Equal("0", JsonSerializer.Serialize(ElementTheme.Default, MonacoJsonContext.Relaxed.Options));
+        Assert.Equal("1", JsonSerializer.Serialize(ElementTheme.Light, MonacoJsonContext.Relaxed.Options));
+        Assert.Equal("2", JsonSerializer.Serialize(ElementTheme.Dark, MonacoJsonContext.Relaxed.Options));
+    }
+
+    /// <summary>
+    /// Verifies round-trip serialization/deserialization of <c>ElementTheme</c> through
+    /// the source-generated context. The bridge sends ElementTheme as an integer and
+    /// JS decodes it via <c>{"0": "Default", "1": "Light", "2": "Dark"}</c> lookup.
+    /// </summary>
+    [Theory]
+    [InlineData(ElementTheme.Default, 0)]
+    [InlineData(ElementTheme.Light, 1)]
+    [InlineData(ElementTheme.Dark, 2)]
+    public void RoundTrip_ElementTheme(ElementTheme theme, int expectedNumericValue)
+    {
+        var json = JsonSerializer.Serialize(theme, MonacoJsonContext.Relaxed.Options);
+        Assert.Equal(expectedNumericValue.ToString(), json);
+
+        var restored = JsonSerializer.Deserialize<ElementTheme>(json, MonacoJsonContext.Default.Options);
+        Assert.Equal(theme, restored);
+    }
+
+    /// <summary>
+    /// Verifies that <c>ElementTheme</c> serializes correctly via the <c>MonacoJsonContext.Default</c>
+    /// context (not just Relaxed), proving the <c>[JsonSerializable(typeof(ElementTheme))]</c>
+    /// registration enables source-generated serialization without reflection fallback.
+    /// </summary>
+    [Fact]
+    public void ElementTheme_SourceGenContext_NoReflectionFallback()
+    {
+        // Use Default context (not Relaxed with FallbackOptions) to prove source-gen works
+        var json = JsonSerializer.Serialize(ElementTheme.Dark, MonacoJsonContext.Default.Options);
+        Assert.Equal("2", json);
+
+        // Also verify deserialization through Default context
+        var restored = JsonSerializer.Deserialize<ElementTheme>(json, MonacoJsonContext.Default.Options);
+        Assert.Equal(ElementTheme.Dark, restored);
+    }
+
+    #endregion
+
+    #region BuildInitialStateJson contract — fn-13.6 initial state push verification
+
+    /// <summary>
+    /// Verifies that an anonymous object with the same shape as <c>BuildInitialStateJson()</c>
+    /// produces valid JSON containing all 6 required <c>InitialState</c> properties:
+    /// <c>requestedTheme</c>, <c>themeName</c>, <c>isHighContrast</c>, <c>text</c>,
+    /// <c>language</c>, <c>readOnly</c>. This matches the JS <c>InitialState</c> interface
+    /// in <c>asyncCallbackHelpers.ts</c>.
+    /// </summary>
+    [Fact]
+    public void InitialState_JsonShape_ContainsAllRequiredProperties()
+    {
+        // Simulate BuildInitialStateJson() output shape
+        var initialState = new
+        {
+            requestedTheme = (int)ElementTheme.Dark,
+            themeName = "Dark",
+            isHighContrast = false,
+            text = "// hello world",
+            language = "javascript",
+            readOnly = false
+        };
+
+        var json = JsonSerializer.Serialize(initialState, MonacoJsonContext.FallbackOptions);
+        var doc = JsonDocument.Parse(json);
+
+        // Verify all 6 properties exist with correct camelCase names
+        Assert.True(doc.RootElement.TryGetProperty("requestedTheme", out var reqTheme));
+        Assert.Equal(2, reqTheme.GetInt32()); // Dark = 2
+
+        Assert.True(doc.RootElement.TryGetProperty("themeName", out var themeName));
+        Assert.Equal("Dark", themeName.GetString());
+
+        Assert.True(doc.RootElement.TryGetProperty("isHighContrast", out var isHc));
+        Assert.False(isHc.GetBoolean());
+
+        Assert.True(doc.RootElement.TryGetProperty("text", out var text));
+        Assert.Equal("// hello world", text.GetString());
+
+        Assert.True(doc.RootElement.TryGetProperty("language", out var lang));
+        Assert.Equal("javascript", lang.GetString());
+
+        Assert.True(doc.RootElement.TryGetProperty("readOnly", out var ro));
+        Assert.False(ro.GetBoolean());
+    }
+
+    /// <summary>
+    /// Verifies that the desktop init script embeds the initial state payload as a JSON
+    /// string literal argument for <c>createMonacoEditor</c>, and that it round-trips
+    /// back to the original JSON object when deserialized.
+    /// </summary>
+    [Fact]
+    public void InitialState_EmbeddedAsJsonStringLiteralInBootstrapScript()
+    {
+        var initialState = new
+        {
+            requestedTheme = (int)ElementTheme.Light,
+            themeName = "Light",
+            isHighContrast = false,
+            text = "console.log('hello');",
+            language = "javascript",
+            readOnly = true
+        };
+
+        var initialStateJson = JsonSerializer.Serialize(initialState, MonacoJsonContext.FallbackOptions);
+        var escapedState = JsonSerializer.Serialize(initialStateJson);
+        var script = CodeEditor.BuildCreateMonacoEditorScript(escapedState);
+
+        Assert.Contains("createMonacoEditor", script);
+        Assert.Contains(escapedState, script);
+
+        var recovered = JsonSerializer.Deserialize<string>(escapedState);
+        Assert.NotNull(recovered);
+        var doc = JsonDocument.Parse(recovered);
+        Assert.Equal(1, doc.RootElement.GetProperty("requestedTheme").GetInt32());
     }
 
     #endregion

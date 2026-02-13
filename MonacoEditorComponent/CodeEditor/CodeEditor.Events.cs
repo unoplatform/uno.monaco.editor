@@ -169,8 +169,8 @@ namespace Monaco
                 && ShouldInvokeDesktopBootstrap(_lifecycleState, _initialized, _desktopBootstrapInFlight))
             {
                 // Build initial state to push to JS -- eliminates async RPC round-trips.
-                var initialState = BuildInitialStateJson();
-                var escapedState = JsonSerializer.Serialize(initialState);
+                var initialStateJson = BuildInitialStateJson();
+                var escapedState = JsonSerializer.Serialize(initialStateJson);
                 StartDesktopBootstrap(desktopPresenter, escapedState, "WebView_NavigationCompleted");
 
                 return;
@@ -259,8 +259,8 @@ namespace Monaco
             }
 
             // Build initial state to push to JS -- eliminates async RPC round-trips.
-            var initialState = BuildInitialStateJson();
-            var escapedState = JsonSerializer.Serialize(initialState);
+            var initialStateJson = BuildInitialStateJson();
+            var escapedState = JsonSerializer.Serialize(initialStateJson);
             StartDesktopBootstrap(desktopPresenter, escapedState, "RebootstrapMonacoAsync");
         }
 
@@ -279,7 +279,7 @@ namespace Monaco
         {
             try
             {
-                await presenter.InvokeScriptAsync($"void createMonacoEditor(null, 'editor-container', '', {escapedState})");
+                await presenter.InvokeScriptAsync(BuildCreateMonacoEditorScript(escapedState));
                 DesktopCodeEditorPresenter.DiagnosticLog($"{source}: createMonacoEditor invoked on desktop");
             }
             catch (Exception ex)
@@ -289,6 +289,9 @@ namespace Monaco
                 InternalException?.Invoke(this, ex);
             }
         }
+
+        internal static string BuildCreateMonacoEditorScript(string escapedState)
+            => $"void createMonacoEditor(null, 'editor-container', '', {escapedState})";
 
         /// <summary>
         /// Timeout fallback: if CodeEditorLoaded never fires within 30 seconds
