@@ -106,130 +106,137 @@ namespace MonacoEditorTestApp
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(CodeContent))
+            try
             {
-                CodeContent = await FileIO.ReadTextAsync(await StorageFile.GetFileFromApplicationUriAsync(new System.Uri("ms-appx:///Content.txt")));
-
-
-                ButtonHighlightRange_Click(null, null);
-            }
-
-            // Ready for Code
-
-            var available_languages = await Editor.Languages.GetLanguagesAsync();
-            //Debugger.Break();
-
-            // Code Lens Action
-            var cmdId = await Editor.AddCommandAsync(0, async (args) =>
-            {
-                try
+                if (string.IsNullOrWhiteSpace(CodeContent))
                 {
-                    var md = new MessageDialog("You hit the CodeLens command " + args[0]?.ToString());
-                    WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
-                    await md.ShowAsync();
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e.Message);
-                }
-            });
+                    CodeContent = await FileIO.ReadTextAsync(await StorageFile.GetFileFromApplicationUriAsync(new System.Uri("ms-appx:///Content.txt")));
 
-            if (cmdId is not null)
-            {
-                await Editor.Languages.RegisterCodeLensProviderAsync("csharp", new EditorCodeLensProvider(cmdId));
-            }
 
-            await Editor.Languages.RegisterColorProviderAsync("csharp", new ColorProvider());
-
-            await Editor.Languages.RegisterCompletionItemProviderAsync("csharp", new LanguageProvider());
-
-            await Editor.Languages.RegisterHoverProviderAsync("csharp", new EditorHoverProvider());
-
-            _myCondition = await Editor.CreateContextKeyAsync("MyCondition", false);
-
-            await Editor.AddCommandAsync(KeyCode.F5, async (args) =>
-            {
-                var md = new MessageDialog("You Hit F5!");
-                WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
-                await md.ShowAsync();
-
-                // Turn off Command again.
-                _myCondition?.Reset();
-
-                // Refocus on CodeEditor
-                Editor.Focus(FocusState.Programmatic);
-            }, _myCondition.Key);
-
-            await Editor.AddCommandAsync(KeyMod.CtrlCmd | KeyCode.KEY_R, async (args) =>
-            {
-                if (Editor.GetModel() is { } model)
-                {
-                    var range = await model.GetFullModelRangeAsync();
-
-                    var md = new MessageDialog("Document Range: " + range?.ToString());
-                    WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
-                    await md.ShowAsync();
+                    ButtonHighlightRange_Click(null, null);
                 }
 
-                Editor.Focus(FocusState.Programmatic);
-            });
+                // Ready for Code
 
-            await Editor.AddCommandAsync(KeyMod.CtrlCmd | KeyCode.KEY_W, async (args) =>
-            {
-                if (Editor.GetModel() is { } model && await Editor.GetPositionAsync() is { } position)
+                var available_languages = await Editor.Languages.GetLanguagesAsync();
+                //Debugger.Break();
+
+                // Code Lens Action
+                var cmdId = await Editor.AddCommandAsync(0, async (args) =>
                 {
-                    var word = await model.GetWordAtPositionAsync(position);
-
-                    if (word == null)
+                    try
                     {
-                        var md = new MessageDialog("No Word Found.");
+                        var md = new MessageDialog("You hit the CodeLens command " + args[0]?.ToString());
                         WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
                         await md.ShowAsync();
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        var md = new MessageDialog("Word: " + word.Word + "[" + word.StartColumn + ", " + word.EndColumn + "]");
+                        Console.WriteLine(ex.Message);
+                    }
+                });
+
+                if (cmdId is not null)
+                {
+                    await Editor.Languages.RegisterCodeLensProviderAsync("csharp", new EditorCodeLensProvider(cmdId));
+                }
+
+                await Editor.Languages.RegisterColorProviderAsync("csharp", new ColorProvider());
+
+                await Editor.Languages.RegisterCompletionItemProviderAsync("csharp", new LanguageProvider());
+
+                await Editor.Languages.RegisterHoverProviderAsync("csharp", new EditorHoverProvider());
+
+                _myCondition = await Editor.CreateContextKeyAsync("MyCondition", false);
+
+                await Editor.AddCommandAsync(KeyCode.F5, async (args) =>
+                {
+                    var md = new MessageDialog("You Hit F5!");
+                    WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
+                    await md.ShowAsync();
+
+                    // Turn off Command again.
+                    _myCondition?.Reset();
+
+                    // Refocus on CodeEditor
+                    Editor.Focus(FocusState.Programmatic);
+                }, _myCondition.Key);
+
+                await Editor.AddCommandAsync(KeyMod.CtrlCmd | KeyCode.KEY_R, async (args) =>
+                {
+                    if (Editor.GetModel() is { } model)
+                    {
+                        var range = await model.GetFullModelRangeAsync();
+
+                        var md = new MessageDialog("Document Range: " + range?.ToString());
                         WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
                         await md.ShowAsync();
                     }
-                }
 
-                Editor.Focus(FocusState.Programmatic);
-            });
+                    Editor.Focus(FocusState.Programmatic);
+                });
 
-            await Editor.AddCommandAsync(KeyMod.CtrlCmd | KeyCode.KEY_L, async (args) =>
-            {
-                if (Editor.GetModel() is { } model
-                    && await Editor.GetPositionAsync() is { } position)
+                await Editor.AddCommandAsync(KeyMod.CtrlCmd | KeyCode.KEY_W, async (args) =>
                 {
-                    var line = await model.GetLineContentAsync(position.LineNumber);
-                    var lines = await model.GetLinesContentAsync();
-                    var count = await model.GetLineCountAsync();
+                    if (Editor.GetModel() is { } model && await Editor.GetPositionAsync() is { } position)
+                    {
+                        var word = await model.GetWordAtPositionAsync(position);
 
-                    var md = new MessageDialog("Current Line: " + line + "\nAll Lines [" + count + "]:\n" + string.Join("\n", lines));
-                    WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
-                    await md.ShowAsync();
-                }
+                        if (word == null)
+                        {
+                            var md = new MessageDialog("No Word Found.");
+                            WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
+                            await md.ShowAsync();
+                        }
+                        else
+                        {
+                            var md = new MessageDialog("Word: " + word.Word + "[" + word.StartColumn + ", " + word.EndColumn + "]");
+                            WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
+                            await md.ShowAsync();
+                        }
+                    }
 
-                Editor.Focus(FocusState.Programmatic);
-            });
+                    Editor.Focus(FocusState.Programmatic);
+                });
 
-            await Editor.AddCommandAsync(KeyMod.CtrlCmd | KeyCode.KEY_U, async (args) =>
-            {
-                if (Editor.GetModel() is { } model)
+                await Editor.AddCommandAsync(KeyMod.CtrlCmd | KeyCode.KEY_L, async (args) =>
                 {
-                    var range = new Monaco.Range(2, 10, 3, 8);
-                    var seg = await model.GetValueInRangeAsync(range);
+                    if (Editor.GetModel() is { } model
+                        && await Editor.GetPositionAsync() is { } position)
+                    {
+                        var line = await model.GetLineContentAsync(position.LineNumber);
+                        var lines = await model.GetLinesContentAsync();
+                        var count = await model.GetLineCountAsync();
 
-                    var md = new MessageDialog("Segment " + range.ToString() + ": " + seg);
-                    WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
-                    await md.ShowAsync();
-                }
+                        var md = new MessageDialog("Current Line: " + line + "\nAll Lines [" + count + "]:\n" + string.Join("\n", lines));
+                        WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
+                        await md.ShowAsync();
+                    }
 
-                Editor.Focus(FocusState.Programmatic);
-            });
+                    Editor.Focus(FocusState.Programmatic);
+                });
 
-            await Editor.AddActionAsync(new TestAction());
+                await Editor.AddCommandAsync(KeyMod.CtrlCmd | KeyCode.KEY_U, async (args) =>
+                {
+                    if (Editor.GetModel() is { } model)
+                    {
+                        var range = new Monaco.Range(2, 10, 3, 8);
+                        var seg = await model.GetValueInRangeAsync(range);
+
+                        var md = new MessageDialog("Segment " + range.ToString() + ": " + seg);
+                        WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
+                        await md.ShowAsync();
+                    }
+
+                    Editor.Focus(FocusState.Programmatic);
+                });
+
+                await Editor.AddActionAsync(new TestAction());
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Editor_Loading failed: {ex}");
+            }
         }
 
         private async void Editor_Loaded(object sender, RoutedEventArgs e)
@@ -654,6 +661,11 @@ namespace MonacoEditorTestApp
 
         private void ButtonSetSelectedText_Click(object sender, RoutedEventArgs e)
         {
+            if (Editor is null || !Editor.IsEditorLoaded)
+            {
+                return;
+            }
+
             Editor.SelectedText = "This is some Selected Text!";
         }
 

@@ -4,7 +4,13 @@ import { EditorContext } from './otherScriptsToBeOrganized';
 export const updateSelectedContent = function (element: any, content: string) {
     var editorContext = EditorContext.getEditorForElement(element);
 
-    let selection = editorContext.editor.getSelection()!;
+    let selection = editorContext.editor.getSelection();
+
+    // If no selection exists (no model) or the selection is collapsed (no text selected),
+    // return early — there is nothing to replace.
+    if (!selection || selection.isEmpty()) {
+        return;
+    }
 
     // Need to ignore updates from us notifying of a change
     if (content != editorContext.model.getValueInRange(selection)) {
