@@ -371,6 +371,18 @@ namespace Monaco
                 return;
             }
 
+            var hasHealthyDesktopPresenter = _view is DesktopCodeEditorPresenter desktopPresenter
+                && desktopPresenter.IsCoreWebView2Initialized;
+            if (ShouldPreserveDesktopPresenterOnDeferredUnload(IsLoaded, hasHealthyDesktopPresenter))
+            {
+                // Preserve healthy desktop presenters across temporary unloads (tab switches).
+                // Recreating WebView2/Monaco on every switch causes visible flicker and focus churn.
+                DesktopCodeEditorPresenter.DiagnosticLog("DeferredTeardown: preserving healthy desktop presenter across unload");
+                _unloadCts?.Dispose();
+                _unloadCts = null;
+                return;
+            }
+
             // Hard teardown: control was not reloaded within the grace period.
             DesktopCodeEditorPresenter.DiagnosticLog("DeferredTeardown: executing hard teardown");
 
@@ -391,6 +403,11 @@ namespace Monaco
             TeardownWebObjects();
             _model = null;
         }
+
+        internal static bool ShouldPreserveDesktopPresenterOnDeferredUnload(
+            bool isLoaded,
+            bool hasHealthyDesktopPresenter)
+            => !isLoaded && hasHealthyDesktopPresenter;
 
         /// <summary>
         /// Returns true when the existing desktop presenter is healthy and can be

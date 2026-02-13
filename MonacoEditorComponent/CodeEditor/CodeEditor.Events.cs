@@ -117,7 +117,9 @@ namespace Monaco
 
             try
             {
-                await ((ICodeEditorPresenter)sender).Launch();
+                var presenter = (ICodeEditorPresenter)sender;
+                await presenter.Launch();
+                presenter.Loaded -= WebView_DOMContentLoaded;
             }
             catch (Exception e)
             {

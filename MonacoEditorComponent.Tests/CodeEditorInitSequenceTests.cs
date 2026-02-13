@@ -97,4 +97,20 @@ public sealed class CodeEditorInitSequenceTests
         Assert.Contains("createMonacoEditor", script);
         Assert.Contains(escapedState, script);
     }
+
+    [Theory]
+    [InlineData(false, true, true)]
+    [InlineData(false, false, false)]
+    [InlineData(true, true, false)]
+    public void ShouldPreserveDesktopPresenterOnDeferredUnload_GuardsExpectedCases(
+        bool isLoaded,
+        bool hasHealthyDesktopPresenter,
+        bool expected)
+    {
+        var preserve = CodeEditor.ShouldPreserveDesktopPresenterOnDeferredUnload(
+            isLoaded,
+            hasHealthyDesktopPresenter);
+
+        Assert.Equal(expected, preserve);
+    }
 }
