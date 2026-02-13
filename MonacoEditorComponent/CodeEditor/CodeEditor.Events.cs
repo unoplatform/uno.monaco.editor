@@ -669,5 +669,11 @@ namespace Monaco
                 && initialized
                 && lifecycleState == EditorLifecycleState.Loaded
                 && hostIsFocused;
+
+        internal static bool ShouldStartDesktopLaunchOnControlLoaded(
+            bool isCoreWebView2Initialized,
+            EditorLifecycleState lifecycleState)
+            => !isCoreWebView2Initialized
+                && lifecycleState == EditorLifecycleState.Unloaded;
     }
 }

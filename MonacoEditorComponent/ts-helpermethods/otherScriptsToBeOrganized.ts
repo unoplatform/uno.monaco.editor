@@ -66,13 +66,17 @@ export class EditorContext {
 
 export const registerHoverProvider = function (unused: any, languageId: string) {
     return monaco.languages.registerHoverProvider(languageId, {
-        provideHover: function (model, position) {
+        provideHover: async function (model, position) {
             var element = EditorContext.getElementFromModel(model);
-            return callParentEventAsync(element, "HoverProvider" + languageId, [JSON.stringify(position)]).then(result => {
+            try {
+                const result = await callParentEventAsync(element, "HoverProvider" + languageId, [JSON.stringify(position)]);
                 if (result) {
                     return JSON.parse(result);
                 }
-            });
+            } catch (error) {
+                console.warn(`[registerHoverProvider] ${languageId} callback failed`, error);
+            }
+            return undefined;
         }
     });
 };

@@ -321,6 +321,18 @@ namespace Monaco
 
                 EmitSubscriptionDiagnostics("Loaded(init)");
             }
+
+            // Desktop WebView2 can remain unloaded when the host is collapsed while
+            // the editor is not ready. Ensure launch/bootstrap still starts from the
+            // control Loaded path so startup does not stall on a missing presenter Loaded event.
+            if (_view is DesktopCodeEditorPresenter desktopPresenter
+                && ShouldStartDesktopLaunchOnControlLoaded(
+                    desktopPresenter.IsCoreWebView2Initialized,
+                    _lifecycleState))
+            {
+                desktopPresenter.Loaded -= WebView_DOMContentLoaded;
+                WebView_DOMContentLoaded(desktopPresenter, new RoutedEventArgs());
+            }
         }
 
         private void OnWindowSizeChanged(object sender, WindowSizeChangedEventArgs e)

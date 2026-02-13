@@ -113,4 +113,21 @@ public sealed class CodeEditorInitSequenceTests
 
         Assert.Equal(expected, preserve);
     }
+
+    [Theory]
+    [InlineData(false, 0, true)]
+    [InlineData(true, 0, false)]
+    [InlineData(false, 1, false)]
+    [InlineData(false, 2, false)]
+    public void ShouldStartDesktopLaunchOnControlLoaded_GuardsExpectedCases(
+        bool isCoreWebView2Initialized,
+        int lifecycleState,
+        bool expected)
+    {
+        var shouldStart = CodeEditor.ShouldStartDesktopLaunchOnControlLoaded(
+            isCoreWebView2Initialized,
+            (EditorLifecycleState)lifecycleState);
+
+        Assert.Equal(expected, shouldStart);
+    }
 }

@@ -44,7 +44,8 @@ namespace Monaco
             _webView = new WebView2
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
-                VerticalAlignment = VerticalAlignment.Stretch
+                VerticalAlignment = VerticalAlignment.Stretch,
+                Visibility = Visibility.Collapsed
             };
 
             Content = _webView;
@@ -54,8 +55,7 @@ namespace Monaco
 
         internal void SetHostVisible(bool isVisible)
         {
-            _webView.Visibility = Visibility.Visible;
-            _webView.Opacity = isVisible ? 1d : 0d;
+            _webView.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
             _webView.IsHitTestVisible = isVisible;
         }
 

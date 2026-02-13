@@ -146,8 +146,6 @@ namespace MonacoEditorTestApp
 
                 await Editor.Languages.RegisterCompletionItemProviderAsync("csharp", new LanguageProvider());
 
-                await Editor.Languages.RegisterHoverProviderAsync("csharp", new EditorHoverProvider());
-
                 _myCondition = await Editor.CreateContextKeyAsync("MyCondition", false);
 
                 await Editor.AddCommandAsync(KeyCode.F5, async (args) =>
