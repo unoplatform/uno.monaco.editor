@@ -37,6 +37,7 @@ namespace Monaco
     {
         private bool _initialized;
         private bool _desktopBootstrapInFlight;
+        private bool _isControlLoadedForVisibility;
         private DispatcherQueue? _queue;
 
         private ICodeEditorPresenter? _view;
@@ -93,7 +94,7 @@ namespace Monaco
 
         private void UpdatePresenterVisibility()
         {
-            var isVisible = IsEditorLoaded;
+            var isVisible = IsEditorLoaded && _isControlLoadedForVisibility;
 
             if (_view is DesktopCodeEditorPresenter desktopPresenter)
             {
@@ -217,6 +218,9 @@ namespace Monaco
 
         private void CodeEditor_Loaded(object sender, RoutedEventArgs e)
         {
+            _isControlLoadedForVisibility = true;
+            UpdatePresenterVisibility();
+
             // If a deferred teardown is pending from a previous Unloaded event,
             // cancel it and skip teardown -- the control was reloaded (e.g., tab switch).
             if (_unloadCts is not null)
@@ -346,6 +350,8 @@ namespace Monaco
         private void CodeEditor_Unloaded(object sender, RoutedEventArgs e)
         {
             Unloaded -= CodeEditor_Unloaded;
+            _isControlLoadedForVisibility = false;
+            UpdatePresenterVisibility();
 
             // Note: Presenter event handlers (NavigationStarting, NavigationCompleted,
             // NewWindowRequested, Loaded) are NOT detached here. The presenter survives
@@ -402,7 +408,9 @@ namespace Monaco
             }
 
             var hasReusableDesktopPresenter = _view is DesktopCodeEditorPresenter desktopPresenter
-                && (desktopPresenter.IsCoreWebView2Initialized || desktopPresenter.IsLaunchInProgress);
+                && (desktopPresenter.IsCoreWebView2Initialized
+                    || desktopPresenter.IsLaunchInProgress
+                    || ReferenceEquals(_initializedPresenter, desktopPresenter));
             if (ShouldPreserveDesktopPresenterOnDeferredUnload(IsLoaded, hasReusableDesktopPresenter))
             {
                 // Preserve healthy desktop presenters across temporary unloads (tab switches).
@@ -450,7 +458,9 @@ namespace Monaco
         {
             if (_view is DesktopCodeEditorPresenter desktop)
             {
-                return desktop.IsCoreWebView2Initialized || desktop.IsLaunchInProgress;
+                return desktop.IsCoreWebView2Initialized
+                    || desktop.IsLaunchInProgress
+                    || ReferenceEquals(_initializedPresenter, desktop);
             }
 
             return false;
