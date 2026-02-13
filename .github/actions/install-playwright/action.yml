@@ -1,0 +1,23 @@
+name: "Install Playwright browsers"
+description: "Resolve Microsoft.Playwright from NuGet cache by exact version and install Chromium"
+
+inputs:
+  playwright-version:
+    description: "Exact Microsoft.Playwright package version (must match Directory.Packages.props)"
+    required: true
+
+runs:
+  using: "composite"
+
+  steps:
+  - name: Install Playwright browsers
+    shell: pwsh
+    run: |
+      $globalPkgs = (dotnet nuget locals global-packages --list | ForEach-Object { ($_ -split '\s+',2)[1].Trim() })
+      $pwPkgPath = Join-Path $globalPkgs "microsoft.playwright/${{ inputs.playwright-version }}"
+      if (-not (Test-Path $pwPkgPath)) { throw "Microsoft.Playwright ${{ inputs.playwright-version }} not found at $pwPkgPath" }
+      $env:PLAYWRIGHT_DRIVER_SEARCH_PATH = $pwPkgPath
+      "PLAYWRIGHT_DRIVER_SEARCH_PATH=$pwPkgPath" | Out-File -FilePath $env:GITHUB_ENV -Append
+      $scriptPath = Join-Path $pwPkgPath "build/playwright.ps1"
+      if (-not (Test-Path $scriptPath)) { throw "playwright.ps1 not found at $scriptPath" }
+      pwsh $scriptPath install --with-deps chromium

@@ -23,6 +23,7 @@ env:
   DOTNET_NOLOGO: 1
   NUGET_XMLDOC_MODE: skip
   ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
+  PLAYWRIGHT_VERSION: '1.58.0'
 
 # Required secrets for signing and publishing jobs:
 # - SIGN_AZURE_CLIENT_ID: Azure client ID for code signing
@@ -88,16 +89,9 @@ jobs:
         run: dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}"
 
       - name: Install Playwright browsers
-        shell: pwsh
-        run: |
-          $globalPkgs = (dotnet nuget locals global-packages --list | ForEach-Object { ($_ -split '\s+',2)[1].Trim() })
-          $pwPkg = Get-ChildItem (Join-Path $globalPkgs "microsoft.playwright") -Directory | Sort-Object Name -Descending | Select-Object -First 1
-          if (-not $pwPkg) { throw "Microsoft.Playwright not found in NuGet cache" }
-          $env:PLAYWRIGHT_DRIVER_SEARCH_PATH = $pwPkg.FullName
-          "PLAYWRIGHT_DRIVER_SEARCH_PATH=$($pwPkg.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
-          $scriptPath = Join-Path $pwPkg.FullName "build/playwright.ps1"
-          if (-not (Test-Path $scriptPath)) { throw "playwright.ps1 not found at $scriptPath" }
-          pwsh $scriptPath install --with-deps chromium
+        uses: ./.github/actions/install-playwright
+        with:
+          playwright-version: ${{ env.PLAYWRIGHT_VERSION }}
 
       - name: Run tests
         run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}" --no-build --coverage --coverage-output-format cobertura --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=DesktopCDP" --report-xunit --report-xunit-filename test-results.xml
@@ -165,16 +159,9 @@ jobs:
         run: dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-desktop -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}"
 
       - name: Install Playwright browsers
-        shell: pwsh
-        run: |
-          $globalPkgs = (dotnet nuget locals global-packages --list | ForEach-Object { ($_ -split '\s+',2)[1].Trim() })
-          $pwPkg = Get-ChildItem (Join-Path $globalPkgs "microsoft.playwright") -Directory | Sort-Object Name -Descending | Select-Object -First 1
-          if (-not $pwPkg) { throw "Microsoft.Playwright not found in NuGet cache" }
-          $env:PLAYWRIGHT_DRIVER_SEARCH_PATH = $pwPkg.FullName
-          "PLAYWRIGHT_DRIVER_SEARCH_PATH=$($pwPkg.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
-          $scriptPath = Join-Path $pwPkg.FullName "build/playwright.ps1"
-          if (-not (Test-Path $scriptPath)) { throw "playwright.ps1 not found at $scriptPath" }
-          pwsh $scriptPath install --with-deps chromium
+        uses: ./.github/actions/install-playwright
+        with:
+          playwright-version: ${{ env.PLAYWRIGHT_VERSION }}
 
       # Windows runners have WebView2 Runtime + Edge pre-installed and support CDP.
       # DesktopCDP tests are enabled here; WASM Playwright tests are covered by Ubuntu.
@@ -232,16 +219,9 @@ jobs:
         run: dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-desktop -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}"
 
       - name: Install Playwright browsers
-        shell: pwsh
-        run: |
-          $globalPkgs = (dotnet nuget locals global-packages --list | ForEach-Object { ($_ -split '\s+',2)[1].Trim() })
-          $pwPkg = Get-ChildItem (Join-Path $globalPkgs "microsoft.playwright") -Directory | Sort-Object Name -Descending | Select-Object -First 1
-          if (-not $pwPkg) { throw "Microsoft.Playwright not found in NuGet cache" }
-          $env:PLAYWRIGHT_DRIVER_SEARCH_PATH = $pwPkg.FullName
-          "PLAYWRIGHT_DRIVER_SEARCH_PATH=$($pwPkg.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
-          $scriptPath = Join-Path $pwPkg.FullName "build/playwright.ps1"
-          if (-not (Test-Path $scriptPath)) { throw "playwright.ps1 not found at $scriptPath" }
-          pwsh $scriptPath install --with-deps chromium
+        uses: ./.github/actions/install-playwright
+        with:
+          playwright-version: ${{ env.PLAYWRIGHT_VERSION }}
 
       # WASM Playwright tests are already covered by the ubuntu job.
       # macOS ARM validates builds + unit tests; exclude DesktopCDP (headless) and WasmPlaywright (slow startup on ARM).
