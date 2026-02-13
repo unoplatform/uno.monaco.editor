@@ -132,9 +132,8 @@ The user requires **comprehensive automated testing through the C# bridge** to v
 - [ ] Fixture includes reset helper for test independence (reset text, language, theme between tests)
 - [ ] Tests use fixture's cursor-based log API (added in task 8) for per-test stdout assertion scoping
 ## Done summary
-TBD
-
+Added 13 comprehensive C# bridge integration tests via Desktop CDP that verify the CodeEditor API works end-to-end through the JSON-RPC bridge: host-initiated properties, text/language roundtrip, AddCommandAsync/AddActionAsync callbacks, theme switching, syntax highlighting CSS, markers, decorations, code folding, ReadOnly toggle, HasGlyphMargin DOM verification, and SelectedText roundtrip. Includes test harness in EditorControl.xaml.cs with stdout-based callback verification and CdpTestAction helper.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: e5075c5, f288081, ff33d70, 8b45571, 048ffc0, 754e8da, 3601cec
+- Tests: dotnet build MonacoEditorComponent.slnx --no-restore, dotnet test --project tools/MonacoTypeEmitter.Tests/
 - PRs:
