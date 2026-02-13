@@ -28,9 +28,8 @@ Commit all changes from tasks 1-4, push to the branch, create or update the PR, 
 - [ ] Coverage Report job passes
 - [ ] `gh pr checks` shows all checks green
 ## Done summary
-TBD
-
+Committed remaining unstaged changes (serialization reflection fallback for desktop bridge), pushed to branch, and verified CI. Build (Ubuntu), Build (macOS ARM), and Coverage Report jobs pass. Desktop Tests (Windows) has a pre-existing DesktopAppFixture timeout failure (TEST_HARNESS_READY not appearing within 60s) that predates all fn-10 changes -- same failure observed on all prior commits since Desktop CDP tests were enabled (commit 02ad0e2). PR #38 is up to date.
 ## Evidence
-- Commits:
-- Tests:
-- PRs:
+- Commits: 5c9351f897ebe179e28d79caf56fbc236357e039
+- Tests: dotnet build MonacoEditorComponent.slnx --no-restore (0 warnings, 0 errors), dotnet test --project tools/MonacoTypeEmitter.Tests/ (24/24 passed), dotnet test --project MonacoEditorComponent.Tests/ --filter-not-trait Category=DesktopCDP --filter-not-trait Category=WasmPlaywright (182/182 passed)
+- PRs: https://github.com/unoplatform/uno.monaco.editor/pull/38
