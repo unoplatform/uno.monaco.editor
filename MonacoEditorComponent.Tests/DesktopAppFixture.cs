@@ -193,9 +193,10 @@ public sealed class DesktopAppFixture : IAsyncLifetime
                 const model = editor.getModel();
                 if (model) {
                     monaco.editor.setModelLanguage(model, 'javascript');
-                    // Clear markers
+                    // Clear markers (all known owners used by tests and harness)
                     monaco.editor.setModelMarkers(model, 'test', []);
                     monaco.editor.setModelMarkers(model, 'CodeEditor', []);
+                    monaco.editor.setModelMarkers(model, 'testHarness', []);
                 }
                 // Reset theme
                 monaco.editor.setTheme('vs');

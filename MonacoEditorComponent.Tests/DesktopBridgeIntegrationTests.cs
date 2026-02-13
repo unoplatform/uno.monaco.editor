@@ -54,6 +54,11 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
         _currentTestName = nameof(HostInitiatedProperties_SetFromCSharp);
         try
         {
+            // Reset to known state for test independence. ResetEditorStateAsync
+            // restores text="// test-init-text" and lang="javascript" which matches
+            // the startup harness values, so the assertions below remain valid.
+            await _fixture.ResetEditorStateAsync();
+
             // The test harness in EditorControl.xaml.cs sets Text and CodeLanguage
             // from C# in the EditorLoaded handler, then emits a TEST_INIT_PROPS marker.
             // Search from cursor 0 because this is a one-time startup marker.
@@ -103,7 +108,7 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
             // Set text via the bridge (parentAccessor/setValue) which invokes C# OnSetValue.
             await _fixture.Page.EvaluateAsync("""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'Text', value: '"bridge-driven text"' })
+                    { name: 'Text', value: 'bridge-driven text' })
                 """);
 
             // Wait deterministically for the C# property change to propagate back to Monaco.
@@ -144,7 +149,7 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
             // Switch language via bridge notification.
             await _fixture.Page.EvaluateAsync("""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'CodeLanguage', value: '"xml"' })
+                    { name: 'CodeLanguage', value: 'xml' })
                 """);
 
             // Wait deterministically for C# side to accept the change.
@@ -178,6 +183,8 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
         _currentTestName = nameof(CustomLanguage_RegisterAndVerifyAvailable);
         try
         {
+            await _fixture.ResetEditorStateAsync();
+
             // The C# test harness in EditorControl.xaml.cs calls
             // Editor.Languages.RegisterAsync({ Id = "test-csproj-lang" })
             // at startup via the C# LanguagesHelper API. Verify the stdout marker
@@ -199,7 +206,7 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
             // Switch the editor to the custom language via bridge and verify C# accepted it.
             await _fixture.Page.EvaluateAsync("""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'CodeLanguage', value: '"test-csproj-lang"' })
+                    { name: 'CodeLanguage', value: 'test-csproj-lang' })
                 """);
 
             await _fixture.Page.WaitForFunctionAsync("""
@@ -227,6 +234,8 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
         _currentTestName = nameof(AddCommandAsync_CallbackFires);
         try
         {
+            await _fixture.ResetEditorStateAsync();
+
             // Parse the command ID from the TEST_HARNESS startup line (cursor 0).
             var harnessLine = await _fixture.WaitForLogLineAfterAsync(
                 0, @"TEST_HARNESS:commandId=", 30_000);
@@ -275,6 +284,8 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
         _currentTestName = nameof(AddActionAsync_CallbackFires);
         try
         {
+            await _fixture.ResetEditorStateAsync();
+
             // Parse the action ID from the TEST_HARNESS startup line (cursor 0).
             var harnessLine = await _fixture.WaitForLogLineAfterAsync(
                 0, @"TEST_HARNESS:commandId=", 30_000);
@@ -386,13 +397,13 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
             // Set language via bridge (CodeLanguage DP).
             await _fixture.Page.EvaluateAsync("""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'CodeLanguage', value: '"javascript"' })
+                    { name: 'CodeLanguage', value: 'javascript' })
                 """);
 
             // Set code with keywords via bridge (Text DP).
             await _fixture.Page.EvaluateAsync("""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'Text', value: '"function hello() { return 42; }"' })
+                    { name: 'Text', value: 'function hello() { return 42; }' })
                 """);
 
             // Wait deterministically for bridge propagation and tokenization.
@@ -444,7 +455,7 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
             // Set text via bridge so preconditions flow through the bridge path.
             await _fixture.Page.EvaluateAsync("""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'Text', value: '"let x = 1;\\nlet y = 2;"' })
+                    { name: 'Text', value: 'let x = 1;\\nlet y = 2;' })
                 """);
 
             await _fixture.Page.WaitForFunctionAsync(
@@ -517,7 +528,7 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
             // Set text via the C# bridge so preconditions flow through the bridge path.
             await _fixture.Page.EvaluateAsync("""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'Text', value: '"Line 1\\nLine 2\\nLine 3"' })
+                    { name: 'Text', value: 'Line 1\\nLine 2\\nLine 3' })
                 """);
 
             await _fixture.Page.WaitForFunctionAsync(
@@ -574,14 +585,14 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
             // Set language via bridge (CodeLanguage DP).
             await _fixture.Page.EvaluateAsync("""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'CodeLanguage', value: '"javascript"' })
+                    { name: 'CodeLanguage', value: 'javascript' })
                 """);
 
             // Set foldable content via bridge (Text DP).
             var foldableCode = "function foo() {\\n  const x = 1;\\n  const y = 2;\\n  return x + y;\\n}\\n\\nfunction bar() {\\n  return 42;\\n}";
             await _fixture.Page.EvaluateAsync($$"""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'Text', value: '"{{foldableCode}}"' })
+                    { name: 'Text', value: '{{foldableCode}}' })
                 """);
 
             // Wait deterministically for the text to propagate.
@@ -657,7 +668,7 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
             // Set ReadOnly = true via the bridge notification.
             await _fixture.Page.EvaluateAsync("""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'ReadOnly', value: '"True"' })
+                    { name: 'ReadOnly', value: 'True' })
                 """);
 
             // Wait deterministically for the readOnly option to propagate.
@@ -673,7 +684,7 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
             // Reset: set ReadOnly = false.
             await _fixture.Page.EvaluateAsync("""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'ReadOnly', value: '"False"' })
+                    { name: 'ReadOnly', value: 'False' })
                 """);
 
             // Wait deterministically for the readOnly option to propagate.
@@ -721,7 +732,7 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
             // Disable glyph margin via bridge.
             await _fixture.Page.EvaluateAsync("""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'HasGlyphMargin', value: '"False"' })
+                    { name: 'HasGlyphMargin', value: 'False' })
                 """);
 
             // Wait deterministically for the glyphMargin option to propagate.
@@ -737,7 +748,7 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
             // Restore glyph margin.
             await _fixture.Page.EvaluateAsync("""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'HasGlyphMargin', value: '"True"' })
+                    { name: 'HasGlyphMargin', value: 'True' })
                 """);
         }
         catch
@@ -763,7 +774,7 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
             // Set known text content via bridge.
             await _fixture.Page.EvaluateAsync("""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'Text', value: '"Hello World Test Content"' })
+                    { name: 'Text', value: 'Hello World Test Content' })
                 """);
 
             await _fixture.Page.WaitForFunctionAsync(
@@ -806,7 +817,7 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
             // Now set SelectedText from C# side via bridge and verify it takes effect.
             await _fixture.Page.EvaluateAsync("""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'SelectedText', value: '"Replaced"' })
+                    { name: 'SelectedText', value: 'Replaced' })
                 """);
 
             // Wait deterministically for the replacement to take effect.
