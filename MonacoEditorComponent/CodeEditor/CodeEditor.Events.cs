@@ -165,50 +165,20 @@ namespace Monaco
             // Idempotency guard: only invoke createMonacoEditor when lifecycle is Loading
             // (set by InitialiseWebObjects) and the editor has not yet been initialized.
             // This prevents duplicate bootstrap on repeated navigations or WebView reloads.
-            if (_view is DesktopCodeEditorPresenter
-                && _lifecycleState == EditorLifecycleState.Loading
-                && !_initialized)
+            if (_view is DesktopCodeEditorPresenter desktopPresenter
+                && ShouldInvokeDesktopBootstrap(_lifecycleState, _initialized, _desktopBootstrapInFlight))
             {
-                // Fire-and-forget: createMonacoEditor() calls JSON-RPC back to C#
-                // (getJsonValueAsync, getCurrentThemeNameAsync, etc.) which needs
-                // DispatcherQueue.EnqueueAsync on the UI thread. Awaiting
-                // InvokeScriptAsync here would deadlock because the UI thread is
-                // blocked waiting for ExecuteScriptAsync to complete while JS is
-                // trying to call back into C#. The "Loaded" callback fires
-                // asynchronously when init completes.
-                // ContinueWith preserves error handling that would be lost with
-                // a bare fire-and-forget (_ = ...).
                 // Build initial state to push to JS -- eliminates async RPC round-trips.
                 var initialState = BuildInitialStateJson();
                 var escapedState = JsonSerializer.Serialize(initialState);
-
-                DesktopCodeEditorPresenter.DiagnosticLog("WebView_NavigationCompleted: invoking createMonacoEditor (fire-and-forget)...");
-                _ = _view.InvokeScriptAsync($"void createMonacoEditor(null, 'editor-container', '', {escapedState})")
-                    .ContinueWith(t =>
-                    {
-                        if (t.IsFaulted)
-                        {
-                            DesktopCodeEditorPresenter.DiagnosticLog(
-                                $"WebView_NavigationCompleted: createMonacoEditor failed: {t.Exception}");
-                            InternalException?.Invoke(this, t.Exception!.InnerException ?? t.Exception);
-                        }
-                        else
-                        {
-                            DesktopCodeEditorPresenter.DiagnosticLog(
-                                "WebView_NavigationCompleted: createMonacoEditor invoked on desktop");
-                        }
-                    }, TaskScheduler.FromCurrentSynchronizationContext());
-
-                // Timeout fallback: if CodeEditorLoaded never fires (script failure,
-                // Monaco crash, etc.), surface a diagnostic error after 30 seconds.
-                _ = MonitorInitTimeoutAsync();
+                StartDesktopBootstrap(desktopPresenter, escapedState, "WebView_NavigationCompleted");
 
                 return;
             }
             else
             {
                 DesktopCodeEditorPresenter.DiagnosticLog(
-                    $"WebView_NavigationCompleted: skipped createMonacoEditor (guard failed)");
+                    $"WebView_NavigationCompleted: skipped createMonacoEditor (guard failed, bootstrapInFlight={_desktopBootstrapInFlight})");
             }
 
             // WASM path: NavigationCompleted does not fire on WASM (BrowserHtmlElement
@@ -265,7 +235,7 @@ namespace Monaco
                 readOnly
             }, MonacoJsonContext.FallbackOptions);
 
-            Debug.WriteLine($"BuildInitialStateJson: {json}");
+            DesktopCodeEditorPresenter.DiagnosticLog($"BuildInitialStateJson: {json}");
             return json;
         }
 
@@ -282,31 +252,42 @@ namespace Monaco
                 return;
             }
 
+            if (_desktopBootstrapInFlight)
+            {
+                DesktopCodeEditorPresenter.DiagnosticLog("RebootstrapMonacoAsync: skipped (bootstrap already in-flight)");
+                return;
+            }
+
             // Build initial state to push to JS -- eliminates async RPC round-trips.
             var initialState = BuildInitialStateJson();
             var escapedState = JsonSerializer.Serialize(initialState);
+            StartDesktopBootstrap(desktopPresenter, escapedState, "RebootstrapMonacoAsync");
+        }
 
-            // Fire-and-forget with ContinueWith for the same deadlock avoidance
-            // as WebView_NavigationCompleted — createMonacoEditor calls back to C#
-            // via JSON-RPC which needs the UI thread.
-            DesktopCodeEditorPresenter.DiagnosticLog("RebootstrapMonacoAsync: invoking createMonacoEditor (fire-and-forget)...");
-            _ = desktopPresenter.InvokeScriptAsync($"void createMonacoEditor(null, 'editor-container', '', {escapedState})")
-                .ContinueWith(t =>
-                {
-                    if (t.IsFaulted)
-                    {
-                        DesktopCodeEditorPresenter.DiagnosticLog(
-                            $"RebootstrapMonacoAsync: createMonacoEditor failed: {t.Exception}");
-                        InternalException?.Invoke(this, t.Exception!.InnerException ?? t.Exception);
-                    }
-                    else
-                    {
-                        DesktopCodeEditorPresenter.DiagnosticLog("RebootstrapMonacoAsync: createMonacoEditor invoked");
-                    }
-                }, TaskScheduler.FromCurrentSynchronizationContext());
+        private void StartDesktopBootstrap(ICodeEditorPresenter presenter, string escapedState, string source)
+        {
+            _desktopBootstrapInFlight = true;
+            DesktopCodeEditorPresenter.DiagnosticLog($"{source}: invoking createMonacoEditor (fire-and-forget)...");
+            _ = InvokeDesktopBootstrapAsync(presenter, escapedState, source);
 
-            // Timeout fallback for re-bootstrap path too.
+            // Timeout fallback: if CodeEditorLoaded never fires (script failure,
+            // Monaco crash, etc.), surface a diagnostic error after 30 seconds.
             _ = MonitorInitTimeoutAsync();
+        }
+
+        private async Task InvokeDesktopBootstrapAsync(ICodeEditorPresenter presenter, string escapedState, string source)
+        {
+            try
+            {
+                await presenter.InvokeScriptAsync($"void createMonacoEditor(null, 'editor-container', '', {escapedState})");
+                DesktopCodeEditorPresenter.DiagnosticLog($"{source}: createMonacoEditor invoked on desktop");
+            }
+            catch (Exception ex)
+            {
+                _desktopBootstrapInFlight = false;
+                DesktopCodeEditorPresenter.DiagnosticLog($"{source}: createMonacoEditor failed: {ex}");
+                InternalException?.Invoke(this, ex);
+            }
         }
 
         /// <summary>
@@ -324,6 +305,7 @@ namespace Monaco
             // Only report if we're still stuck in Loading (not yet Loaded or Unloaded).
             if (_lifecycleState == EditorLifecycleState.Loading && startState == EditorLifecycleState.Loading)
             {
+                _desktopBootstrapInFlight = false;
                 var msg = $"Monaco editor initialization timed out after {timeoutMs}ms. " +
                     "CodeEditorLoaded callback was never received. Check browser console for errors.";
                 DesktopCodeEditorPresenter.DiagnosticLog($"INIT_TIMEOUT: {msg}");
@@ -407,6 +389,7 @@ namespace Monaco
             _keyboardListener = null;
             _debugLogger = null;
             _initializedPresenter = null;
+            _desktopBootstrapInFlight = false;
 
             // Reset lifecycle state on teardown via transition method
             TransitionLifecycle(EditorLifecycleState.Unloaded);
@@ -495,6 +478,7 @@ namespace Monaco
             // ParentAccessor.CallAction("Loaded") which can be queued/delayed.
             if (!IsLoaded || _lifecycleState != EditorLifecycleState.Loading)
             {
+                _desktopBootstrapInFlight = false;
                 Debug.WriteLine($"CodeEditorLoaded: ignoring (IsLoaded={IsLoaded}, state={_lifecycleState})");
                 return;
             }
@@ -519,6 +503,7 @@ namespace Monaco
             // Use lifecycle state machine for exactly-once semantics.
             // Transition BEFORE focus to prevent focus ping-pong during init.
             TransitionLifecycle(EditorLifecycleState.Loaded);
+            _desktopBootstrapInFlight = false;
 
             // Defer focus until after init is fully complete to avoid focus ping-pong.
             // Only focus if this CodeEditor is the currently focused element.
@@ -649,12 +634,35 @@ namespace Monaco
             base.OnGotFocus(e);
 
 #pragma warning disable CS0618 // Type or member is obsolete
-            if (_view != null && FocusManager.GetFocusedElement() == this)
+            var presenter = _view;
+            if (ShouldForwardPresenterFocus(
+                presenter,
+                _initialized,
+                _lifecycleState,
+                FocusManager.GetFocusedElement() == this))
             {
                 // Forward Focus onto our inner WebView
-                _view.Focus(FocusState.Programmatic);
+                presenter!.Focus(FocusState.Programmatic);
             }
 #pragma warning restore CS0618 // Type or member is obsolete
         }
+
+        internal static bool ShouldInvokeDesktopBootstrap(
+            EditorLifecycleState lifecycleState,
+            bool initialized,
+            bool bootstrapInFlight)
+            => lifecycleState == EditorLifecycleState.Loading
+                && !initialized
+                && !bootstrapInFlight;
+
+        internal static bool ShouldForwardPresenterFocus(
+            ICodeEditorPresenter? view,
+            bool initialized,
+            EditorLifecycleState lifecycleState,
+            bool hostIsFocused)
+            => view != null
+                && initialized
+                && lifecycleState == EditorLifecycleState.Loaded
+                && hostIsFocused;
     }
 }

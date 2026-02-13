@@ -131,6 +131,26 @@ function registerDesktopHandlers(editorContext: EditorContext): Disposable[] {
     return disposables;
 }
 
+function cleanupEditorRuntimeState(editorContext: EditorContext): void {
+    const resizeObserver = (editorContext as any)._resizeObserver as ResizeObserver | undefined;
+    if (resizeObserver) {
+        resizeObserver.disconnect();
+        (editorContext as any)._resizeObserver = undefined;
+    }
+
+    const disposables = (editorContext as any)._rpcHandlerDisposables as Disposable[] | undefined;
+    if (disposables) {
+        for (const d of disposables) {
+            d.dispose();
+        }
+        (editorContext as any)._rpcHandlerDisposables = undefined;
+    }
+
+    if (editorContext.editor) {
+        editorContext.editor.dispose();
+    }
+}
+
 /**
  * Initial state pushed from C# on desktop to eliminate async RPC round-trips.
  * When provided, JS uses these values directly instead of calling back to C#.
@@ -151,6 +171,14 @@ interface InitialState {
  * On WASM (or desktop without initialState), property reads use the existing paths.
  */
 export const initializeMonacoEditor = async (managedOwner: any, element: any, initialState?: InitialState) => {
+    // Re-init guard: when createMonacoEditor is invoked repeatedly for the same element,
+    // tear down previous editor/runtime hooks first to avoid duplicated handlers and
+    // leaked editor instances during async lifecycle races.
+    const existingContext = EditorContext.tryGetEditorForElement(element);
+    if (existingContext?.editor) {
+        cleanupEditorRuntimeState(existingContext);
+    }
+
     // When initial state is provided, pass theme + language + readOnly to monaco.editor.create()
     // so the editor renders correctly from the first frame.
     var opt: any = {};
@@ -268,7 +296,10 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any, in
 
     // Register C#->JS JSON-RPC handlers on desktop; track disposables for cleanup
     if (_isDesktop) {
-        retainConnection();
+        if (!(editorContext as any)._connectionRetained) {
+            retainConnection();
+            (editorContext as any)._connectionRetained = true;
+        }
         const handlerDisposables = registerDesktopHandlers(editorContext);
         // Store disposables on context for deterministic teardown
         (editorContext as any)._rpcHandlerDisposables = handlerDisposables;
@@ -286,33 +317,15 @@ export const disposeEditor = (element: any) => {
     const editorContext = EditorContext.tryGetEditorForElement(element);
     if (!editorContext) return;
 
-    // Disconnect the ResizeObserver
-    const resizeObserver = (editorContext as any)._resizeObserver as ResizeObserver | undefined;
-    if (resizeObserver) {
-        resizeObserver.disconnect();
-        (editorContext as any)._resizeObserver = undefined;
-    }
-
-    // Dispose tracked RPC handler registrations
-    const disposables = (editorContext as any)._rpcHandlerDisposables as Disposable[] | undefined;
-    if (disposables) {
-        for (const d of disposables) {
-            d.dispose();
-        }
-        (editorContext as any)._rpcHandlerDisposables = undefined;
-    }
-
-    // Dispose the Monaco editor instance (releases DOM, workers, etc.)
-    if (editorContext.editor) {
-        editorContext.editor.dispose();
-    }
+    cleanupEditorRuntimeState(editorContext);
 
     // Remove from context map
     EditorContext.removeEditorForElement(element);
 
     // Release the connection reference on desktop (disposes only when last editor releases)
-    if (_isDesktop && editorContext.Accessor) {
+    if (_isDesktop && (editorContext as any)._connectionRetained && editorContext.Accessor) {
         editorContext.Accessor.close();
+        (editorContext as any)._connectionRetained = false;
     }
 };
 

@@ -38,6 +38,48 @@ public sealed class IsNavigationAllowedTests
     }
 
     [Fact]
+    public void BuildVirtualHostEditorUri_UsesHttpEditorPath()
+    {
+        var uri = DesktopCodeEditorPresenter.BuildVirtualHostEditorUri();
+        Assert.Equal("http", uri.Scheme);
+        Assert.Equal(DesktopCodeEditorPresenter.AllowedVirtualHost, uri.Host);
+        Assert.Equal("/editor.html", uri.AbsolutePath);
+    }
+
+    [Fact]
+    public void ShouldFallbackToFileNavigation_FailedVirtualHostWithRoot_Allowed()
+    {
+        var source = new global::System.Uri($"http://{DesktopCodeEditorPresenter.AllowedVirtualHost}/editor.html");
+        Assert.True(DesktopCodeEditorPresenter.ShouldFallbackToFileNavigation(
+            isSuccess: false,
+            currentSource: source,
+            fallbackAttempted: false,
+            allowedFileContentRoot: Path.GetTempPath()));
+    }
+
+    [Fact]
+    public void ShouldFallbackToFileNavigation_Success_NoFallback()
+    {
+        var source = new global::System.Uri($"http://{DesktopCodeEditorPresenter.AllowedVirtualHost}/editor.html");
+        Assert.False(DesktopCodeEditorPresenter.ShouldFallbackToFileNavigation(
+            isSuccess: true,
+            currentSource: source,
+            fallbackAttempted: false,
+            allowedFileContentRoot: Path.GetTempPath()));
+    }
+
+    [Fact]
+    public void ShouldFallbackToFileNavigation_AlreadyAttempted_NoFallback()
+    {
+        var source = new global::System.Uri($"http://{DesktopCodeEditorPresenter.AllowedVirtualHost}/editor.html");
+        Assert.False(DesktopCodeEditorPresenter.ShouldFallbackToFileNavigation(
+            isSuccess: false,
+            currentSource: source,
+            fallbackAttempted: true,
+            allowedFileContentRoot: Path.GetTempPath()));
+    }
+
+    [Fact]
     public void AllowedVirtualHost_WithPath_Allowed()
     {
         var uri = $"https://{DesktopCodeEditorPresenter.AllowedVirtualHost}/subdir/page.html";

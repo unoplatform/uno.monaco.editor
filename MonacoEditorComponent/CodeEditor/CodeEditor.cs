@@ -36,6 +36,7 @@ namespace Monaco
     public sealed partial class CodeEditor : Control, INotifyPropertyChanged, IDisposable
     {
         private bool _initialized;
+        private bool _desktopBootstrapInFlight;
         private DispatcherQueue? _queue;
 
         private ICodeEditorPresenter? _view;

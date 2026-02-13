@@ -27,6 +27,8 @@ namespace Monaco
         private bool _isCoreWebView2Initialized;
         private WebView2JsonRpcMessageHandler? _messageHandler;
         private JsonRpc? _jsonRpc;
+        private string? _desktopContentRoot;
+        private bool _fileFallbackAttempted;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DesktopCodeEditorPresenter"/> class.
@@ -428,6 +430,16 @@ namespace Monaco
         {
             Debug.WriteLine($"DesktopCodeEditorPresenter: NavigationCompleted (IsSuccess={args.IsSuccess})");
 
+            if (ShouldFallbackToFileNavigation(args.IsSuccess, _webView.Source, _fileFallbackAttempted, AllowedFileContentRoot)
+                && _desktopContentRoot is { } contentRoot)
+            {
+                _fileFallbackAttempted = true;
+                var fallbackUri = BuildFileEditorUri(contentRoot);
+                Debug.WriteLine($"DesktopCodeEditorPresenter: Virtual host navigation failed, retrying with {fallbackUri}");
+                _webView.Source = fallbackUri;
+                return;
+            }
+
             NavigationCompleted?.Invoke(this, new PresenterNavigationCompletedEventArgs
             {
                 IsSuccess = args.IsSuccess
@@ -504,8 +516,34 @@ namespace Monaco
         /// Attempts virtual host mapping first; falls back to <c>file://</c> navigation
         /// which works reliably on all WebView2 implementations.
         /// </summary>
+        internal static global::System.Uri BuildVirtualHostEditorUri()
+            => new($"http://{AllowedVirtualHost}/editor.html");
+
+        internal static global::System.Uri BuildFileEditorUri(string contentRoot)
+            => new(Path.Combine(contentRoot, "editor.html"));
+
+        internal static bool ShouldFallbackToFileNavigation(
+            bool isSuccess,
+            global::System.Uri? currentSource,
+            bool fallbackAttempted,
+            string? allowedFileContentRoot)
+        {
+            if (isSuccess || fallbackAttempted || string.IsNullOrEmpty(allowedFileContentRoot) || currentSource is null)
+            {
+                return false;
+            }
+
+            return (string.Equals(currentSource.Scheme, "http", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(currentSource.Scheme, "https", StringComparison.OrdinalIgnoreCase))
+                && string.Equals(currentSource.Host, AllowedVirtualHost, StringComparison.OrdinalIgnoreCase)
+                && currentSource.IsDefaultPort;
+        }
+
         private void NavigateToEditorPage(string contentRoot)
         {
+            _desktopContentRoot = contentRoot;
+            _fileFallbackAttempted = false;
+
             // Try virtual host mapping (CoreWebView2 API, may not be available on X11/WebKitGTK)
             bool virtualHostAvailable = false;
             try
@@ -527,13 +565,14 @@ namespace Monaco
             global::System.Uri editorUri;
             if (virtualHostAvailable)
             {
-                editorUri = new global::System.Uri($"http://{AllowedVirtualHost}/editor.html");
+                editorUri = BuildVirtualHostEditorUri();
             }
             else
             {
                 // file:// works reliably on all WebView2 backends (Edge, WebKitGTK, WKWebView).
                 // editor.html uses classic scripts (no ES modules) specifically for file:// compat.
-                editorUri = new global::System.Uri(Path.Combine(contentRoot, "editor.html"));
+                _fileFallbackAttempted = true;
+                editorUri = BuildFileEditorUri(contentRoot);
             }
 
             _webView.Source = editorUri;
@@ -606,7 +645,7 @@ namespace Monaco
             // CreateBridgeTargets is called from InitialiseWebObjects which runs on
             // the UI thread, so SynchronizationContext.Current is the UI context.
             _jsonRpc.SynchronizationContext = SynchronizationContext.Current;
-            Debug.WriteLine($"DesktopCodeEditorPresenter: JsonRpc.SynchronizationContext set (non-null={SynchronizationContext.Current is not null})");
+            DiagnosticLog($"DesktopCodeEditorPresenter: JsonRpc.SynchronizationContext set (non-null={SynchronizationContext.Current is not null})");
 
             // Register the initialization handshake targets directly on the presenter.
             // StartListening is deferred to CreateBridgeTargets after all targets are registered.
