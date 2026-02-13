@@ -11,12 +11,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="xunit.v3.mtp-v2" />
-		<!-- Playwright runtime is referenced for Task 8 integration tests.
-		     Build/buildTransitive assets are excluded to prevent the Playwright targets
-		     from copying node driver files into a subdirectory that conflicts with the
-		     exe output file on macOS/Linux (UseArtifactsOutput + OutputType=Exe).
-		     CI installs the Playwright driver post-build via a dedicated step. -->
-		<PackageReference Include="Microsoft.Playwright" IncludeAssets="compile;runtime" PrivateAssets="contentFiles;build;buildTransitive;analyzers;native" />
+		<PackageReference Include="Microsoft.Playwright.Xunit.v3" />
 		<PackageReference Include="StreamJsonRpc" />
 		<PackageReference Include="Nerdbank.Streams" />
 		<PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" PrivateAssets="all" />
