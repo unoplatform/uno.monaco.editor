@@ -20,4 +20,14 @@ runs:
       "PLAYWRIGHT_DRIVER_SEARCH_PATH=$pwPkgPath" | Out-File -FilePath $env:GITHUB_ENV -Append
       $scriptPath = Join-Path $pwPkgPath "build/playwright.ps1"
       if (-not (Test-Path $scriptPath)) { throw "playwright.ps1 not found at $scriptPath" }
+      # The NuGet package keeps Microsoft.Playwright.dll in lib/netstandard2.0 but
+      # build/playwright.ps1 expects it next to itself. Copy the DLL so the script
+      # can load the Playwright driver without relying on MSBuild build targets
+      # (which are excluded via ExcludeAssets to avoid UseArtifactsOutput conflicts).
+      $dllSrc = Join-Path $pwPkgPath "lib/netstandard2.0/Microsoft.Playwright.dll"
+      $dllDst = Join-Path $pwPkgPath "build/Microsoft.Playwright.dll"
+      if ((Test-Path $dllSrc) -and -not (Test-Path $dllDst)) {
+        Copy-Item $dllSrc $dllDst
+        Write-Host "Copied Microsoft.Playwright.dll into build/ for playwright.ps1"
+      }
       pwsh $scriptPath install --with-deps chromium
