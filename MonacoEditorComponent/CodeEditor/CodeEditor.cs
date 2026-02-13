@@ -328,6 +328,7 @@ namespace Monaco
             if (_view is DesktopCodeEditorPresenter desktopPresenter
                 && ShouldStartDesktopLaunchOnControlLoaded(
                     desktopPresenter.IsCoreWebView2Initialized,
+                    desktopPresenter.IsLaunchInProgress,
                     _lifecycleState))
             {
                 desktopPresenter.Loaded -= WebView_DOMContentLoaded;
@@ -400,9 +401,9 @@ namespace Monaco
                 return;
             }
 
-            var hasHealthyDesktopPresenter = _view is DesktopCodeEditorPresenter desktopPresenter
-                && desktopPresenter.IsCoreWebView2Initialized;
-            if (ShouldPreserveDesktopPresenterOnDeferredUnload(IsLoaded, hasHealthyDesktopPresenter))
+            var hasReusableDesktopPresenter = _view is DesktopCodeEditorPresenter desktopPresenter
+                && (desktopPresenter.IsCoreWebView2Initialized || desktopPresenter.IsLaunchInProgress);
+            if (ShouldPreserveDesktopPresenterOnDeferredUnload(IsLoaded, hasReusableDesktopPresenter))
             {
                 // Preserve healthy desktop presenters across temporary unloads (tab switches).
                 // Recreating WebView2/Monaco on every switch causes visible flicker and focus churn.
@@ -435,13 +436,13 @@ namespace Monaco
 
         internal static bool ShouldPreserveDesktopPresenterOnDeferredUnload(
             bool isLoaded,
-            bool hasHealthyDesktopPresenter)
-            => !isLoaded && hasHealthyDesktopPresenter;
+            bool hasReusableDesktopPresenter)
+            => !isLoaded && hasReusableDesktopPresenter;
 
         /// <summary>
         /// Returns true when the existing desktop presenter is healthy and can be
         /// reused across unload/load cycles (e.g., tab switches). A healthy presenter
-        /// has CoreWebView2 initialized and is not disposed.
+        /// has CoreWebView2 initialized (or is actively initializing) and is not disposed.
         /// WASM presenters are always considered non-reusable (they are lightweight
         /// and stateless).
         /// </summary>
@@ -449,7 +450,7 @@ namespace Monaco
         {
             if (_view is DesktopCodeEditorPresenter desktop)
             {
-                return desktop.IsCoreWebView2Initialized;
+                return desktop.IsCoreWebView2Initialized || desktop.IsLaunchInProgress;
             }
 
             return false;

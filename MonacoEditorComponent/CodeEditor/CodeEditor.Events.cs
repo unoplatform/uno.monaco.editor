@@ -672,8 +672,10 @@ namespace Monaco
 
         internal static bool ShouldStartDesktopLaunchOnControlLoaded(
             bool isCoreWebView2Initialized,
+            bool isLaunchInProgress,
             EditorLifecycleState lifecycleState)
             => !isCoreWebView2Initialized
+                && !isLaunchInProgress
                 && lifecycleState == EditorLifecycleState.Unloaded;
     }
 }

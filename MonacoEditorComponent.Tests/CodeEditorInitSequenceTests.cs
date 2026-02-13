@@ -115,17 +115,20 @@ public sealed class CodeEditorInitSequenceTests
     }
 
     [Theory]
-    [InlineData(false, 0, true)]
-    [InlineData(true, 0, false)]
-    [InlineData(false, 1, false)]
-    [InlineData(false, 2, false)]
+    [InlineData(false, false, 0, true)]
+    [InlineData(true, false, 0, false)]
+    [InlineData(false, true, 0, false)]
+    [InlineData(false, false, 1, false)]
+    [InlineData(false, false, 2, false)]
     public void ShouldStartDesktopLaunchOnControlLoaded_GuardsExpectedCases(
         bool isCoreWebView2Initialized,
+        bool isLaunchInProgress,
         int lifecycleState,
         bool expected)
     {
         var shouldStart = CodeEditor.ShouldStartDesktopLaunchOnControlLoaded(
             isCoreWebView2Initialized,
+            isLaunchInProgress,
             (EditorLifecycleState)lifecycleState);
 
         Assert.Equal(expected, shouldStart);
