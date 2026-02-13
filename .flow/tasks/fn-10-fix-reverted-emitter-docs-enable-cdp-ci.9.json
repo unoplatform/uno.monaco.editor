@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-13T03:14:09.046187Z",
+  "depends_on": [
+    "fn-10-fix-reverted-emitter-docs-enable-cdp-ci.8"
+  ],
+  "epic": "fn-10-fix-reverted-emitter-docs-enable-cdp-ci",
+  "id": "fn-10-fix-reverted-emitter-docs-enable-cdp-ci.9",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-10-fix-reverted-emitter-docs-enable-cdp-ci.9.md",
+  "status": "todo",
+  "title": "Add comprehensive C# bridge integration tests via Desktop CDP",
+  "updated_at": "2026-02-13T03:15:54.297220Z"
+}

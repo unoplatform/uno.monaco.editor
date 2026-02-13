@@ -8,7 +8,10 @@
     "fn-10-fix-reverted-emitter-docs-enable-cdp-ci.2",
     "fn-10-fix-reverted-emitter-docs-enable-cdp-ci.3",
     "fn-10-fix-reverted-emitter-docs-enable-cdp-ci.4",
-    "fn-10-fix-reverted-emitter-docs-enable-cdp-ci.6"
+    "fn-10-fix-reverted-emitter-docs-enable-cdp-ci.6",
+    "fn-10-fix-reverted-emitter-docs-enable-cdp-ci.7",
+    "fn-10-fix-reverted-emitter-docs-enable-cdp-ci.8",
+    "fn-10-fix-reverted-emitter-docs-enable-cdp-ci.9"
   ],
   "epic": "fn-10-fix-reverted-emitter-docs-enable-cdp-ci",
   "id": "fn-10-fix-reverted-emitter-docs-enable-cdp-ci.5",
@@ -16,5 +19,5 @@
   "spec_path": ".flow/tasks/fn-10-fix-reverted-emitter-docs-enable-cdp-ci.5.md",
   "status": "todo",
   "title": "Commit, push, and verify all CI jobs pass",
-  "updated_at": "2026-02-12T20:31:02.907991Z"
+  "updated_at": "2026-02-13T03:14:15.445939Z"
 }

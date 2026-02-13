@@ -4,6 +4,8 @@
 
 Two agent loops ran concurrently and fn-5.8's emitter regeneration was reverted (commit `6e7fee0`) due to invalid C# identifiers in the output. The emitter code improvements (WriteParamDocs, WriteReturnsDocs, WriteTypeDocRemarks, etc.) are intact in `CSharpEmitter.cs` but the generated Monaco files were rolled back. Additionally, Desktop CDP tests should run on Windows CI (runners have Edge/Chrome/WebDriver), a WSL2 launch profile is missing, and the desktop test app shows initialization race condition warnings.
 
+**Added scope (tasks 7-9):** Fix incorrect Playwright package installation, fix desktop bridge initialization bugs (JsonRpc argument mismatches, lifecycle flickering, "before initialized" warnings), and add comprehensive C# bridge integration tests that verify the CodeEditor API works end-to-end through the bridge protocol.
+
 ## Scope
 
 1. **Fix emitter edge cases** — Handle `$`-prefixed properties (`$comment`, `$id`, `$ref`, `$schema`), dotted identifiers (`'semanticHighlighting.enabled'`), and TypeScript type guard return syntax (`obj is IPosition`) that produce invalid C#. Includes `TypeMapper.cs` for mapping TS type predicates to `bool`.
@@ -12,10 +14,13 @@ Two agent loops ran concurrently and fn-5.8's emitter regeneration was reverted 
 4. **Add WSL2 launch profile** — Create `.vscode/launch.json` (if absent) and add launchSettings.json profile with `DISPLAY=:0` and `GDK_GL=gles` environment variables for Skia Desktop under WSL2
 5. **Update documentation** — Update AGENTS.md CI limitations section, docs/generated-type-docs-strategy.md (mark complete; defer TypeDoc URL pattern drift as tracked follow-up), and CHANGELOG.md
 6. **Unified script invocation and full WASM/desktop parity** — Create a single `InvokeMethodAsync` on `ICodeEditorPresenter` that encapsulates element resolution per-platform. Migrate all callers, remove the leaky `element` global from `WebViewExtensions.cs`, remove ALL `PlatformNotSupportedException` guards from the public `CodeEditor` API (`AddActionAsync`, `AddCommandAsync`, any others). Update all docs that say "WASM only". Add explicit Linux and WSL2-on-Win11 prerequisites to getting-started.md. After this task, every public API works identically on both platforms.
+7. **Fix Playwright package installation** — Replace incorrect `Microsoft.Playwright` + ExcludeAssets hacks with official `Microsoft.Playwright.Xunit.v3` per https://playwright.dev/dotnet/docs/intro
+8. **Fix desktop bridge initialization bugs** — Fix JsonRpc argument mismatch (bridge/ready, parentAccessor/* methods), fix Editor_Unloaded/Loaded flickering on tab switch, fix "before initialized" warning spam
+9. **Comprehensive C# bridge integration tests** — Add tests that verify CodeEditor C# properties and methods work through the bridge (text, language, commands, actions, themes, decorations, markers, folding, readOnly). Current tests only test JS APIs directly — the automated test suite must NOT rely on the manual test app for correctness.
 
 ## Parallelism
 
-fn-10.1 → fn-10.2 must be strictly sequential (both touch emitter tests/snapshots). fn-10.3, fn-10.4, and fn-10.6 can run in parallel with each other and with fn-10.1. fn-10.5 depends on all.
+fn-10.1 → fn-10.2 must be strictly sequential (both touch emitter tests/snapshots). fn-10.3, fn-10.4, and fn-10.6 can run in parallel with each other and with fn-10.1. fn-10.7 is independent. fn-10.8 depends on fn-10.7. fn-10.9 depends on fn-10.8. fn-10.5 depends on all.
 
 ## Quick commands
 
@@ -29,6 +34,9 @@ dotnet run --project tools/MonacoTypeEmitter -- --input tools/monaco-type-extrac
 
 # Full build
 dotnet build MonacoEditorComponent.slnx --no-restore
+
+# Run tests
+dotnet test --project MonacoEditorComponent.Tests/ --filter "Category!=DesktopCDP&Category!=WasmPlaywright"
 
 # Monitor CI
 gh pr checks --watch
@@ -47,6 +55,10 @@ gh pr checks --watch
 - [ ] Unified `InvokeMethodAsync` on `ICodeEditorPresenter` — one invocation path, both platforms
 - [ ] ALL `PlatformNotSupportedException` removed from `CodeEditor` public API — full WASM/desktop parity
 - [ ] Docs updated: no "WASM only" notes remain; Linux/WSL2 prerequisites documented in getting-started.md
+- [ ] Playwright package uses `Microsoft.Playwright.Xunit.v3` per official docs (no ExcludeAssets hacks)
+- [ ] Desktop bridge JsonRpc dispatch works (no "arguments do not match" warnings)
+- [ ] Desktop app stable on tab switch (no flickering/rapid Loaded/Unloaded cycling)
+- [ ] Comprehensive C# bridge integration tests pass (text, language, commands, themes, decorations, markers, folding)
 - [ ] All CI jobs pass on the PR
 
 ## References
@@ -57,5 +69,8 @@ gh pr checks --watch
 - CI workflow: `.github/workflows/ci.yml` L180-185 (DesktopCDP exclusion)
 - Previous CDP enablement: commit `2fdc2bf` (enabled) -> `8d522af` (re-excluded)
 - DesktopAppFixture: `MonacoEditorComponent.Tests/DesktopAppFixture.cs`
-- Overlap: fn-5.8 (reset to todo), fn-6.2 (init race — separate epic)
+- Overlap: fn-5.8 (reset to todo), fn-6.2 (init race — separate epic, deeper fix later)
 - Windows runner image: Chrome 144, Edge 144, WebView2 Runtime, ChromeDriver, EdgeDriver pre-installed
+- Playwright .NET official docs: https://playwright.dev/dotnet/docs/intro
+- StreamJsonRpc named params: https://github.com/microsoft/vs-streamjsonrpc/issues/48
+- Debug output: JsonRpc "arguments do not match" for bridge/ready, parentAccessor/setValue, parentAccessor/setValueWithType, parentAccessor/getJsonValue; rapid Editor_Unloaded/Loaded cycling; "before initialized" warnings; exit code 0xffffffff

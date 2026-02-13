@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-13T03:14:04.954717Z",
+  "depends_on": [
+    "fn-10-fix-reverted-emitter-docs-enable-cdp-ci.7"
+  ],
+  "epic": "fn-10-fix-reverted-emitter-docs-enable-cdp-ci",
+  "id": "fn-10-fix-reverted-emitter-docs-enable-cdp-ci.8",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-10-fix-reverted-emitter-docs-enable-cdp-ci.8.md",
+  "status": "todo",
+  "title": "Fix desktop bridge initialization bugs and lifecycle flickering",
+  "updated_at": "2026-02-13T03:15:15.140335Z"
+}
