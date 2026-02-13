@@ -133,4 +133,45 @@ public sealed class CodeEditorInitSequenceTests
 
         Assert.Equal(expected, shouldStart);
     }
+
+    [Theory]
+    [InlineData(false, true, true, true)]
+    [InlineData(true, true, true, false)]
+    [InlineData(false, false, true, false)]
+    [InlineData(false, true, false, false)]
+    public void ShouldDeferDesktopBootstrapOnNavigationCompleted_GuardsExpectedCases(
+        bool controlIsLoaded,
+        bool navigationSucceeded,
+        bool canInvokeBootstrap,
+        bool expected)
+    {
+        var shouldDefer = CodeEditor.ShouldDeferDesktopBootstrapOnNavigationCompleted(
+            controlIsLoaded,
+            navigationSucceeded,
+            canInvokeBootstrap);
+
+        Assert.Equal(expected, shouldDefer);
+    }
+
+    [Theory]
+    [InlineData(true, true, false, true, true)]
+    [InlineData(false, true, false, true, false)]
+    [InlineData(true, false, false, true, false)]
+    [InlineData(true, true, true, true, false)]
+    [InlineData(true, true, false, false, false)]
+    public void ShouldResumeDeferredDesktopBootstrapOnControlLoaded_GuardsExpectedCases(
+        bool hasPendingBootstrap,
+        bool isCoreWebView2Initialized,
+        bool isLaunchInProgress,
+        bool canInvokeBootstrap,
+        bool expected)
+    {
+        var shouldResume = CodeEditor.ShouldResumeDeferredDesktopBootstrapOnControlLoaded(
+            hasPendingBootstrap,
+            isCoreWebView2Initialized,
+            isLaunchInProgress,
+            canInvokeBootstrap);
+
+        Assert.Equal(expected, shouldResume);
+    }
 }

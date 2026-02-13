@@ -37,6 +37,7 @@ namespace Monaco
     {
         private bool _initialized;
         private bool _desktopBootstrapInFlight;
+        private bool _pendingDesktopBootstrapAfterLoad;
         private DispatcherQueue? _queue;
 
         private ICodeEditorPresenter? _view;
@@ -104,6 +105,36 @@ namespace Monaco
             {
                 presenterElement.Opacity = isVisible ? 1d : 0d;
                 presenterElement.IsHitTestVisible = isVisible;
+            }
+        }
+
+        private void ResumePendingDesktopInitialization()
+        {
+            if (_view is not DesktopCodeEditorPresenter desktopPresenter)
+            {
+                return;
+            }
+
+            var canInvokeBootstrap = ShouldInvokeDesktopBootstrap(_lifecycleState, _initialized, _desktopBootstrapInFlight);
+            if (ShouldResumeDeferredDesktopBootstrapOnControlLoaded(
+                    _pendingDesktopBootstrapAfterLoad,
+                    desktopPresenter.IsCoreWebView2Initialized,
+                    desktopPresenter.IsLaunchInProgress,
+                    canInvokeBootstrap))
+            {
+                _pendingDesktopBootstrapAfterLoad = false;
+                DesktopCodeEditorPresenter.DiagnosticLog("CodeEditor_Loaded: resuming deferred desktop bootstrap");
+                RebootstrapMonacoAsync();
+                return;
+            }
+
+            if (ShouldStartDesktopLaunchOnControlLoaded(
+                    desktopPresenter.IsCoreWebView2Initialized,
+                    desktopPresenter.IsLaunchInProgress,
+                    _lifecycleState))
+            {
+                desktopPresenter.Loaded -= WebView_DOMContentLoaded;
+                WebView_DOMContentLoaded(desktopPresenter, new RoutedEventArgs());
             }
         }
 
@@ -239,6 +270,7 @@ namespace Monaco
                 }
 
                 EmitSubscriptionDiagnostics("Loaded(soft)");
+                ResumePendingDesktopInitialization();
                 return;
             }
 
@@ -265,6 +297,7 @@ namespace Monaco
                 }
 
                 EmitSubscriptionDiagnostics("Loaded(soft-reuse)");
+                ResumePendingDesktopInitialization();
                 return;
             }
 
@@ -327,15 +360,7 @@ namespace Monaco
             // Desktop WebView2 can remain unloaded when the host is collapsed while
             // the editor is not ready. Ensure launch/bootstrap still starts from the
             // control Loaded path so startup does not stall on a missing presenter Loaded event.
-            if (_view is DesktopCodeEditorPresenter desktopPresenter
-                && ShouldStartDesktopLaunchOnControlLoaded(
-                    desktopPresenter.IsCoreWebView2Initialized,
-                    desktopPresenter.IsLaunchInProgress,
-                    _lifecycleState))
-            {
-                desktopPresenter.Loaded -= WebView_DOMContentLoaded;
-                WebView_DOMContentLoaded(desktopPresenter, new RoutedEventArgs());
-            }
+            ResumePendingDesktopInitialization();
         }
 
         private void OnWindowSizeChanged(object sender, WindowSizeChangedEventArgs e)

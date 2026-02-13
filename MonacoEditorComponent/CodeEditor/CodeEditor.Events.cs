@@ -145,6 +145,18 @@ namespace Monaco
             // Guard against late callbacks after unload.
             if (!IsLoaded)
             {
+                if (_view is DesktopCodeEditorPresenter
+                    && args is { IsSuccess: true }
+                    && ShouldDeferDesktopBootstrapOnNavigationCompleted(
+                        IsLoaded,
+                        navigationSucceeded: true,
+                        canInvokeBootstrap: ShouldInvokeDesktopBootstrap(_lifecycleState, _initialized, _desktopBootstrapInFlight)))
+                {
+                    _pendingDesktopBootstrapAfterLoad = true;
+                    DesktopCodeEditorPresenter.DiagnosticLog(
+                        "WebView_NavigationCompleted: control not loaded, deferring desktop bootstrap until reload.");
+                }
+
                 DesktopCodeEditorPresenter.DiagnosticLog("WebView_NavigationCompleted: control not loaded, ignoring.");
                 return;
             }
@@ -153,6 +165,7 @@ namespace Monaco
             // advance the lifecycle to Loaded.
             if (args is { IsSuccess: false })
             {
+                _pendingDesktopBootstrapAfterLoad = false;
                 DesktopCodeEditorPresenter.DiagnosticLog("WebView_NavigationCompleted: navigation failed, not advancing lifecycle.");
                 return;
             }
@@ -170,6 +183,7 @@ namespace Monaco
             if (_view is DesktopCodeEditorPresenter desktopPresenter
                 && ShouldInvokeDesktopBootstrap(_lifecycleState, _initialized, _desktopBootstrapInFlight))
             {
+                _pendingDesktopBootstrapAfterLoad = false;
                 // Build initial state to push to JS -- eliminates async RPC round-trips.
                 var initialStateJson = BuildInitialStateJson();
                 var escapedState = JsonSerializer.Serialize(initialStateJson);
@@ -395,6 +409,7 @@ namespace Monaco
             _debugLogger = null;
             _initializedPresenter = null;
             _desktopBootstrapInFlight = false;
+            _pendingDesktopBootstrapAfterLoad = false;
 
             // Reset lifecycle state on teardown via transition method
             TransitionLifecycle(EditorLifecycleState.Unloaded);
@@ -509,6 +524,7 @@ namespace Monaco
             // Transition BEFORE focus to prevent focus ping-pong during init.
             TransitionLifecycle(EditorLifecycleState.Loaded);
             _desktopBootstrapInFlight = false;
+            _pendingDesktopBootstrapAfterLoad = false;
 
             // Defer focus until after init is fully complete to avoid focus ping-pong.
             // Only focus if this CodeEditor is the currently focused element.
@@ -677,5 +693,23 @@ namespace Monaco
             => !isCoreWebView2Initialized
                 && !isLaunchInProgress
                 && lifecycleState == EditorLifecycleState.Unloaded;
+
+        internal static bool ShouldDeferDesktopBootstrapOnNavigationCompleted(
+            bool controlIsLoaded,
+            bool navigationSucceeded,
+            bool canInvokeBootstrap)
+            => !controlIsLoaded
+                && navigationSucceeded
+                && canInvokeBootstrap;
+
+        internal static bool ShouldResumeDeferredDesktopBootstrapOnControlLoaded(
+            bool hasPendingBootstrap,
+            bool isCoreWebView2Initialized,
+            bool isLaunchInProgress,
+            bool canInvokeBootstrap)
+            => hasPendingBootstrap
+                && isCoreWebView2Initialized
+                && !isLaunchInProgress
+                && canInvokeBootstrap;
     }
 }
