@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-13T14:45:46.314253Z",
+  "depends_on": [],
+  "epic": "fn-13-fix-desktop-webview2-runtime-bugs",
+  "id": "fn-13-fix-desktop-webview2-runtime-bugs.1",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-13-fix-desktop-webview2-runtime-bugs.1.md",
+  "status": "todo",
+  "title": "Fix OnApplyTemplate presenter re-creation causing flickering and cycling",
+  "updated_at": "2026-02-13T15:50:26.674656Z"
+}
