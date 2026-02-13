@@ -239,10 +239,14 @@ namespace MonacoEditorTestApp
             // Test harness: when MONACO_DIAGNOSTICS=1, set known property values
             // and register test commands/actions so CDP integration tests can verify
             // the C# bridge round-trip without any library modifications.
-            if (Environment.GetEnvironmentVariable("MONACO_DIAGNOSTICS") != "1")
+            // Guard: run only once to prevent duplicate registrations on re-load.
+            if (Environment.GetEnvironmentVariable("MONACO_DIAGNOSTICS") != "1"
+                || _testHarnessInitialized)
             {
                 return;
             }
+
+            _testHarnessInitialized = true;
 
             try
             {
@@ -253,11 +257,13 @@ namespace MonacoEditorTestApp
                 Console.WriteLine("TEST_INIT_PROPS:text=// test-init-text,lang=javascript");
 
                 // Register a test command (no keybinding) whose callback logs to stdout.
-                var commandId = await Editor.AddCommandAsync(0, (args) =>
+                // Declare ID before the closure so the lambda captures the variable.
+                string? commandId = null;
+                commandId = await Editor.AddCommandAsync(0, (args) =>
                 {
-                    Console.WriteLine($"TEST_CALLBACK:{_testCommandName}:invoked");
+                    Console.WriteLine($"TEST_CALLBACK:{commandId}:invoked");
                 });
-                _testCommandName = commandId ?? "unknown";
+                commandId ??= "unknown";
 
                 // Register a test action whose callback logs to stdout.
                 const string testActionId = "testCdpAction";
@@ -266,7 +272,7 @@ namespace MonacoEditorTestApp
                     Console.WriteLine($"TEST_CALLBACK:Action{testActionId}:invoked");
                 }));
 
-                Console.WriteLine($"TEST_HARNESS:commandId={_testCommandName},actionId={testActionId}");
+                Console.WriteLine($"TEST_HARNESS:commandId={commandId},actionId={testActionId}");
             }
             catch (Exception ex)
             {
@@ -275,9 +281,9 @@ namespace MonacoEditorTestApp
         }
 
         /// <summary>
-        /// Stores the command name returned by AddCommandAsync for test correlation.
+        /// One-time guard preventing duplicate test harness registration on re-load.
         /// </summary>
-        private string _testCommandName = "unknown";
+        private bool _testHarnessInitialized;
 
         private void Editor_OpenLinkRequest(CodeEditor sender, OpenLinkRequestedEventArgs args)
         {
