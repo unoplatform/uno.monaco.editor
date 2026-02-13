@@ -335,6 +335,12 @@ namespace Monaco
 
             // Hard teardown: control was not reloaded within the grace period.
             DesktopCodeEditorPresenter.DiagnosticLog("DeferredTeardown: executing hard teardown");
+
+            // Clear _unloadCts BEFORE teardown so that a subsequent CodeEditor_Loaded
+            // does not mistakenly enter the soft-reload early-return path.
+            _unloadCts?.Dispose();
+            _unloadCts = null;
+
             _initialized = false;
 
             Decorations.VectorChanged -= Decorations_VectorChanged;

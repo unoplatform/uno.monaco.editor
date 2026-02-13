@@ -407,6 +407,11 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         try
         {
             await using var logWriter = new StreamWriter(logPath, append: false);
+            // Use a SemaphoreSlim to serialize StreamWriter access from concurrent
+            // stdout/stderr readers. _logLock guards List<string> but StreamWriter
+            // is not thread-safe and needs its own synchronization.
+            using var writerSemaphore = new SemaphoreSlim(1, 1);
+
             // ReadLineAsync returns null at end-of-stream, avoiding the CA2024
             // diagnostic from synchronous EndOfStream checks in async methods.
             var stdoutTask = Task.Run(async () =>
@@ -420,8 +425,16 @@ public sealed class DesktopAppFixture : IAsyncLifetime
                     {
                         _logLines.Add(formattedLine);
                     }
-                    await logWriter.WriteLineAsync(formattedLine.AsMemory(), cancellationToken);
-                    await logWriter.FlushAsync(cancellationToken);
+                    await writerSemaphore.WaitAsync(cancellationToken);
+                    try
+                    {
+                        await logWriter.WriteLineAsync(formattedLine.AsMemory(), cancellationToken);
+                        await logWriter.FlushAsync(cancellationToken);
+                    }
+                    finally
+                    {
+                        writerSemaphore.Release();
+                    }
                 }
             }, cancellationToken);
             var stderrTask = Task.Run(async () =>
@@ -435,8 +448,16 @@ public sealed class DesktopAppFixture : IAsyncLifetime
                     {
                         _logLines.Add(formattedLine);
                     }
-                    await logWriter.WriteLineAsync(formattedLine.AsMemory(), cancellationToken);
-                    await logWriter.FlushAsync(cancellationToken);
+                    await writerSemaphore.WaitAsync(cancellationToken);
+                    try
+                    {
+                        await logWriter.WriteLineAsync(formattedLine.AsMemory(), cancellationToken);
+                        await logWriter.FlushAsync(cancellationToken);
+                    }
+                    finally
+                    {
+                        writerSemaphore.Release();
+                    }
                 }
             }, cancellationToken);
 
