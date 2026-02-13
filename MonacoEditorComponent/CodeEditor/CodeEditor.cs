@@ -37,7 +37,6 @@ namespace Monaco
     {
         private bool _initialized;
         private bool _desktopBootstrapInFlight;
-        private bool _isControlLoadedForVisibility;
         private DispatcherQueue? _queue;
 
         private ICodeEditorPresenter? _view;
@@ -94,7 +93,7 @@ namespace Monaco
 
         private void UpdatePresenterVisibility()
         {
-            var isVisible = IsEditorLoaded && _isControlLoadedForVisibility;
+            var isVisible = IsEditorLoaded && IsLoaded;
 
             if (_view is DesktopCodeEditorPresenter desktopPresenter)
             {
@@ -218,7 +217,6 @@ namespace Monaco
 
         private void CodeEditor_Loaded(object sender, RoutedEventArgs e)
         {
-            _isControlLoadedForVisibility = true;
             UpdatePresenterVisibility();
 
             // If a deferred teardown is pending from a previous Unloaded event,
@@ -350,7 +348,6 @@ namespace Monaco
         private void CodeEditor_Unloaded(object sender, RoutedEventArgs e)
         {
             Unloaded -= CodeEditor_Unloaded;
-            _isControlLoadedForVisibility = false;
             UpdatePresenterVisibility();
 
             // Note: Presenter event handlers (NavigationStarting, NavigationCompleted,
@@ -387,7 +384,7 @@ namespace Monaco
         /// </summary>
         private async Task DeferredTeardownAsync(CancellationToken ct)
         {
-            const int deferredTeardownDelayMs = 1200;
+            const int deferredTeardownDelayMs = 5000;
             await Task.Delay(deferredTeardownDelayMs);
             if (ct.IsCancellationRequested)
             {
