@@ -12,7 +12,7 @@ namespace Monaco.Bridge;
 /// <summary>
 /// Custom <see cref="IJsonRpcMessageHandler"/> that bridges StreamJsonRpc
 /// with WebView2's postMessage/WebMessageReceived transport.
-/// Writer sends via <see cref="ICodeEditorPresenter.PostWebMessage(string)"/>.
+/// Writer sends via <see cref="ICodeEditorPresenter.PostWebMessageAsync(string)"/>.
 /// Reader feeds from <see cref="ICodeEditorPresenter.MessageReceived"/> into a
 /// <see cref="Channel{T}"/> of UTF-8 byte sequences for deserialization.
 /// </summary>
@@ -119,7 +119,7 @@ internal sealed class WebView2JsonRpcMessageHandler : IJsonRpcMessageHandler, ID
             var writer = new ArrayBufferWriter<byte>();
             _formatter.Serialize(writer, message);
             var json = Encoding.UTF8.GetString(writer.WrittenSpan);
-            _presenter.PostWebMessage(json);
+            await _presenter.PostWebMessageAsync(json);
         }
         finally
         {

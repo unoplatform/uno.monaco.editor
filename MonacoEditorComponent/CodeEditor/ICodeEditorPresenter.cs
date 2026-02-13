@@ -171,9 +171,9 @@ namespace Monaco
 
         /// <summary>
         /// Posts a JSON message to the web view.
-        /// Desktop wraps CoreWebView2.PostWebMessageAsJson().
+        /// Desktop wraps CoreWebView2.PostWebMessageAsJson(), dispatched to the UI thread.
         /// WASM throws PlatformNotSupportedException (not used on WASM).
         /// </summary>
-        void PostWebMessage(string json);
+        Task PostWebMessageAsync(string json);
 	}
 }

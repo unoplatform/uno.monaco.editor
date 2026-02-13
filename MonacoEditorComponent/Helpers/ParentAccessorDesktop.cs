@@ -107,6 +107,9 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
 
     public string GetJsonValue(string name)
     {
+        // Synchronous interface implementation. On desktop, callers should use
+        // GetJsonValueAsync to ensure UI thread dispatch. This exists for
+        // interface compliance only; direct callers on desktop should not use it.
         if (_parent.TryGetTarget(out var tobj))
         {
             var propinfo = _typeinfo.GetProperty(name);
@@ -131,6 +134,45 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
         }
 
         return "null";
+    }
+
+    /// <summary>
+    /// Async version of <see cref="GetJsonValue"/> that dispatches through the
+    /// <see cref="DispatcherQueue"/> to ensure DependencyProperty access occurs
+    /// on the UI thread. Called by the JSON-RPC handler <see cref="OnGetJsonValue"/>.
+    /// </summary>
+    public async Task<string> GetJsonValueAsync(string name)
+    {
+        string result = "null";
+
+        await _queue.EnqueueAsync(() =>
+        {
+            if (_parent.TryGetTarget(out var tobj))
+            {
+                var propinfo = _typeinfo.GetProperty(name);
+                var obj = propinfo?.GetValue(tobj);
+
+                if (obj is null)
+                {
+                    result = "null";
+                    return;
+                }
+
+                try
+                {
+                    result = JsonSerializer.Serialize(obj, obj.GetType(), MonacoJsonContext.Relaxed.Options);
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException)
+                {
+                    throw new InvalidOperationException(
+                        $"Type '{obj.GetType().FullName}' is not registered in MonacoJsonContext. " +
+                        "Register it as a [JsonSerializable] attribute on MonacoJsonContext to enable AOT-safe serialization.",
+                        ex);
+                }
+            }
+        });
+
+        return result;
     }
 
     public async Task<object?> GetChildValue(string name, string child)
@@ -303,9 +345,9 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
     }
 
     [JsonRpcMethod("parentAccessor/getJsonValue")]
-    public string OnGetJsonValue(string name)
+    public async Task<string> OnGetJsonValue(string name)
     {
-        return GetJsonValue(name);
+        return await GetJsonValueAsync(name);
     }
 
     // ============================================================

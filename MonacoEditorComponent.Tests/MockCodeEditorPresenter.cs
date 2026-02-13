@@ -61,9 +61,10 @@ internal sealed class MockCodeEditorPresenter : ICodeEditorPresenter
         return Task.FromResult("null");
     }
 
-    public void PostWebMessage(string json)
+    public Task PostWebMessageAsync(string json)
     {
         PostedMessages.Add(json);
+        return Task.CompletedTask;
     }
 
     /// <summary>

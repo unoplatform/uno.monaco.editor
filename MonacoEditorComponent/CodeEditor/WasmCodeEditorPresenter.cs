@@ -165,7 +165,7 @@ namespace Monaco
 
         /// <inheritdoc />
         /// <remarks>Not used on WASM. JSExport direct calls are used instead.</remarks>
-        public void PostWebMessage(string json)
+        public Task PostWebMessageAsync(string json)
         {
             throw new PlatformNotSupportedException("PostWebMessage is not supported on WASM. Use JSExport direct calls instead.");
         }
