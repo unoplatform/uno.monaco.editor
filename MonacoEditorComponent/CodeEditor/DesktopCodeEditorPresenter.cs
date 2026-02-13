@@ -93,6 +93,7 @@ namespace Monaco
         {
             var shouldBeVisible = forceVisibleForInitialization || _isHostVisibleRequested;
             _webView.Visibility = shouldBeVisible ? Visibility.Visible : Visibility.Collapsed;
+            _webView.Opacity = _isHostVisibleRequested ? 1d : 0d;
             _webView.IsHitTestVisible = _isHostVisibleRequested;
         }
 

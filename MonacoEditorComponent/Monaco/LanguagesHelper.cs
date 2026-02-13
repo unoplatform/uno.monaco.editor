@@ -274,15 +274,21 @@ namespace Monaco
                     System.Diagnostics.Debug.WriteLine($"Hover provider.......... {args != null}");
                     if (args != null && args.Length >= 1)
                     {
-                        if (editor.GetModel() is { } model
-                        && JsonSerializer.Deserialize(args[0], MonacoJsonContext.Default.Position) is { } position)
+                        try
                         {
-                            var hover = await provider.ProvideHover(model, position);
-
-                            if (hover != null)
+                            if (editor.GetModel() is { } model
+                                && JsonSerializer.Deserialize(args[0], MonacoJsonContext.Default.Position) is { } position)
                             {
-                                return JsonSerializer.Serialize(hover, MonacoJsonContext.Relaxed.Hover);
+                                var hover = await provider.ProvideHover(model, position);
+                                if (hover != null)
+                                {
+                                    return JsonSerializer.Serialize(hover, MonacoJsonContext.Relaxed.Hover);
+                                }
                             }
+                        }
+                        catch (JsonException ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Hover provider position parse failed: {ex}");
                         }
                     }
 
