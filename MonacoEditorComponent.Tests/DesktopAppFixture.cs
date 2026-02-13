@@ -43,6 +43,7 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     private string _userDataFolder = string.Empty;
     private string _processLogPath = string.Empty;
     private int _cdpPort;
+    private CancellationTokenSource? _logCaptureCts;
 
     /// <summary>The Playwright page connected to the Monaco WebView2 content.</summary>
     public IPage Page { get; private set; } = null!;
@@ -93,8 +94,9 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         _appProcess = Process.Start(startInfo)
             ?? throw new InvalidOperationException("Failed to start MonacoEditorTestApp desktop process.");
 
-        // Start background log capture.
-        _ = CaptureProcessOutputAsync(_appProcess, _processLogPath);
+        // Start background log capture with cancellation support.
+        _logCaptureCts = new CancellationTokenSource();
+        _ = CaptureProcessOutputAsync(_appProcess, _processLogPath, _logCaptureCts.Token);
 
         // 5. Deterministic readiness: poll CDP version endpoint.
         var cdpEndpoint = $"http://localhost:{_cdpPort}";
@@ -122,6 +124,14 @@ public sealed class DesktopAppFixture : IAsyncLifetime
 
     public async ValueTask DisposeAsync()
     {
+        // Cancel log capture first so stream reads don't block process disposal.
+        if (_logCaptureCts is not null)
+        {
+            try { await _logCaptureCts.CancelAsync(); } catch { /* best-effort */ }
+            _logCaptureCts.Dispose();
+            _logCaptureCts = null;
+        }
+
         if (_browser is not null)
         {
             try { await _browser.CloseAsync(); } catch { /* best-effort cleanup */ }
@@ -308,7 +318,7 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
     }
 
-    private static async Task CaptureProcessOutputAsync(Process process, string logPath)
+    private static async Task CaptureProcessOutputAsync(Process process, string logPath, CancellationToken cancellationToken)
     {
         try
         {
@@ -318,23 +328,29 @@ public sealed class DesktopAppFixture : IAsyncLifetime
             var stdoutTask = Task.Run(async () =>
             {
                 string? line;
-                while ((line = await process.StandardOutput.ReadLineAsync()) is not null)
+                while (!cancellationToken.IsCancellationRequested &&
+                       (line = await process.StandardOutput.ReadLineAsync(cancellationToken)) is not null)
                 {
-                    await logWriter.WriteLineAsync($"[stdout] {line}");
-                    await logWriter.FlushAsync();
+                    await logWriter.WriteLineAsync(($"[stdout] {line}").AsMemory(), cancellationToken);
+                    await logWriter.FlushAsync(cancellationToken);
                 }
-            });
+            }, cancellationToken);
             var stderrTask = Task.Run(async () =>
             {
                 string? line;
-                while ((line = await process.StandardError.ReadLineAsync()) is not null)
+                while (!cancellationToken.IsCancellationRequested &&
+                       (line = await process.StandardError.ReadLineAsync(cancellationToken)) is not null)
                 {
-                    await logWriter.WriteLineAsync($"[stderr] {line}");
-                    await logWriter.FlushAsync();
+                    await logWriter.WriteLineAsync(($"[stderr] {line}").AsMemory(), cancellationToken);
+                    await logWriter.FlushAsync(cancellationToken);
                 }
-            });
+            }, cancellationToken);
 
-            await Task.WhenAny(Task.WhenAll(stdoutTask, stderrTask), Task.Delay(TimeSpan.FromMinutes(5)));
+            await Task.WhenAny(Task.WhenAll(stdoutTask, stderrTask), Task.Delay(TimeSpan.FromMinutes(5), cancellationToken));
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when fixture is being disposed -- log capture is no longer needed.
         }
         catch
         {
