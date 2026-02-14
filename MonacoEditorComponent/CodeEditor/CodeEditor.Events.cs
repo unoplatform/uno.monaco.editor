@@ -52,6 +52,7 @@ namespace Monaco
 
         private IThemeListener? _themeListener;
         private EditorLifecycleState _lifecycleState = EditorLifecycleState.Unloaded;
+        private int _desktopInitTimeoutRetryCount;
 
         /// <summary>
         /// Transitions the editor lifecycle to the specified state,
@@ -65,6 +66,7 @@ namespace Monaco
             {
                 case EditorLifecycleState.Loading when _lifecycleState == EditorLifecycleState.Unloaded:
                     _lifecycleState = EditorLifecycleState.Loading;
+                    _desktopInitTimeoutRetryCount = 0;
                     EditorLoading?.Invoke(this, new RoutedEventArgs());
                     // Emit lifecycle update via JSON-RPC for desktop testability (Task 8).
                     if (_view is DesktopCodeEditorPresenter loadingPresenter)
@@ -86,6 +88,7 @@ namespace Monaco
 
                 case EditorLifecycleState.Unloaded:
                     _lifecycleState = EditorLifecycleState.Unloaded;
+                    _desktopInitTimeoutRetryCount = 0;
                     IsEditorLoaded = false;
                     return true;
 
@@ -117,7 +120,9 @@ namespace Monaco
 
             try
             {
-                await ((ICodeEditorPresenter)sender).Launch();
+                var presenter = (ICodeEditorPresenter)sender;
+                await presenter.Launch();
+                presenter.Loaded -= WebView_DOMContentLoaded;
             }
             catch (Exception e)
             {
@@ -143,6 +148,18 @@ namespace Monaco
             // Guard against late callbacks after unload.
             if (!IsLoaded)
             {
+                if (_view is DesktopCodeEditorPresenter
+                    && args is { IsSuccess: true }
+                    && ShouldDeferDesktopBootstrapOnNavigationCompleted(
+                        IsLoaded,
+                        navigationSucceeded: true,
+                        canInvokeBootstrap: ShouldInvokeDesktopBootstrap(_lifecycleState, _initialized, _desktopBootstrapInFlight)))
+                {
+                    _pendingDesktopBootstrapAfterLoad = true;
+                    DesktopCodeEditorPresenter.DiagnosticLog(
+                        "WebView_NavigationCompleted: control not loaded, deferring desktop bootstrap until reload.");
+                }
+
                 DesktopCodeEditorPresenter.DiagnosticLog("WebView_NavigationCompleted: control not loaded, ignoring.");
                 return;
             }
@@ -151,6 +168,7 @@ namespace Monaco
             // advance the lifecycle to Loaded.
             if (args is { IsSuccess: false })
             {
+                _pendingDesktopBootstrapAfterLoad = false;
                 DesktopCodeEditorPresenter.DiagnosticLog("WebView_NavigationCompleted: navigation failed, not advancing lifecycle.");
                 return;
             }
@@ -168,6 +186,7 @@ namespace Monaco
             if (_view is DesktopCodeEditorPresenter desktopPresenter
                 && ShouldInvokeDesktopBootstrap(_lifecycleState, _initialized, _desktopBootstrapInFlight))
             {
+                _pendingDesktopBootstrapAfterLoad = false;
                 // Build initial state to push to JS -- eliminates async RPC round-trips.
                 var initialStateJson = BuildInitialStateJson();
                 var escapedState = JsonSerializer.Serialize(initialStateJson);
@@ -270,6 +289,11 @@ namespace Monaco
             DesktopCodeEditorPresenter.DiagnosticLog($"{source}: invoking createMonacoEditor (fire-and-forget)...");
             _ = InvokeDesktopBootstrapAsync(presenter, escapedState, source);
 
+            // Callback-loss recovery: some desktop backends (notably WKWebView host paths)
+            // can initialize Monaco successfully but never deliver the JS->C# Loaded callback.
+            // Probe the JS init-complete flag and synthesize CodeEditorLoaded when observed.
+            _ = MonitorDesktopInitCompletionAsync();
+
             // Timeout fallback: if CodeEditorLoaded never fires (script failure,
             // Monaco crash, etc.), surface a diagnostic error after 30 seconds.
             _ = MonitorInitTimeoutAsync();
@@ -309,10 +333,233 @@ namespace Monaco
             if (_lifecycleState == EditorLifecycleState.Loading && startState == EditorLifecycleState.Loading)
             {
                 _desktopBootstrapInFlight = false;
+
+                if (_view is DesktopCodeEditorPresenter desktopPresenter)
+                {
+                    if (await HasDesktopEditorContextAsync(desktopPresenter))
+                    {
+                        DesktopCodeEditorPresenter.DiagnosticLog(
+                            "INIT_TIMEOUT: editor context exists despite missing callback; synthesizing CodeEditorLoaded.");
+                        CodeEditorLoaded();
+                        return;
+                    }
+
+                    if (_desktopInitTimeoutRetryCount < 1)
+                    {
+                        _desktopInitTimeoutRetryCount++;
+                        var initError = await ReadDesktopInitErrorAsync(desktopPresenter);
+                        var runtimeSnapshot = await ReadDesktopRuntimeSnapshotAsync(desktopPresenter);
+                        if (await IsDesktopInitCompleteAsync(desktopPresenter, runtimeSnapshot))
+                        {
+                            DesktopCodeEditorPresenter.DiagnosticLog(
+                                $"INIT_TIMEOUT: JS init complete after timeout probe (runtime={runtimeSnapshot ?? "null"}); synthesizing CodeEditorLoaded.");
+                            CodeEditorLoaded();
+                            return;
+                        }
+
+                        DesktopCodeEditorPresenter.DiagnosticLog(
+                            $"INIT_TIMEOUT: retrying createMonacoEditor (attempt={_desktopInitTimeoutRetryCount + 1}, initError={initError ?? "none"}, runtime={runtimeSnapshot ?? "null"}).");
+                        RebootstrapMonacoAsync();
+                        return;
+                    }
+                }
+
                 var msg = $"Monaco editor initialization timed out after {timeoutMs}ms. " +
                     "CodeEditorLoaded callback was never received. Check browser console for errors.";
                 DesktopCodeEditorPresenter.DiagnosticLog($"INIT_TIMEOUT: {msg}");
                 InternalException?.Invoke(this, new TimeoutException(msg));
+            }
+        }
+
+        private async Task MonitorDesktopInitCompletionAsync()
+        {
+            if (_view is not DesktopCodeEditorPresenter desktopPresenter)
+            {
+                return;
+            }
+
+            const int probeIntervalMs = 250;
+            const int maxProbeAttempts = 40; // 10 seconds total
+            for (var attempt = 0; attempt < maxProbeAttempts; attempt++)
+            {
+                if (_lifecycleState != EditorLifecycleState.Loading || !_desktopBootstrapInFlight)
+                {
+                    return;
+                }
+
+                if (await IsDesktopInitCompleteAsync(desktopPresenter))
+                {
+                    DesktopCodeEditorPresenter.DiagnosticLog(
+                        "INIT_COMPLETE_PROBE: JS init complete without callback; synthesizing CodeEditorLoaded.");
+                    CodeEditorLoaded();
+                    return;
+                }
+
+                await Task.Delay(probeIntervalMs);
+            }
+        }
+
+        private static bool ScriptResultIsTrue(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            var normalized = value.Trim().Trim('"');
+            return string.Equals(normalized, "true", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private async Task<bool> HasDesktopEditorContextAsync(DesktopCodeEditorPresenter desktopPresenter)
+        {
+            try
+            {
+                var hasContext = await desktopPresenter.InvokeScriptAsync("""
+                    (() => {
+                        const element = document.getElementById('editor-container');
+                        const context = typeof EditorContext !== 'undefined' && EditorContext.tryGetEditorForElement
+                            ? EditorContext.tryGetEditorForElement(element)
+                            : null;
+                        return !!(context && context.editor && context.model);
+                    })()
+                    """);
+
+                return ScriptResultIsTrue(hasContext);
+            }
+            catch (Exception ex)
+            {
+                DesktopCodeEditorPresenter.DiagnosticLog($"INIT_TIMEOUT: context probe failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        private async Task<string?> ReadDesktopInitErrorAsync(DesktopCodeEditorPresenter desktopPresenter)
+        {
+            try
+            {
+                var result = await desktopPresenter.InvokeScriptAsync("globalThis.__unoMonacoInitError ?? null");
+                if (string.Equals(result, "null", StringComparison.OrdinalIgnoreCase))
+                {
+                    return null;
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                return $"probe-failed:{ex.Message}";
+            }
+        }
+
+        private async Task<string?> ReadDesktopRuntimeSnapshotAsync(DesktopCodeEditorPresenter desktopPresenter)
+        {
+            try
+            {
+                return await desktopPresenter.InvokeScriptAsync("""
+                    (() => JSON.stringify({
+                        isDesktopHostDetected: !!(globalThis.isDesktopHost && globalThis.isDesktopHost()),
+                        hasChromeWebView: !!(globalThis.chrome && globalThis.chrome.webview && globalThis.chrome.webview.postMessage),
+                        hasWebkitBridge: !!(globalThis.webkit && globalThis.webkit.messageHandlers && globalThis.webkit.messageHandlers.unoWebView && globalThis.webkit.messageHandlers.unoWebView.postMessage),
+                        hasWindowModule: typeof window.Module !== 'undefined',
+                        hasJsonRpc: !!globalThis.__jsonRpc,
+                        initComplete: globalThis.__unoMonacoInitComplete ?? null
+                    }))()
+                    """);
+            }
+            catch (Exception ex)
+            {
+                return $"runtime-probe-failed:{ex.Message}";
+            }
+        }
+
+        private async Task<bool> IsDesktopInitCompleteAsync(DesktopCodeEditorPresenter desktopPresenter, string? runtimeSnapshot = null)
+        {
+            if (RuntimeSnapshotIndicatesInitComplete(runtimeSnapshot))
+            {
+                return true;
+            }
+
+            var snapshot = runtimeSnapshot ?? await ReadDesktopRuntimeSnapshotAsync(desktopPresenter);
+            if (RuntimeSnapshotIndicatesInitComplete(snapshot))
+            {
+                return true;
+            }
+
+            try
+            {
+                var result = await desktopPresenter.InvokeScriptAsync("globalThis.__unoMonacoInitComplete === true");
+                return ScriptResultIsTrue(result);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        internal static bool RuntimeSnapshotIndicatesInitComplete(string? runtimeSnapshot)
+        {
+            if (string.IsNullOrWhiteSpace(runtimeSnapshot))
+            {
+                return false;
+            }
+
+            if (TryReadInitCompleteFlag(runtimeSnapshot, out var isComplete))
+            {
+                return isComplete;
+            }
+
+            try
+            {
+                var decoded = JsonSerializer.Deserialize<string>(runtimeSnapshot);
+                if (TryReadInitCompleteFlag(decoded, out isComplete))
+                {
+                    return isComplete;
+                }
+            }
+            catch (JsonException)
+            {
+            }
+
+            return runtimeSnapshot.Contains("\"initComplete\":true", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool TryReadInitCompleteFlag(string? runtimeSnapshot, out bool isComplete)
+        {
+            isComplete = false;
+            if (string.IsNullOrWhiteSpace(runtimeSnapshot))
+            {
+                return false;
+            }
+
+            try
+            {
+                using var doc = JsonDocument.Parse(runtimeSnapshot);
+                if (doc.RootElement.ValueKind != JsonValueKind.Object
+                    || !doc.RootElement.TryGetProperty("initComplete", out var initCompleteElement))
+                {
+                    return false;
+                }
+
+                switch (initCompleteElement.ValueKind)
+                {
+                    case JsonValueKind.True:
+                        isComplete = true;
+                        return true;
+                    case JsonValueKind.False:
+                        isComplete = false;
+                        return true;
+                    case JsonValueKind.String:
+                        return bool.TryParse(initCompleteElement.GetString(), out isComplete);
+                    case JsonValueKind.Number when initCompleteElement.TryGetInt32(out var numericValue):
+                        isComplete = numericValue != 0;
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+            catch (JsonException)
+            {
+                return false;
             }
         }
 
@@ -393,6 +640,7 @@ namespace Monaco
             _debugLogger = null;
             _initializedPresenter = null;
             _desktopBootstrapInFlight = false;
+            _pendingDesktopBootstrapAfterLoad = false;
 
             // Reset lifecycle state on teardown via transition method
             TransitionLifecycle(EditorLifecycleState.Unloaded);
@@ -475,50 +723,67 @@ namespace Monaco
 
         private async void CodeEditorLoaded()
         {
-            Debug.WriteLine($"CodeEditorLoaded: IsLoaded={IsLoaded}, state={_lifecycleState}, HasThreadAccess={_queue?.HasThreadAccess}");
+            Debug.WriteLine($"CodeEditorLoaded: IsLoaded={IsLoaded}, state={_lifecycleState}, bootstrapInFlight={_desktopBootstrapInFlight}, HasThreadAccess={_queue?.HasThreadAccess}");
 
             // Guard against late callback after unload. This is invoked via
             // ParentAccessor.CallAction("Loaded") which can be queued/delayed.
-            if (!IsLoaded || _lifecycleState != EditorLifecycleState.Loading)
+            if (!ShouldProcessCodeEditorLoaded(IsLoaded, _lifecycleState, _desktopBootstrapInFlight))
             {
                 _desktopBootstrapInFlight = false;
-                Debug.WriteLine($"CodeEditorLoaded: ignoring (IsLoaded={IsLoaded}, state={_lifecycleState})");
+                Debug.WriteLine($"CodeEditorLoaded: ignoring (IsLoaded={IsLoaded}, state={_lifecycleState}, bootstrapInFlight={_desktopBootstrapInFlight})");
                 return;
             }
 
-            _view = _view ?? throw new InvalidOperationException("The view not set");
-
-            // Enable script execution before init-time calls. SendScriptAsync and
-            // InvokeScriptAsync are gated by _initialized, so we must set it before
-            // applying initial properties.
-            _initialized = true;
-
-            // Emit canonical init-complete marker for diagnostics (always visible).
-            Debug.WriteLine("INIT_COMPLETE");
-
-            // Layout first to ensure the editor dimensions are correct.
-            await SendScriptAsync("EditorContext.getEditorForElement(element).editor.layout();");
-
-            // Apply all current property values in the correct order
-            // This ensures properties set before IsEditorLoaded=true take effect
-            await ApplyInitialPropertyValues();
-
-            // Use lifecycle state machine for exactly-once semantics.
-            // Transition BEFORE focus to prevent focus ping-pong during init.
-            TransitionLifecycle(EditorLifecycleState.Loaded);
-            _desktopBootstrapInFlight = false;
-
-            // Defer focus until after init is fully complete to avoid focus ping-pong.
-            // Only focus if this CodeEditor is the currently focused element.
-#pragma warning disable CS0618 // Type or member is obsolete
-            if (FocusManager.GetFocusedElement() == this)
+            try
             {
-                await SendScriptAsync("EditorContext.getEditorForElement(element).editor.focus();");
-                _view.Focus(FocusState.Programmatic);
-            }
+                _view = _view ?? throw new InvalidOperationException("The view not set");
+
+                // Enable script execution before init-time calls. SendScriptAsync and
+                // InvokeScriptAsync are gated by _initialized, so we must set it before
+                // applying initial properties.
+                _initialized = true;
+
+                // Emit canonical init-complete marker for diagnostics (always visible).
+                Debug.WriteLine("INIT_COMPLETE");
+
+                // Layout first to ensure the editor dimensions are correct.
+                await SendScriptAsync("EditorContext.getEditorForElement(element).editor.layout();");
+
+                // Apply all current property values in the correct order
+                // This ensures properties set before IsEditorLoaded=true take effect
+                await ApplyInitialPropertyValues();
+
+                // Transition to Loaded only when coming from Loading.
+                if (_lifecycleState == EditorLifecycleState.Loading)
+                {
+                    TransitionLifecycle(EditorLifecycleState.Loaded);
+                }
+                else
+                {
+                    IsEditorLoaded = true;
+                }
+
+                _desktopBootstrapInFlight = false;
+                _pendingDesktopBootstrapAfterLoad = false;
+
+                // Defer focus until after init is fully complete to avoid focus ping-pong.
+                // Only focus if this CodeEditor is the currently focused element.
+#pragma warning disable CS0618 // Type or member is obsolete
+                if (FocusManager.GetFocusedElement() == this)
+                {
+                    await SendScriptAsync("EditorContext.getEditorForElement(element).editor.focus();");
+                    _view.Focus(FocusState.Programmatic);
+                }
 #pragma warning restore CS0618 // Type or member is obsolete
 
-            Debug.WriteLine("CodeEditorLoaded: complete");
+                Debug.WriteLine("CodeEditorLoaded: complete");
+            }
+            catch (Exception ex)
+            {
+                _desktopBootstrapInFlight = false;
+                Debug.WriteLine($"CodeEditorLoaded failed: {ex}");
+                InternalException?.Invoke(this, ex);
+            }
         }
 
         /// <summary>
@@ -688,6 +953,14 @@ namespace Monaco
                 && !isLaunchInProgress
                 && !bootstrapInFlight;
 
+        internal static bool ShouldDeferDesktopBootstrapOnNavigationCompleted(
+            bool controlIsLoaded,
+            bool navigationSucceeded,
+            bool canInvokeBootstrap)
+            => !controlIsLoaded
+                && navigationSucceeded
+                && canInvokeBootstrap;
+
         internal static bool ShouldResumeDeferredDesktopBootstrapOnControlLoaded(
             bool hasPendingBootstrap,
             bool isCoreWebView2Initialized,
@@ -697,5 +970,13 @@ namespace Monaco
                 && isCoreWebView2Initialized
                 && !isLaunchInProgress
                 && canInvokeBootstrap;
+
+        internal static bool ShouldProcessCodeEditorLoaded(
+            bool isLoaded,
+            EditorLifecycleState lifecycleState,
+            bool bootstrapInFlight)
+            => isLoaded
+                && (lifecycleState == EditorLifecycleState.Loading
+                    || (bootstrapInFlight && lifecycleState == EditorLifecycleState.Loaded));
     }
 }

@@ -195,9 +195,11 @@ namespace Monaco
                 {
                     if (_webView.CoreWebView2 is { Settings: { } settings })
                     {
+                        settings.IsWebMessageEnabled = true;
                         settings.AreDefaultScriptDialogsEnabled = false;
                         settings.AreDefaultContextMenusEnabled = false;
                         settings.AreHostObjectsAllowed = false;
+                        DiagnosticLog("DesktopCodeEditorPresenter: CoreWebView2 web messaging explicitly enabled");
                     }
                 }
                 catch (Exception ex)
@@ -373,6 +375,7 @@ namespace Monaco
             // TryGetWebMessageAsString() would fail for JSON object messages
             // which is the primary format for JSON-RPC bridge traffic.
             var json = args.WebMessageAsJson;
+            DiagnosticLog($"DesktopCodeEditorPresenter: WebMessageReceived len={json?.Length ?? 0}");
             if (!string.IsNullOrEmpty(json))
             {
                 MessageReceived?.Invoke(this, new WebViewMessageEventArgs { MessageJson = json });

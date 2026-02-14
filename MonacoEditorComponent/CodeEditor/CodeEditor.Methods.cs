@@ -209,7 +209,7 @@ namespace Monaco
         {
             if (_view is not null)
             {
-                var r = await _view.InvokeScriptAsync("eval", [script]);
+                var r = await _view.RunScriptAsync<object>(script);
                 return r?.ToString();
             }
 
