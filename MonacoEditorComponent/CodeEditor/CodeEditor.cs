@@ -128,37 +128,44 @@ namespace Monaco
                 return;
             }
 
-            bool hasEditorContext = false;
             try
             {
-                hasEditorContext = await SendScriptAsync<bool>(
-                    "(() => { try { const getContext = (EditorContext.tryGetEditorForElement || EditorContext.getEditorForElement); const ctx = getContext.call(EditorContext, element); return !!(ctx && ctx.editor); } catch { return false; } })()")
-                    == true;
+                var hasEditorContextResult = await desktopPresenter.InvokeScriptAsync("""
+                    (() => {
+                        try {
+                            const getContext = (EditorContext.tryGetEditorForElement || EditorContext.getEditorForElement);
+                            const ctx = getContext.call(EditorContext, element);
+                            return !!(ctx && ctx.editor && ctx.model);
+                        } catch {
+                            return false;
+                        }
+                    })()
+                    """);
+                if (!ScriptResultIsTrue(hasEditorContextResult))
+                {
+                    if (_desktopBootstrapInFlight
+                        || desktopPresenter.IsLaunchInProgress
+                        || !desktopPresenter.IsCoreWebView2Initialized)
+                    {
+                        Debug.WriteLine(
+                            "CodeEditor_Loaded: soft-reuse probe missing context, but bootstrap/launch still in flight.");
+                        return;
+                    }
+
+                    Debug.WriteLine(
+                        "CodeEditor_Loaded: soft-reuse probe missing editor context, rebootstrap requested.");
+                    RebootstrapMonacoAsync();
+                    return;
+                }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine(
                     $"CodeEditor_Loaded: soft-reuse probe failed ({ex.GetType().Name}: {ex.Message})");
-            }
-
-            if (hasEditorContext)
-            {
-                await SendScriptAsync("EditorContext.getEditorForElement(element).editor.layout();");
                 return;
             }
 
-            if (_desktopBootstrapInFlight
-                || desktopPresenter.IsLaunchInProgress
-                || !desktopPresenter.IsCoreWebView2Initialized)
-            {
-                Debug.WriteLine(
-                    "CodeEditor_Loaded: soft-reuse probe missing context, but bootstrap/launch still in flight.");
-                return;
-            }
-
-            Debug.WriteLine(
-                "CodeEditor_Loaded: soft-reuse probe missing editor context, rebootstrap requested.");
-            RebootstrapMonacoAsync();
+            await SendScriptAsync("EditorContext.getEditorForElement(element).editor.layout();");
         }
 
         private void ResumePendingDesktopInitialization()

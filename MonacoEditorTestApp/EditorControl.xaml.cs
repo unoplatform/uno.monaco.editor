@@ -229,7 +229,6 @@ namespace MonacoEditorTestApp
                     Editor.Focus(FocusState.Programmatic);
                 });
 
-                await Editor.AddActionAsync(new TestAction());
             }
             catch (Exception ex)
             {
@@ -242,10 +241,11 @@ namespace MonacoEditorTestApp
             try
             {
                 await Editor.Languages.RegisterHoverProviderAsync("csharp", new EditorHoverProvider());
+                await Editor.AddActionAsync(new TestAction());
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Editor_Loaded hover registration failed: {ex}");
+                Debug.WriteLine($"Editor_Loaded registration failed: {ex}");
             }
 
             // Ready for Display
