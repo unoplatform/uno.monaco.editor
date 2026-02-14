@@ -376,6 +376,63 @@ namespace MonacoEditorTestApp
         /// </summary>
         private bool _testHarnessInitialized;
 
+        public bool IsEditorOperational => Editor is { IsEditorLoaded: true };
+
+        public async Task<string> CollectRuntimeProbeAsync(string stage)
+        {
+            if (Editor is null)
+            {
+                return BuildProbeErrorJson(stage, "editor-null");
+            }
+
+            try
+            {
+                var stageLiteral = ToJsonStringLiteral(stage);
+                var probe = await Editor.InvokeScriptAsync($$"""
+                    (() => {
+                        try {
+                            const context = typeof EditorContext !== 'undefined' && EditorContext.getEditorForElement
+                                ? EditorContext.getEditorForElement(element)
+                                : null;
+                            const editor = context && context.editor
+                                ? context.editor
+                                : (window.monaco?.editor?.getEditors?.()[0] ?? null);
+                            const model = editor && editor.getModel ? editor.getModel() : null;
+                            const domNode = editor && editor.getDomNode ? editor.getDomNode() : null;
+                            const rect = domNode && domNode.getBoundingClientRect ? domNode.getBoundingClientRect() : null;
+                            return JSON.stringify({
+                                stage: {{stageLiteral}},
+                                hasEditor: !!editor,
+                                hasModel: !!model,
+                                isConnected: !!(domNode && domNode.isConnected),
+                                width: rect ? rect.width : -1,
+                                height: rect ? rect.height : -1,
+                                valueLength: model && model.getValue ? model.getValue().length : -1
+                            });
+                        } catch (error) {
+                            return JSON.stringify({ stage: {{stageLiteral}}, error: String(error) });
+                        }
+                    })()
+                    """);
+
+                return probe ?? BuildProbeErrorJson(stage, "null-probe");
+            }
+            catch (Exception ex)
+            {
+                return BuildProbeErrorJson(stage, ex.Message);
+            }
+        }
+
+        private static string BuildProbeErrorJson(string stage, string error)
+            => $"{{\"stage\":{ToJsonStringLiteral(stage)},\"error\":{ToJsonStringLiteral(error)}}}";
+
+        private static string ToJsonStringLiteral(string value)
+            => $"\"{value
+                .Replace("\\", "\\\\", StringComparison.Ordinal)
+                .Replace("\"", "\\\"", StringComparison.Ordinal)
+                .Replace("\r", "\\r", StringComparison.Ordinal)
+                .Replace("\n", "\\n", StringComparison.Ordinal)}\"";
+
         private void Editor_OpenLinkRequest(CodeEditor sender, OpenLinkRequestedEventArgs args)
         {
             if (this.AllowWeb.IsChecked == false)

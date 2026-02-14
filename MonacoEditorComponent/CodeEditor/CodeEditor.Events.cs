@@ -52,6 +52,7 @@ namespace Monaco
 
         private IThemeListener? _themeListener;
         private EditorLifecycleState _lifecycleState = EditorLifecycleState.Unloaded;
+        private int _desktopInitTimeoutRetryCount;
 
         /// <summary>
         /// Transitions the editor lifecycle to the specified state,
@@ -65,6 +66,7 @@ namespace Monaco
             {
                 case EditorLifecycleState.Loading when _lifecycleState == EditorLifecycleState.Unloaded:
                     _lifecycleState = EditorLifecycleState.Loading;
+                    _desktopInitTimeoutRetryCount = 0;
                     EditorLoading?.Invoke(this, new RoutedEventArgs());
                     // Emit lifecycle update via JSON-RPC for desktop testability (Task 8).
                     if (_view is DesktopCodeEditorPresenter loadingPresenter)
@@ -86,6 +88,7 @@ namespace Monaco
 
                 case EditorLifecycleState.Unloaded:
                     _lifecycleState = EditorLifecycleState.Unloaded;
+                    _desktopInitTimeoutRetryCount = 0;
                     IsEditorLoaded = false;
                     return true;
 
@@ -325,10 +328,77 @@ namespace Monaco
             if (_lifecycleState == EditorLifecycleState.Loading && startState == EditorLifecycleState.Loading)
             {
                 _desktopBootstrapInFlight = false;
+
+                if (_view is DesktopCodeEditorPresenter desktopPresenter)
+                {
+                    if (await HasDesktopEditorContextAsync(desktopPresenter))
+                    {
+                        DesktopCodeEditorPresenter.DiagnosticLog(
+                            "INIT_TIMEOUT: editor context exists despite missing callback; synthesizing CodeEditorLoaded.");
+                        CodeEditorLoaded();
+                        return;
+                    }
+
+                    if (_desktopInitTimeoutRetryCount < 1)
+                    {
+                        _desktopInitTimeoutRetryCount++;
+                        var initError = await ReadDesktopInitErrorAsync(desktopPresenter);
+                        DesktopCodeEditorPresenter.DiagnosticLog(
+                            $"INIT_TIMEOUT: retrying createMonacoEditor (attempt={_desktopInitTimeoutRetryCount + 1}, initError={initError ?? "none"}).");
+                        RebootstrapMonacoAsync();
+                        return;
+                    }
+                }
+
                 var msg = $"Monaco editor initialization timed out after {timeoutMs}ms. " +
                     "CodeEditorLoaded callback was never received. Check browser console for errors.";
                 DesktopCodeEditorPresenter.DiagnosticLog($"INIT_TIMEOUT: {msg}");
                 InternalException?.Invoke(this, new TimeoutException(msg));
+            }
+        }
+
+        private static bool ScriptResultIsTrue(string? value)
+            => string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "\"true\"", StringComparison.OrdinalIgnoreCase);
+
+        private async Task<bool> HasDesktopEditorContextAsync(DesktopCodeEditorPresenter desktopPresenter)
+        {
+            try
+            {
+                var hasContext = await desktopPresenter.InvokeScriptAsync("""
+                    (() => {
+                        const element = document.getElementById('editor-container');
+                        const context = typeof EditorContext !== 'undefined' && EditorContext.tryGetEditorForElement
+                            ? EditorContext.tryGetEditorForElement(element)
+                            : null;
+                        return !!(context && context.editor && context.model);
+                    })()
+                    """);
+
+                return ScriptResultIsTrue(hasContext);
+            }
+            catch (Exception ex)
+            {
+                DesktopCodeEditorPresenter.DiagnosticLog($"INIT_TIMEOUT: context probe failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        private async Task<string?> ReadDesktopInitErrorAsync(DesktopCodeEditorPresenter desktopPresenter)
+        {
+            try
+            {
+                var result = await desktopPresenter.InvokeScriptAsync("globalThis.__unoMonacoInitError ?? null");
+                if (string.Equals(result, "null", StringComparison.OrdinalIgnoreCase))
+                {
+                    return null;
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                return $"probe-failed:{ex.Message}";
             }
         }
 
