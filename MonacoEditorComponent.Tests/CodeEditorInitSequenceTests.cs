@@ -174,4 +174,24 @@ public sealed class CodeEditorInitSequenceTests
 
         Assert.Equal(expected, shouldResume);
     }
+
+    [Theory]
+    [InlineData(true, 1, false, true)]   // Loading
+    [InlineData(true, 2, true, true)]    // Loaded + rebootstrap in flight
+    [InlineData(true, 2, false, false)]  // Loaded without rebootstrap
+    [InlineData(true, 0, true, false)]   // Unloaded
+    [InlineData(false, 1, true, false)]  // Not loaded control
+    public void ShouldProcessCodeEditorLoaded_GuardsExpectedCases(
+        bool isLoaded,
+        int lifecycleState,
+        bool bootstrapInFlight,
+        bool expected)
+    {
+        var shouldProcess = CodeEditor.ShouldProcessCodeEditorLoaded(
+            isLoaded,
+            (EditorLifecycleState)lifecycleState,
+            bootstrapInFlight);
+
+        Assert.Equal(expected, shouldProcess);
+    }
 }

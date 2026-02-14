@@ -492,51 +492,67 @@ namespace Monaco
 
         private async void CodeEditorLoaded()
         {
-            Debug.WriteLine($"CodeEditorLoaded: IsLoaded={IsLoaded}, state={_lifecycleState}, HasThreadAccess={_queue?.HasThreadAccess}");
+            Debug.WriteLine($"CodeEditorLoaded: IsLoaded={IsLoaded}, state={_lifecycleState}, bootstrapInFlight={_desktopBootstrapInFlight}, HasThreadAccess={_queue?.HasThreadAccess}");
 
             // Guard against late callback after unload. This is invoked via
             // ParentAccessor.CallAction("Loaded") which can be queued/delayed.
-            if (!IsLoaded || _lifecycleState != EditorLifecycleState.Loading)
+            if (!ShouldProcessCodeEditorLoaded(IsLoaded, _lifecycleState, _desktopBootstrapInFlight))
             {
                 _desktopBootstrapInFlight = false;
-                Debug.WriteLine($"CodeEditorLoaded: ignoring (IsLoaded={IsLoaded}, state={_lifecycleState})");
+                Debug.WriteLine($"CodeEditorLoaded: ignoring (IsLoaded={IsLoaded}, state={_lifecycleState}, bootstrapInFlight={_desktopBootstrapInFlight})");
                 return;
             }
 
-            _view = _view ?? throw new InvalidOperationException("The view not set");
-
-            // Enable script execution before init-time calls. SendScriptAsync and
-            // InvokeScriptAsync are gated by _initialized, so we must set it before
-            // applying initial properties.
-            _initialized = true;
-
-            // Emit canonical init-complete marker for diagnostics (always visible).
-            Debug.WriteLine("INIT_COMPLETE");
-
-            // Layout first to ensure the editor dimensions are correct.
-            await SendScriptAsync("EditorContext.getEditorForElement(element).editor.layout();");
-
-            // Apply all current property values in the correct order
-            // This ensures properties set before IsEditorLoaded=true take effect
-            await ApplyInitialPropertyValues();
-
-            // Use lifecycle state machine for exactly-once semantics.
-            // Transition BEFORE focus to prevent focus ping-pong during init.
-            TransitionLifecycle(EditorLifecycleState.Loaded);
-            _desktopBootstrapInFlight = false;
-            _pendingDesktopBootstrapAfterLoad = false;
-
-            // Defer focus until after init is fully complete to avoid focus ping-pong.
-            // Only focus if this CodeEditor is the currently focused element.
-#pragma warning disable CS0618 // Type or member is obsolete
-            if (FocusManager.GetFocusedElement() == this)
+            try
             {
-                await SendScriptAsync("EditorContext.getEditorForElement(element).editor.focus();");
-                _view.Focus(FocusState.Programmatic);
-            }
+                _view = _view ?? throw new InvalidOperationException("The view not set");
+
+                // Enable script execution before init-time calls. SendScriptAsync and
+                // InvokeScriptAsync are gated by _initialized, so we must set it before
+                // applying initial properties.
+                _initialized = true;
+
+                // Emit canonical init-complete marker for diagnostics (always visible).
+                Debug.WriteLine("INIT_COMPLETE");
+
+                // Layout first to ensure the editor dimensions are correct.
+                await SendScriptAsync("EditorContext.getEditorForElement(element).editor.layout();");
+
+                // Apply all current property values in the correct order
+                // This ensures properties set before IsEditorLoaded=true take effect
+                await ApplyInitialPropertyValues();
+
+                // Transition to Loaded only when coming from Loading.
+                if (_lifecycleState == EditorLifecycleState.Loading)
+                {
+                    TransitionLifecycle(EditorLifecycleState.Loaded);
+                }
+                else
+                {
+                    IsEditorLoaded = true;
+                }
+
+                _desktopBootstrapInFlight = false;
+                _pendingDesktopBootstrapAfterLoad = false;
+
+                // Defer focus until after init is fully complete to avoid focus ping-pong.
+                // Only focus if this CodeEditor is the currently focused element.
+#pragma warning disable CS0618 // Type or member is obsolete
+                if (FocusManager.GetFocusedElement() == this)
+                {
+                    await SendScriptAsync("EditorContext.getEditorForElement(element).editor.focus();");
+                    _view.Focus(FocusState.Programmatic);
+                }
 #pragma warning restore CS0618 // Type or member is obsolete
 
-            Debug.WriteLine("CodeEditorLoaded: complete");
+                Debug.WriteLine("CodeEditorLoaded: complete");
+            }
+            catch (Exception ex)
+            {
+                _desktopBootstrapInFlight = false;
+                Debug.WriteLine($"CodeEditorLoaded failed: {ex}");
+                InternalException?.Invoke(this, ex);
+            }
         }
 
         /// <summary>
@@ -711,5 +727,13 @@ namespace Monaco
                 && isCoreWebView2Initialized
                 && !isLaunchInProgress
                 && canInvokeBootstrap;
+
+        internal static bool ShouldProcessCodeEditorLoaded(
+            bool isLoaded,
+            EditorLifecycleState lifecycleState,
+            bool bootstrapInFlight)
+            => isLoaded
+                && (lifecycleState == EditorLifecycleState.Loading
+                    || (bootstrapInFlight && lifecycleState == EditorLifecycleState.Loaded));
     }
 }

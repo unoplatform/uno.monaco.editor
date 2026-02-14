@@ -399,8 +399,7 @@ namespace Monaco
             if (string.Equals(parsed.Scheme, "https", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(parsed.Scheme, "http", StringComparison.OrdinalIgnoreCase))
             {
-                return string.Equals(parsed.Host, AllowedVirtualHost, StringComparison.OrdinalIgnoreCase)
-                    && parsed.IsDefaultPort;
+                return string.Equals(parsed.Host, AllowedVirtualHost, StringComparison.OrdinalIgnoreCase);
             }
 
             // Fallback: file:// navigation for platforms where virtual host mapping
@@ -567,8 +566,7 @@ namespace Monaco
 
             return (string.Equals(currentSource.Scheme, "http", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(currentSource.Scheme, "https", StringComparison.OrdinalIgnoreCase))
-                && string.Equals(currentSource.Host, AllowedVirtualHost, StringComparison.OrdinalIgnoreCase)
-                && currentSource.IsDefaultPort;
+                && string.Equals(currentSource.Host, AllowedVirtualHost, StringComparison.OrdinalIgnoreCase);
         }
 
         private void NavigateToEditorPage(string contentRoot)
@@ -595,7 +593,7 @@ namespace Monaco
             // Navigate using WebView2.Source (documented as implemented on Skia).
             // Prefer virtual host (proper origins for CORS); fall back to file://.
             global::System.Uri editorUri;
-            if (virtualHostAvailable)
+            if (virtualHostAvailable && OperatingSystem.IsWindows())
             {
                 editorUri = BuildVirtualHostEditorUri();
             }

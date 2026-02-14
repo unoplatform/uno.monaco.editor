@@ -95,6 +95,8 @@ namespace Monaco
         private void UpdatePresenterVisibility()
         {
             var isVisible = IsEditorLoaded;
+            Debug.WriteLine(
+                $"UpdatePresenterVisibility: visible={isVisible} IsEditorLoaded={IsEditorLoaded} IsLoaded={IsLoaded} lifecycle={_lifecycleState} presenter={_view?.GetHashCode():x8}");
 
             if (_view is DesktopCodeEditorPresenter desktopPresenter)
             {
@@ -106,6 +108,57 @@ namespace Monaco
                 presenterElement.Opacity = isVisible ? 1d : 0d;
                 presenterElement.IsHitTestVisible = isVisible;
             }
+        }
+
+        private void EnsureDesktopEditorContextAfterSoftReload()
+        {
+            if (_view is DesktopCodeEditorPresenter)
+            {
+                _ = EnsureDesktopEditorContextAfterSoftReloadAsync();
+            }
+        }
+
+        private async Task EnsureDesktopEditorContextAfterSoftReloadAsync()
+        {
+            if (_view is not DesktopCodeEditorPresenter desktopPresenter
+                || !IsLoaded
+                || !_initialized
+                || _lifecycleState == EditorLifecycleState.Unloaded)
+            {
+                return;
+            }
+
+            bool hasEditorContext = false;
+            try
+            {
+                hasEditorContext = await SendScriptAsync<bool>(
+                    "(() => { try { const getContext = (EditorContext.tryGetEditorForElement || EditorContext.getEditorForElement); const ctx = getContext.call(EditorContext, element); return !!(ctx && ctx.editor); } catch { return false; } })()")
+                    == true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(
+                    $"CodeEditor_Loaded: soft-reuse probe failed ({ex.GetType().Name}: {ex.Message})");
+            }
+
+            if (hasEditorContext)
+            {
+                await SendScriptAsync("EditorContext.getEditorForElement(element).editor.layout();");
+                return;
+            }
+
+            if (_desktopBootstrapInFlight
+                || desktopPresenter.IsLaunchInProgress
+                || !desktopPresenter.IsCoreWebView2Initialized)
+            {
+                Debug.WriteLine(
+                    "CodeEditor_Loaded: soft-reuse probe missing context, but bootstrap/launch still in flight.");
+                return;
+            }
+
+            Debug.WriteLine(
+                "CodeEditor_Loaded: soft-reuse probe missing editor context, rebootstrap requested.");
+            RebootstrapMonacoAsync();
         }
 
         private void ResumePendingDesktopInitialization()
@@ -248,6 +301,8 @@ namespace Monaco
 
         private void CodeEditor_Loaded(object sender, RoutedEventArgs e)
         {
+            Debug.WriteLine(
+                $"CodeEditor_Loaded: IsLoaded={IsLoaded} lifecycle={_lifecycleState} IsEditorLoaded={IsEditorLoaded} initialized={_initialized} presenter={_view?.GetHashCode():x8}");
             UpdatePresenterVisibility();
 
             // If a deferred teardown is pending from a previous Unloaded event,
@@ -271,6 +326,7 @@ namespace Monaco
 
                 EmitSubscriptionDiagnostics("Loaded(soft)");
                 ResumePendingDesktopInitialization();
+                EnsureDesktopEditorContextAfterSoftReload();
                 return;
             }
 
@@ -298,6 +354,7 @@ namespace Monaco
 
                 EmitSubscriptionDiagnostics("Loaded(soft-reuse)");
                 ResumePendingDesktopInitialization();
+                EnsureDesktopEditorContextAfterSoftReload();
                 return;
             }
 
@@ -373,6 +430,8 @@ namespace Monaco
         private void CodeEditor_Unloaded(object sender, RoutedEventArgs e)
         {
             Unloaded -= CodeEditor_Unloaded;
+            Debug.WriteLine(
+                $"CodeEditor_Unloaded: IsLoaded={IsLoaded} lifecycle={_lifecycleState} IsEditorLoaded={IsEditorLoaded} initialized={_initialized} presenter={_view?.GetHashCode():x8}");
             UpdatePresenterVisibility();
 
             // Note: Presenter event handlers (NavigationStarting, NavigationCompleted,
