@@ -219,4 +219,20 @@ public sealed class CodeEditorInitSequenceTests
 
         Assert.Equal(expected, shouldProcess);
     }
+
+    [Theory]
+    [InlineData("{\"initComplete\":true}", true)]
+    [InlineData("{\"initComplete\":false}", false)]
+    [InlineData("\"{\\\"initComplete\\\":true}\"", true)]
+    [InlineData("\"{\\\"initComplete\\\":false}\"", false)]
+    [InlineData("\"{\\\"initComplete\\\":\\\"true\\\"}\"", true)]
+    [InlineData("\"{\\\"other\\\":1,\\\"initComplete\\\":true}\"", true)]
+    public void RuntimeSnapshotIndicatesInitComplete_ParsesDirectAndEscapedJson(
+        string runtimeSnapshot,
+        bool expected)
+    {
+        var isComplete = CodeEditor.RuntimeSnapshotIndicatesInitComplete(runtimeSnapshot);
+
+        Assert.Equal(expected, isComplete);
+    }
 }

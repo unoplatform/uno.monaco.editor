@@ -289,6 +289,11 @@ namespace Monaco
             DesktopCodeEditorPresenter.DiagnosticLog($"{source}: invoking createMonacoEditor (fire-and-forget)...");
             _ = InvokeDesktopBootstrapAsync(presenter, escapedState, source);
 
+            // Callback-loss recovery: some desktop backends (notably WKWebView host paths)
+            // can initialize Monaco successfully but never deliver the JS->C# Loaded callback.
+            // Probe the JS init-complete flag and synthesize CodeEditorLoaded when observed.
+            _ = MonitorDesktopInitCompletionAsync();
+
             // Timeout fallback: if CodeEditorLoaded never fires (script failure,
             // Monaco crash, etc.), surface a diagnostic error after 30 seconds.
             _ = MonitorInitTimeoutAsync();
@@ -343,8 +348,17 @@ namespace Monaco
                     {
                         _desktopInitTimeoutRetryCount++;
                         var initError = await ReadDesktopInitErrorAsync(desktopPresenter);
+                        var runtimeSnapshot = await ReadDesktopRuntimeSnapshotAsync(desktopPresenter);
+                        if (await IsDesktopInitCompleteAsync(desktopPresenter, runtimeSnapshot))
+                        {
+                            DesktopCodeEditorPresenter.DiagnosticLog(
+                                $"INIT_TIMEOUT: JS init complete after timeout probe (runtime={runtimeSnapshot ?? "null"}); synthesizing CodeEditorLoaded.");
+                            CodeEditorLoaded();
+                            return;
+                        }
+
                         DesktopCodeEditorPresenter.DiagnosticLog(
-                            $"INIT_TIMEOUT: retrying createMonacoEditor (attempt={_desktopInitTimeoutRetryCount + 1}, initError={initError ?? "none"}).");
+                            $"INIT_TIMEOUT: retrying createMonacoEditor (attempt={_desktopInitTimeoutRetryCount + 1}, initError={initError ?? "none"}, runtime={runtimeSnapshot ?? "null"}).");
                         RebootstrapMonacoAsync();
                         return;
                     }
@@ -357,9 +371,44 @@ namespace Monaco
             }
         }
 
+        private async Task MonitorDesktopInitCompletionAsync()
+        {
+            if (_view is not DesktopCodeEditorPresenter desktopPresenter)
+            {
+                return;
+            }
+
+            const int probeIntervalMs = 250;
+            const int maxProbeAttempts = 40; // 10 seconds total
+            for (var attempt = 0; attempt < maxProbeAttempts; attempt++)
+            {
+                if (_lifecycleState != EditorLifecycleState.Loading || !_desktopBootstrapInFlight)
+                {
+                    return;
+                }
+
+                if (await IsDesktopInitCompleteAsync(desktopPresenter))
+                {
+                    DesktopCodeEditorPresenter.DiagnosticLog(
+                        "INIT_COMPLETE_PROBE: JS init complete without callback; synthesizing CodeEditorLoaded.");
+                    CodeEditorLoaded();
+                    return;
+                }
+
+                await Task.Delay(probeIntervalMs);
+            }
+        }
+
         private static bool ScriptResultIsTrue(string? value)
-            => string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(value, "\"true\"", StringComparison.OrdinalIgnoreCase);
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            var normalized = value.Trim().Trim('"');
+            return string.Equals(normalized, "true", StringComparison.OrdinalIgnoreCase);
+        }
 
         private async Task<bool> HasDesktopEditorContextAsync(DesktopCodeEditorPresenter desktopPresenter)
         {
@@ -399,6 +448,118 @@ namespace Monaco
             catch (Exception ex)
             {
                 return $"probe-failed:{ex.Message}";
+            }
+        }
+
+        private async Task<string?> ReadDesktopRuntimeSnapshotAsync(DesktopCodeEditorPresenter desktopPresenter)
+        {
+            try
+            {
+                return await desktopPresenter.InvokeScriptAsync("""
+                    (() => JSON.stringify({
+                        isDesktopHostDetected: !!(globalThis.isDesktopHost && globalThis.isDesktopHost()),
+                        hasChromeWebView: !!(globalThis.chrome && globalThis.chrome.webview && globalThis.chrome.webview.postMessage),
+                        hasWebkitBridge: !!(globalThis.webkit && globalThis.webkit.messageHandlers && globalThis.webkit.messageHandlers.unoWebView && globalThis.webkit.messageHandlers.unoWebView.postMessage),
+                        hasWindowModule: typeof window.Module !== 'undefined',
+                        hasJsonRpc: !!globalThis.__jsonRpc,
+                        initComplete: globalThis.__unoMonacoInitComplete ?? null
+                    }))()
+                    """);
+            }
+            catch (Exception ex)
+            {
+                return $"runtime-probe-failed:{ex.Message}";
+            }
+        }
+
+        private async Task<bool> IsDesktopInitCompleteAsync(DesktopCodeEditorPresenter desktopPresenter, string? runtimeSnapshot = null)
+        {
+            if (RuntimeSnapshotIndicatesInitComplete(runtimeSnapshot))
+            {
+                return true;
+            }
+
+            var snapshot = runtimeSnapshot ?? await ReadDesktopRuntimeSnapshotAsync(desktopPresenter);
+            if (RuntimeSnapshotIndicatesInitComplete(snapshot))
+            {
+                return true;
+            }
+
+            try
+            {
+                var result = await desktopPresenter.InvokeScriptAsync("globalThis.__unoMonacoInitComplete === true");
+                return ScriptResultIsTrue(result);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        internal static bool RuntimeSnapshotIndicatesInitComplete(string? runtimeSnapshot)
+        {
+            if (string.IsNullOrWhiteSpace(runtimeSnapshot))
+            {
+                return false;
+            }
+
+            if (TryReadInitCompleteFlag(runtimeSnapshot, out var isComplete))
+            {
+                return isComplete;
+            }
+
+            try
+            {
+                var decoded = JsonSerializer.Deserialize<string>(runtimeSnapshot);
+                if (TryReadInitCompleteFlag(decoded, out isComplete))
+                {
+                    return isComplete;
+                }
+            }
+            catch (JsonException)
+            {
+            }
+
+            return runtimeSnapshot.Contains("\"initComplete\":true", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool TryReadInitCompleteFlag(string? runtimeSnapshot, out bool isComplete)
+        {
+            isComplete = false;
+            if (string.IsNullOrWhiteSpace(runtimeSnapshot))
+            {
+                return false;
+            }
+
+            try
+            {
+                using var doc = JsonDocument.Parse(runtimeSnapshot);
+                if (doc.RootElement.ValueKind != JsonValueKind.Object
+                    || !doc.RootElement.TryGetProperty("initComplete", out var initCompleteElement))
+                {
+                    return false;
+                }
+
+                switch (initCompleteElement.ValueKind)
+                {
+                    case JsonValueKind.True:
+                        isComplete = true;
+                        return true;
+                    case JsonValueKind.False:
+                        isComplete = false;
+                        return true;
+                    case JsonValueKind.String:
+                        return bool.TryParse(initCompleteElement.GetString(), out isComplete);
+                    case JsonValueKind.Number when initCompleteElement.TryGetInt32(out var numericValue):
+                        isComplete = numericValue != 0;
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+            catch (JsonException)
+            {
+                return false;
             }
         }
 
