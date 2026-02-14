@@ -45,7 +45,8 @@ namespace Monaco.Extensions
             var returnstring = await _view.InvokeScriptWithElementAsync(script);
 
             // TODO: Need to decode the error correctly
-            if (returnstring.Contains("wv_internal_error"))
+            if (!string.IsNullOrEmpty(returnstring)
+                && returnstring.Contains("wv_internal_error", StringComparison.Ordinal))
             {
                 throw new JavaScriptInnerException(returnstring, "");
             }
@@ -140,7 +141,8 @@ namespace Monaco.Extensions
 
                 System.Diagnostics.Debug.WriteLine($"InvokeMethodAsync {method} result: {returnstring}");
 
-                if (returnstring.Contains("wv_internal_error"))
+                if (!string.IsNullOrEmpty(returnstring)
+                    && returnstring.Contains("wv_internal_error", StringComparison.Ordinal))
                 {
                     throw new JavaScriptInnerException(returnstring, "");
                 }
