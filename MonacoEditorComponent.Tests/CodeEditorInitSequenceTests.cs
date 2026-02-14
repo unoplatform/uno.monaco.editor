@@ -135,6 +135,31 @@ public sealed class CodeEditorInitSequenceTests
     }
 
     [Theory]
+    [InlineData(0, false, true, false, false, true)]
+    [InlineData(1, false, true, false, false, false)]
+    [InlineData(0, true, true, false, false, false)]
+    [InlineData(0, false, false, false, false, false)]
+    [InlineData(0, false, true, true, false, false)]
+    [InlineData(0, false, true, false, true, false)]
+    public void ShouldRestoreDesktopBridgeOnControlLoaded_GuardsExpectedCases(
+        int lifecycleState,
+        bool hasInitializedPresenter,
+        bool isCoreWebView2Initialized,
+        bool isLaunchInProgress,
+        bool bootstrapInFlight,
+        bool expected)
+    {
+        var shouldRestore = CodeEditor.ShouldRestoreDesktopBridgeOnControlLoaded(
+            (EditorLifecycleState)lifecycleState,
+            hasInitializedPresenter,
+            isCoreWebView2Initialized,
+            isLaunchInProgress,
+            bootstrapInFlight);
+
+        Assert.Equal(expected, shouldRestore);
+    }
+
+    [Theory]
     [InlineData(false, true, true, true)]
     [InlineData(true, true, true, false)]
     [InlineData(false, false, true, false)]

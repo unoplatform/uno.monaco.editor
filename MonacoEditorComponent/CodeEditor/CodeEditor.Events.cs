@@ -710,6 +710,18 @@ namespace Monaco
                 && !isLaunchInProgress
                 && lifecycleState == EditorLifecycleState.Unloaded;
 
+        internal static bool ShouldRestoreDesktopBridgeOnControlLoaded(
+            EditorLifecycleState lifecycleState,
+            bool hasInitializedPresenter,
+            bool isCoreWebView2Initialized,
+            bool isLaunchInProgress,
+            bool bootstrapInFlight)
+            => lifecycleState == EditorLifecycleState.Unloaded
+                && !hasInitializedPresenter
+                && isCoreWebView2Initialized
+                && !isLaunchInProgress
+                && !bootstrapInFlight;
+
         internal static bool ShouldDeferDesktopBootstrapOnNavigationCompleted(
             bool controlIsLoaded,
             bool navigationSucceeded,

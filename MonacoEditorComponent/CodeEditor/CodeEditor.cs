@@ -191,6 +191,32 @@ namespace Monaco
             }
         }
 
+        private void RestoreDesktopBridgeAfterHardTeardown()
+        {
+            if (_view is not DesktopCodeEditorPresenter desktopPresenter)
+            {
+                return;
+            }
+
+            if (!ShouldRestoreDesktopBridgeOnControlLoaded(
+                    _lifecycleState,
+                    _initializedPresenter is not null,
+                    desktopPresenter.IsCoreWebView2Initialized,
+                    desktopPresenter.IsLaunchInProgress,
+                    _desktopBootstrapInFlight))
+            {
+                return;
+            }
+
+            Debug.WriteLine("CodeEditor_Loaded: restoring bridge and rebootstrap after hard teardown.");
+            if (!InitialiseWebObjects())
+            {
+                return;
+            }
+
+            RebootstrapMonacoAsync();
+        }
+
         /// <summary>
         /// Gets the rendering backend used by the editor (Wasm or Desktop).
         /// </summary>
@@ -418,6 +444,7 @@ namespace Monaco
             // the editor is not ready. Ensure launch/bootstrap still starts from the
             // control Loaded path so startup does not stall on a missing presenter Loaded event.
             ResumePendingDesktopInitialization();
+            RestoreDesktopBridgeAfterHardTeardown();
         }
 
         private void OnWindowSizeChanged(object sender, WindowSizeChangedEventArgs e)
