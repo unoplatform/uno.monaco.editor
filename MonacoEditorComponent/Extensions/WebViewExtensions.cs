@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices.JavaScript;
 using System.Text.Json;
 
+using Monaco.Editor;
 using Monaco.Serialization;
 
 namespace Monaco.Extensions
@@ -121,6 +122,20 @@ namespace Monaco.Extensions
                         else if (item is string s)
                         {
                             return JsonSerializer.Serialize(s, MonacoJsonContext.Relaxed.Options);
+                        }
+                        else if (item is IActionDescriptor actionDescriptor)
+                        {
+                            var actionPayload = new
+                            {
+                                actionDescriptor.ContextMenuGroupId,
+                                actionDescriptor.ContextMenuOrder,
+                                actionDescriptor.Id,
+                                actionDescriptor.KeybindingContext,
+                                actionDescriptor.Keybindings,
+                                actionDescriptor.Label,
+                                actionDescriptor.Precondition
+                            };
+                            return JsonSerializer.Serialize(actionPayload, MonacoJsonContext.Relaxed.Options);
                         }
                         else
                         {

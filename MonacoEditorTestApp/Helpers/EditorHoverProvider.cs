@@ -22,7 +22,11 @@ namespace MonacoEditorTestApp.Helpers
                 ], new Monaco.Range(position.LineNumber, position.Column, position.LineNumber, position.Column + 3)));
             }
 
-            return Task.FromResult<Hover?>(null);
+            return Task.FromResult<Hover?>(new Hover(
+            [
+                "Hover provider is active."
+            ],
+            new Monaco.Range(position.LineNumber, position.Column, position.LineNumber, position.Column + 1)));
         }
     }
 }

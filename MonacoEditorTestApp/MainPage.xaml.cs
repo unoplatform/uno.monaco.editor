@@ -71,6 +71,8 @@ namespace MonacoEditorTestApp
                 var firstEditor = await WaitForEditorControlReadyAsync(0, readinessTimeout);
                 var firstProbe = await firstEditor.CollectRuntimeProbeAsync("tab0-initial");
                 Console.WriteLine($"SELF_VERIFY_PROBE:{firstProbe}");
+                var firstFeatureProbe = await firstEditor.CollectFeatureProbeAsync("tab0-initial");
+                Console.WriteLine($"SELF_VERIFY_FEATURE_PROBE:{firstFeatureProbe}");
 
                 AddEditorTab();
                 editors.SelectedIndex = editors.TabItems.Count - 1;
@@ -78,15 +80,22 @@ namespace MonacoEditorTestApp
                 var secondEditor = await WaitForEditorControlReadyAsync(editors.SelectedIndex, readinessTimeout);
                 var secondProbe = await secondEditor.CollectRuntimeProbeAsync("tab1-selected");
                 Console.WriteLine($"SELF_VERIFY_PROBE:{secondProbe}");
+                var secondFeatureProbe = await secondEditor.CollectFeatureProbeAsync("tab1-selected");
+                Console.WriteLine($"SELF_VERIFY_FEATURE_PROBE:{secondFeatureProbe}");
 
                 editors.SelectedIndex = 0;
                 var firstEditorAgain = await WaitForEditorControlReadyAsync(0, readinessTimeout);
                 var firstProbeAgain = await firstEditorAgain.CollectRuntimeProbeAsync("tab0-returned");
                 Console.WriteLine($"SELF_VERIFY_PROBE:{firstProbeAgain}");
+                var firstFeatureProbeAgain = await firstEditorAgain.CollectFeatureProbeAsync("tab0-returned");
+                Console.WriteLine($"SELF_VERIFY_FEATURE_PROBE:{firstFeatureProbeAgain}");
 
                 var isHealthy = IsHealthyProbe(firstProbe)
                     && IsHealthyProbe(secondProbe)
-                    && IsHealthyProbe(firstProbeAgain);
+                    && IsHealthyProbe(firstProbeAgain)
+                    && IsHealthyFeatureProbe(firstFeatureProbe)
+                    && IsHealthyFeatureProbe(secondFeatureProbe)
+                    && IsHealthyFeatureProbe(firstFeatureProbeAgain);
                 Console.WriteLine(isHealthy
                     ? "SELF_VERIFY_RESULT:PASS"
                     : "SELF_VERIFY_RESULT:FAIL");
@@ -153,6 +162,45 @@ namespace MonacoEditorTestApp
                     && root.GetProperty("isConnected").GetBoolean()
                     && root.GetProperty("width").GetDouble() > 0
                     && root.GetProperty("height").GetDouble() > 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool IsHealthyFeatureProbe(string probeJson)
+        {
+            if (string.IsNullOrWhiteSpace(probeJson))
+            {
+                return false;
+            }
+
+            try
+            {
+                using var json = JsonDocument.Parse(probeJson);
+                var root = json.RootElement;
+                if (root.TryGetProperty("error", out _))
+                {
+                    return false;
+                }
+
+                if (!root.TryGetProperty("hasTestAction", out var hasTestAction)
+                    || !hasTestAction.GetBoolean())
+                {
+                    return false;
+                }
+
+                if (!root.TryGetProperty("hoverProbeResult", out var hoverProbeResult)
+                    || hoverProbeResult.ValueKind != JsonValueKind.String)
+                {
+                    return false;
+                }
+
+                var hoverResultValue = hoverProbeResult.GetString();
+                return !string.IsNullOrWhiteSpace(hoverResultValue)
+                    && !string.Equals(hoverResultValue, "__null__", StringComparison.Ordinal)
+                    && !hoverResultValue.StartsWith("__error__:", StringComparison.Ordinal);
             }
             catch
             {

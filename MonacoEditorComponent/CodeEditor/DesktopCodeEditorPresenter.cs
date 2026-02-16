@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 
@@ -27,6 +28,7 @@ namespace Monaco
         private bool _isCoreWebView2Initialized;
         private bool _isLaunchInProgress;
         private bool _isHostVisibleRequested;
+        private bool _usingCoreWebMessageReceived;
         private WebView2JsonRpcMessageHandler? _messageHandler;
         private JsonRpc? _jsonRpc;
         private string? _desktopContentRoot;
@@ -199,8 +201,29 @@ namespace Monaco
                 _webView.NavigationStarting += WebView2_NavigationStarting;
                 _webView.NavigationCompleted += WebView2_NavigationCompleted;
 
-                // WebMessageReceived — use control-level event (documented on Skia).
-                _webView.WebMessageReceived += WebView2_WebMessageReceived;
+                // WebMessageReceived:
+                // - Windows reliably raises the control-level event.
+                // - macOS/Linux can require the CoreWebView2-level event for inbound messages.
+                if (OperatingSystem.IsWindows())
+                {
+                    _webView.WebMessageReceived += WebView2_WebMessageReceived;
+                    _usingCoreWebMessageReceived = false;
+                }
+                else
+                {
+                    try
+                    {
+                        _webView.CoreWebView2.WebMessageReceived += CoreWebView2_WebMessageReceived;
+                        _usingCoreWebMessageReceived = true;
+                        DiagnosticLog("DesktopCodeEditorPresenter: Using CoreWebView2.WebMessageReceived transport");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"DesktopCodeEditorPresenter: Core WebMessageReceived not supported ({ex.GetType().Name}), falling back to control event");
+                        _webView.WebMessageReceived += WebView2_WebMessageReceived;
+                        _usingCoreWebMessageReceived = false;
+                    }
+                }
 
                 // Block external navigation (CoreWebView2-only, best effort)
                 try
@@ -306,7 +329,7 @@ namespace Monaco
             // marshal back to the DispatcherQueue and await completion.
             if (_webView.DispatcherQueue.HasThreadAccess)
             {
-                _webView.CoreWebView2.PostWebMessageAsJson(json);
+                PostWebMessageToPage(json);
                 DiagnosticLog("PostWebMessageAsync: sent (UI thread)");
                 return Task.CompletedTask;
             }
@@ -316,7 +339,7 @@ namespace Monaco
             {
                 try
                 {
-                    _webView.CoreWebView2.PostWebMessageAsJson(json);
+                    PostWebMessageToPage(json);
                     DiagnosticLog("PostWebMessageAsync: sent (dispatched)");
                     tcs.SetResult();
                 }
@@ -335,6 +358,22 @@ namespace Monaco
             return tcs.Task;
         }
 
+        private void PostWebMessageToPage(string json)
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                _webView.CoreWebView2.PostWebMessageAsJson(json);
+                return;
+            }
+
+            // Uno's non-Windows WebView host does not consistently surface
+            // PostWebMessageAsJson to JS JSON-RPC readers. Dispatch a window-level
+            // MessageEvent directly so vscode-jsonrpc receives the envelope.
+            var base64Payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
+            _ = _webView.CoreWebView2.ExecuteScriptAsync(
+                "(function(){const __unoMsg = JSON.parse(atob('" + base64Payload + "'));window.dispatchEvent(new MessageEvent('message', { data: __unoMsg }));})();");
+        }
+
         /// <summary>
         /// Detaches event handlers that may have been partially attached during Launch().
         /// Covers both WebView2 control-level and CoreWebView2-level handlers.
@@ -350,18 +389,31 @@ namespace Monaco
             // CoreWebView2-level events (may not have been attached if not supported)
             if (_webView.CoreWebView2 is { } coreWebView2)
             {
+                if (_usingCoreWebMessageReceived)
+                {
+                    try { coreWebView2.WebMessageReceived -= CoreWebView2_WebMessageReceived; }
+                    catch { /* Not supported on this platform */ }
+                    _usingCoreWebMessageReceived = false;
+                }
+
                 try { coreWebView2.NewWindowRequested -= CoreWebView2_NewWindowRequested; }
                 catch { /* Not supported on this platform */ }
             }
         }
 
         private void WebView2_WebMessageReceived(WebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs args)
+            => ForwardWebMessageReceived(args, "control");
+
+        private void CoreWebView2_WebMessageReceived(Microsoft.Web.WebView2.Core.CoreWebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs args)
+            => ForwardWebMessageReceived(args, "core");
+
+        private void ForwardWebMessageReceived(Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs args, string source)
         {
             // Use WebMessageAsJson to handle both string and object payloads.
             // TryGetWebMessageAsString() would fail for JSON object messages
             // which is the primary format for JSON-RPC bridge traffic.
             var json = args.WebMessageAsJson;
-            DiagnosticLog($"DesktopCodeEditorPresenter: WebMessageReceived len={json?.Length ?? 0}");
+            DiagnosticLog($"DesktopCodeEditorPresenter: WebMessageReceived source={source} len={json?.Length ?? 0}");
             if (!string.IsNullOrEmpty(json))
             {
                 MessageReceived?.Invoke(this, new WebViewMessageEventArgs { MessageJson = json });

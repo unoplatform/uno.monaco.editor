@@ -16,17 +16,18 @@ import {
  * macOS/Linux: webkit.messageHandlers.unoWebView.postMessage
  */
 function postWebViewMessage(message: any): void {
-    if (typeof (window as any).chrome !== 'undefined' &&
-        (window as any).chrome.webview &&
-        typeof (window as any).chrome.webview.postMessage === 'function') {
-        // Windows WebView2
-        (window as any).chrome.webview.postMessage(message);
-    } else if (typeof (window as any).webkit !== 'undefined' &&
+    if (typeof (window as any).webkit !== 'undefined' &&
         (window as any).webkit.messageHandlers &&
         (window as any).webkit.messageHandlers.unoWebView &&
         typeof (window as any).webkit.messageHandlers.unoWebView.postMessage === 'function') {
         // macOS/Linux via WKWebView/WebKitGTK
-        (window as any).webkit.messageHandlers.unoWebView.postMessage(message);
+        // Send as JSON string to maximize compatibility with native message handlers.
+        (window as any).webkit.messageHandlers.unoWebView.postMessage(JSON.stringify(message));
+    } else if (typeof (window as any).chrome !== 'undefined' &&
+        (window as any).chrome.webview &&
+        typeof (window as any).chrome.webview.postMessage === 'function') {
+        // Windows WebView2
+        (window as any).chrome.webview.postMessage(message);
     } else {
         console.warn('[jsonRpcBridge] No WebView message transport available');
     }
@@ -40,7 +41,9 @@ function postWebViewMessage(message: any): void {
 class WebViewMessageReader extends AbstractMessageReader implements MessageReader {
     private _callback: DataCallback | null = null;
     private _messageListener: ((event: MessageEvent) => void) | null = null;
-    private _eventTarget: EventTarget | null = null;
+    private _eventTargets: EventTarget[] = [];
+    private _lastMessageFingerprint: string | null = null;
+    private _lastMessageTimestamp = 0;
 
     constructor() {
         super();
@@ -51,8 +54,25 @@ class WebViewMessageReader extends AbstractMessageReader implements MessageReade
 
         this._messageListener = (event: MessageEvent) => {
             // Only process messages that look like JSON-RPC (have jsonrpc field or id field)
-            const data = event.data;
+            let data = event.data;
+            if (typeof data === 'string') {
+                try {
+                    data = JSON.parse(data);
+                } catch {
+                    return;
+                }
+            }
             if (data && typeof data === 'object' && (data.jsonrpc || data.id !== undefined)) {
+                // When both window and chrome.webview channels are active, some hosts can
+                // deliver the same envelope on both targets. Drop near-immediate duplicates.
+                const fingerprint = JSON.stringify(data);
+                const now = Date.now();
+                if (this._lastMessageFingerprint === fingerprint && (now - this._lastMessageTimestamp) <= 5) {
+                    return;
+                }
+                this._lastMessageFingerprint = fingerprint;
+                this._lastMessageTimestamp = now;
+
                 if (this._callback) {
                     this._callback(data as Message);
                 }
@@ -62,20 +82,26 @@ class WebViewMessageReader extends AbstractMessageReader implements MessageReade
         // On Windows, WebView2 delivers host-to-page messages via chrome.webview 'message' events,
         // NOT window 'message'. Subscribe to the correct target per platform.
         // On macOS/Linux (WKWebView/WebKitGTK), messages arrive via window 'message'.
+        const hasWebkitBridge = typeof (window as any).webkit !== 'undefined'
+            && !!(window as any).webkit?.messageHandlers?.unoWebView?.postMessage;
         const chromeWebview = (window as any).chrome?.webview;
         if (chromeWebview && typeof chromeWebview.addEventListener === 'function') {
             chromeWebview.addEventListener('message', this._messageListener);
-        } else {
-            window.addEventListener('message', this._messageListener);
+            this._eventTargets.push(chromeWebview);
         }
-        this._eventTarget = chromeWebview || window;
+        if (hasWebkitBridge || !chromeWebview || typeof chromeWebview.addEventListener !== 'function') {
+            window.addEventListener('message', this._messageListener);
+            this._eventTargets.push(window);
+        }
 
         return {
             dispose: () => {
-                if (this._messageListener && this._eventTarget) {
-                    this._eventTarget.removeEventListener('message', this._messageListener);
+                if (this._messageListener) {
+                    for (const target of this._eventTargets) {
+                        target.removeEventListener('message', this._messageListener);
+                    }
                     this._messageListener = null;
-                    this._eventTarget = null;
+                    this._eventTargets = [];
                 }
                 this._callback = null;
             }

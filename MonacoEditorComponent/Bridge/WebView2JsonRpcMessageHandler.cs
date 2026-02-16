@@ -147,6 +147,14 @@ internal sealed class WebView2JsonRpcMessageHandler : IJsonRpcMessageHandler, ID
 
         try
         {
+            // Some desktop hosts deliver postMessage payloads as a JSON-encoded string
+            // (e.g. "\"{...}\"") instead of a JSON object. Normalize those envelopes.
+            json = NormalizeInboundJsonEnvelope(json);
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return;
+            }
+
             // Parse the raw JSON to inspect envelope type for security validation.
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
@@ -213,6 +221,26 @@ internal sealed class WebView2JsonRpcMessageHandler : IJsonRpcMessageHandler, ID
         {
             Debug.WriteLine($"WebView2JsonRpcMessageHandler: Error processing inbound message: {ex.Message}");
         }
+    }
+
+    private static string? NormalizeInboundJsonEnvelope(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        if (doc.RootElement.ValueKind != JsonValueKind.String)
+        {
+            return json;
+        }
+
+        var innerJson = doc.RootElement.GetString();
+        if (string.IsNullOrWhiteSpace(innerJson))
+        {
+            return null;
+        }
+
+        using var innerDoc = JsonDocument.Parse(innerJson);
+        return innerDoc.RootElement.ValueKind == JsonValueKind.Object
+            ? innerJson
+            : null;
     }
 
     public void Dispose()

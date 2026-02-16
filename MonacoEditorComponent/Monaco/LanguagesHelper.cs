@@ -277,14 +277,14 @@ namespace Monaco
                     {
                         try
                         {
-                            if (editor.GetModel() is { } model
-                                && JsonSerializer.Deserialize(args[0], MonacoJsonContext.Default.Position) is { } position)
+                            if (JsonSerializer.Deserialize(args[0], MonacoJsonContext.Default.Position) is { } position)
                             {
+                                var model = editor.GetModel() ?? new Monaco.Editor.ModelHelper(editor);
                                 const int hoverTimeoutMs = 5000;
                                 var hoverTask = provider.ProvideHover(model, position);
                                 var completedTask = await Task.WhenAny(hoverTask, Task.Delay(hoverTimeoutMs));
-                                if (completedTask != hoverTask)
-                                {
+                                    if (completedTask != hoverTask)
+                                    {
                                     System.Diagnostics.Debug.WriteLine($"Hover provider timeout [{requestId}] after {hoverTimeoutMs}ms");
                                     return string.Empty;
                                 }

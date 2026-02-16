@@ -246,6 +246,10 @@ namespace MonacoEditorTestApp
             catch (Exception ex)
             {
                 Debug.WriteLine($"Editor_Loaded registration failed: {ex}");
+                if (Environment.GetEnvironmentVariable("MONACO_DIAGNOSTICS") == "1")
+                {
+                    Console.WriteLine($"EDITOR_LOADED_REGISTRATION_FAILED:{ex.GetType().Name}:{ex.Message}");
+                }
             }
 
             // Ready for Display
@@ -416,6 +420,128 @@ namespace MonacoEditorTestApp
                     """);
 
                 return probe ?? BuildProbeErrorJson(stage, "null-probe");
+            }
+            catch (Exception ex)
+            {
+                return BuildProbeErrorJson(stage, ex.Message);
+            }
+        }
+
+        public async Task<string> CollectFeatureProbeAsync(string stage)
+        {
+            if (Editor is null)
+            {
+                return BuildProbeErrorJson(stage, "editor-null");
+            }
+
+            try
+            {
+                var stageLiteral = ToJsonStringLiteral(stage);
+                await Editor.InvokeScriptAsync("""
+                    (() => {
+                        globalThis.__unoHoverProbeResult = null;
+                        try {
+                            callParentEventAsync(
+                                element,
+                                "HoverProvidercsharp",
+                                [JSON.stringify({ lineNumber: 1, column: 1 })]
+                            )
+                            .then(result => {
+                                globalThis.__unoHoverProbeResult = result ?? "__null__";
+                            })
+                            .catch(error => {
+                                globalThis.__unoHoverProbeResult = "__error__:" + String(error);
+                            });
+                        } catch (error) {
+                            globalThis.__unoHoverProbeResult = "__error__:" + String(error);
+                        }
+                        return "started";
+                    })()
+                    """);
+
+                string? lastProbe = null;
+                for (var attempt = 0; attempt < 40; attempt++)
+                {
+                    string? probe = null;
+                    try
+                    {
+                        probe = await Editor.InvokeScriptAsync($$"""
+                            (() => {
+                                try {
+                                    const context = typeof EditorContext !== 'undefined' && EditorContext.getEditorForElement
+                                        ? EditorContext.getEditorForElement(element)
+                                        : null;
+                                    const editor = context && context.editor ? context.editor : null;
+                                    const hasTestAction = !!(
+                                        editor &&
+                                        (
+                                            (editor.getAction && editor.getAction('meta-test-action')) ||
+                                            (editor.getSupportedActions &&
+                                                editor.getSupportedActions().some(action => action.id === 'meta-test-action'))
+                                        )
+                                    );
+                                    const hoverProbeResult = globalThis.__unoHoverProbeResult;
+                                    const isReady = !!(hasTestAction
+                                        && typeof hoverProbeResult === 'string'
+                                        && hoverProbeResult.length > 0
+                                        && hoverProbeResult !== "__null__"
+                                        && !hoverProbeResult.startsWith("__error__:"));
+                                    return JSON.stringify({
+                                        stage: {{stageLiteral}},
+                                        hasTestAction,
+                                        hoverProbeResult,
+                                        isReady
+                                    });
+                                } catch (error) {
+                                    return JSON.stringify({ stage: {{stageLiteral}}, error: String(error) });
+                                }
+                            })()
+                            """);
+                    }
+                    catch
+                    {
+                        // Transient unload/reload can fail probe script execution.
+                        // Keep polling until the editor stabilizes.
+                    }
+
+                    if (!string.IsNullOrEmpty(probe))
+                    {
+                        lastProbe = probe;
+                        if (probe.Contains("\"isReady\":true", StringComparison.Ordinal))
+                        {
+                            return probe;
+                        }
+                    }
+
+                    if (string.IsNullOrEmpty(probe)
+                        || probe.Contains("\"hoverProbeResult\":null", StringComparison.Ordinal))
+                    {
+                        await Editor.InvokeScriptAsync("""
+                            (() => {
+                                try {
+                                    callParentEventAsync(
+                                        element,
+                                        "HoverProvidercsharp",
+                                        [JSON.stringify({ lineNumber: 1, column: 1 })]
+                                    )
+                                    .then(result => {
+                                        globalThis.__unoHoverProbeResult = result ?? "__null__";
+                                    })
+                                    .catch(error => {
+                                        globalThis.__unoHoverProbeResult = "__error__:" + String(error);
+                                    });
+                                } catch (error) {
+                                    globalThis.__unoHoverProbeResult = "__error__:" + String(error);
+                                }
+                                return "started";
+                            })()
+                            """);
+                    }
+
+                    await Task.Delay(200);
+                }
+
+                return lastProbe ?? BuildProbeErrorJson(stage, "hover-probe-timeout");
             }
             catch (Exception ex)
             {
