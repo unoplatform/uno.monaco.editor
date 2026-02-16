@@ -18,3 +18,6 @@ When reading process stdout/stderr concurrently with timeout: (1) start ReadToEn
 
 ## 2026-02-13 manual [convention]
 CDP bridge integration tests must verify both C# state (getJsonValue) AND Monaco/DOM state after bridge operations -- testing only one side can miss regressions in the C#->JS application path.
+
+## 2026-02-16 manual [convention]
+Validation/findings documents must explicitly state their methodology (empirical runtime observation vs architecture-based code analysis) upfront -- predictive conclusions from code reading must not be presented as observed test results

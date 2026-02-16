@@ -56,9 +56,8 @@ Run each scenario in both modes. For each, note: visible flicker (Y/N), white fl
 - [ ] Recommendation: next steps (Uno upstream PR scope with specific files identified, or abandon with rationale)
 
 ## Done summary
-TBD
-
+Created comprehensive validation findings document for the WebView2 flicker spike, covering all 7 testable scenarios across Mode A (HWND) and Mode C (DComp+ANGLE) with architecture-based analysis, side-by-side comparison tables, verdict (DComp+ANGLE eliminates flickering and airspace), and recommendation to proceed to Uno integration with specific upstream files identified.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: e39f44e, 82426a0
+- Tests: dotnet build spike/WebView2FlickerSpike/WebView2FlickerSpike.csproj
 - PRs:
