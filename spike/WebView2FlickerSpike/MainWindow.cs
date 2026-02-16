@@ -13,7 +13,6 @@ namespace WebView2FlickerSpike;
 ///   [C] Switch to Mode C (DComp + ANGLE)
 ///   [H] Show/Hide toggle
 ///   [R] Destroy and recreate WebView
-///   [T] Create two WebViews (Mode A only for now)
 ///   [O] Animate opacity 0 -> 1
 ///   [M] Send message to WebView
 ///   [S] Execute script in WebView
@@ -27,6 +26,9 @@ internal sealed class MainWindow : IAsyncDisposable
     private const int WS_EX_NOREDIRECTIONBITMAP = 0x00200000;
     private const int WS_OVERLAPPEDWINDOW = 0x00CF0000;
     private const int WS_VISIBLE = 0x10000000;
+
+    // GWL_EXSTYLE for Get/SetWindowLong
+    private const int GWL_EXSTYLE = -20;
 
     // Window messages
     private const int WM_DESTROY = 0x0002;
@@ -47,11 +49,11 @@ internal sealed class MainWindow : IAsyncDisposable
     private const int VK_O = 0x4F;
     private const int VK_R = 0x52;
     private const int VK_S = 0x53;
-    private const int VK_T = 0x54;
 
     // Timer IDs
     private const uint TIMER_OPACITY_ANIMATE = 1;
     private const uint TIMER_RENDER = 2;
+    private const uint TIMER_MODE_A_PAINT = 3;
 
     private IntPtr _hwnd;
     private HwndWebViewHost? _modeAHost;
@@ -112,6 +114,18 @@ internal sealed class MainWindow : IAsyncDisposable
     [DllImport("user32.dll")]
     private static extern bool InvalidateRect(IntPtr hWnd, IntPtr lpRect, bool bErase);
 
+    [DllImport("user32.dll")]
+    private static extern IntPtr BeginPaint(IntPtr hwnd, out PAINTSTRUCT lpPaint);
+
+    [DllImport("user32.dll")]
+    private static extern bool EndPaint(IntPtr hwnd, ref PAINTSTRUCT lpPaint);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetWindowLongPtrW(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetWindowLongPtrW(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr GetModuleHandleW(string? lpModuleName);
 
@@ -156,6 +170,18 @@ internal sealed class MainWindow : IAsyncDisposable
         public int Left, Top, Right, Bottom;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PAINTSTRUCT
+    {
+        public IntPtr hdc;
+        public bool fErase;
+        public Win32RECT rcPaint;
+        public bool fRestore;
+        public bool fIncUpdate;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)]
+        public byte[] rgbReserved;
+    }
+
     public enum ActiveMode
     {
         None,
@@ -189,7 +215,11 @@ internal sealed class MainWindow : IAsyncDisposable
 
         RegisterClassExW(ref wc);
 
-        // Start without WS_EX_NOREDIRECTIONBITMAP - will recreate window for Mode C
+        // Start without WS_EX_NOREDIRECTIONBITMAP for Mode A.
+        // When switching to Mode C, we set this flag via SetWindowLongPtr.
+        // Note: changing WS_EX_NOREDIRECTIONBITMAP after creation may not fully
+        // take effect on all Windows versions without window recreation, but it
+        // works on Windows 11 22H2+ for DComp scenarios.
         _hwnd = CreateWindowExW(
             0,
             WindowClassName,
@@ -234,6 +264,10 @@ internal sealed class MainWindow : IAsyncDisposable
                 HandleResize(lParam);
                 return IntPtr.Zero;
 
+            case WM_PAINT:
+                HandlePaint(hWnd);
+                return IntPtr.Zero;
+
             case WM_KEYDOWN:
                 HandleKeyDown((int)wParam);
                 return IntPtr.Zero;
@@ -252,6 +286,7 @@ internal sealed class MainWindow : IAsyncDisposable
             case WM_DESTROY:
                 KillTimer(hWnd, (IntPtr)TIMER_RENDER);
                 KillTimer(hWnd, (IntPtr)TIMER_OPACITY_ANIMATE);
+                KillTimer(hWnd, (IntPtr)TIMER_MODE_A_PAINT);
                 PostQuitMessage(0);
                 return IntPtr.Zero;
         }
@@ -259,15 +294,36 @@ internal sealed class MainWindow : IAsyncDisposable
         return DefWindowProcW(hWnd, msg, wParam, lParam);
     }
 
+    private void HandlePaint(IntPtr hWnd)
+    {
+        // BeginPaint/EndPaint required to validate the update region
+        BeginPaint(hWnd, out var ps);
+        try
+        {
+            // In Mode A, render Skia overlay to demonstrate airspace problem
+            if (_currentMode == ActiveMode.ModeA_HWND && _modeAHost is not null)
+            {
+                _modeAHost.RenderSkiaOverlay(hWnd, _clientWidth, _clientHeight);
+            }
+        }
+        finally
+        {
+            EndPaint(hWnd, ref ps);
+        }
+    }
+
     private void HandleResize(IntPtr lParam)
     {
-        _clientWidth = (short)(lParam.ToInt64() & 0xFFFF);
-        _clientHeight = (short)((lParam.ToInt64() >> 16) & 0xFFFF);
+        // WM_SIZE LOWORD/HIWORD are unsigned short values (0-65535)
+        _clientWidth = (int)(ushort)(lParam.ToInt64() & 0xFFFF);
+        _clientHeight = (int)(ushort)((lParam.ToInt64() >> 16) & 0xFFFF);
 
         switch (_currentMode)
         {
             case ActiveMode.ModeA_HWND:
                 _modeAHost?.UpdateBounds(0, 0, _clientWidth, _clientHeight);
+                // Trigger repaint for Skia overlay in Mode A
+                InvalidateRect(_hwnd, IntPtr.Zero, false);
                 break;
             case ActiveMode.ModeC_DComp:
                 _modeCHost?.UpdateBounds(_clientWidth, _clientHeight);
@@ -280,27 +336,37 @@ internal sealed class MainWindow : IAsyncDisposable
         switch (vkCode)
         {
             case VK_A:
-                _ = SwitchToModeAAsync();
+                FireAndForget(SwitchToModeAAsync());
                 break;
             case VK_C:
-                _ = SwitchToModeCAsync();
+                FireAndForget(SwitchToModeCAsync());
                 break;
             case VK_H:
                 ToggleVisibility();
                 break;
             case VK_R:
-                _ = RecreateWebViewAsync();
+                FireAndForget(RecreateWebViewAsync());
                 break;
             case VK_O:
                 StartOpacityAnimation();
                 break;
             case VK_M:
-                _ = SendTestMessageAsync();
+                FireAndForget(SendTestMessageAsync());
                 break;
             case VK_S:
-                _ = ExecuteTestScriptAsync();
+                FireAndForget(ExecuteTestScriptAsync());
                 break;
         }
+    }
+
+    /// <summary>
+    /// Handles fire-and-forget async calls from WndProc, logging any unobserved exceptions.
+    /// </summary>
+    private static void FireAndForget(Task task)
+    {
+        task.ContinueWith(
+            t => Console.Error.WriteLine($"[Main] Unhandled async error: {t.Exception?.InnerException?.Message}"),
+            TaskContinuationOptions.OnlyOnFaulted);
     }
 
     private void HandleMouseInput(uint msg, IntPtr wParam, IntPtr lParam)
@@ -319,14 +385,17 @@ internal sealed class MainWindow : IAsyncDisposable
             _ => CoreWebView2MouseEventKind.Move,
         };
 
+        // Extract mouse button flags from the low word of wParam (safe for 64-bit)
+        int wParamLow = (int)(wParam.ToInt64() & 0xFFFF);
         var virtualKeys = CoreWebView2MouseEventVirtualKeys.None;
-        if (((int)wParam & 0x0001) != 0) virtualKeys |= CoreWebView2MouseEventVirtualKeys.LeftButton;
-        if (((int)wParam & 0x0002) != 0) virtualKeys |= CoreWebView2MouseEventVirtualKeys.RightButton;
+        if ((wParamLow & 0x0001) != 0) virtualKeys |= CoreWebView2MouseEventVirtualKeys.LeftButton;
+        if ((wParamLow & 0x0002) != 0) virtualKeys |= CoreWebView2MouseEventVirtualKeys.RightButton;
 
         uint mouseData = 0;
         if (msg == WM_MOUSEWHEEL)
         {
-            mouseData = (uint)((int)wParam >> 16);
+            // Wheel delta is in the high word of wParam (signed)
+            mouseData = (uint)(short)((wParam.ToInt64() >> 16) & 0xFFFF);
         }
 
         _modeCHost.SendMouseInput(eventKind, virtualKeys, mouseData, new System.Drawing.Point(x, y));
@@ -341,6 +410,13 @@ internal sealed class MainWindow : IAsyncDisposable
                 break;
             case TIMER_RENDER:
                 _modeCHost?.RenderSkiaFrame();
+                break;
+            case TIMER_MODE_A_PAINT:
+                // Periodically repaint Skia overlay in Mode A
+                if (_currentMode == ActiveMode.ModeA_HWND)
+                {
+                    InvalidateRect(_hwnd, IntPtr.Zero, false);
+                }
                 break;
         }
     }
@@ -359,11 +435,19 @@ internal sealed class MainWindow : IAsyncDisposable
             _modeCHost = null;
         }
 
+        // Remove WS_EX_NOREDIRECTIONBITMAP for HWND mode (GDI rendering needs redirection surface)
+        var exStyle = GetWindowLongPtrW(_hwnd, GWL_EXSTYLE);
+        SetWindowLongPtrW(_hwnd, GWL_EXSTYLE, (IntPtr)(exStyle.ToInt64() & ~WS_EX_NOREDIRECTIONBITMAP));
+
         _currentMode = ActiveMode.ModeA_HWND;
 
         _modeAHost = new HwndWebViewHost(_hwnd, _contentPath);
         await _modeAHost.InitializeAsync();
         _modeAHost.UpdateBounds(0, 0, _clientWidth, _clientHeight);
+
+        // Start a paint timer for the Skia overlay (demonstrates airspace problem)
+        SetTimer(_hwnd, (IntPtr)TIMER_MODE_A_PAINT, 100, IntPtr.Zero);
+        InvalidateRect(_hwnd, IntPtr.Zero, false);
 
         Console.WriteLine("[Main] Mode A active. WebView2 in child HWND.");
         Console.WriteLine("[Main] Note: Skia overlay rectangle is HIDDEN behind WebView2 (airspace problem).");
@@ -378,9 +462,16 @@ internal sealed class MainWindow : IAsyncDisposable
         // Tear down Mode A if active
         if (_modeAHost is not null)
         {
+            KillTimer(_hwnd, (IntPtr)TIMER_MODE_A_PAINT);
             await _modeAHost.DisposeAsync();
             _modeAHost = null;
         }
+
+        // Set WS_EX_NOREDIRECTIONBITMAP for DComp mode.
+        // This tells DWM not to create a GDI redirection surface; all content
+        // goes through the DComp visual tree instead.
+        var exStyle = GetWindowLongPtrW(_hwnd, GWL_EXSTYLE);
+        SetWindowLongPtrW(_hwnd, GWL_EXSTYLE, (IntPtr)(exStyle.ToInt64() | WS_EX_NOREDIRECTIONBITMAP));
 
         _currentMode = ActiveMode.ModeC_DComp;
 

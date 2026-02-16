@@ -1,5 +1,4 @@
 using System.Drawing;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Microsoft.Web.WebView2.Core;
 using SkiaSharp;
@@ -38,11 +37,12 @@ internal sealed class DCompWebViewHost : IAsyncDisposable
     private IntPtr _eglDisplay;
     private IntPtr _eglConfig;
     private IntPtr _eglContext;
+    private IntPtr _eglStableSurface; // Kept alive for context validity between frames
 
     // SkiaSharp
     private GRContext? _grContext;
 
-    // DComp
+    // DComp - COM RCWs released explicitly in DisposeAsync in reverse creation order
     private IDCompositionDevice? _dcompDevice;
     private IDCompositionTarget? _dcompTarget;
     private IDCompositionVisual? _rootVisual;
@@ -158,34 +158,37 @@ internal sealed class DCompWebViewHost : IAsyncDisposable
 
         (_eglDisplay, _eglConfig, _eglContext) = AngleEglBridge.InitializeAngle(_d3dDevice);
 
-        // Make context current with a small pbuffer surface since some ANGLE configs require a surface
+        // Create a stable 1x1 pbuffer surface to keep the EGL context valid between frames.
+        // The context must be bound to a live surface during GRContext creation in InitializeSkia.
+        // This surface is kept alive for the lifetime of the host and destroyed in DisposeAsync.
         int[] pbufferAttribs =
         [
             AngleEglBridge.EGL_WIDTH, 1,
             AngleEglBridge.EGL_HEIGHT, 1,
             AngleEglBridge.EGL_NONE
         ];
-        var tempSurface = AngleEglBridge.eglCreatePbufferSurface(_eglDisplay, _eglConfig, pbufferAttribs);
-        if (!AngleEglBridge.eglMakeCurrent(_eglDisplay, tempSurface, tempSurface, _eglContext))
+        _eglStableSurface = AngleEglBridge.eglCreatePbufferSurface(_eglDisplay, _eglConfig, pbufferAttribs);
+        if (_eglStableSurface == IntPtr.Zero)
+        {
+            throw new InvalidOperationException(
+                $"eglCreatePbufferSurface failed: 0x{AngleEglBridge.eglGetError():X}");
+        }
+
+        if (!AngleEglBridge.eglMakeCurrent(_eglDisplay, _eglStableSurface, _eglStableSurface, _eglContext))
         {
             throw new InvalidOperationException(
                 $"eglMakeCurrent failed: 0x{AngleEglBridge.eglGetError():X}");
         }
 
         Console.WriteLine("[Mode C] ANGLE EGL initialized and context made current.");
-
-        // Clean up temp surface after context is current
-        if (tempSurface != IntPtr.Zero)
-        {
-            AngleEglBridge.eglDestroySurface(_eglDisplay, tempSurface);
-        }
     }
 
     private void InitializeSkia()
     {
         Console.WriteLine("[Mode C] Creating SkiaSharp GRContext from ANGLE GL context...");
 
-        // Use CreateAngle() which is specifically designed for ANGLE EGL contexts
+        // Use CreateAngle() which is specifically designed for ANGLE EGL contexts.
+        // The EGL context is current with the stable pbuffer surface from InitializeAngle.
         var glInterface = GRGlInterface.CreateAngle();
         if (glInterface is null)
         {
@@ -252,11 +255,11 @@ internal sealed class DCompWebViewHost : IAsyncDisposable
         // Wire up cursor changes
         _compositionController.CursorChanged += (_, _) =>
         {
-            // Get the system cursor ID and load the appropriate cursor
+            // Get the system cursor handle and apply it
             try
             {
                 var cursorHandle = _compositionController.Cursor;
-                NativeMethods.SetCursor(cursorHandle);
+                Win32Helpers.SetCursor(cursorHandle);
             }
             catch
             {
@@ -293,7 +296,7 @@ internal sealed class DCompWebViewHost : IAsyncDisposable
             _compositionController.Bounds = new Rectangle(0, 0, width, height);
         }
 
-        // Resize the DComp surface
+        // Resize the DComp surface; on failure it will be recreated in EnsureDCompSurface
         if (_dcompSurface is not null)
         {
             try
@@ -302,7 +305,8 @@ internal sealed class DCompWebViewHost : IAsyncDisposable
             }
             catch
             {
-                // Surface will be recreated on next render
+                // Surface will be recreated on next render via EnsureDCompSurface,
+                // which also re-sets the content on the visual.
                 _dcompSurface = null;
             }
         }
@@ -317,6 +321,7 @@ internal sealed class DCompWebViewHost : IAsyncDisposable
         if (!_isInitialized || _dcompDevice is null || _grContext is null) return;
         if (_width <= 0 || _height <= 0) return;
 
+        bool drawStarted = false;
         try
         {
             // Ensure we have a DComp virtual surface
@@ -331,6 +336,7 @@ internal sealed class DCompWebViewHost : IAsyncDisposable
                 DCompInterop.IID_ID3D11Texture2D,
                 out object textureObj,
                 out POINT offset);
+            drawStarted = true;
 
             var texturePtr = Marshal.GetIUnknownForObject(textureObj);
             try
@@ -374,17 +380,22 @@ internal sealed class DCompWebViewHost : IAsyncDisposable
             finally
             {
                 Marshal.Release(texturePtr);
+                // Release the RCW for the transient D3D11 texture
+                Marshal.ReleaseComObject(textureObj);
             }
 
             // Step 5: EndDraw + Commit
             _dcompSurface.EndDraw();
+            drawStarted = false;
             _dcompDevice.Commit();
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[Mode C] RenderSkiaFrame error: {ex.Message}");
-            // Try to end draw if we started it
-            try { _dcompSurface?.EndDraw(); } catch { /* best effort */ }
+            if (drawStarted)
+            {
+                try { _dcompSurface?.EndDraw(); } catch { /* best effort */ }
+            }
         }
     }
 
@@ -399,6 +410,8 @@ internal sealed class DCompWebViewHost : IAsyncDisposable
             DCompInterop.DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_PREMULTIPLIED,
             out _dcompSurface);
 
+        // Always set content when creating/recreating the surface so the visual
+        // references the correct surface instance after resize failures.
         _skiaVisual.SetContent(_dcompSurface);
 
         Console.WriteLine($"[Mode C] DComp virtual surface created: {_width}x{_height}");
@@ -408,7 +421,7 @@ internal sealed class DCompWebViewHost : IAsyncDisposable
     /// Renders demo Skia content: background + overlapping rectangle that proves
     /// z-ordering works (visible OVER WebView2 in Mode C).
     /// </summary>
-    private static void RenderSkiaContent(SKCanvas canvas, int width, int height)
+    internal static void RenderSkiaContent(SKCanvas canvas, int width, int height)
     {
         // Clear with semi-transparent dark background
         canvas.Clear(new SKColor(30, 30, 30, 200));
@@ -432,7 +445,7 @@ internal sealed class DCompWebViewHost : IAsyncDisposable
         canvas.DrawText("Mode C: Skia + DComp (this overlay is ABOVE WebView2)", 12, 26, SKTextAlign.Left, textFont, textPaint);
 
         // Draw the key demo element: a colored rectangle that overlaps the WebView2 area.
-        // In Mode A (HWND), this would be hidden behind WebView2.
+        // In Mode A (HWND), this same rectangle is rendered but hidden behind WebView2.
         // In Mode C (DComp), this is visible ON TOP of WebView2.
         using var rectPaint = new SKPaint
         {
@@ -534,6 +547,7 @@ internal sealed class DCompWebViewHost : IAsyncDisposable
     {
         Console.WriteLine("[Mode C] Disposing DComp WebView host...");
 
+        // Close WebView2 first
         if (_compositionController is not null)
         {
             _compositionController.Close();
@@ -541,14 +555,38 @@ internal sealed class DCompWebViewHost : IAsyncDisposable
             _webView = null;
         }
 
+        // Release DComp COM objects in reverse creation order.
+        // Explicit release ensures deterministic cleanup (GC finalization order is undefined)
+        // and prevents stale references in the composition tree.
+        if (_dcompSurface is not null) { Marshal.ReleaseComObject(_dcompSurface); _dcompSurface = null; }
+        if (_skiaVisual is not null) { Marshal.ReleaseComObject(_skiaVisual); _skiaVisual = null; }
+        if (_webViewVisual is not null) { Marshal.ReleaseComObject(_webViewVisual); _webViewVisual = null; }
+        if (_rootVisual is not null) { Marshal.ReleaseComObject(_rootVisual); _rootVisual = null; }
+        if (_dcompTarget is not null) { Marshal.ReleaseComObject(_dcompTarget); _dcompTarget = null; }
+        if (_dcompDevice is not null) { Marshal.ReleaseComObject(_dcompDevice); _dcompDevice = null; }
+
+        // Dispose Skia GRContext before tearing down EGL
         _grContext?.Dispose();
         _grContext = null;
 
-        if (_eglContext != IntPtr.Zero && _eglDisplay != IntPtr.Zero)
+        // Tear down EGL: destroy stable surface, context, then terminate display
+        if (_eglDisplay != IntPtr.Zero)
         {
-            AngleEglBridge.eglDestroyContext(_eglDisplay, _eglContext);
+            AngleEglBridge.eglMakeCurrent(_eglDisplay, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+
+            if (_eglStableSurface != IntPtr.Zero)
+            {
+                AngleEglBridge.eglDestroySurface(_eglDisplay, _eglStableSurface);
+                _eglStableSurface = IntPtr.Zero;
+            }
+
+            if (_eglContext != IntPtr.Zero)
+            {
+                AngleEglBridge.eglDestroyContext(_eglDisplay, _eglContext);
+                _eglContext = IntPtr.Zero;
+            }
+
             AngleEglBridge.eglTerminate(_eglDisplay);
-            _eglContext = IntPtr.Zero;
             _eglDisplay = IntPtr.Zero;
         }
 
@@ -572,8 +610,9 @@ internal sealed class DCompWebViewHost : IAsyncDisposable
 
 /// <summary>
 /// P/Invoke helpers for cursor management.
+/// Named to avoid collision with CsWin32-generated NativeMethods partial class.
 /// </summary>
-internal static class NativeMethods
+internal static class Win32Helpers
 {
     [DllImport("user32.dll")]
     public static extern IntPtr SetCursor(IntPtr hCursor);
