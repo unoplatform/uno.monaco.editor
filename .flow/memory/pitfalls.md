@@ -150,3 +150,6 @@ COM RCWs from DComp/D3D11 interop must be explicitly released via Marshal.Releas
 
 ## 2026-02-16 manual [pitfall]
 IDCompositionVirtualSurface.BeginDraw/EndDraw must be tracked with a boolean flag -- calling EndDraw on a surface not in draw state throws E_UNEXPECTED and leaves it in a broken state for subsequent frames
+
+## 2026-02-16 manual [pitfall]
+DComp BeginDraw/EndDraw: call EndDraw BEFORE releasing the D3D11 texture RCW - DComp may reference the texture during EndDraw commit
