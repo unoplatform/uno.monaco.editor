@@ -242,6 +242,30 @@ namespace MonacoEditorTestApp
             {
                 await Editor.Languages.RegisterHoverProviderAsync("csharp", new EditorHoverProvider());
                 await Editor.AddActionAsync(new TestAction());
+                if (Environment.GetEnvironmentVariable("MONACO_DIAGNOSTICS") == "1")
+                {
+                    var actionProbe = await Editor.InvokeScriptAsync("""
+                        (() => {
+                            try {
+                                const context = typeof EditorContext !== 'undefined' && EditorContext.getEditorForElement
+                                    ? EditorContext.getEditorForElement(element)
+                                    : null;
+                                const editor = context && context.editor ? context.editor : null;
+                                const byGetAction = !!(editor && editor.getAction && editor.getAction('meta-test-action'));
+                                const bySupportedActions = !!(editor && editor.getSupportedActions
+                                    && editor.getSupportedActions().some(action => action.id === 'meta-test-action'));
+                                return JSON.stringify({
+                                    byGetAction,
+                                    bySupportedActions,
+                                    supportedCount: editor && editor.getSupportedActions ? editor.getSupportedActions().length : -1
+                                });
+                            } catch (error) {
+                                return JSON.stringify({ error: String(error) });
+                            }
+                        })()
+                        """);
+                    Console.WriteLine($"EDITOR_FEATURE_PROBE:test-action={actionProbe}");
+                }
             }
             catch (Exception ex)
             {
