@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-16T21:16:06.876721Z",
+  "depends_on": [
+    "fn-15-spike-composition-mode-webview2-to.1"
+  ],
+  "epic": "fn-15-spike-composition-mode-webview2-to",
+  "id": "fn-15-spike-composition-mode-webview2-to.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-15-spike-composition-mode-webview2-to.2.md",
+  "status": "todo",
+  "title": "Validate: flickering scenarios, interop, and document findings",
+  "updated_at": "2026-02-16T22:19:59.031941Z"
+}

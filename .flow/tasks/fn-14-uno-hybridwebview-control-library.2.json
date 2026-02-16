@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-16T20:56:47.294736Z",
+  "depends_on": [
+    "fn-14-uno-hybridwebview-control-library.1"
+  ],
+  "epic": "fn-14-uno-hybridwebview-control-library",
+  "id": "fn-14-uno-hybridwebview-control-library.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-14-uno-hybridwebview-control-library.2.md",
+  "status": "todo",
+  "title": "Core interfaces, control, and XAML template",
+  "updated_at": "2026-02-16T20:59:34.452459Z"
+}

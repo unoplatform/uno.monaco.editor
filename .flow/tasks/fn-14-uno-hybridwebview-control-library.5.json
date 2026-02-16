@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-16T20:57:03.705617Z",
+  "depends_on": [
+    "fn-14-uno-hybridwebview-control-library.2",
+    "fn-14-uno-hybridwebview-control-library.3"
+  ],
+  "epic": "fn-14-uno-hybridwebview-control-library",
+  "id": "fn-14-uno-hybridwebview-control-library.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-14-uno-hybridwebview-control-library.5.md",
+  "status": "todo",
+  "title": "WASM iframe presenter",
+  "updated_at": "2026-02-16T20:59:37.936001Z"
+}
