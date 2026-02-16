@@ -240,7 +240,7 @@ namespace MonacoEditorTestApp
         {
             try
             {
-                await Editor.Languages.RegisterHoverProviderAsync("csharp", new EditorHoverProvider());
+                await Editor.Languages.RegisterHoverProviderAsync("csharp", new EditorHoverProvider(() => Editor.Text ?? string.Empty));
                 await Editor.AddActionAsync(new TestAction());
                 if (Environment.GetEnvironmentVariable("MONACO_DIAGNOSTICS") == "1")
                 {

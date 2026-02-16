@@ -38,7 +38,10 @@ namespace Monaco
         private bool _initialized;
         private bool _desktopBootstrapInFlight;
         private bool _pendingDesktopBootstrapAfterLoad;
+        private bool _hasPresenterVisibilityState;
+        private bool _presenterVisibleState;
         private DispatcherQueue? _queue;
+        private ICodeEditorPresenter? _presenterVisibilityTarget;
 
         private ICodeEditorPresenter? _view;
 
@@ -94,7 +97,17 @@ namespace Monaco
 
         private void UpdatePresenterVisibility()
         {
-            var isVisible = IsEditorLoaded;
+            var isVisible = ShouldPresenterBeVisible(IsEditorLoaded, IsLoaded, _lifecycleState);
+            var presenterChanged = !ReferenceEquals(_presenterVisibilityTarget, _view);
+            if (!presenterChanged && _hasPresenterVisibilityState && _presenterVisibleState == isVisible)
+            {
+                return;
+            }
+
+            _presenterVisibilityTarget = _view;
+            _presenterVisibleState = isVisible;
+            _hasPresenterVisibilityState = true;
+
             Debug.WriteLine(
                 $"UpdatePresenterVisibility: visible={isVisible} IsEditorLoaded={IsEditorLoaded} IsLoaded={IsLoaded} lifecycle={_lifecycleState} presenter={_view?.GetHashCode():x8}");
 
@@ -108,65 +121,6 @@ namespace Monaco
                 presenterElement.Opacity = isVisible ? 1d : 0d;
                 presenterElement.IsHitTestVisible = isVisible;
             }
-        }
-
-        private void EnsureDesktopEditorContextAfterSoftReload()
-        {
-            if (_view is DesktopCodeEditorPresenter)
-            {
-                _ = EnsureDesktopEditorContextAfterSoftReloadAsync();
-            }
-        }
-
-        private async Task EnsureDesktopEditorContextAfterSoftReloadAsync()
-        {
-            if (_view is not DesktopCodeEditorPresenter desktopPresenter
-                || !IsLoaded
-                || !_initialized
-                || _lifecycleState == EditorLifecycleState.Unloaded)
-            {
-                return;
-            }
-
-            try
-            {
-                var hasEditorContextResult = await desktopPresenter.InvokeScriptAsync("""
-                    (() => {
-                        try {
-                            const element = document.getElementById('editor-container');
-                            const getContext = (EditorContext.tryGetEditorForElement || EditorContext.getEditorForElement);
-                            const ctx = getContext.call(EditorContext, element);
-                            return !!(ctx && ctx.editor && ctx.model);
-                        } catch {
-                            return false;
-                        }
-                    })()
-                    """);
-                if (!ScriptResultIsTrue(hasEditorContextResult))
-                {
-                    if (_desktopBootstrapInFlight
-                        || desktopPresenter.IsLaunchInProgress
-                        || !desktopPresenter.IsCoreWebView2Initialized)
-                    {
-                        Debug.WriteLine(
-                            "CodeEditor_Loaded: soft-reuse probe missing context, but bootstrap/launch still in flight.");
-                        return;
-                    }
-
-                    Debug.WriteLine(
-                        "CodeEditor_Loaded: soft-reuse probe missing editor context, rebootstrap requested.");
-                    RebootstrapMonacoAsync();
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine(
-                    $"CodeEditor_Loaded: soft-reuse probe failed ({ex.GetType().Name}: {ex.Message})");
-                return;
-            }
-
-            await SendScriptAsync("EditorContext.getEditorForElement(element).editor.layout();");
         }
 
         private void ResumePendingDesktopInitialization()
@@ -360,7 +314,6 @@ namespace Monaco
 
                 EmitSubscriptionDiagnostics("Loaded(soft)");
                 ResumePendingDesktopInitialization();
-                EnsureDesktopEditorContextAfterSoftReload();
                 return;
             }
 
@@ -388,7 +341,6 @@ namespace Monaco
 
                 EmitSubscriptionDiagnostics("Loaded(soft-reuse)");
                 ResumePendingDesktopInitialization();
-                EnsureDesktopEditorContextAfterSoftReload();
                 return;
             }
 
@@ -562,6 +514,14 @@ namespace Monaco
             bool isLoaded,
             bool hasReusableDesktopPresenter)
             => !isLoaded && hasReusableDesktopPresenter;
+
+        internal static bool ShouldPresenterBeVisible(
+            bool isEditorLoaded,
+            bool isControlLoaded,
+            EditorLifecycleState lifecycleState)
+            => isEditorLoaded
+                && isControlLoaded
+                && lifecycleState == EditorLifecycleState.Loaded;
 
         /// <summary>
         /// Returns true when the existing desktop presenter is healthy and can be

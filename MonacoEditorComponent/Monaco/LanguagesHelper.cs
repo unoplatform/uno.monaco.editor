@@ -277,24 +277,24 @@ namespace Monaco
                     {
                         try
                         {
-                            if (JsonSerializer.Deserialize(args[0], MonacoJsonContext.Default.Position) is { } position)
-                            {
-                                var model = editor.GetModel() ?? new Monaco.Editor.ModelHelper(editor);
-                                const int hoverTimeoutMs = 5000;
-                                var hoverTask = provider.ProvideHover(model, position);
-                                var completedTask = await Task.WhenAny(hoverTask, Task.Delay(hoverTimeoutMs));
-                                    if (completedTask != hoverTask)
-                                    {
-                                    System.Diagnostics.Debug.WriteLine($"Hover provider timeout [{requestId}] after {hoverTimeoutMs}ms");
-                                    return string.Empty;
-                                }
-
-                                var hover = await hoverTask;
-                                if (hover != null)
+                                if (JsonSerializer.Deserialize(args[0], MonacoJsonContext.Default.Position) is { } position)
                                 {
-                                    System.Diagnostics.Debug.WriteLine($"Hover provider complete [{requestId}] hasHover=True");
-                                    return JsonSerializer.Serialize(hover, MonacoJsonContext.Relaxed.Hover);
-                                }
+                                    var model = editor.GetModel() ?? new Monaco.Editor.ModelHelper(editor);
+                                    var hoverTask = provider.ProvideHover(model, position);
+                                    Hover? hover;
+                                    if (hoverTask.IsCompletedSuccessfully)
+                                    {
+                                        hover = hoverTask.Result;
+                                    }
+                                    else
+                                    {
+                                        hover = await hoverTask.ConfigureAwait(false);
+                                    }
+                                    if (hover != null)
+                                    {
+                                        System.Diagnostics.Debug.WriteLine($"Hover provider complete [{requestId}] hasHover=True");
+                                        return JsonSerializer.Serialize(hover, MonacoJsonContext.Relaxed.Hover);
+                                    }
 
                                 System.Diagnostics.Debug.WriteLine($"Hover provider complete [{requestId}] hasHover=False");
                             }
