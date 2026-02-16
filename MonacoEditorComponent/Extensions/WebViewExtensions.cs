@@ -1,7 +1,9 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices.JavaScript;
 using System.Text.Json;
 
+using Monaco.Editor;
 using Monaco.Serialization;
 
 namespace Monaco.Extensions
@@ -45,7 +47,8 @@ namespace Monaco.Extensions
             var returnstring = await _view.InvokeScriptWithElementAsync(script);
 
             // TODO: Need to decode the error correctly
-            if (returnstring.Contains("wv_internal_error"))
+            if (!string.IsNullOrEmpty(returnstring)
+                && returnstring.Contains("wv_internal_error", StringComparison.Ordinal))
             {
                 throw new JavaScriptInnerException(returnstring, "");
             }
@@ -121,6 +124,22 @@ namespace Monaco.Extensions
                         {
                             return JsonSerializer.Serialize(s, MonacoJsonContext.Relaxed.Options);
                         }
+                        else if (item is IActionDescriptor actionDescriptor)
+                        {
+                            // Serialize as a deterministic JSON object without anonymous types.
+                            // Anonymous payload types are not part of the source-generated context
+                            // and can throw NotSupportedException on desktop bridge calls.
+                            var contextMenuGroupId = JsonSerializer.Serialize(actionDescriptor.ContextMenuGroupId, MonacoJsonContext.Relaxed.Options);
+                            // Monaco expects a JSON number. Serialize single using invariant
+                            // formatting to avoid requiring source-generated metadata for float.
+                            var contextMenuOrder = actionDescriptor.ContextMenuOrder.ToString(CultureInfo.InvariantCulture);
+                            var id = JsonSerializer.Serialize(actionDescriptor.Id, MonacoJsonContext.Relaxed.Options);
+                            var keybindingContext = JsonSerializer.Serialize(actionDescriptor.KeybindingContext, MonacoJsonContext.Relaxed.Options);
+                            var keybindings = JsonSerializer.Serialize(actionDescriptor.Keybindings, MonacoJsonContext.Relaxed.Options);
+                            var label = JsonSerializer.Serialize(actionDescriptor.Label, MonacoJsonContext.Relaxed.Options);
+                            var precondition = JsonSerializer.Serialize(actionDescriptor.Precondition, MonacoJsonContext.Relaxed.Options);
+                            return $$"""{"contextMenuGroupId":{{contextMenuGroupId}},"contextMenuOrder":{{contextMenuOrder}},"id":{{id}},"keybindingContext":{{keybindingContext}},"keybindings":{{keybindings}},"label":{{label}},"precondition":{{precondition}}}""";
+                        }
                         else
                         {
                             // TODO: Need JSON.parse?
@@ -140,7 +159,8 @@ namespace Monaco.Extensions
 
                 System.Diagnostics.Debug.WriteLine($"InvokeMethodAsync {method} result: {returnstring}");
 
-                if (returnstring.Contains("wv_internal_error"))
+                if (!string.IsNullOrEmpty(returnstring)
+                    && returnstring.Contains("wv_internal_error", StringComparison.Ordinal))
                 {
                     throw new JavaScriptInnerException(returnstring, "");
                 }

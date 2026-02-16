@@ -145,8 +145,6 @@ namespace MonacoEditorTestApp
 
                 await Editor.Languages.RegisterCompletionItemProviderAsync("csharp", new LanguageProvider());
 
-                await Editor.Languages.RegisterHoverProviderAsync("csharp", new EditorHoverProvider());
-
                 _myCondition = await Editor.CreateContextKeyAsync("MyCondition", false);
 
                 await Editor.AddCommandAsync(KeyCode.F5, async (args) =>
@@ -231,7 +229,6 @@ namespace MonacoEditorTestApp
                     Editor.Focus(FocusState.Programmatic);
                 });
 
-                await Editor.AddActionAsync(new TestAction());
             }
             catch (Exception ex)
             {
@@ -241,6 +238,44 @@ namespace MonacoEditorTestApp
 
         private async void Editor_Loaded(object sender, RoutedEventArgs e)
         {
+            try
+            {
+                await Editor.Languages.RegisterHoverProviderAsync("csharp", new EditorHoverProvider());
+                await Editor.AddActionAsync(new TestAction());
+                if (Environment.GetEnvironmentVariable("MONACO_DIAGNOSTICS") == "1")
+                {
+                    var actionProbe = await Editor.InvokeScriptAsync("""
+                        (() => {
+                            try {
+                                const context = typeof EditorContext !== 'undefined' && EditorContext.getEditorForElement
+                                    ? EditorContext.getEditorForElement(element)
+                                    : null;
+                                const editor = context && context.editor ? context.editor : null;
+                                const byGetAction = !!(editor && editor.getAction && editor.getAction('meta-test-action'));
+                                const bySupportedActions = !!(editor && editor.getSupportedActions
+                                    && editor.getSupportedActions().some(action => action.id === 'meta-test-action'));
+                                return JSON.stringify({
+                                    byGetAction,
+                                    bySupportedActions,
+                                    supportedCount: editor && editor.getSupportedActions ? editor.getSupportedActions().length : -1
+                                });
+                            } catch (error) {
+                                return JSON.stringify({ error: String(error) });
+                            }
+                        })()
+                        """);
+                    Console.WriteLine($"EDITOR_FEATURE_PROBE:test-action={actionProbe}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Editor_Loaded registration failed: {ex}");
+                if (Environment.GetEnvironmentVariable("MONACO_DIAGNOSTICS") == "1")
+                {
+                    Console.WriteLine($"EDITOR_LOADED_REGISTRATION_FAILED:{ex.GetType().Name}:{ex.Message}");
+                }
+            }
+
             // Ready for Display
 
             // Test harness: when MONACO_DIAGNOSTICS=1, set known property values
@@ -368,6 +403,185 @@ namespace MonacoEditorTestApp
         /// One-time guard preventing duplicate test harness registration on re-load.
         /// </summary>
         private bool _testHarnessInitialized;
+
+        public bool IsEditorOperational => Editor is { IsEditorLoaded: true };
+
+        public async Task<string> CollectRuntimeProbeAsync(string stage)
+        {
+            if (Editor is null)
+            {
+                return BuildProbeErrorJson(stage, "editor-null");
+            }
+
+            try
+            {
+                var stageLiteral = ToJsonStringLiteral(stage);
+                var probe = await Editor.InvokeScriptAsync($$"""
+                    (() => {
+                        try {
+                            const context = typeof EditorContext !== 'undefined' && EditorContext.getEditorForElement
+                                ? EditorContext.getEditorForElement(element)
+                                : null;
+                            const editor = context && context.editor
+                                ? context.editor
+                                : (window.monaco?.editor?.getEditors?.()[0] ?? null);
+                            const model = editor && editor.getModel ? editor.getModel() : null;
+                            const domNode = editor && editor.getDomNode ? editor.getDomNode() : null;
+                            const rect = domNode && domNode.getBoundingClientRect ? domNode.getBoundingClientRect() : null;
+                            return JSON.stringify({
+                                stage: {{stageLiteral}},
+                                hasEditor: !!editor,
+                                hasModel: !!model,
+                                isConnected: !!(domNode && domNode.isConnected),
+                                width: rect ? rect.width : -1,
+                                height: rect ? rect.height : -1,
+                                valueLength: model && model.getValue ? model.getValue().length : -1
+                            });
+                        } catch (error) {
+                            return JSON.stringify({ stage: {{stageLiteral}}, error: String(error) });
+                        }
+                    })()
+                    """);
+
+                return probe ?? BuildProbeErrorJson(stage, "null-probe");
+            }
+            catch (Exception ex)
+            {
+                return BuildProbeErrorJson(stage, ex.Message);
+            }
+        }
+
+        public async Task<string> CollectFeatureProbeAsync(string stage)
+        {
+            if (Editor is null)
+            {
+                return BuildProbeErrorJson(stage, "editor-null");
+            }
+
+            try
+            {
+                var stageLiteral = ToJsonStringLiteral(stage);
+                await Editor.InvokeScriptAsync("""
+                    (() => {
+                        globalThis.__unoHoverProbeResult = null;
+                        try {
+                            callParentEventAsync(
+                                element,
+                                "HoverProvidercsharp",
+                                [JSON.stringify({ lineNumber: 1, column: 1 })]
+                            )
+                            .then(result => {
+                                globalThis.__unoHoverProbeResult = result ?? "__null__";
+                            })
+                            .catch(error => {
+                                globalThis.__unoHoverProbeResult = "__error__:" + String(error);
+                            });
+                        } catch (error) {
+                            globalThis.__unoHoverProbeResult = "__error__:" + String(error);
+                        }
+                        return "started";
+                    })()
+                    """);
+
+                string? lastProbe = null;
+                for (var attempt = 0; attempt < 40; attempt++)
+                {
+                    string? probe = null;
+                    try
+                    {
+                        probe = await Editor.InvokeScriptAsync($$"""
+                            (() => {
+                                try {
+                                    const context = typeof EditorContext !== 'undefined' && EditorContext.getEditorForElement
+                                        ? EditorContext.getEditorForElement(element)
+                                        : null;
+                                    const editor = context && context.editor ? context.editor : null;
+                                    const hasTestAction = !!(
+                                        editor &&
+                                        (
+                                            (editor.getAction && editor.getAction('meta-test-action')) ||
+                                            (editor.getSupportedActions &&
+                                                editor.getSupportedActions().some(action => action.id === 'meta-test-action'))
+                                        )
+                                    );
+                                    const hoverProbeResult = globalThis.__unoHoverProbeResult;
+                                    const isReady = !!(hasTestAction
+                                        && typeof hoverProbeResult === 'string'
+                                        && hoverProbeResult.length > 0
+                                        && hoverProbeResult !== "__null__"
+                                        && !hoverProbeResult.startsWith("__error__:"));
+                                    return JSON.stringify({
+                                        stage: {{stageLiteral}},
+                                        hasTestAction,
+                                        hoverProbeResult,
+                                        isReady
+                                    });
+                                } catch (error) {
+                                    return JSON.stringify({ stage: {{stageLiteral}}, error: String(error) });
+                                }
+                            })()
+                            """);
+                    }
+                    catch
+                    {
+                        // Transient unload/reload can fail probe script execution.
+                        // Keep polling until the editor stabilizes.
+                    }
+
+                    if (!string.IsNullOrEmpty(probe))
+                    {
+                        lastProbe = probe;
+                        if (probe.Contains("\"isReady\":true", StringComparison.Ordinal))
+                        {
+                            return probe;
+                        }
+                    }
+
+                    if (string.IsNullOrEmpty(probe)
+                        || probe.Contains("\"hoverProbeResult\":null", StringComparison.Ordinal))
+                    {
+                        await Editor.InvokeScriptAsync("""
+                            (() => {
+                                try {
+                                    callParentEventAsync(
+                                        element,
+                                        "HoverProvidercsharp",
+                                        [JSON.stringify({ lineNumber: 1, column: 1 })]
+                                    )
+                                    .then(result => {
+                                        globalThis.__unoHoverProbeResult = result ?? "__null__";
+                                    })
+                                    .catch(error => {
+                                        globalThis.__unoHoverProbeResult = "__error__:" + String(error);
+                                    });
+                                } catch (error) {
+                                    globalThis.__unoHoverProbeResult = "__error__:" + String(error);
+                                }
+                                return "started";
+                            })()
+                            """);
+                    }
+
+                    await Task.Delay(200);
+                }
+
+                return lastProbe ?? BuildProbeErrorJson(stage, "hover-probe-timeout");
+            }
+            catch (Exception ex)
+            {
+                return BuildProbeErrorJson(stage, ex.Message);
+            }
+        }
+
+        private static string BuildProbeErrorJson(string stage, string error)
+            => $"{{\"stage\":{ToJsonStringLiteral(stage)},\"error\":{ToJsonStringLiteral(error)}}}";
+
+        private static string ToJsonStringLiteral(string value)
+            => $"\"{value
+                .Replace("\\", "\\\\", StringComparison.Ordinal)
+                .Replace("\"", "\\\"", StringComparison.Ordinal)
+                .Replace("\r", "\\r", StringComparison.Ordinal)
+                .Replace("\n", "\\n", StringComparison.Ordinal)}\"";
 
         private void Editor_OpenLinkRequest(CodeEditor sender, OpenLinkRequestedEventArgs args)
         {
