@@ -6,7 +6,7 @@
 	/*
 	 * Things to Try:
 	 * - Hover over the word 'Hit'
-	 * - Hit F1 and Search for 'TestAction'
+	 * - Select some text, then hit F1 and search for 'TestAction'
 	 * - Press Ctrl+Enter
 	 * - After using Ctrl+Enter, hit F5
 	 * - Hit Ctrl+L
