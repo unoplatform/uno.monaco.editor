@@ -141,3 +141,12 @@ When two concurrent Task.Run lambdas share a StreamWriter, wrap writes in a Sema
 
 ## 2026-02-13 manual [pitfall]
 CDP test fixtures must wait for ALL async harness setup (not just Monaco readiness) before allowing tests to run -- add a final ready marker at the end of the harness init and block fixture InitializeAsync until it appears.
+
+## 2026-02-16 manual [pitfall]
+EGL context bound to a destroyed pbuffer surface can fault when querying GL state -- keep a stable 1x1 pbuffer alive for the context's lifetime or use EGL_KHR_surfaceless_context
+
+## 2026-02-16 manual [pitfall]
+COM RCWs from DComp/D3D11 interop must be explicitly released via Marshal.ReleaseComObject in reverse creation order -- GC finalization order is undefined and composition pipelines require ordered teardown
+
+## 2026-02-16 manual [pitfall]
+IDCompositionVirtualSurface.BeginDraw/EndDraw must be tracked with a boolean flag -- calling EndDraw on a surface not in draw state throws E_UNEXPECTED and leaves it in a broken state for subsequent frames

@@ -136,9 +136,8 @@ Before building the full spike, validate the three critical integration points:
 - [ ] JS interop works in both modes (`ExecuteScriptAsync`, `WebMessageReceived`)
 
 ## Done summary
-TBD
-
+Standalone Win32 spike project with two WebView2 hosting modes: Mode A (HWND-hosted, demonstrates airspace problem) and Mode C (full DComp+ANGLE composition with Skia and WebView2 as sibling visuals, eliminates airspace). Includes manual COM interop for DirectComposition, ANGLE EGL bridge for D3D11 texture wrapping, per-frame Skia rendering lifecycle, mouse input forwarding, and JS interop. Cross-compiles on macOS, runs on Windows 11.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: c9495576abbd8a56660d8f6e7ec365540f7edfd9, 897c31128e7b9e6e5e19d71b5cd0e24c9d7daadc
+- Tests: dotnet build spike/WebView2FlickerSpike/WebView2FlickerSpike.csproj, dotnet build MonacoEditorComponent.slnx --no-restore
 - PRs:
