@@ -305,8 +305,9 @@ internal sealed class DCompWebViewHost : IAsyncDisposable
             }
             catch
             {
-                // Surface will be recreated on next render via EnsureDCompSurface,
-                // which also re-sets the content on the visual.
+                // Release the failed surface COM object to avoid leaking, then
+                // null it so EnsureDCompSurface recreates it on next render.
+                try { Marshal.ReleaseComObject(_dcompSurface); } catch { /* best effort */ }
                 _dcompSurface = null;
             }
         }
@@ -372,21 +373,27 @@ internal sealed class DCompWebViewHost : IAsyncDisposable
                 }
                 finally
                 {
-                    // Step 4: Destroy transient EGL surface
-                    AngleEglBridge.eglMakeCurrent(_eglDisplay, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+                    // Step 4: Destroy transient EGL surface, restore stable surface.
+                    // Rebind stable surface so GRContext has a valid context for any
+                    // lazy cleanup (texture eviction etc.) between frames.
+                    AngleEglBridge.eglMakeCurrent(_eglDisplay, _eglStableSurface, _eglStableSurface, _eglContext);
                     AngleEglBridge.eglDestroySurface(_eglDisplay, eglSurface);
                 }
             }
             finally
             {
+                // Step 5: EndDraw BEFORE releasing the texture RCW.
+                // DComp's EndDraw commits the surface content and may reference the
+                // D3D11 texture internally. Releasing the RCW first would destroy the
+                // COM object (refcount → 0) causing a use-after-free.
+                _dcompSurface.EndDraw();
+                drawStarted = false;
+
                 Marshal.Release(texturePtr);
-                // Release the RCW for the transient D3D11 texture
                 Marshal.ReleaseComObject(textureObj);
             }
 
-            // Step 5: EndDraw + Commit
-            _dcompSurface.EndDraw();
-            drawStarted = false;
+            // Step 6: Commit the DComp frame
             _dcompDevice.Commit();
         }
         catch (Exception ex)

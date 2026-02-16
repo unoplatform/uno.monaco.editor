@@ -166,13 +166,17 @@ internal interface IDCompositionSurface
 
 /// <summary>
 /// IDCompositionVirtualSurface COM interface - extends IDCompositionSurface.
+/// NOTE: Base IDCompositionSurface methods are re-declared (not inherited via C# interface
+/// inheritance) because COM interop with [InterfaceType(InterfaceIsIUnknown)] requires the
+/// full vtable layout starting at slot 3. C# interface inheritance would produce incorrect
+/// slot offsets — the CLR would skip the base interface slots, misaligning every method.
 /// </summary>
 [ComImport]
 [Guid("AE471C51-5F53-4A24-8D3E-D0C39C30B3F0")]
 [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 internal interface IDCompositionVirtualSurface
 {
-    // IDCompositionSurface methods (inherited)
+    // IDCompositionSurface methods (vtable slots 3-7, re-declared for correct layout)
     void BeginDraw(
         [In] ref RECT updateRect,
         [MarshalAs(UnmanagedType.LPStruct)] Guid iid,

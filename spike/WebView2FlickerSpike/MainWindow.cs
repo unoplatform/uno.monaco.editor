@@ -59,6 +59,7 @@ internal sealed class MainWindow : IAsyncDisposable
     private HwndWebViewHost? _modeAHost;
     private DCompWebViewHost? _modeCHost;
     private ActiveMode _currentMode = ActiveMode.None;
+    private bool _modeSwitching; // Guards against concurrent mode switches
     private float _animatingOpacity;
     private bool _isAnimating;
     private int _clientWidth;
@@ -365,7 +366,7 @@ internal sealed class MainWindow : IAsyncDisposable
     private static void FireAndForget(Task task)
     {
         task.ContinueWith(
-            t => Console.Error.WriteLine($"[Main] Unhandled async error: {t.Exception?.InnerException?.Message}"),
+            t => Console.Error.WriteLine($"[Main] Unhandled async error: {t.Exception}"),
             TaskContinuationOptions.OnlyOnFaulted);
     }
 
@@ -423,70 +424,86 @@ internal sealed class MainWindow : IAsyncDisposable
 
     private async Task SwitchToModeAAsync()
     {
-        if (_currentMode == ActiveMode.ModeA_HWND) return;
+        if (_currentMode == ActiveMode.ModeA_HWND || _modeSwitching) return;
+        _modeSwitching = true;
 
-        Console.WriteLine("[Main] Switching to Mode A (HWND)...");
-
-        // Tear down Mode C if active
-        if (_modeCHost is not null)
+        try
         {
-            KillTimer(_hwnd, (IntPtr)TIMER_RENDER);
-            await _modeCHost.DisposeAsync();
-            _modeCHost = null;
+            Console.WriteLine("[Main] Switching to Mode A (HWND)...");
+
+            // Tear down Mode C if active
+            if (_modeCHost is not null)
+            {
+                KillTimer(_hwnd, (IntPtr)TIMER_RENDER);
+                await _modeCHost.DisposeAsync();
+                _modeCHost = null;
+            }
+
+            // Remove WS_EX_NOREDIRECTIONBITMAP for HWND mode (GDI rendering needs redirection surface)
+            var exStyle = GetWindowLongPtrW(_hwnd, GWL_EXSTYLE);
+            SetWindowLongPtrW(_hwnd, GWL_EXSTYLE, (IntPtr)(exStyle.ToInt64() & ~WS_EX_NOREDIRECTIONBITMAP));
+
+            _currentMode = ActiveMode.ModeA_HWND;
+
+            _modeAHost = new HwndWebViewHost(_hwnd, _contentPath);
+            await _modeAHost.InitializeAsync();
+            _modeAHost.UpdateBounds(0, 0, _clientWidth, _clientHeight);
+
+            // Start a paint timer for the Skia overlay (demonstrates airspace problem)
+            SetTimer(_hwnd, (IntPtr)TIMER_MODE_A_PAINT, 100, IntPtr.Zero);
+            InvalidateRect(_hwnd, IntPtr.Zero, false);
+
+            Console.WriteLine("[Main] Mode A active. WebView2 in child HWND.");
+            Console.WriteLine("[Main] Note: Skia overlay rectangle is HIDDEN behind WebView2 (airspace problem).");
         }
-
-        // Remove WS_EX_NOREDIRECTIONBITMAP for HWND mode (GDI rendering needs redirection surface)
-        var exStyle = GetWindowLongPtrW(_hwnd, GWL_EXSTYLE);
-        SetWindowLongPtrW(_hwnd, GWL_EXSTYLE, (IntPtr)(exStyle.ToInt64() & ~WS_EX_NOREDIRECTIONBITMAP));
-
-        _currentMode = ActiveMode.ModeA_HWND;
-
-        _modeAHost = new HwndWebViewHost(_hwnd, _contentPath);
-        await _modeAHost.InitializeAsync();
-        _modeAHost.UpdateBounds(0, 0, _clientWidth, _clientHeight);
-
-        // Start a paint timer for the Skia overlay (demonstrates airspace problem)
-        SetTimer(_hwnd, (IntPtr)TIMER_MODE_A_PAINT, 100, IntPtr.Zero);
-        InvalidateRect(_hwnd, IntPtr.Zero, false);
-
-        Console.WriteLine("[Main] Mode A active. WebView2 in child HWND.");
-        Console.WriteLine("[Main] Note: Skia overlay rectangle is HIDDEN behind WebView2 (airspace problem).");
+        finally
+        {
+            _modeSwitching = false;
+        }
     }
 
     private async Task SwitchToModeCAsync()
     {
-        if (_currentMode == ActiveMode.ModeC_DComp) return;
+        if (_currentMode == ActiveMode.ModeC_DComp || _modeSwitching) return;
+        _modeSwitching = true;
 
-        Console.WriteLine("[Main] Switching to Mode C (DComp + ANGLE)...");
-
-        // Tear down Mode A if active
-        if (_modeAHost is not null)
+        try
         {
-            KillTimer(_hwnd, (IntPtr)TIMER_MODE_A_PAINT);
-            await _modeAHost.DisposeAsync();
-            _modeAHost = null;
+            Console.WriteLine("[Main] Switching to Mode C (DComp + ANGLE)...");
+
+            // Tear down Mode A if active
+            if (_modeAHost is not null)
+            {
+                KillTimer(_hwnd, (IntPtr)TIMER_MODE_A_PAINT);
+                await _modeAHost.DisposeAsync();
+                _modeAHost = null;
+            }
+
+            // Set WS_EX_NOREDIRECTIONBITMAP for DComp mode.
+            // This tells DWM not to create a GDI redirection surface; all content
+            // goes through the DComp visual tree instead.
+            var exStyle = GetWindowLongPtrW(_hwnd, GWL_EXSTYLE);
+            SetWindowLongPtrW(_hwnd, GWL_EXSTYLE, (IntPtr)(exStyle.ToInt64() | WS_EX_NOREDIRECTIONBITMAP));
+
+            _currentMode = ActiveMode.ModeC_DComp;
+
+            _modeCHost = new DCompWebViewHost(_hwnd, _contentPath);
+            await _modeCHost.InitializeAsync();
+            _modeCHost.UpdateBounds(_clientWidth, _clientHeight);
+
+            // Start render timer for DComp mode (16ms ~ 60fps)
+            SetTimer(_hwnd, (IntPtr)TIMER_RENDER, 16, IntPtr.Zero);
+
+            // Do initial render
+            _modeCHost.RenderSkiaFrame();
+
+            Console.WriteLine("[Main] Mode C active. Skia + WebView2 in DComp visual tree.");
+            Console.WriteLine("[Main] Skia overlay rectangle should be VISIBLE over WebView2 (airspace solved).");
         }
-
-        // Set WS_EX_NOREDIRECTIONBITMAP for DComp mode.
-        // This tells DWM not to create a GDI redirection surface; all content
-        // goes through the DComp visual tree instead.
-        var exStyle = GetWindowLongPtrW(_hwnd, GWL_EXSTYLE);
-        SetWindowLongPtrW(_hwnd, GWL_EXSTYLE, (IntPtr)(exStyle.ToInt64() | WS_EX_NOREDIRECTIONBITMAP));
-
-        _currentMode = ActiveMode.ModeC_DComp;
-
-        _modeCHost = new DCompWebViewHost(_hwnd, _contentPath);
-        await _modeCHost.InitializeAsync();
-        _modeCHost.UpdateBounds(_clientWidth, _clientHeight);
-
-        // Start render timer for DComp mode (16ms ~ 60fps)
-        SetTimer(_hwnd, (IntPtr)TIMER_RENDER, 16, IntPtr.Zero);
-
-        // Do initial render
-        _modeCHost.RenderSkiaFrame();
-
-        Console.WriteLine("[Main] Mode C active. Skia + WebView2 in DComp visual tree.");
-        Console.WriteLine("[Main] Skia overlay rectangle should be VISIBLE over WebView2 (airspace solved).");
+        finally
+        {
+            _modeSwitching = false;
+        }
     }
 
     private void ToggleVisibility()
