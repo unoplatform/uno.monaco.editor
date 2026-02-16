@@ -91,11 +91,25 @@ namespace Monaco
 
         private void ApplyHostVisibility(bool forceVisibleForInitialization = false)
         {
-            var shouldBeVisible = forceVisibleForInitialization || _isHostVisibleRequested;
+            var shouldBeVisible = ShouldHostBeVisible(
+                forceVisibleForInitialization,
+                _isHostVisibleRequested,
+                ShouldKeepHostVisibleWhenHidden(OperatingSystem.IsWindows(), _isCoreWebView2Initialized));
             _webView.Visibility = shouldBeVisible ? Visibility.Visible : Visibility.Collapsed;
             _webView.Opacity = _isHostVisibleRequested ? 1d : 0d;
             _webView.IsHitTestVisible = _isHostVisibleRequested;
         }
+
+        internal static bool ShouldHostBeVisible(
+            bool forceVisibleForInitialization,
+            bool isHostVisibleRequested,
+            bool keepHostVisibleWhenHidden)
+            => forceVisibleForInitialization || isHostVisibleRequested || keepHostVisibleWhenHidden;
+
+        internal static bool ShouldKeepHostVisibleWhenHidden(
+            bool isWindows,
+            bool isCoreWebView2Initialized)
+            => isWindows && isCoreWebView2Initialized;
 
         /// <inheritdoc />
         public string ElementId => "desktop-" + GetHashCode().ToString("X8");
