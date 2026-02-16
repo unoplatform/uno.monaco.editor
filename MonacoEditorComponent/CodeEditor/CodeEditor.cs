@@ -153,6 +153,18 @@ namespace Monaco
             }
         }
 
+        private void RequestDesktopLayoutAfterSoftReload()
+        {
+            if (_view is not DesktopCodeEditorPresenter
+                || !_initialized
+                || _lifecycleState != EditorLifecycleState.Loaded)
+            {
+                return;
+            }
+
+            _ = SendScriptAsync("EditorContext.getEditorForElement(element).editor.layout();");
+        }
+
         private void RestoreDesktopBridgeAfterHardTeardown()
         {
             if (_view is not DesktopCodeEditorPresenter desktopPresenter)
@@ -314,6 +326,7 @@ namespace Monaco
 
                 EmitSubscriptionDiagnostics("Loaded(soft)");
                 ResumePendingDesktopInitialization();
+                RequestDesktopLayoutAfterSoftReload();
                 return;
             }
 
@@ -341,6 +354,7 @@ namespace Monaco
 
                 EmitSubscriptionDiagnostics("Loaded(soft-reuse)");
                 ResumePendingDesktopInitialization();
+                RequestDesktopLayoutAfterSoftReload();
                 return;
             }
 

@@ -106,6 +106,42 @@ public sealed class CodeEditorInitSequenceTests
         Assert.Equal(expected, shouldBeVisible);
     }
 
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, false)]
+    public void ShouldKeepHostVisibleWhenHidden_GuardsExpectedCases(
+        bool isWindows,
+        bool isCoreWebView2Initialized,
+        bool expected)
+    {
+        var keepVisible = DesktopCodeEditorPresenter.ShouldKeepHostVisibleWhenHidden(
+            isWindows,
+            isCoreWebView2Initialized);
+
+        Assert.Equal(expected, keepVisible);
+    }
+
+    [Theory]
+    [InlineData(true, false, false, true)]
+    [InlineData(false, true, false, true)]
+    [InlineData(false, false, true, true)]
+    [InlineData(false, false, false, false)]
+    public void ShouldHostBeVisible_GuardsExpectedCases(
+        bool forceVisibleForInitialization,
+        bool isHostVisibleRequested,
+        bool keepHostVisibleWhenHidden,
+        bool expected)
+    {
+        var shouldBeVisible = DesktopCodeEditorPresenter.ShouldHostBeVisible(
+            forceVisibleForInitialization,
+            isHostVisibleRequested,
+            keepHostVisibleWhenHidden);
+
+        Assert.Equal(expected, shouldBeVisible);
+    }
+
     [Fact]
     public void BuildCreateMonacoEditorScript_EmbedsInitialStateAsJsonStringLiteral()
     {
