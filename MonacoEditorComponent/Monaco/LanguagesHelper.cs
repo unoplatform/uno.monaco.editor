@@ -271,24 +271,41 @@ namespace Monaco
                 // TODO: Add Incremented Id so that we can register multiple providers per language?
                 editor._parentAccessor.RegisterEvent("HoverProvider" + languageId, async (args) =>
                 {
-                    System.Diagnostics.Debug.WriteLine($"Hover provider.......... {args != null}");
+                    var requestId = Guid.NewGuid().ToString("N")[..8];
+                    System.Diagnostics.Debug.WriteLine($"Hover provider start [{requestId}] args={args?.Length ?? 0}");
                     if (args != null && args.Length >= 1)
                     {
                         try
                         {
-                            if (editor.GetModel() is { } model
-                                && JsonSerializer.Deserialize(args[0], MonacoJsonContext.Default.Position) is { } position)
-                            {
-                                var hover = await provider.ProvideHover(model, position);
-                                if (hover != null)
+                                if (JsonSerializer.Deserialize(args[0], MonacoJsonContext.Default.Position) is { } position)
                                 {
-                                    return JsonSerializer.Serialize(hover, MonacoJsonContext.Relaxed.Hover);
-                                }
+                                    var model = editor.GetModel() ?? new Monaco.Editor.ModelHelper(editor);
+                                    var hoverTask = provider.ProvideHover(model, position);
+                                    Hover? hover;
+                                    if (hoverTask.IsCompletedSuccessfully)
+                                    {
+                                        hover = hoverTask.Result;
+                                    }
+                                    else
+                                    {
+                                        hover = await hoverTask.ConfigureAwait(false);
+                                    }
+                                    if (hover != null)
+                                    {
+                                        System.Diagnostics.Debug.WriteLine($"Hover provider complete [{requestId}] hasHover=True");
+                                        return JsonSerializer.Serialize(hover, MonacoJsonContext.Relaxed.Hover);
+                                    }
+
+                                System.Diagnostics.Debug.WriteLine($"Hover provider complete [{requestId}] hasHover=False");
                             }
                         }
                         catch (JsonException ex)
                         {
-                            System.Diagnostics.Debug.WriteLine($"Hover provider position parse failed: {ex}");
+                            System.Diagnostics.Debug.WriteLine($"Hover provider parse failed [{requestId}]: {ex}");
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Hover provider failed [{requestId}]: {ex}");
                         }
                     }
 

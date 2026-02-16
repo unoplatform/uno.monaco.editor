@@ -37,7 +37,11 @@ namespace Monaco
     {
         private bool _initialized;
         private bool _desktopBootstrapInFlight;
+        private bool _pendingDesktopBootstrapAfterLoad;
+        private bool _hasPresenterVisibilityState;
+        private bool _presenterVisibleState;
         private DispatcherQueue? _queue;
+        private ICodeEditorPresenter? _presenterVisibilityTarget;
 
         private ICodeEditorPresenter? _view;
 
@@ -85,7 +89,94 @@ namespace Monaco
 
         private static void OnIsEditorLoadedChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
+            if (d is CodeEditor editor)
+            {
+                editor.UpdatePresenterVisibility();
+            }
+        }
 
+        private void UpdatePresenterVisibility()
+        {
+            var isVisible = ShouldPresenterBeVisible(IsEditorLoaded, IsLoaded, _lifecycleState);
+            var presenterChanged = !ReferenceEquals(_presenterVisibilityTarget, _view);
+            if (!presenterChanged && _hasPresenterVisibilityState && _presenterVisibleState == isVisible)
+            {
+                return;
+            }
+
+            _presenterVisibilityTarget = _view;
+            _presenterVisibleState = isVisible;
+            _hasPresenterVisibilityState = true;
+
+            Debug.WriteLine(
+                $"UpdatePresenterVisibility: visible={isVisible} IsEditorLoaded={IsEditorLoaded} IsLoaded={IsLoaded} lifecycle={_lifecycleState} presenter={_view?.GetHashCode():x8}");
+
+            if (_view is DesktopCodeEditorPresenter desktopPresenter)
+            {
+                desktopPresenter.SetHostVisible(isVisible);
+            }
+
+            if (_view is UIElement presenterElement)
+            {
+                presenterElement.Opacity = isVisible ? 1d : 0d;
+                presenterElement.IsHitTestVisible = isVisible;
+            }
+        }
+
+        private void ResumePendingDesktopInitialization()
+        {
+            if (_view is not DesktopCodeEditorPresenter desktopPresenter)
+            {
+                return;
+            }
+
+            var canInvokeBootstrap = ShouldInvokeDesktopBootstrap(_lifecycleState, _initialized, _desktopBootstrapInFlight);
+            if (ShouldResumeDeferredDesktopBootstrapOnControlLoaded(
+                    _pendingDesktopBootstrapAfterLoad,
+                    desktopPresenter.IsCoreWebView2Initialized,
+                    desktopPresenter.IsLaunchInProgress,
+                    canInvokeBootstrap))
+            {
+                _pendingDesktopBootstrapAfterLoad = false;
+                DesktopCodeEditorPresenter.DiagnosticLog("CodeEditor_Loaded: resuming deferred desktop bootstrap");
+                RebootstrapMonacoAsync();
+                return;
+            }
+
+            if (ShouldStartDesktopLaunchOnControlLoaded(
+                    desktopPresenter.IsCoreWebView2Initialized,
+                    desktopPresenter.IsLaunchInProgress,
+                    _lifecycleState))
+            {
+                desktopPresenter.Loaded -= WebView_DOMContentLoaded;
+                WebView_DOMContentLoaded(desktopPresenter, new RoutedEventArgs());
+            }
+        }
+
+        private void RestoreDesktopBridgeAfterHardTeardown()
+        {
+            if (_view is not DesktopCodeEditorPresenter desktopPresenter)
+            {
+                return;
+            }
+
+            if (!ShouldRestoreDesktopBridgeOnControlLoaded(
+                    _lifecycleState,
+                    _initializedPresenter is not null,
+                    desktopPresenter.IsCoreWebView2Initialized,
+                    desktopPresenter.IsLaunchInProgress,
+                    _desktopBootstrapInFlight))
+            {
+                return;
+            }
+
+            Debug.WriteLine("CodeEditor_Loaded: restoring bridge and rebootstrap after hard teardown.");
+            if (!InitialiseWebObjects())
+            {
+                return;
+            }
+
+            RebootstrapMonacoAsync();
         }
 
         /// <summary>
@@ -198,6 +289,10 @@ namespace Monaco
 
         private void CodeEditor_Loaded(object sender, RoutedEventArgs e)
         {
+            Debug.WriteLine(
+                $"CodeEditor_Loaded: IsLoaded={IsLoaded} lifecycle={_lifecycleState} IsEditorLoaded={IsEditorLoaded} initialized={_initialized} presenter={_view?.GetHashCode():x8}");
+            UpdatePresenterVisibility();
+
             // If a deferred teardown is pending from a previous Unloaded event,
             // cancel it and skip teardown -- the control was reloaded (e.g., tab switch).
             if (_unloadCts is not null)
@@ -218,6 +313,7 @@ namespace Monaco
                 }
 
                 EmitSubscriptionDiagnostics("Loaded(soft)");
+                ResumePendingDesktopInitialization();
                 return;
             }
 
@@ -244,6 +340,7 @@ namespace Monaco
                 }
 
                 EmitSubscriptionDiagnostics("Loaded(soft-reuse)");
+                ResumePendingDesktopInitialization();
                 return;
             }
 
@@ -302,6 +399,12 @@ namespace Monaco
 
                 EmitSubscriptionDiagnostics("Loaded(init)");
             }
+
+            // Desktop WebView2 can remain unloaded when the host is collapsed while
+            // the editor is not ready. Ensure launch/bootstrap still starts from the
+            // control Loaded path so startup does not stall on a missing presenter Loaded event.
+            ResumePendingDesktopInitialization();
+            RestoreDesktopBridgeAfterHardTeardown();
         }
 
         private void OnWindowSizeChanged(object sender, WindowSizeChangedEventArgs e)
@@ -314,6 +417,9 @@ namespace Monaco
         private void CodeEditor_Unloaded(object sender, RoutedEventArgs e)
         {
             Unloaded -= CodeEditor_Unloaded;
+            Debug.WriteLine(
+                $"CodeEditor_Unloaded: IsLoaded={IsLoaded} lifecycle={_lifecycleState} IsEditorLoaded={IsEditorLoaded} initialized={_initialized} presenter={_view?.GetHashCode():x8}");
+            UpdatePresenterVisibility();
 
             // Note: Presenter event handlers (NavigationStarting, NavigationCompleted,
             // NewWindowRequested, Loaded) are NOT detached here. The presenter survives
@@ -349,11 +455,9 @@ namespace Monaco
         /// </summary>
         private async Task DeferredTeardownAsync(CancellationToken ct)
         {
-            try
-            {
-                await Task.Delay(100, ct);
-            }
-            catch (OperationCanceledException)
+            const int deferredTeardownDelayMs = 5000;
+            await Task.Delay(deferredTeardownDelayMs);
+            if (ct.IsCancellationRequested)
             {
                 // Control was reloaded -- skip teardown.
                 DesktopCodeEditorPresenter.DiagnosticLog("DeferredTeardown: cancelled (control reloaded)");
@@ -366,6 +470,20 @@ namespace Monaco
             if (IsLoaded)
             {
                 DesktopCodeEditorPresenter.DiagnosticLog("DeferredTeardown: control is loaded, skipping teardown");
+                _unloadCts?.Dispose();
+                _unloadCts = null;
+                return;
+            }
+
+            var hasReusableDesktopPresenter = _view is DesktopCodeEditorPresenter desktopPresenter
+                && (desktopPresenter.IsCoreWebView2Initialized
+                    || desktopPresenter.IsLaunchInProgress
+                    || ReferenceEquals(_initializedPresenter, desktopPresenter));
+            if (ShouldPreserveDesktopPresenterOnDeferredUnload(IsLoaded, hasReusableDesktopPresenter))
+            {
+                // Preserve healthy desktop presenters across temporary unloads (tab switches).
+                // Recreating WebView2/Monaco on every switch causes visible flicker and focus churn.
+                DesktopCodeEditorPresenter.DiagnosticLog("DeferredTeardown: preserving healthy desktop presenter across unload");
                 _unloadCts?.Dispose();
                 _unloadCts = null;
                 return;
@@ -392,10 +510,23 @@ namespace Monaco
             _model = null;
         }
 
+        internal static bool ShouldPreserveDesktopPresenterOnDeferredUnload(
+            bool isLoaded,
+            bool hasReusableDesktopPresenter)
+            => !isLoaded && hasReusableDesktopPresenter;
+
+        internal static bool ShouldPresenterBeVisible(
+            bool isEditorLoaded,
+            bool isControlLoaded,
+            EditorLifecycleState lifecycleState)
+            => isEditorLoaded
+                && isControlLoaded
+                && lifecycleState == EditorLifecycleState.Loaded;
+
         /// <summary>
         /// Returns true when the existing desktop presenter is healthy and can be
         /// reused across unload/load cycles (e.g., tab switches). A healthy presenter
-        /// has CoreWebView2 initialized and is not disposed.
+        /// has CoreWebView2 initialized (or is actively initializing) and is not disposed.
         /// WASM presenters are always considered non-reusable (they are lightweight
         /// and stateless).
         /// </summary>
@@ -403,7 +534,9 @@ namespace Monaco
         {
             if (_view is DesktopCodeEditorPresenter desktop)
             {
-                return desktop.IsCoreWebView2Initialized;
+                return desktop.IsCoreWebView2Initialized
+                    || desktop.IsLaunchInProgress
+                    || ReferenceEquals(_initializedPresenter, desktop);
             }
 
             return false;
@@ -438,6 +571,7 @@ namespace Monaco
                 {
                     viewHost.Content = _view;
                 }
+                UpdatePresenterVisibility();
 
                 // If hard teardown already ran (lifecycle is Unloaded), the bridge
                 // objects were torn down. Restore them by re-running InitialiseWebObjects
@@ -462,6 +596,7 @@ namespace Monaco
                         // InitialiseWebObjects transitioned lifecycle to Loading, so
                         // CodeEditorLoaded (the "Loaded" callback) will handle the rest.
                         RebootstrapMonacoAsync();
+                        UpdatePresenterVisibility();
 
                         base.OnApplyTemplate();
                         return;
@@ -469,6 +604,7 @@ namespace Monaco
                 }
                 else
                 {
+                    UpdatePresenterVisibility();
                     base.OnApplyTemplate();
                     return;
                 }
@@ -519,6 +655,7 @@ namespace Monaco
             viewHost.Content = presenter;
             _view = presenter;
             _view.ParentCodeEditor = this;
+            UpdatePresenterVisibility();
 
             _view.NavigationStarting -= WebView_NavigationStarting;
             _view.NavigationStarting += WebView_NavigationStarting;

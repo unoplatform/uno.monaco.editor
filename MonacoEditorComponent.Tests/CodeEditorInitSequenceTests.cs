@@ -87,6 +87,25 @@ public sealed class CodeEditorInitSequenceTests
         Assert.False(shouldForward);
     }
 
+    [Theory]
+    [InlineData(true, true, 2, true)]   // Loaded and visible
+    [InlineData(true, false, 2, false)] // Control unloaded
+    [InlineData(false, true, 2, false)] // Editor not initialized
+    [InlineData(true, true, 1, false)]  // Loading lifecycle
+    public void ShouldPresenterBeVisible_GuardsExpectedCases(
+        bool isEditorLoaded,
+        bool isControlLoaded,
+        int lifecycleState,
+        bool expected)
+    {
+        var shouldBeVisible = CodeEditor.ShouldPresenterBeVisible(
+            isEditorLoaded,
+            isControlLoaded,
+            (EditorLifecycleState)lifecycleState);
+
+        Assert.Equal(expected, shouldBeVisible);
+    }
+
     [Fact]
     public void BuildCreateMonacoEditorScript_EmbedsInitialStateAsJsonStringLiteral()
     {
