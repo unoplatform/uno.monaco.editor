@@ -18,7 +18,7 @@ namespace MonacoEditorTestApp.Helpers
             }
 
             var word = await wordTask;
-            if (word is null || !string.Equals(word.Word, "Hit", StringComparison.OrdinalIgnoreCase))
+            if (word is null || !string.Equals(word.Word, "Hit", StringComparison.Ordinal))
             {
                 return null;
             }
