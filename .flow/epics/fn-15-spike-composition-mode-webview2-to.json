@@ -9,10 +9,10 @@
   "depends_on_epics": [],
   "id": "fn-15-spike-composition-mode-webview2-to",
   "next_task": 1,
-  "plan_review_status": "unknown",
-  "plan_reviewed_at": null,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-02-16T22:40:02.811910Z",
   "spec_path": ".flow/specs/fn-15-spike-composition-mode-webview2-to.md",
   "status": "open",
   "title": "Spike: composition-mode WebView2 to eliminate flickering",
-  "updated_at": "2026-02-16T22:15:29.404941Z"
+  "updated_at": "2026-02-16T22:40:02.812063Z"
 }

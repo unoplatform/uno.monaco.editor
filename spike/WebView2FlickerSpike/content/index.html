@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebView2 Flicker Spike</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 24px;
+            min-height: 100vh;
+        }
+        h1 {
+            color: #569cd6;
+            font-size: 24px;
+            margin-bottom: 16px;
+        }
+        .info {
+            color: #808080;
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+        .counter-section {
+            margin-bottom: 24px;
+        }
+        .counter-section button {
+            background: #0e639c;
+            color: #fff;
+            border: none;
+            padding: 10px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background 0.15s;
+        }
+        .counter-section button:hover {
+            background: #1177bb;
+        }
+        .counter-section span {
+            margin-left: 16px;
+            font-size: 18px;
+            color: #4ec9b0;
+        }
+        .transparent-section {
+            margin-top: 24px;
+            padding: 24px;
+            background: rgba(86, 156, 214, 0.3);
+            border: 1px solid rgba(86, 156, 214, 0.5);
+            border-radius: 8px;
+        }
+        .transparent-section h2 {
+            color: #569cd6;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+        .transparent-section p {
+            color: #d4d4d4;
+            font-size: 14px;
+        }
+        .fully-transparent {
+            margin-top: 16px;
+            padding: 24px;
+            background: rgba(0, 0, 0, 0);
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+        }
+        .fully-transparent p {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 14px;
+        }
+        .message-section {
+            margin-top: 24px;
+        }
+        .message-section button {
+            background: #6a9955;
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-right: 8px;
+        }
+        .message-section button:hover {
+            background: #7fbf6a;
+        }
+        #messageLog {
+            margin-top: 12px;
+            padding: 12px;
+            background: #2d2d2d;
+            border-radius: 4px;
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+            font-size: 13px;
+            color: #ce9178;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebView2 Flicker Spike</h1>
+    <p class="info">This page is loaded in both Mode A (HWND) and Mode C (DComp + ANGLE).</p>
+
+    <div class="counter-section">
+        <button id="clickBtn">Click Me</button>
+        <span id="clickCount">Clicks: 0</span>
+    </div>
+
+    <div class="transparent-section">
+        <h2>Semi-Transparent Region (rgba 30% alpha)</h2>
+        <p>In Mode C with transparent background, Skia content should be visible through this area.</p>
+    </div>
+
+    <div class="fully-transparent">
+        <p>Fully Transparent Region - Skia content should be clearly visible behind this area in Mode C.</p>
+    </div>
+
+    <div class="message-section">
+        <button id="sendMsgBtn">Send Message to Host</button>
+        <button id="clearLogBtn">Clear Log</button>
+        <div id="messageLog">Waiting for messages...</div>
+    </div>
+
+    <script>
+        let clicks = 0;
+        const clickBtn = document.getElementById('clickBtn');
+        const clickCount = document.getElementById('clickCount');
+        const sendMsgBtn = document.getElementById('sendMsgBtn');
+        const clearLogBtn = document.getElementById('clearLogBtn');
+        const messageLog = document.getElementById('messageLog');
+
+        clickBtn.addEventListener('click', () => {
+            clicks++;
+            clickCount.textContent = `Clicks: ${clicks}`;
+        });
+
+        sendMsgBtn.addEventListener('click', () => {
+            if (window.chrome && window.chrome.webview) {
+                window.chrome.webview.postMessage({ type: 'click_count', value: clicks });
+                logMessage('Sent: click_count = ' + clicks);
+            } else {
+                logMessage('Error: chrome.webview not available');
+            }
+        });
+
+        clearLogBtn.addEventListener('click', () => {
+            messageLog.textContent = '';
+        });
+
+        // Listen for messages from host
+        if (window.chrome && window.chrome.webview) {
+            window.chrome.webview.addEventListener('message', (event) => {
+                logMessage('Received: ' + JSON.stringify(event.data));
+            });
+        }
+
+        function logMessage(msg) {
+            const line = document.createElement('div');
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            messageLog.appendChild(line);
+            messageLog.scrollTop = messageLog.scrollHeight;
+        }
+
+        logMessage('Page loaded successfully');
+    </script>
+</body>
+</html>
