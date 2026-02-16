@@ -173,7 +173,28 @@ namespace Monaco
             }
 
             var wref = new WeakReference<CodeEditor>(this);
-            _parentAccessor.RegisterAction("Action" + action.Id, new Action(() => { if (wref.TryGetTarget(out var editor)) { action?.Run(editor, null); } }));
+            _parentAccessor.RegisterActionWithParameters("Action" + action.Id, (parameters) =>
+            {
+                if (!wref.TryGetTarget(out var editor))
+                {
+                    return;
+                }
+
+                if (parameters != null && parameters.Length > 0)
+                {
+                    object[] args = new object[parameters.Length];
+                    for (int i = 0; i < parameters.Length; i++)
+                    {
+                        args[i] = JsonSerializer.Deserialize<object>(parameters[i], MonacoJsonContext.Default.Options) ?? string.Empty;
+                    }
+
+                    action?.Run(editor, args);
+                }
+                else
+                {
+                    action?.Run(editor, []);
+                }
+            });
             return InvokeScriptAsync("addAction", action).AsAsyncAction();
         }
 

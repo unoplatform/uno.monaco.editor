@@ -80,8 +80,24 @@ export const registerHoverProvider = function (unused: any, languageId: string) 
 export const addAction = function (element: any, action: monaco.editor.IActionDescriptor) {
     var editorContext = EditorContext.getEditorForElement(element);
 
-    action.run = function (ed) {
-        editorContext.Accessor.callAction("Action" + action.id)
+    action.run = function (ed, ...runArgs) {
+        const objs: string[] = [];
+        try {
+            const selection = ed && ed.getSelection ? ed.getSelection() : null;
+            const model = ed && ed.getModel ? ed.getModel() : null;
+            const selectedText = selection && model ? model.getValueInRange(selection) : '';
+            objs.push(JSON.stringify(selectedText ?? ''));
+        } catch {
+            objs.push(JSON.stringify(''));
+        }
+
+        if (runArgs) {
+            for (let i = 0; i < runArgs.length; i++) {
+                objs.push(JSON.stringify(runArgs[i]));
+            }
+        }
+
+        editorContext.Accessor.callActionWithParameters2("Action" + action.id, objs);
     };
 
     editorContext.editor.addAction(action);

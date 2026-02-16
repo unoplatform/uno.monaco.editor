@@ -1,4 +1,5 @@
-﻿using Monaco.Editor;
+using Monaco.Editor;
+using System.Text.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,7 +22,22 @@ namespace MonacoEditorTestApp.Actions
 
         public async void Run(CodeEditor editor, object[]? args)
         {
-            var md = new MessageDialog("You have selected text:\n\n" + editor.SelectedText);
+            var selectedText = editor.SelectedText ?? string.Empty;
+            if (args is { Length: > 0 })
+            {
+                selectedText = args[0] switch
+                {
+                    string text => text,
+                    JsonElement { ValueKind: JsonValueKind.String } json => json.GetString() ?? string.Empty,
+                    _ => selectedText
+                };
+            }
+
+            var md = new MessageDialog("You have selected text:\n\n" + selectedText);
+            if (App.MainWindow is not null)
+            {
+                WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
+            }
             await md.ShowAsync();
 
             editor.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
