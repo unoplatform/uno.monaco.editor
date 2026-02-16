@@ -15,10 +15,10 @@ namespace MonacoEditorTestApp.Actions
         public string? ContextMenuGroupId => "navigation";
         public float ContextMenuOrder => 1.5f;
         public string Id => "meta-test-action";
-        public string? KeybindingContext => null;
+        public string? KeybindingContext => "editorHasSelection";
         public int[] Keybindings => [Monaco.KeyMod.Chord(Monaco.KeyMod.CtrlCmd | Monaco.KeyCode.KEY_K, Monaco.KeyMod.CtrlCmd | Monaco.KeyCode.KEY_M)];
         public string? Label => "Test Action";
-        public string? Precondition => null;
+        public string? Precondition => "editorHasSelection";
 
         public async void Run(CodeEditor editor, object[]? args)
         {
