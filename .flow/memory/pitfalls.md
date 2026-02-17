@@ -153,3 +153,6 @@ IDCompositionVirtualSurface.BeginDraw/EndDraw must be tracked with a boolean fla
 
 ## 2026-02-16 manual [pitfall]
 DComp BeginDraw/EndDraw: call EndDraw BEFORE releasing the D3D11 texture RCW - DComp may reference the texture during EndDraw commit
+
+## 2026-02-17 manual [pitfall]
+WindowsFormsSynchronizationContext requires Application.Run() and WinForms message infrastructure - it silently fails with raw Win32 GetMessage/DispatchMessage loops

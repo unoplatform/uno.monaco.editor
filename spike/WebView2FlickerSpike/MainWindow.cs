@@ -65,6 +65,12 @@ internal sealed class MainWindow : IAsyncDisposable
     private int _clientWidth;
     private int _clientHeight;
     private readonly string _contentPath;
+    private Win32SynchronizationContext? _syncCtx;
+
+    /// <summary>
+    /// The main window handle. Available after <see cref="Create"/> returns.
+    /// </summary>
+    public IntPtr Hwnd => _hwnd;
 
     // Win32 delegates and P/Invoke
     private delegate IntPtr WndProcDelegate(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
@@ -195,6 +201,16 @@ internal sealed class MainWindow : IAsyncDisposable
         _contentPath = Path.Combine(AppContext.BaseDirectory, ContentRelativePath);
     }
 
+    /// <summary>
+    /// Provides the custom <see cref="Win32SynchronizationContext"/> so that WndProc
+    /// can drain queued callbacks when the <see cref="Win32SynchronizationContext.WM_DISPATCH_CALLBACK"/>
+    /// message is received.
+    /// </summary>
+    public void SetSynchronizationContext(Win32SynchronizationContext syncCtx)
+    {
+        _syncCtx = syncCtx;
+    }
+
     public void Create()
     {
         var hInstance = GetModuleHandleW(null);
@@ -289,6 +305,10 @@ internal sealed class MainWindow : IAsyncDisposable
                 KillTimer(hWnd, (IntPtr)TIMER_OPACITY_ANIMATE);
                 KillTimer(hWnd, (IntPtr)TIMER_MODE_A_PAINT);
                 PostQuitMessage(0);
+                return IntPtr.Zero;
+
+            case Win32SynchronizationContext.WM_DISPATCH_CALLBACK:
+                _syncCtx?.DrainCallbacks();
                 return IntPtr.Zero;
         }
 

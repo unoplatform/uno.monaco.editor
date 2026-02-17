@@ -32,20 +32,43 @@ using WebView2FlickerSpike;
 ///   [M] Send message to WebView
 ///   [S] Execute script in WebView
 /// </summary>
-
-Console.WriteLine("=== WebView2 Flicker Spike ===");
-Console.WriteLine("Two modes in one window: HWND (Mode A) vs DComp+ANGLE (Mode C)");
-Console.WriteLine();
-
-try
+internal class Program
 {
-    var window = new MainWindow();
-    window.Create();
-    window.RunMessageLoop();
-    await window.DisposeAsync();
-}
-catch (Exception ex)
-{
-    Console.Error.WriteLine($"Fatal error: {ex}");
-    Environment.ExitCode = 1;
+    [STAThread]
+    static void Main()
+    {
+        Console.WriteLine("=== WebView2 Flicker Spike ===");
+        Console.WriteLine("Two modes in one window: HWND (Mode A) vs DComp+ANGLE (Mode C)");
+        Console.WriteLine();
+
+        // Log threading state at startup for verification
+        Console.WriteLine($"[Main] Thread apartment state: {Thread.CurrentThread.GetApartmentState()}");
+
+        try
+        {
+            var window = new MainWindow();
+            window.Create();
+
+            // Install a custom PostMessage-based SynchronizationContext so that async
+            // continuations from FireAndForget marshal back to the STA UI thread.
+            // This must happen after window.Create() (needs the HWND) but before
+            // the message loop starts.
+            var syncCtx = new Win32SynchronizationContext(window.Hwnd);
+            SynchronizationContext.SetSynchronizationContext(syncCtx);
+            window.SetSynchronizationContext(syncCtx);
+
+            Console.WriteLine($"[Main] SynchronizationContext.Current: {SynchronizationContext.Current?.GetType().Name ?? "null"}");
+
+            window.RunMessageLoop();
+
+            // Dispose after message loop exits (PostQuitMessage was called).
+            // Safe to block here since no further message pumping or marshaling is needed.
+            window.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Fatal error: {ex}");
+            Environment.ExitCode = 1;
+        }
+    }
 }

@@ -1,0 +1,47 @@
+{
+  "created_at": "2026-02-17T00:20:20.369586Z",
+  "epic": {
+    "data": {
+      "branch_name": "dev/cnov/skia-webview-dcomp",
+      "completion_review_status": "unknown",
+      "completion_reviewed_at": null,
+      "created_at": "2026-02-17T00:15:08.261229Z",
+      "default_impl": null,
+      "default_review": null,
+      "default_sync": null,
+      "depends_on_epics": [],
+      "id": "fn-16-fixspike-add-stathread-and",
+      "next_task": 1,
+      "plan_review_status": "unknown",
+      "plan_reviewed_at": null,
+      "spec_path": ".flow/specs/fn-16-fixspike-add-stathread-and.md",
+      "status": "open",
+      "title": "fix(spike): add STAThread and SynchronizationContext to WebView2 flicker spike",
+      "updated_at": "2026-02-17T00:15:36.982736Z"
+    },
+    "spec": "# fix(spike): Add STAThread and SynchronizationContext to WebView2 Flicker Spike\n\n## Problem\n\nThe spike app at `spike/WebView2FlickerSpike/Program.cs` uses C# top-level statements, which cannot carry the `[STAThread]` attribute. The .NET runtime defaults to MTA (Multi-Threaded Apartment). When WebView2 or DComp COM objects are created, they require STA, causing:\n\n```\nSystem.Runtime.InteropServices.COMException: 'Cannot change thread mode after it is set. (0x80010106 (RPC_E_CHANGED_MODE))'\n```\n\nAdditionally, the spike's raw Win32 message loop (`GetMessage`/`DispatchMessage` in `MainWindow.cs`) does not install a `SynchronizationContext`, so `async` continuations from `FireAndForget` methods resume on MTA threadpool threads \u2014 a latent threading bug even after the STA fix.\n\n## Scope\n\n- Convert `Program.cs` from top-level statements to explicit `static void Main()` with `[STAThread]`\n- Install a `SynchronizationContext` so async continuations marshal back to the STA/UI thread\n- Handle `DisposeAsync` in the now-synchronous `Main`\n- Spike-only change \u2014 no impact on library, test app, or CI\n\n## Quick commands\n\n```bash\n# Build the spike\ndotnet build spike/WebView2FlickerSpike/WebView2FlickerSpike.csproj\n\n# Run the spike (Windows only \u2014 requires WebView2 Runtime)\ndotnet run --project spike/WebView2FlickerSpike/WebView2FlickerSpike.csproj\n```\n\n## Acceptance\n\n- [ ] Spike runs without `RPC_E_CHANGED_MODE` COM exception\n- [ ] `[STAThread]` attribute present on `Main()`\n- [ ] Async continuations (from `FireAndForget`) execute on the STA/UI thread\n- [ ] `DisposeAsync` cleanup still runs correctly\n- [ ] No changes to files outside `spike/WebView2FlickerSpike/`\n\n## Key context\n\n- `async Task Main()` with `[STAThread]` does NOT work \u2014 continuations resume on MTA threadpool threads (dotnet/runtime#73099). Must use synchronous `void Main()`.\n- `WindowsFormsSynchronizationContext` is the simplest proven approach for raw Win32 message loops. Alternatively, a custom `SynchronizationContext` posting via `PostMessage` works but is more code.\n- `MainWindow.FireAndForget` dispatches async WebView2 init \u2014 these continuations are the secondary threading concern.\n- DComp COM interfaces in `DCompInterop.cs` (all `[ComImport]` with `InterfaceIsIUnknown`) are STA-affine.\n\n## References\n\n- `spike/WebView2FlickerSpike/Program.cs` \u2014 top-level statements, no `[STAThread]`\n- `spike/WebView2FlickerSpike/MainWindow.cs:60-259` \u2014 Win32 message loop, `FireAndForget`\n- `spike/WebView2FlickerSpike/DCompInterop.cs` \u2014 DComp COM interface definitions\n- `MonacoEditorTestApp/Platforms/Desktop/Program.cs` \u2014 reference for correct `[STAThread]` usage\n- dotnet/runtime#73099 \u2014 async Main + STAThread incompatibility\n"
+  },
+  "epic_id": "fn-16-fixspike-add-stathread-and",
+  "schema_version": 2,
+  "tasks": [
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-17T00:15:42.402867Z",
+        "depends_on": [],
+        "epic": "fn-16-fixspike-add-stathread-and",
+        "id": "fn-16-fixspike-add-stathread-and.1",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-16-fixspike-add-stathread-and.1.md",
+        "status": "todo",
+        "title": "Convert spike Program.cs to STAThread Main with SynchronizationContext",
+        "updated_at": "2026-02-17T00:15:57.012442Z"
+      },
+      "id": "fn-16-fixspike-add-stathread-and.1",
+      "runtime": null,
+      "spec": "# fn-16-fixspike-add-stathread-and.1 Convert spike Program.cs to STAThread Main with SynchronizationContext\n\n## Description\nConvert the spike's `Program.cs` from top-level statements to an explicit `[STAThread] static void Main()` and install a `SynchronizationContext` on the UI thread so async continuations from `FireAndForget` marshal back to STA.\n\n**Size:** M\n**Files:** `spike/WebView2FlickerSpike/Program.cs`, `spike/WebView2FlickerSpike/MainWindow.cs`\n\n## Approach\n\n- Follow the pattern at `MonacoEditorTestApp/Platforms/Desktop/Program.cs` for `[STAThread]` declaration\n- Replace top-level statements with `class Program { [STAThread] static void Main() { ... } }`\n- Must use synchronous `void Main()` \u2014 `async Task Main()` defeats `[STAThread]` (dotnet/runtime#73099)\n- Install `SynchronizationContext` before the message loop so `await` continuations post back to STA. Two options:\n  - `WindowsFormsSynchronizationContext.SetSynchronizationContext()` (simplest, requires `System.Windows.Forms` reference)\n  - Custom `SynchronizationContext` that posts via Win32 `PostMessage` to the HWND (no extra dependency)\n- Convert `await window.DisposeAsync()` to synchronous disposal (implementations in `MainWindow` are effectively sync)\n\n## Key context\n\n- `MainWindow.FireAndForget` in `MainWindow.cs` dispatches async WebView2 init \u2014 these continuations are the secondary threading concern after the STA fix\n- The spike's Win32 message loop is a raw `GetMessage`/`DispatchMessage` loop \u2014 no WinForms `Application.Run` \u2014 so no built-in `SynchronizationContext` is installed\n- DComp COM interfaces (`DCompInterop.cs`) are all STA-affine via `[ComImport]`\n## Acceptance\n- [ ] `Program.cs` has explicit `[STAThread] static void Main()` (no top-level statements)\n- [ ] Spike runs without `RPC_E_CHANGED_MODE` COM exception\n- [ ] `SynchronizationContext.Current` is non-null on the UI thread before WebView2 init\n- [ ] Async continuations from `FireAndForget` execute on the STA thread (verify via `Thread.CurrentThread.GetApartmentState() == ApartmentState.STA`)\n- [ ] Window cleanup/disposal still executes correctly on exit\n- [ ] No changes outside `spike/WebView2FlickerSpike/`\n## Done summary\nTBD\n\n## Evidence\n- Commits:\n- Tests:\n- PRs:\n"
+    }
+  ]
+}
