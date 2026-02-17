@@ -48,9 +48,8 @@ Convert the spike's `Program.cs` from top-level statements to an explicit `[STAT
 - [ ] No `.csproj` changes required
 
 ## Done summary
-TBD
-
+Converted spike Program.cs from top-level statements to explicit [STAThread] static void Main() and added a custom PostMessage-based Win32SynchronizationContext that marshals async continuations to the STA UI thread via WM_APP+0 message dispatch in WndProc.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: d04b1a13bd5b0a2f2f15b8890c600ba3c81ff865
+- Tests: dotnet build spike/WebView2FlickerSpike/WebView2FlickerSpike.csproj
 - PRs:
