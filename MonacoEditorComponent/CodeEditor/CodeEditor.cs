@@ -335,17 +335,6 @@ namespace Monaco
                 _unloadCts.Dispose();
                 _unloadCts = null;
 
-                // Soft reload: re-subscribe only Window.SizeChanged (the only handler
-                // removed in the soft unload path). All other subscriptions survive.
-                Unloaded -= CodeEditor_Unloaded;
-                Unloaded += CodeEditor_Unloaded;
-
-                if (Window.Current is not null)
-                {
-                    Window.Current.SizeChanged += OnWindowSizeChanged;
-                    _sizeChangedSubCount++;
-                }
-
                 EmitSubscriptionDiagnostics("Loaded(soft)");
                 ResumePendingDesktopInitialization();
                 RequestDesktopLayoutAfterSoftReload();
@@ -364,15 +353,6 @@ namespace Monaco
             {
                 DesktopCodeEditorPresenter.DiagnosticLog(
                     $"CodeEditor_Loaded: soft reload (lifecycle={_lifecycleState}, presenter={_view.GetHashCode():x8})");
-
-                Unloaded -= CodeEditor_Unloaded;
-                Unloaded += CodeEditor_Unloaded;
-
-                if (Window.Current is not null)
-                {
-                    Window.Current.SizeChanged += OnWindowSizeChanged;
-                    _sizeChangedSubCount++;
-                }
 
                 EmitSubscriptionDiagnostics("Loaded(soft-reuse)");
                 ResumePendingDesktopInitialization();
@@ -452,7 +432,6 @@ namespace Monaco
 
         private void CodeEditor_Unloaded(object sender, RoutedEventArgs e)
         {
-            Unloaded -= CodeEditor_Unloaded;
             Debug.WriteLine(
                 $"CodeEditor_Unloaded: IsLoaded={IsLoaded} lifecycle={_lifecycleState} IsEditorLoaded={IsEditorLoaded} initialized={_initialized} presenter={_view?.GetHashCode():x8}");
             UpdatePresenterVisibility();
@@ -463,16 +442,25 @@ namespace Monaco
             // Detaching here without reattaching in CodeEditor_Loaded would leave
             // the editor non-functional after reload.
 
-            // Soft unload: only unsubscribe Window.SizeChanged (prevents accumulation).
-            // Do NOT unsubscribe Options.PropertyChanged, Decorations.VectorChanged,
-            // Markers.VectorChanged -- these must survive soft cycles.
-            if (Window.Current is not null)
-            {
-                Window.Current.SizeChanged -= OnWindowSizeChanged;
-                _sizeChangedSubCount--;
-            }
+            // Do not detach subscriptions on tab-switch unload. This control can be
+            // reloaded multiple times while reusing the same presenter instance;
+            // detaching/re-attaching during those cycles is churn and risks drift.
+            // Hard teardown paths (template replacement/dispose) still detach.
 
             EmitSubscriptionDiagnostics("Unloaded");
+
+            // For desktop tab switches, keep the existing presenter/WebView alive.
+            // The hidden tab's content is not visible, so tearing down here only
+            // increases blank-state risk on return without functional benefit.
+            if (_view is DesktopCodeEditorPresenter)
+            {
+                _unloadCts?.Cancel();
+                _unloadCts?.Dispose();
+                _unloadCts = null;
+                DesktopCodeEditorPresenter.DiagnosticLog(
+                    "CodeEditor_Unloaded: preserving desktop presenter on unload (no deferred teardown).");
+                return;
+            }
 
             // Defer teardown behind a short delay. If CodeEditor_Loaded fires
             // before the delay completes, cancel and skip teardown entirely.
