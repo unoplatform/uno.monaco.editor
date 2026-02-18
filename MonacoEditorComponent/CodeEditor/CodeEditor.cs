@@ -113,10 +113,9 @@ namespace Monaco
 
             if (_view is DesktopCodeEditorPresenter desktopPresenter)
             {
-                // Desktop tab switches should not change WebView visibility state.
-                // Keep the host visible and let the tab container own visibility.
+                // Keep the desktop host alive (prevents init stalls), but hide/show
+                // the presenter itself using opacity/hit-testing like the WASM path.
                 desktopPresenter.SetHostVisible(true);
-                return;
             }
 
             if (_view is UIElement presenterElement)
