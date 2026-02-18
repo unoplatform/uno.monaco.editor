@@ -417,9 +417,10 @@ namespace Monaco
                 var hasContext = await desktopPresenter.InvokeScriptAsync("""
                     (() => {
                         const element = document.getElementById('editor-container');
-                        const context = typeof EditorContext !== 'undefined' && EditorContext.tryGetEditorForElement
-                            ? EditorContext.tryGetEditorForElement(element)
+                        const getContext = typeof EditorContext !== 'undefined'
+                            ? (EditorContext.tryGetEditorForElement || EditorContext.getEditorForElement)
                             : null;
+                        const context = getContext ? getContext.call(EditorContext, element) : null;
                         return !!(context && context.editor && context.model);
                     })()
                     """);
