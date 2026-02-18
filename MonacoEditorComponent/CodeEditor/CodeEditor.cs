@@ -544,7 +544,6 @@ namespace Monaco
             bool isControlLoaded,
             EditorLifecycleState lifecycleState)
             => isEditorLoaded
-                && isControlLoaded
                 && lifecycleState == EditorLifecycleState.Loaded;
 
         /// <summary>
