@@ -155,14 +155,36 @@ namespace Monaco
 
         private void RequestDesktopLayoutAfterSoftReload()
         {
-            if (_view is not DesktopCodeEditorPresenter
+            if (_view is not DesktopCodeEditorPresenter desktopPresenter
                 || !_initialized
                 || _lifecycleState != EditorLifecycleState.Loaded)
             {
                 return;
             }
 
-            _ = SendScriptAsync("EditorContext.getEditorForElement(element).editor.layout();");
+            _ = RequestDesktopLayoutAfterSoftReloadAsync(desktopPresenter);
+        }
+
+        private async Task RequestDesktopLayoutAfterSoftReloadAsync(DesktopCodeEditorPresenter desktopPresenter)
+        {
+            if (!await HasDesktopEditorContextAsync(desktopPresenter))
+            {
+                if (_desktopBootstrapInFlight
+                    || desktopPresenter.IsLaunchInProgress
+                    || !desktopPresenter.IsCoreWebView2Initialized)
+                {
+                    DesktopCodeEditorPresenter.DiagnosticLog(
+                        "CodeEditor_Loaded: soft-reuse context probe missing editor, but bootstrap/launch is already in flight.");
+                    return;
+                }
+
+                DesktopCodeEditorPresenter.DiagnosticLog(
+                    "CodeEditor_Loaded: soft-reuse context probe missing editor, rebootstrap requested.");
+                RebootstrapMonacoAsync();
+                return;
+            }
+
+            await SendScriptAsync("EditorContext.getEditorForElement(element).editor.layout();");
         }
 
         private void RestoreDesktopBridgeAfterHardTeardown()
