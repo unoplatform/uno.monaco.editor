@@ -418,6 +418,9 @@ export const callParentActionWithParameters = (element: any, name: string, param
         parameters != null && parameters.length > 1 ? stringifyForMarshalling(parameters[1]) : null as any);
 
 export const createMonacoEditor = async (managedOwner: any, elementId: string, basePath: string, initialStatePayload?: InitialState | string) => {
+    (globalThis as any).__unoMonacoInitError = null;
+    (globalThis as any).__unoMonacoInitComplete = false;
+
     // Ensure a single <style id="dynamic"> element exists (editor.html already provides one on desktop)
     if (!document.getElementById('dynamic')) {
         var head = document.head || document.getElementsByTagName('head')[0];
@@ -450,7 +453,9 @@ export const createMonacoEditor = async (managedOwner: any, elementId: string, b
 
     try {
         await initializeMonacoEditor(managedOwner, document.getElementById(elementId), initialState);
+        (globalThis as any).__unoMonacoInitComplete = true;
     } catch (err) {
+        (globalThis as any).__unoMonacoInitError = String(err);
         console.error('[createMonacoEditor] initializeMonacoEditor failed:', err);
     }
 

@@ -64,17 +64,39 @@ export class EditorContext {
     public modifingSelection: boolean;
 }
 
+const hoverProviderRegistrations = new Map<string, monaco.IDisposable>();
+
 export const registerHoverProvider = function (unused: any, languageId: string) {
-    return monaco.languages.registerHoverProvider(languageId, {
-        provideHover: function (model, position) {
+    const existing = hoverProviderRegistrations.get(languageId);
+    if (existing) {
+        existing.dispose();
+        hoverProviderRegistrations.delete(languageId);
+    }
+
+    const disposable = monaco.languages.registerHoverProvider(languageId, {
+        provideHover: async function (model, position) {
             var element = EditorContext.getElementFromModel(model);
-            return callParentEventAsync(element, "HoverProvider" + languageId, [JSON.stringify(position)]).then(result => {
+            try {
+                const result = await callParentEventAsync(element, "HoverProvider" + languageId, [JSON.stringify(position)]);
                 if (result) {
                     return JSON.parse(result);
                 }
-            });
+            } catch (error) {
+                console.warn(`[registerHoverProvider] ${languageId} callback failed`, error);
+            }
+            return undefined;
         }
     });
+
+    hoverProviderRegistrations.set(languageId, disposable);
+    return {
+        dispose: () => {
+            disposable.dispose();
+            if (hoverProviderRegistrations.get(languageId) === disposable) {
+                hoverProviderRegistrations.delete(languageId);
+            }
+        }
+    };
 };
 
 export const addAction = function (element: any, action: monaco.editor.IActionDescriptor) {

@@ -69,6 +69,17 @@ public sealed class IsNavigationAllowedTests
     }
 
     [Fact]
+    public void ShouldFallbackToFileNavigation_NonDefaultPort_Allowed()
+    {
+        var source = new global::System.Uri($"http://{DesktopCodeEditorPresenter.AllowedVirtualHost}:8080/editor.html");
+        Assert.True(DesktopCodeEditorPresenter.ShouldFallbackToFileNavigation(
+            isSuccess: false,
+            currentSource: source,
+            fallbackAttempted: false,
+            allowedFileContentRoot: Path.GetTempPath()));
+    }
+
+    [Fact]
     public void ShouldFallbackToFileNavigation_AlreadyAttempted_NoFallback()
     {
         var source = new global::System.Uri($"http://{DesktopCodeEditorPresenter.AllowedVirtualHost}/editor.html");
@@ -93,10 +104,10 @@ public sealed class IsNavigationAllowedTests
     }
 
     [Fact]
-    public void AllowedVirtualHost_NonDefaultPort_Blocked()
+    public void AllowedVirtualHost_NonDefaultPort_Allowed()
     {
         var uri = $"https://{DesktopCodeEditorPresenter.AllowedVirtualHost}:8080/editor.html";
-        Assert.False(DesktopCodeEditorPresenter.IsNavigationAllowed(uri, null));
+        Assert.True(DesktopCodeEditorPresenter.IsNavigationAllowed(uri, null));
     }
 
     [Fact]

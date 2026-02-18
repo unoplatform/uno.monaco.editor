@@ -113,7 +113,10 @@ namespace Monaco
 
             if (_view is DesktopCodeEditorPresenter desktopPresenter)
             {
-                desktopPresenter.SetHostVisible(isVisible);
+                // Desktop tab switches should not change WebView visibility state.
+                // Keep the host visible and let the tab container own visibility.
+                desktopPresenter.SetHostVisible(true);
+                return;
             }
 
             if (_view is UIElement presenterElement)
@@ -434,7 +437,6 @@ namespace Monaco
         {
             Debug.WriteLine(
                 $"CodeEditor_Unloaded: IsLoaded={IsLoaded} lifecycle={_lifecycleState} IsEditorLoaded={IsEditorLoaded} initialized={_initialized} presenter={_view?.GetHashCode():x8}");
-            UpdatePresenterVisibility();
 
             // Note: Presenter event handlers (NavigationStarting, NavigationCompleted,
             // NewWindowRequested, Loaded) are NOT detached here. The presenter survives
@@ -544,6 +546,7 @@ namespace Monaco
             bool isControlLoaded,
             EditorLifecycleState lifecycleState)
             => isEditorLoaded
+                && isControlLoaded
                 && lifecycleState == EditorLifecycleState.Loaded;
 
         /// <summary>

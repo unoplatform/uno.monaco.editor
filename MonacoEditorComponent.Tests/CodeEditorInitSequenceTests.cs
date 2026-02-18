@@ -87,6 +87,61 @@ public sealed class CodeEditorInitSequenceTests
         Assert.False(shouldForward);
     }
 
+    [Theory]
+    [InlineData(true, true, 2, true)]   // Loaded and visible
+    [InlineData(true, false, 2, false)] // Control unloaded
+    [InlineData(false, true, 2, false)] // Editor not initialized
+    [InlineData(true, true, 1, false)]  // Loading lifecycle
+    public void ShouldPresenterBeVisible_GuardsExpectedCases(
+        bool isEditorLoaded,
+        bool isControlLoaded,
+        int lifecycleState,
+        bool expected)
+    {
+        var shouldBeVisible = CodeEditor.ShouldPresenterBeVisible(
+            isEditorLoaded,
+            isControlLoaded,
+            (EditorLifecycleState)lifecycleState);
+
+        Assert.Equal(expected, shouldBeVisible);
+    }
+
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, false)]
+    public void ShouldKeepHostVisibleWhenHidden_GuardsExpectedCases(
+        bool isWindows,
+        bool isCoreWebView2Initialized,
+        bool expected)
+    {
+        var keepVisible = DesktopCodeEditorPresenter.ShouldKeepHostVisibleWhenHidden(
+            isWindows,
+            isCoreWebView2Initialized);
+
+        Assert.Equal(expected, keepVisible);
+    }
+
+    [Theory]
+    [InlineData(true, false, false, true)]
+    [InlineData(false, true, false, true)]
+    [InlineData(false, false, true, true)]
+    [InlineData(false, false, false, false)]
+    public void ShouldHostBeVisible_GuardsExpectedCases(
+        bool forceVisibleForInitialization,
+        bool isHostVisibleRequested,
+        bool keepHostVisibleWhenHidden,
+        bool expected)
+    {
+        var shouldBeVisible = DesktopCodeEditorPresenter.ShouldHostBeVisible(
+            forceVisibleForInitialization,
+            isHostVisibleRequested,
+            keepHostVisibleWhenHidden);
+
+        Assert.Equal(expected, shouldBeVisible);
+    }
+
     [Fact]
     public void BuildCreateMonacoEditorScript_EmbedsInitialStateAsJsonStringLiteral()
     {

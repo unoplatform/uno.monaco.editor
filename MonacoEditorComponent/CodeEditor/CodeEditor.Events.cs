@@ -762,6 +762,10 @@ namespace Monaco
                 else
                 {
                     IsEditorLoaded = true;
+                    if (_desktopBootstrapInFlight && _lifecycleState == EditorLifecycleState.Loaded)
+                    {
+                        EditorLoaded?.Invoke(this, new RoutedEventArgs());
+                    }
                 }
 
                 _desktopBootstrapInFlight = false;
