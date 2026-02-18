@@ -667,5 +667,35 @@ namespace Monaco
                 && initialized
                 && lifecycleState == EditorLifecycleState.Loaded
                 && hostIsFocused;
+
+        internal static bool ShouldStartDesktopLaunchOnControlLoaded(
+            bool isCoreWebView2Initialized,
+            bool isLaunchInProgress,
+            EditorLifecycleState lifecycleState)
+            => !isCoreWebView2Initialized
+                && !isLaunchInProgress
+                && lifecycleState == EditorLifecycleState.Unloaded;
+
+        internal static bool ShouldRestoreDesktopBridgeOnControlLoaded(
+            EditorLifecycleState lifecycleState,
+            bool hasInitializedPresenter,
+            bool isCoreWebView2Initialized,
+            bool isLaunchInProgress,
+            bool bootstrapInFlight)
+            => lifecycleState == EditorLifecycleState.Unloaded
+                && !hasInitializedPresenter
+                && isCoreWebView2Initialized
+                && !isLaunchInProgress
+                && !bootstrapInFlight;
+
+        internal static bool ShouldResumeDeferredDesktopBootstrapOnControlLoaded(
+            bool hasPendingBootstrap,
+            bool isCoreWebView2Initialized,
+            bool isLaunchInProgress,
+            bool canInvokeBootstrap)
+            => hasPendingBootstrap
+                && isCoreWebView2Initialized
+                && !isLaunchInProgress
+                && canInvokeBootstrap;
     }
 }
