@@ -12,7 +12,7 @@
 	<ItemGroup>
 		<PackageReference Include="xunit.v3.mtp-v2" />
 		<PackageReference Include="Microsoft.Playwright.Xunit.v3" />
-		<PackageReference Include="Microsoft.Playwright" />
+		<PackageReference Include="Microsoft.Playwright" ExcludeAssets="build;buildTransitive" />
 		<PackageReference Include="StreamJsonRpc" />
 		<PackageReference Include="Nerdbank.Streams" />
 		<PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" PrivateAssets="all" />
