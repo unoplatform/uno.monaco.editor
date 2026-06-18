@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Text.RegularExpressions;
 
 using Microsoft.Playwright;
@@ -59,6 +60,7 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         // 0. Create Playwright instance (owned by this fixture).
+        EnsurePlaywrightDriverSearchPath();
         _playwright = await Playwright.CreateAsync();
 
         // 1. Pick a random available port for CDP.
@@ -419,6 +421,31 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         throw new TimeoutException(
             $"Could not find Monaco editor page within {MonacoPageTimeoutMs}ms. " +
             "Check that the desktop app started correctly and WebView2 loaded the editor.");
+    }
+
+    /// <summary>
+    /// Points Playwright at the driver bundled in the Microsoft.Playwright NuGet package
+    /// (the .playwright/ folder) when <c>PLAYWRIGHT_DRIVER_SEARCH_PATH</c> is not already set.
+    /// The project excludes Playwright's build assets (see the .csproj), so the driver is not
+    /// copied next to the test DLL; CI sets this env var explicitly, and this makes local runs
+    /// work without manual setup. No-op when the env var is already set (e.g. on CI).
+    /// </summary>
+    private static void EnsurePlaywrightDriverSearchPath()
+    {
+        const string envVar = "PLAYWRIGHT_DRIVER_SEARCH_PATH";
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(envVar)))
+        {
+            return;
+        }
+
+        var packagePath = typeof(DesktopAppFixture).Assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(a => a.Key == "PlaywrightPackagePath")?.Value;
+
+        if (!string.IsNullOrEmpty(packagePath) && Directory.Exists(packagePath))
+        {
+            Environment.SetEnvironmentVariable(envVar, packagePath);
+        }
     }
 
     private static int GetAvailablePort()
