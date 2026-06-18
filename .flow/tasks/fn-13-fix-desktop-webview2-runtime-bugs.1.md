@@ -66,7 +66,8 @@ Investigate whether a deferral mechanism for DP change handlers (inspired by `IS
 - [ ] Solution builds clean for both net10.0-desktop and net10.0-browserwasm targets
 ## Done summary
 Fix OnApplyTemplate to retain healthy DesktopCodeEditorPresenter across unload/load cycles instead of unconditionally destroying and recreating it. Added IsPresenterHealthy guard, DeferredTeardownAsync IsLoaded race check, soft-reload detection in CodeEditor_Loaded, and bridge restoration with RebootstrapMonacoAsync for post-hard-teardown presenter reuse. BeginInit/EndInit investigation concluded existing guards are sufficient.
+Resolved upstream. WebView2 init flickering/cycling was fixed in unoplatform/uno PR #23226; the fix landed locally via the uno.sdk bump (commit 196c146 'chore: bumping uno.sdk with webview2 fixes').
 ## Evidence
-- Commits: 60b6465406ec6579e8146493c7883111f46aea8a
+- Commits: 60b6465406ec6579e8146493c7883111f46aea8a, 196c146
 - Tests: dotnet build MonacoEditorComponent.slnx --no-restore, dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj --filter-not-trait Category=WasmPlaywright --filter-not-trait Category=DesktopCdp, dotnet test --project tools/MonacoTypeEmitter.Tests/MonacoTypeEmitter.Tests.csproj
-- PRs:
+- PRs: https://github.com/unoplatform/uno/pull/23226
