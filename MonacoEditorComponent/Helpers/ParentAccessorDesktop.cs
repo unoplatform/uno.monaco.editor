@@ -93,25 +93,29 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
     {
         if (_queue.HasThreadAccess)
         {
-            if (_parent.TryGetTarget(out var tobj))
-            {
-                var propinfo = _typeinfo.GetProperty(name);
-                return propinfo?.GetValue(tobj);
-            }
-            return null;
+            return GetValueOnUIThread(name);
         }
 
         object? result = null;
         await _queue.EnqueueAsync(() =>
         {
-            if (_parent.TryGetTarget(out var tobj))
-            {
-                var propinfo = _typeinfo.GetProperty(name);
-                result = propinfo?.GetValue(tobj);
-            }
+            result = GetValueOnUIThread(name);
         }).ConfigureAwait(false);
 
         return result;
+    }
+
+    private object? GetValueOnUIThread(string name)
+    {
+        if (!_parent.TryGetTarget(out var presenter)) return null;
+
+        var propinfo = _typeinfo.GetProperty(name);
+        if (propinfo is not null) return propinfo.GetValue(presenter);
+
+        if (presenter.ParentCodeEditor is { } codeEditor)
+            return codeEditor.GetType().GetProperty(name)?.GetValue(codeEditor);
+
+        return null;
     }
 
     public string GetJsonValue(string name)
@@ -119,10 +123,22 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
         // Synchronous interface implementation. On desktop, callers should use
         // GetJsonValueAsync to ensure UI thread dispatch. This exists for
         // interface compliance only; direct callers on desktop should not use it.
-        if (_parent.TryGetTarget(out var tobj))
+        if (_parent.TryGetTarget(out var presenter))
         {
+            object? obj;
             var propinfo = _typeinfo.GetProperty(name);
-            var obj = propinfo?.GetValue(tobj);
+            if (propinfo is not null)
+            {
+                obj = propinfo.GetValue(presenter);
+            }
+            else if (presenter.ParentCodeEditor is { } codeEditor)
+            {
+                obj = codeEditor.GetType().GetProperty(name)?.GetValue(codeEditor);
+            }
+            else
+            {
+                return "null";
+            }
 
             if (obj is null)
             {
@@ -218,20 +234,49 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
 
     private void SetValueDirect(string name, object newValue)
     {
-        if (_parent.TryGetTarget(out var tobj))
+        if (!_parent.TryGetTarget(out var presenter)) return;
+
+        var propinfo = _typeinfo.GetProperty(name);
+        if (propinfo is not null)
         {
-            var propinfo = _typeinfo.GetProperty(name);
-            tobj.IsSettingValue = true;
+            // Property found on the presenter (e.g., IsSettingValue, ElementId).
+            presenter.IsSettingValue = true;
             try
             {
-                // Desktop values arrive as clean JSON via JSON-RPC -- no Desanitize needed.
-                propinfo?.SetValue(tobj, newValue);
+                propinfo.SetValue(presenter, newValue);
             }
             finally
             {
-                tobj.IsSettingValue = false;
+                presenter.IsSettingValue = false;
             }
         }
+        else if (presenter.ParentCodeEditor is { } codeEditor)
+        {
+            // Property not on presenter — it belongs to CodeEditor (Text, CodeLanguage,
+            // ReadOnly, HasGlyphMargin, SelectedText, etc.). Route directly to CodeEditor.
+            //
+            // IsSettingValue is intentionally NOT set here: the JS updateContent /
+            // updateSelectedContent helpers guard echo-back via a same-value check on
+            // model.getValue(), so the bridge-driven write propagates to Monaco correctly.
+            var editorPropInfo = codeEditor.GetType().GetProperty(name);
+            if (editorPropInfo is not null)
+            {
+                editorPropInfo.SetValue(codeEditor, ConvertValue(newValue, editorPropInfo.PropertyType));
+            }
+        }
+    }
+
+    private static object? ConvertValue(object? value, Type targetType)
+    {
+        if (targetType == typeof(bool) || targetType == typeof(bool?))
+        {
+            return value switch
+            {
+                bool b => b,
+                _ => bool.Parse(value?.ToString() ?? "false")
+            };
+        }
+        return value;
     }
 
     private void SetValueWithTypeDirect(string name, string newValue, string type)
