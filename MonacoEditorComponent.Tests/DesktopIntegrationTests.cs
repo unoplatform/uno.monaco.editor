@@ -461,6 +461,52 @@ public sealed class DesktopIntegrationTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "DesktopCDP")]
+    public async Task RapidTyping_DoesNotRevertOrFlicker()
+    {
+        // Regression test for the ping-pong/flicker bug: rapid content changes each fire
+        // onDidChangeContent -> Accessor.setValue("Text", ...) over the bridge. If the
+        // managed side echoes that JS-originated write back via updateContent (because
+        // IsSettingValue was not set on the desktop bridge path), a stale round-tripped
+        // value reverts the model and the editor ping-pongs between two states.
+        _currentTestName = nameof(RapidTyping_DoesNotRevertOrFlicker);
+        try
+        {
+            // Start from an empty document.
+            await _fixture.Page.EvaluateAsync(
+                "() => monaco.editor.getEditors()[0].setValue('')");
+
+            // Type many characters in rapid succession, each producing a separate
+            // onDidChangeContent event, without awaiting the async bridge round-trip
+            // between keystrokes -- this is what triggers the stale echo-back race.
+            const string expected = "abcdefghijklmnopqrstuvwxyz0123456789";
+            await _fixture.Page.EvaluateAsync($$"""
+                () => {
+                    const editor = monaco.editor.getEditors()[0];
+                    const text = '{{expected}}';
+                    for (const ch of text) {
+                        editor.trigger('test', 'type', { text: ch });
+                    }
+                }
+                """);
+
+            // Allow the async JS<->managed bridge to fully settle. Any stale echo-back
+            // would land within this window and revert the model.
+            await Task.Delay(1500);
+
+            var finalText = await _fixture.Page.EvaluateAsync<string>(
+                "() => monaco.editor.getEditors()[0].getValue()");
+
+            Assert.Equal(expected, finalText);
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "DesktopCDP")]
     public async Task MultiInstance_EditorsHaveIndependentState()
     {
         _currentTestName = nameof(MultiInstance_EditorsHaveIndependentState);

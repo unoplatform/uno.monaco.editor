@@ -255,13 +255,25 @@ internal sealed class ParentAccessorDesktop : IParentAccessor
             // Property not on presenter — it belongs to CodeEditor (Text, CodeLanguage,
             // ReadOnly, HasGlyphMargin, SelectedText, etc.). Route directly to CodeEditor.
             //
-            // IsSettingValue is intentionally NOT set here: the JS updateContent /
-            // updateSelectedContent helpers guard echo-back via a same-value check on
-            // model.getValue(), so the bridge-driven write propagates to Monaco correctly.
+            // IsSettingValue MUST be set around the write to suppress echo-back, mirroring
+            // the WASM SetValueDirect path. Without it, a JS-originated Text write re-enters
+            // the DP callback (CodeEditor.Properties.cs) and pushes updateContent back to JS;
+            // under rapid typing the round-tripped value is already stale, so the JS
+            // model.getValue() same-value check fires instead of suppressing, reverts the
+            // model, and the editor ping-pongs/flickers between two states. The JS check is a
+            // timing-fragile secondary guard; IsSettingValue is the authoritative one.
             var editorPropInfo = codeEditor.GetType().GetProperty(name);
             if (editorPropInfo is not null)
             {
-                editorPropInfo.SetValue(codeEditor, ConvertValue(newValue, editorPropInfo.PropertyType));
+                codeEditor.IsSettingValue = true;
+                try
+                {
+                    editorPropInfo.SetValue(codeEditor, ConvertValue(newValue, editorPropInfo.PropertyType));
+                }
+                finally
+                {
+                    codeEditor.IsSettingValue = false;
+                }
             }
         }
     }
