@@ -95,7 +95,7 @@ public sealed class DesktopIntegrationTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 20_000)]
     [Trait("Category", "DesktopCDP")]
     public async Task BridgeRoundTrip_JsonRpcGetValue()
     {
