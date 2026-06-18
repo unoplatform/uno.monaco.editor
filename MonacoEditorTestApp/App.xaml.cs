@@ -1,4 +1,4 @@
-﻿namespace MonacoEditorTestApp;
+namespace MonacoEditorTestApp;
 
 
 public partial class App : Application
@@ -17,7 +17,7 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         MainWindow = new Window();
-#if DEBUG
+#if DEBUG && false
         MainWindow.UseStudio();
 #endif
 
