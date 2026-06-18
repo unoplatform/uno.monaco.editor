@@ -48,10 +48,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Tmds.DBus.Protocol" VersionOverride="0.21.3" />
-	</ItemGroup>
-
-	<ItemGroup>
 	  <Folder Include="bin\Debug\" />
 	  <Folder Include="Platforms/Desktop/" />
 	</ItemGroup>
