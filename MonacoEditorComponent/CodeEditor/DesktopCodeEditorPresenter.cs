@@ -374,18 +374,25 @@ namespace Monaco
 
         private void PostWebMessageToPage(string json)
         {
-            if (OperatingSystem.IsWindows())
-            {
-                _webView.CoreWebView2.PostWebMessageAsJson(json);
-                return;
-            }
-
-            // Uno's non-Windows WebView host does not consistently surface
-            // PostWebMessageAsJson to JS JSON-RPC readers. Dispatch a window-level
-            // MessageEvent directly so vscode-jsonrpc receives the envelope.
+            // Deliver the JSON-RPC envelope by dispatching a window 'message' event in the
+            // page via ExecuteScript. CoreWebView2.PostWebMessageAsJson does NOT reliably
+            // surface to the page's JS in the WebView2 host we target -- a CDP probe
+            // confirmed that neither the chrome.webview nor the window 'message' event ever
+            // fires for a posted message, which left request/response round-trips
+            // (parentAccessor/getJsonValue, callEvent) hanging forever while notifications
+            // (which expect no reply) appeared to work. ExecuteScript is the same channel
+            // every other C#->JS call uses (createMonacoEditor, updateContent, ...), and it
+            // is reliable. The JS reader listens on 'window' to receive these (see
+            // jsonRpcBridge.ts WebViewMessageReader.listen).
+            // Base64 the UTF-8 bytes and decode them back through TextDecoder on the JS side.
+            // A naive JSON.parse(atob(...)) would mis-decode any non-ASCII content (atob yields
+            // a Latin-1 byte-string), corrupting e.g. a getJsonValue("Text") reply that contains
+            // multi-byte characters. Round-tripping via Uint8Array + TextDecoder preserves UTF-8.
             var base64Payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
             _ = _webView.CoreWebView2.ExecuteScriptAsync(
-                "(function(){const __unoMsg = JSON.parse(atob('" + base64Payload + "'));window.dispatchEvent(new MessageEvent('message', { data: __unoMsg }));})();");
+                "(function(){const b=atob('" + base64Payload + "');const u=Uint8Array.from(b,c=>c.charCodeAt(0));" +
+                "const __unoMsg=JSON.parse(new TextDecoder().decode(u));" +
+                "window.dispatchEvent(new MessageEvent('message',{data:__unoMsg}));})();");
         }
 
         /// <summary>

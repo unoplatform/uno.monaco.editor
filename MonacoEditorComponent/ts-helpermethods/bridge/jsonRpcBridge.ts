@@ -79,20 +79,20 @@ class WebViewMessageReader extends AbstractMessageReader implements MessageReade
             }
         };
 
-        // On Windows, WebView2 delivers host-to-page messages via chrome.webview 'message' events,
-        // NOT window 'message'. Subscribe to the correct target per platform.
-        // On macOS/Linux (WKWebView/WebKitGTK), messages arrive via window 'message'.
-        const hasWebkitBridge = typeof (window as any).webkit !== 'undefined'
-            && !!(window as any).webkit?.messageHandlers?.unoWebView?.postMessage;
+        // The host (DesktopCodeEditorPresenter.PostWebMessageToPage) delivers host-to-page
+        // JSON-RPC envelopes by dispatching a window 'message' event via ExecuteScript on
+        // all platforms: CoreWebView2.PostWebMessageAsJson was confirmed (via CDP probe) to
+        // never surface to the page on the WebView2 host we target, which hung every
+        // request/response round-trip. So we MUST listen on window. We also listen on
+        // chrome.webview defensively in case a host delivers there instead; the dedup guard
+        // in the message listener drops any envelope that arrives on both channels.
         const chromeWebview = (window as any).chrome?.webview;
         if (chromeWebview && typeof chromeWebview.addEventListener === 'function') {
             chromeWebview.addEventListener('message', this._messageListener);
             this._eventTargets.push(chromeWebview);
         }
-        if (hasWebkitBridge || !chromeWebview || typeof chromeWebview.addEventListener !== 'function') {
-            window.addEventListener('message', this._messageListener);
-            this._eventTargets.push(window);
-        }
+        window.addEventListener('message', this._messageListener);
+        this._eventTargets.push(window);
 
         return {
             dispose: () => {
