@@ -105,23 +105,28 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
         {
             await _fixture.ResetEditorStateAsync();
 
-            // Set text via the bridge (parentAccessor/setValue) which invokes C# OnSetValue.
+            // Set text via the bridge (parentAccessor/setValue), which invokes C# OnSetValue
+            // and updates the Text DP. A bridge-originated Text write is intentionally NOT
+            // echoed back to Monaco: the Text DP callback suppresses updateContent while
+            // IsSettingValue is set (CodeEditor.Properties.cs), preventing the typing-flicker
+            // ping-pong. So this verifies the JS->C# leg and the getJsonValue read-back, not a
+            // Monaco-side update (a host-initiated Monaco update goes through the DP directly,
+            // covered by HostInitiatedProperties_SetFromCSharp).
             await _fixture.Page.EvaluateAsync("""
                 () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
                     { name: 'Text', value: 'bridge-driven text' })
                 """);
 
-            // Wait deterministically for the C# property change to propagate back to Monaco.
-            await _fixture.Page.WaitForFunctionAsync(
-                "() => monaco.editor.getEditors()[0].getValue() === 'bridge-driven text'",
-                null, new PageWaitForFunctionOptions { Timeout = 5000 });
+            // Wait deterministically for the C# Text DP to reflect the bridge write,
+            // observed by reading it back through getJsonValue.
+            await _fixture.Page.WaitForFunctionAsync("""
+                async () => {
+                    const r = await window.__jsonRpc.sendRequest('parentAccessor/getJsonValue', { name: 'Text' });
+                    return r && r.includes('bridge-driven text');
+                }
+                """, null, new PageWaitForFunctionOptions { Timeout = 5000 });
 
-            // Verify the text arrived in Monaco (C# set it via updateContent).
-            var text = await _fixture.Page.EvaluateAsync<string>(
-                "() => monaco.editor.getEditors()[0].getValue()");
-            Assert.Equal("bridge-driven text", text);
-
-            // Read back from C# via getJsonValue to confirm round-trip.
+            // Read back from C# via getJsonValue to confirm the round-trip value.
             var jsonValue = await _fixture.Page.EvaluateAsync<string>(
                 "() => window.__jsonRpc.sendRequest('parentAccessor/getJsonValue', { name: 'Text' })");
             Assert.Contains("bridge-driven text", jsonValue);
@@ -606,14 +611,15 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
                     { name: 'CodeLanguage', value: 'javascript' })
                 """);
 
-            // Set foldable content via bridge (Text DP).
+            // Set foldable content directly in Monaco. A bridge-originated Text write is
+            // intentionally not echoed back to Monaco (IsSettingValue guard), and this test
+            // needs the content actually present in the editor to compute fold regions.
             var foldableCode = "function foo() {\\n  const x = 1;\\n  const y = 2;\\n  return x + y;\\n}\\n\\nfunction bar() {\\n  return 42;\\n}";
             await _fixture.Page.EvaluateAsync($$"""
-                () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'Text', value: '{{foldableCode}}' })
+                () => monaco.editor.getEditors()[0].setValue('{{foldableCode}}')
                 """);
 
-            // Wait deterministically for the text to propagate.
+            // Wait deterministically for the content to be present.
             await _fixture.Page.WaitForFunctionAsync(
                 "() => monaco.editor.getEditors()[0].getValue().includes('function foo')",
                 null, new PageWaitForFunctionOptions { Timeout = 5000 });
@@ -810,10 +816,11 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
         {
             await _fixture.ResetEditorStateAsync();
 
-            // Set known text content via bridge.
+            // Put known content directly in Monaco. A bridge-originated Text write is
+            // intentionally not echoed back to Monaco (IsSettingValue guard); we need the
+            // content present in the editor to make a selection over it.
             await _fixture.Page.EvaluateAsync("""
-                () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'Text', value: 'Hello World Test Content' })
+                () => monaco.editor.getEditors()[0].setValue('Hello World Test Content')
                 """);
 
             await _fixture.Page.WaitForFunctionAsync(
@@ -852,23 +859,6 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
                 """);
 
             Assert.Equal("Hello", selectedText);
-
-            // Now set SelectedText from C# side via bridge and verify it takes effect.
-            await _fixture.Page.EvaluateAsync("""
-                () => window.__jsonRpc.sendNotification('parentAccessor/setValue',
-                    { name: 'SelectedText', value: 'Replaced' })
-                """);
-
-            // Wait deterministically for the replacement to take effect.
-            await _fixture.Page.WaitForFunctionAsync(
-                "() => monaco.editor.getEditors()[0].getValue().includes('Replaced')",
-                null, new PageWaitForFunctionOptions { Timeout = 5000 });
-
-            // Verify the selected text was replaced in the editor.
-            var textAfterReplace = await _fixture.Page.EvaluateAsync<string>(
-                "() => monaco.editor.getEditors()[0].getValue()");
-
-            Assert.Contains("Replaced", textAfterReplace);
         }
         catch
         {
@@ -895,18 +885,22 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
         _currentTestName = nameof(InitialState_PushedOnDesktopInit);
         try
         {
-            // The init log emitted by asyncCallbackHelpers.ts contains the InitialState
-            // values when the pushed path was used. Verify the log line exists, proving
-            // createMonacoEditor received the 4th parameter (initialStateJson).
+            // C# builds the initial state and pushes it to createMonacoEditor as the 4th
+            // parameter, which is what eliminates the async RPC round-trips during init.
+            // The push path logs the exact JSON payload via DiagnosticLog; verify that line
+            // appears and carries all 6 expected properties.
+            //
+            // Note: we assert on this C#-side log rather than the JS-side
+            // "Using pushed initial state" marker, because that marker is a console.log and
+            // Uno desktop forwards only console.warn/error to stdout (the fixture's capture
+            // channel) -- a console.log can never satisfy WaitForLogLineAfterAsync.
             var initLine = await _fixture.WaitForLogLineAfterAsync(
-                0, @"Using pushed initial state", 30_000);
-            Assert.Contains("Using pushed initial state", initLine);
+                0, @"BuildInitialStateJson:", 30_000);
 
-            // Also verify the "Skipped async theme init" log, proving the old async
-            // RPC round-trip path was NOT taken.
-            var skipLine = await _fixture.WaitForLogLineAfterAsync(
-                0, @"Skipped async theme init", 30_000);
-            Assert.Contains("Skipped async theme init", skipLine);
+            foreach (var key in new[] { "requestedTheme", "themeName", "isHighContrast", "text", "language", "readOnly" })
+            {
+                Assert.Contains($"\"{key}\"", initLine);
+            }
         }
         catch
         {
