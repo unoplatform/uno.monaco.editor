@@ -53,6 +53,7 @@ import { registerCodeActionProvider } from './registerCodeActionProvider';
 import { registerCodeLensProvider } from './registerCodeLensProvider';
 import { registerColorProvider } from './registerColorProvider';
 import { registerCompletionItemProvider } from './registerCompletionItemProvider';
+import { registerLanguage } from './registerLanguage';
 import { updateSelectedContent } from './updateSelectedContent';
 
 // Bridge module
@@ -152,6 +153,7 @@ globalThis.languageIdFromExtension = languageIdFromExtension;
 (globalThis as any).registerCodeActionProvider = registerCodeActionProvider;
 (globalThis as any).registerCodeLensProvider = registerCodeLensProvider;
 (globalThis as any).registerColorProvider = registerColorProvider;
+(globalThis as any).registerLanguage = registerLanguage;
 (globalThis as any).registerCompletionItemProvider = registerCompletionItemProvider;
 
 // Utility functions (used internally by InvokeScriptAsync eval code)

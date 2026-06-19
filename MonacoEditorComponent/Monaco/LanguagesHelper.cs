@@ -47,7 +47,11 @@ namespace Monaco
         {
             if (_editor.TryGetTarget(out var editor))
             {
-                await editor.InvokeScriptAsync("monaco.languages.register", language).AsAsyncAction();
+                // Use the registerLanguage helper (not the raw monaco.languages.register):
+                // the bridge prepends the editor element as the first argument to invoked
+                // methods, and monaco.languages.register takes only the descriptor, so calling
+                // it raw would pass the element as the language and silently fail to register.
+                await editor.InvokeScriptAsync("registerLanguage", language).AsAsyncAction();
             }
         }
 
