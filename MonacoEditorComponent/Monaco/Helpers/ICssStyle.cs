@@ -1,6 +1,6 @@
-﻿using Newtonsoft.Json;
 using System;
-using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Helpers
 {
@@ -43,18 +43,55 @@ namespace Monaco.Helpers
         }
     }
 
-    internal class CssStyleConverter : JsonConverter
+    /// <summary>
+    /// STJ write-only converter for <see cref="CssLineStyle"/>.
+    /// Serializes as the style's <see cref="ICssStyle.Name"/> string.
+    /// </summary>
+    internal class CssLineStyleConverter : System.Text.Json.Serialization.JsonConverter<CssLineStyle>
     {
-        public override bool CanConvert(Type objectType) => typeof(ICssStyle).IsAssignableFrom(objectType);
-
-        public override object? ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer) => new NotSupportedException();
-
-        public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
+        public override CssLineStyle Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            if (value is ICssStyle style)
-            {
-                writer.WriteValue(style.Name);
-            }
+            throw new NotSupportedException("CssStyleConverter is write-only.");
+        }
+
+        public override void Write(Utf8JsonWriter writer, CssLineStyle value, JsonSerializerOptions options)
+        {
+            writer.WriteStringValue(value.Name);
         }
     }
+
+    /// <summary>
+    /// STJ write-only converter for <see cref="CssGlyphStyle"/>.
+    /// Serializes as the style's <see cref="ICssStyle.Name"/> string.
+    /// </summary>
+    internal class CssGlyphStyleConverter : System.Text.Json.Serialization.JsonConverter<CssGlyphStyle>
+    {
+        public override CssGlyphStyle Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            throw new NotSupportedException("CssStyleConverter is write-only.");
+        }
+
+        public override void Write(Utf8JsonWriter writer, CssGlyphStyle value, JsonSerializerOptions options)
+        {
+            writer.WriteStringValue(value.Name);
+        }
+    }
+
+    /// <summary>
+    /// STJ write-only converter for <see cref="CssInlineStyle"/>.
+    /// Serializes as the style's <see cref="ICssStyle.Name"/> string.
+    /// </summary>
+    internal class CssInlineStyleConverter : System.Text.Json.Serialization.JsonConverter<CssInlineStyle>
+    {
+        public override CssInlineStyle Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            throw new NotSupportedException("CssStyleConverter is write-only.");
+        }
+
+        public override void Write(Utf8JsonWriter writer, CssInlineStyle value, JsonSerializerOptions options)
+        {
+            writer.WriteStringValue(value.Name);
+        }
+    }
+
 }

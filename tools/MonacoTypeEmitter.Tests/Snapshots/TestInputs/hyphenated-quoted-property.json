@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "sourceFile": "test.d.ts",
+  "extractedAt": "2026-01-01T00:00:00.000Z",
+  "namespaces": [
+    {
+      "name": "monaco.editor",
+      "interfaces": [
+        {
+          "name": "IAccessibilityOptions",
+          "documentation": "Accessibility options for the editor.",
+          "typeParameters": [],
+          "extends": [],
+          "properties": [
+            {
+              "name": "'aria-label'",
+              "documentation": "The ARIA label for the editor.",
+              "type": { "kind": "primitive", "name": "string" },
+              "isOptional": true,
+              "isReadonly": false
+            },
+            {
+              "name": "enabled",
+              "documentation": "Whether accessibility is enabled.",
+              "type": { "kind": "primitive", "name": "boolean" },
+              "isOptional": true,
+              "isReadonly": false
+            }
+          ],
+          "methods": [],
+          "indexSignatures": [],
+          "callSignatures": []
+        }
+      ],
+      "enums": [],
+      "typeAliases": [],
+      "classes": [],
+      "functions": []
+    }
+  ]
+}

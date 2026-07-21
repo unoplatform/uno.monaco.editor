@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-11T22:37:30.259205Z",
+  "depends_on": [],
+  "epic": "fn-4-modernize-ci-add-code-coverage-and",
+  "id": "fn-4-modernize-ci-add-code-coverage-and.4",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-4-modernize-ci-add-code-coverage-and.4.md",
+  "status": "todo",
+  "title": "Create ts-morph Monaco type extractor (Node.js parser)",
+  "updated_at": "2026-02-11T22:47:00.639111Z"
+}

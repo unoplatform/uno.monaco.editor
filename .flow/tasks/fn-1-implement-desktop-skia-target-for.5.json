@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-10T22:36:15.801980Z",
+  "depends_on": [
+    "fn-1-implement-desktop-skia-target-for.2",
+    "fn-1-implement-desktop-skia-target-for.4"
+  ],
+  "epic": "fn-1-implement-desktop-skia-target-for",
+  "id": "fn-1-implement-desktop-skia-target-for.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-1-implement-desktop-skia-target-for.5.md",
+  "status": "done",
+  "title": "Desktop C# bridge classes and CodeEditor platform guards",
+  "updated_at": "2026-02-11T05:22:39.176806Z"
+}

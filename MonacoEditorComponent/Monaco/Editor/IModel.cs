@@ -1,20 +1,18 @@
-﻿using Newtonsoft.Json;
 using System.Collections.Generic;
 using Windows.Foundation;
 using Windows.Foundation.Metadata;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor;
 
 /// <summary>
-/// https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.imodel.html
+/// <see href="https://microsoft.github.io/monaco-editor/typedoc/types/editor_editor_api.editor.IModel.html">monaco.editor.IModel</see>
 /// </summary>
 public interface IModel
 {
     // TODO: Events
 
-    [JsonProperty("id", NullValueHandling = NullValueHandling.Ignore)]
     string Id { get; }
-    [JsonProperty("uri", NullValueHandling = NullValueHandling.Ignore)]
     Uri Uri { get; }
 
     //IIdentifiedSingleEditOperation[] ApplyEditsAsync(IIdentifiedSingleEditOperation[] operations)

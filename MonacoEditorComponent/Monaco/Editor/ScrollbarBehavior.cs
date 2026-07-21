@@ -1,5 +1,5 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -8,47 +8,17 @@ namespace Monaco.Editor
     /// Render horizontal or vertical scrollbar.
     /// Defaults to 'auto'.
     /// </summary>
-    [JsonConverter(typeof(ScrollbarBehaviorConverter))]
-    public enum ScrollbarBehavior { Auto, Hidden, Visible };
-
-    internal class ScrollbarBehaviorConverter : JsonConverter
+    [JsonConverter(typeof(JsonStringEnumConverter<ScrollbarBehavior>))]
+    public enum ScrollbarBehavior
     {
-        public override bool CanConvert(Type t) => t == typeof(ScrollbarBehavior) || t == typeof(ScrollbarBehavior?);
-
-        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
-        {
-            if (reader.TokenType == JsonToken.Null) return null;
-            var value = serializer.Deserialize<string>(reader);
-            return value switch
-            {
-                "auto" => ScrollbarBehavior.Auto,
-                "hidden" => ScrollbarBehavior.Hidden,
-                "visible" => ScrollbarBehavior.Visible,
-                _ => throw new Exception("Cannot unmarshal type ScrollbarBehavior"),
-            };
-        }
-
-        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
-        {
-            if (untypedValue == null)
-            {
-                serializer.Serialize(writer, null);
-                return;
-            }
-            var value = (ScrollbarBehavior)untypedValue;
-            switch (value)
-            {
-                case ScrollbarBehavior.Auto:
-                    serializer.Serialize(writer, "auto");
-                    return;
-                case ScrollbarBehavior.Hidden:
-                    serializer.Serialize(writer, "hidden");
-                    return;
-                case ScrollbarBehavior.Visible:
-                    serializer.Serialize(writer, "visible");
-                    return;
-            }
-            throw new Exception("Cannot marshal type ScrollbarBehavior");
-        }
-    }
+        [JsonStringEnumMemberName("auto")]
+        [EnumMember(Value = "auto")]
+        Auto,
+        [JsonStringEnumMemberName("hidden")]
+        [EnumMember(Value = "hidden")]
+        Hidden,
+        [JsonStringEnumMemberName("visible")]
+        [EnumMember(Value = "visible")]
+        Visible,
+    };
 }

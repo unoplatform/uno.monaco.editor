@@ -1,0 +1,41 @@
+# Files that have been hand-tuned and should NOT be overwritten by the generator.
+# Each line is a repo-relative path that will be matched exactly.
+# The emitter skips these files during code generation.
+
+# StandaloneEditorConstructionOptions has INotifyPropertyChanged + dictionary backing
+# and extensive hand-tuned property wiring.
+MonacoEditorComponent/Monaco/Editor/StandaloneEditorConstructionOptions.cs
+
+# LanguagesHelper contains hand-written language registration helpers
+MonacoEditorComponent/Monaco/LanguagesHelper.cs
+
+# LanguagesHelper.Additions.cs contains hand-written extension methods
+MonacoEditorComponent/Monaco/LanguagesHelper.Additions.cs
+
+# ModelHelper.cs contains hand-written editor model helpers
+MonacoEditorComponent/Monaco/ModelHelper.cs
+
+# CssStyleBroker.cs and related helpers are UI-layer utilities, not generated types
+MonacoEditorComponent/Monaco/Helpers/CssStyleBroker.cs
+MonacoEditorComponent/Monaco/Helpers/CssGlyphStyle.cs
+MonacoEditorComponent/Monaco/Helpers/CssLineStyle.cs
+MonacoEditorComponent/Monaco/Helpers/CssInlineStyle.cs
+MonacoEditorComponent/Monaco/Helpers/ICssStyle.cs
+MonacoEditorComponent/Monaco/Helpers/TextDecoration.cs
+
+# Provider types contain hand-written delegate signatures
+MonacoEditorComponent/Monaco/Languages/CodeActionProvider.cs
+MonacoEditorComponent/Monaco/Languages/CodeLensProvider.cs
+MonacoEditorComponent/Monaco/Languages/CompletionItemProvider.cs
+MonacoEditorComponent/Monaco/Languages/DocumentColorProvider.cs
+MonacoEditorComponent/Monaco/Languages/HoverProvider.cs
+
+# IMarkdownString is hand-written with constructor, WinRT attributes, and custom members
+MonacoEditorComponent/Monaco/IMarkdownString.cs
+
+# CancellationToken/Source conflict with System.Threading types
+MonacoEditorComponent/Monaco/CancellationToken.cs
+MonacoEditorComponent/Monaco/CancellationTokenSource.cs
+
+# Disposable conflicts with System.IDisposable patterns
+MonacoEditorComponent/Monaco/Disposable.cs

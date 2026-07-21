@@ -1,0 +1,18 @@
+{
+  "branch_name": "ralph-20260211-093916-012f",
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-02-12T03:09:10.055994Z",
+  "created_at": "2026-02-11T20:35:45.613548Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "fn-3-merge-ralph-branch-add-macos-arm-ci-and",
+  "next_task": 1,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-02-11T20:59:46.338707Z",
+  "spec_path": ".flow/specs/fn-3-merge-ralph-branch-add-macos-arm-ci-and.md",
+  "status": "done",
+  "title": "Merge ralph branch, add macOS ARM CI, and get CI green",
+  "updated_at": "2026-02-12T03:09:21.388629Z"
+}

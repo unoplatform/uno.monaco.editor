@@ -2,7 +2,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:monaco="using:Monaco">
-    
+
     <Style TargetType="monaco:CodeEditor" >
         <Setter Property="Template">
             <Setter.Value>
@@ -14,10 +14,8 @@
                         BorderThickness="{TemplateBinding BorderThickness}"
                         HorizontalAlignment="Stretch"
                         VerticalAlignment="Stretch">
-                        <monaco:CodeEditorPresenter 
+                        <ContentPresenter
                             x:Name="View"
-                            Background="Transparent"
-                            Margin="{TemplateBinding Padding}"
                             HorizontalAlignment="Stretch"
                             VerticalAlignment="Stretch"/>
                     </Border>
@@ -25,5 +23,5 @@
             </Setter.Value>
         </Setter>
     </Style>
-    
+
 </ResourceDictionary>

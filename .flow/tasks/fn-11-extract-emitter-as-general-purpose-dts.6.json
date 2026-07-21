@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-12T21:29:46.295343Z",
+  "depends_on": [
+    "fn-11-extract-emitter-as-general-purpose-dts.5",
+    "fn-11-extract-emitter-as-general-purpose-dts.7"
+  ],
+  "epic": "fn-11-extract-emitter-as-general-purpose-dts",
+  "id": "fn-11-extract-emitter-as-general-purpose-dts.6",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-11-extract-emitter-as-general-purpose-dts.6.md",
+  "status": "todo",
+  "title": "Migrate uno.monaco.editor to consume source generator",
+  "updated_at": "2026-02-12T22:45:26.219103Z"
+}

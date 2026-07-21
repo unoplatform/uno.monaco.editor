@@ -1,5 +1,5 @@
-﻿using Newtonsoft.Json;
 using System;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -14,20 +14,20 @@ namespace Monaco.Editor
         /// <summary>
         /// Gets the unique key identifier for this context key.
         /// </summary>
-        [JsonProperty("key")]
-        public string Key { get; private set; }
-        
+        [JsonInclude]
+        public string Key { get; internal set; }
+
         /// <summary>
         /// Gets the default value of this context key.
         /// </summary>
-        [JsonProperty("defaultValue")]
-        public bool DefaultValue { get; private set; }
-        
+        [JsonInclude]
+        public bool DefaultValue { get; internal set; }
+
         /// <summary>
         /// Gets or sets the current value of this context key.
         /// </summary>
-        [JsonProperty("value")]
-        public bool Value { get; private set; }
+        [JsonInclude]
+        public bool Value { get; internal set; }
 
         internal ContextKey(CodeEditor editor, string key, bool defaultValue)
         {

@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "sourceFile": "test.d.ts",
+  "extractedAt": "2026-01-01T00:00:00.000Z",
+  "namespaces": [
+    {
+      "name": "monaco",
+      "interfaces": [],
+      "enums": [
+        {
+          "name": "MarkerSeverity",
+          "documentation": "Severity levels.",
+          "isStringEnum": false,
+          "members": [
+            { "name": "Error", "value": 8 }
+          ]
+        }
+      ],
+      "typeAliases": [],
+      "classes": [],
+      "functions": []
+    },
+    {
+      "name": "monaco.editor",
+      "interfaces": [
+        {
+          "name": "IMarkerData",
+          "documentation": "A structure defining a problem/warning/etc.",
+          "typeParameters": [],
+          "extends": [],
+          "properties": [
+            {
+              "name": "severity",
+              "type": { "kind": "reference", "name": "MarkerSeverity", "typeArguments": [] },
+              "isOptional": false,
+              "isReadonly": false
+            },
+            {
+              "name": "message",
+              "type": { "kind": "primitive", "name": "string" },
+              "isOptional": false,
+              "isReadonly": false
+            },
+            {
+              "name": "startLineNumber",
+              "type": { "kind": "primitive", "name": "number" },
+              "isOptional": false,
+              "isReadonly": false
+            },
+            {
+              "name": "startColumn",
+              "type": { "kind": "primitive", "name": "number" },
+              "isOptional": false,
+              "isReadonly": false
+            },
+            {
+              "name": "endLineNumber",
+              "type": { "kind": "primitive", "name": "number" },
+              "isOptional": false,
+              "isReadonly": false
+            },
+            {
+              "name": "endColumn",
+              "type": { "kind": "primitive", "name": "number" },
+              "isOptional": false,
+              "isReadonly": false
+            }
+          ],
+          "methods": [],
+          "indexSignatures": [],
+          "callSignatures": []
+        }
+      ],
+      "enums": [],
+      "typeAliases": [],
+      "classes": [],
+      "functions": []
+    }
+  ]
+}

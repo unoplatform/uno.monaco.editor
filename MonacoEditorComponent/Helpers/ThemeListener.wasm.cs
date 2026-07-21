@@ -9,9 +9,22 @@ namespace Monaco.Helpers
 
         partial void PartialCtor()
         {
-            _instances.Add(_owner, this);
+            _instances.AddOrUpdate(_owner, this);
         }
 
+        /// <summary>
+        /// Removes the registration for the given presenter, allowing safe re-initialization.
+        /// </summary>
+        internal static void RemoveInstance(ICodeEditorPresenter presenter)
+        {
+            _instances.Remove(presenter);
+        }
+
+        /// <summary>
+        /// JSExport entry point: returns the current theme name for the specified presenter owner.
+        /// </summary>
+        /// <param name="managedOwner">The managed presenter object passed from JavaScript.</param>
+        /// <returns>The current theme name string.</returns>
         [JSExport]
         public static string ManagedGetCurrentThemeName([JSMarshalAs<JSType.Any>] object managedOwner)
         {
@@ -25,6 +38,11 @@ namespace Monaco.Helpers
             }
         }
 
+        /// <summary>
+        /// JSExport entry point: returns whether high contrast mode is active for the specified owner.
+        /// </summary>
+        /// <param name="managedOwner">The managed presenter object passed from JavaScript.</param>
+        /// <returns><see langword="true"/> if high contrast is active.</returns>
         [JSExport]
         public static bool ManagedGetIsHighContrast([JSMarshalAs<JSType.Any>] object managedOwner)
         {

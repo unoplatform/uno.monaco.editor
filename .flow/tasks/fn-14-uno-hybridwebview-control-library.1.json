@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-16T20:56:42.063657Z",
+  "depends_on": [],
+  "epic": "fn-14-uno-hybridwebview-control-library",
+  "id": "fn-14-uno-hybridwebview-control-library.1",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-14-uno-hybridwebview-control-library.1.md",
+  "status": "todo",
+  "title": "Project scaffold and build infrastructure",
+  "updated_at": "2026-02-16T20:59:32.921440Z"
+}

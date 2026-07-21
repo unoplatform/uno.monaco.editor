@@ -1,0 +1,315 @@
+{
+  "created_at": "2026-02-12T09:06:57.845870Z",
+  "epic": {
+    "data": {
+      "branch_name": "fn-4-update-ci-runner-images-to-latest-and",
+      "completion_review_status": "unknown",
+      "completion_reviewed_at": null,
+      "created_at": "2026-02-11T21:47:59.075454Z",
+      "default_impl": null,
+      "default_review": null,
+      "default_sync": null,
+      "depends_on_epics": [],
+      "id": "fn-4-modernize-ci-add-code-coverage-and",
+      "next_task": 1,
+      "plan_review_status": "ship",
+      "plan_reviewed_at": "2026-02-11T22:18:03.870329Z",
+      "spec_path": ".flow/specs/fn-4-modernize-ci-add-code-coverage-and.md",
+      "status": "open",
+      "title": "Modernize CI, add code coverage, and replace broken type generator",
+      "updated_at": "2026-02-11T22:46:31.746426Z"
+    },
+    "spec": "# Modernize CI, Add Code Coverage, and Replace Broken Type Generator\n\n## Overview\n\nThree workstreams:\n1. **CI modernization**: Update runner images (macos-26), bump stale action versions, delete legacy `build/` directory, update README\n2. **Code coverage**: Add full MonacoEditorComponent coverage collection across all CI test jobs (ubuntu unit+WASM, Windows DesktopCDP, macOS WASM) with merged reporting, following the Humanizer pattern\n3. **Type generator replacement**: Replace the broken PowerShell/TypedocConverter pipeline with a ts-morph parser + .NET CLI emitter, with tests\n\n**Why the generator must be replaced:** The current `GenerateMonacoTypings/` pipeline uses TypeDoc 0.20.37 + TypeScript 4.2.4 + TypedocConverter (unmaintained since 2023). Monaco 0.54.0 uses TS 5.x features that break TypeDoc parsing. The pipeline is silently broken \u2014 nothing tests whether it can parse current `monaco.d.ts`. The `SerializationContractTests.cs` tests the output types but not the generator pipeline itself.\n\n**Architecture for new generator:**\n```\nmonaco.d.ts\n    \u2502  (ts-morph, Node.js \u2014 via tsx or compiled JS)\n    \u25bc\nintermediate-model.json   \u2190 versioned schema (schemaVersion field)\n    \u2502  (.NET CLI tool)\n    \u25bc\n*.cs files                \u2190 STJ-attributed, deterministic ordering\n```\n\n**Execution:** `npx tsx src/index.ts` or `npm run build && node dist/index.js` (defined once, used everywhere).\n\n## Scope\n\n**In scope:**\n- Update `macos-15` \u2192 `macos-26` runner in ci.yml\n- Update stale action versions in `tag-release/action.yml` and `nuget-uno-publish/action.yml`\n- Delete entire `build/` directory (4 legacy files)\n- Fix stale \"UWP\" signing label; update README.md\n- Add full MonacoEditorComponent code coverage across all CI test jobs with merged reporting (Microsoft.Testing.Extensions.CodeCoverage + ReportGenerator)\n- Build ts-morph type extractor with versioned intermediate JSON schema\n- Build .NET CLI tool for C# emission (absorbs postprocess-stj.ps1 logic)\n- Add generator tests (snapshot + smoke + round-trip with serialization validation)\n- Migrate off old `GenerateMonacoTypings/` scripts and clean up all references\n\n**Out of scope:**\n- `wasm-tools-net9` workload removal (owned by fn-3.3)\n- `copilot-setup-steps.yml` changes\n- `install-dependencies.ps1` (confirmed active)\n\n## Task dependency graph\n\n```\n.1 (CI runners)  .2 (build/ + README)  .4 (ts-morph parser)\n       \u2502                                        \u2502\n       \u25bc                                        \u25bc\n.3 (coverage)                            .5 (.NET CLI emitter)\n                                                \u2502\n                                                \u25bc\n                                   .6 (generator tests)\n                                                \u2502\n                                                \u25bc\n                                   .7 (migration + cleanup)\n```\n\n- Tasks .1, .2, .4 are independent (parallelizable)\n- Task .3 depends on .1 (both edit ci.yml)\n- Task .5 depends on .4 (needs intermediate JSON schema)\n- Task .6 depends on .4 + .5 (needs both tools to test)\n- Task .7 depends on .4 + .5 + .6 (needs tests green before deleting old scripts)\n\n## Quick commands\n\n```bash\ndotnet build MonacoEditorComponent.slnx --no-restore\ndotnet test MonacoEditorComponent.Tests --coverage --results-directory ./TestResults\n\n# Type extractor (after task .4)\nnpx tsx tools/monaco-type-extractor/src/index.ts -- node_modules/monaco-editor/monaco.d.ts -o tools/monaco-type-extractor/output/model.json\n\n# .NET emitter (after task .5)\ndotnet run --project tools/MonacoTypeEmitter -- --input tools/monaco-type-extractor/output/model.json --output MonacoEditorComponent/Monaco/\n```\n\n## Acceptance\n\n**CI modernization (Tasks .1, .2):**\n- [ ] `build-macos` uses `runs-on: macos-26`; stale action versions bumped; signing label fixed (Task .1)\n- [ ] `build/` deleted; README modernized (.NET 10, browserwasm + desktop, no VS 2019/Legacy Edge) (Task .2)\n\n**Code coverage (Task .3):**\n- [ ] Coverage collected via `--coverage` in all CI test jobs: `build` (ubuntu: unit + WASM), `desktop-tests` (Windows: DesktopCDP), `build-macos` (macOS: WASM) (Task .3)\n- [ ] Coverage artifacts uploaded per-job, then merged via a `coverage-report` job into a single combined report (Task .3)\n- [ ] Combined Cobertura XML + HTML report uploaded as `coverage-report` artifact (Task .3)\n\n**Type generator (Tasks .4, .5, .6, .7):**\n- [ ] ts-morph extractor parses current `monaco.d.ts` (TS 5.x) \u2192 versioned intermediate JSON with deterministic ordering (Task .4)\n- [ ] .NET CLI tool emits C# matching all existing patterns (string enums, numeric enums, models, interfaces, constructors/defaults, global CamelCase policy) (Task .5)\n- [ ] Snapshot tests lock down emitter output; smoke test compiles emitted files and runs serialization contract subset; deterministic ordering guaranteed (Task .6)\n- [ ] `GenerateMonacoTypings/` deleted; `.generator-ignore` migrated to path-based matching; no `GenerateMonacoTypings`/`TypedocConverter` references in repo (excluding .flow history) (Task .7)\n\n## References\n\n- [ts-morph](https://github.com/dsherret/ts-morph) (5.9k stars)\n- [Humanizer CI/coverage](https://github.com/Humanizr/Humanizer)\n- [Verify](https://github.com/VerifyTests/Verify) (3.4k stars)\n- [macOS 26 beta \u2014 actions/runner-images#13008](https://github.com/actions/runner-images/issues/13008)\n- Existing patterns: `MonacoEditorComponent/Monaco/Editor/*.cs`, `SerializationContractTests.cs`\n\n## Risks\n\n- **macOS 26 beta**: Rollback to `macos-15` if runner-image failures for 3+ consecutive runs.\n- **Intermediate JSON schema design**: Versioned schema (`schemaVersion`) enables iterative refinement. Snapshot tests catch regressions.\n- **Coverage merge across OS runners**: Each job uploads its own coverage artifact; a downstream `coverage-report` job merges them via ReportGenerator. If a job is skipped/fails, partial coverage still works.\n- **Snapshot churn**: Mitigated by requiring deterministic ordering in both JSON model and emitted files.\n"
+  },
+  "epic_id": "fn-4-modernize-ci-add-code-coverage-and",
+  "schema_version": 2,
+  "tasks": [
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-11T21:48:28.290372Z",
+        "depends_on": [],
+        "epic": "fn-4-modernize-ci-add-code-coverage-and",
+        "id": "fn-4-modernize-ci-add-code-coverage-and.1",
+        "impl": null,
+        "priority": null,
+        "review": null,
+        "spec_path": ".flow/tasks/fn-4-modernize-ci-add-code-coverage-and.1.md",
+        "status": "todo",
+        "sync": null,
+        "title": "Update CI runner images and GitHub Action versions",
+        "updated_at": "2026-02-11T22:37:23.819975Z"
+      },
+      "id": "fn-4-modernize-ci-add-code-coverage-and.1",
+      "runtime": {
+        "assignee": "claire@novotny.org",
+        "claim_note": "",
+        "claimed_at": "2026-02-12T03:10:57.008811Z",
+        "evidence": {
+          "commits": [
+            "010b7492df2aa5754bfe5b5c704e44067941337b"
+          ],
+          "prs": [],
+          "tests": [
+            "dotnet build MonacoEditorComponent.slnx --no-restore"
+          ]
+        },
+        "status": "done",
+        "updated_at": "2026-02-12T03:19:27.663715Z"
+      },
+      "spec": "# fn-4-modernize-ci-add-code-coverage-and.1 Update CI runner images and GitHub Action versions\n\n## Description\nUpdate CI runner images and GitHub Action versions to latest in the targeted composite actions and main CI workflow.\n\n**Policy:** Standardize on `@v4` for `actions/checkout` and `actions/setup-dotnet`. The `copilot-setup-steps.yml` (@v5) and `nuget-org-publish/action.yml` (no checkout/setup-dotnet) are out of scope.\n\n**Size:** M\n**Files:** `.github/workflows/ci.yml`, `.github/actions/tag-release/action.yml`, `.github/actions/nuget-uno-publish/action.yml`\n\n## Approach\n\n- In `ci.yml` L161: change `runs-on: macos-15` to `runs-on: macos-26` for the `build-macos` job\n- In `ci.yml` L249: change signing description from `\"Uno Monaco Editor UWP\"` to `\"Uno Monaco Editor\"` (UWP label is stale)\n- In `tag-release/action.yml`:\n  - L8: `actions/checkout@v2` \u2192 `actions/checkout@v4`\n  - L11: `actions/setup-dotnet@v1` \u2192 `actions/setup-dotnet@v4`\n  - L13: `dotnet-version: '9.0.201'` \u2192 `dotnet-version: '10.0.x'`\n  - L19: `toolVersion: 3.6.139` \u2192 `toolVersion: 3.8.118` (aligns with ci.yml L50)\n- In `nuget-uno-publish/action.yml`:\n  - L20-21: `dotnet-version: '9.0.x'` \u2192 `dotnet-version: '10.0.x'`\n\n## Key context\n\n- macOS 26 is public beta (since Sep 2025). .NET 10.0.102 is preinstalled. Default Xcode is 26.2.\n- **Rollback rule:** if `build-macos` fails due to runner-image issues for 3+ consecutive runs, revert to `macos-15`. The job gates `sign` via `needs: [build, desktop-tests, build-macos]`.\n- The `tag-release` action is used in `publish_release_nuget_org` (ci.yml L314) \u2014 production release path. NBGV 3.8.118 is already in the main build (ci.yml L50), so aligning reduces skew.\n- The `tag-release` action has its own `actions/checkout` step (L7-8) even though the caller job already checks out. Keep it but update to v4 \u2014 removing it would change composite action behavior.\n\n## Acceptance\n- [ ] `build-macos` job uses `runs-on: macos-26`\n- [ ] `tag-release/action.yml` uses `actions/checkout@v4` and `actions/setup-dotnet@v4`\n- [ ] `tag-release/action.yml` uses `dotnet-version: '10.0.x'` and NBGV `toolVersion: 3.8.118`\n- [ ] `nuget-uno-publish/action.yml` uses `dotnet-version: '10.0.x'`\n- [ ] Signing description says `\"Uno Monaco Editor\"` (no \"UWP\")\n- [ ] `dotnet build MonacoEditorComponent.slnx --no-restore` passes (no local breakage)\n\n## Done summary\nUpdated CI runner images and GitHub Action versions: macos-15 to macos-26 for build-macos job, bumped tag-release action to checkout@v4/setup-dotnet@v4/dotnet 10.0.x/NBGV 3.8.118, bumped nuget-uno-publish to dotnet 10.0.x, and fixed stale \"UWP\" signing label.\n## Evidence\n- Commits: 010b7492df2aa5754bfe5b5c704e44067941337b\n- Tests: dotnet build MonacoEditorComponent.slnx --no-restore\n- PRs:"
+    },
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-11T21:48:29.656077Z",
+        "depends_on": [],
+        "epic": "fn-4-modernize-ci-add-code-coverage-and",
+        "id": "fn-4-modernize-ci-add-code-coverage-and.2",
+        "impl": null,
+        "priority": null,
+        "review": null,
+        "spec_path": ".flow/tasks/fn-4-modernize-ci-add-code-coverage-and.2.md",
+        "status": "todo",
+        "sync": null,
+        "title": "Delete stale build directory and update README",
+        "updated_at": "2026-02-11T22:37:23.822857Z"
+      },
+      "id": "fn-4-modernize-ci-add-code-coverage-and.2",
+      "runtime": {
+        "assignee": "claire@novotny.org",
+        "claim_note": "",
+        "claimed_at": "2026-02-12T03:29:03.597220Z",
+        "evidence": {
+          "commits": [
+            "ac1392f1267be7f8dc4fbbb6860952159a43ff82"
+          ],
+          "prs": [],
+          "tests": [
+            "grep scan for build/ references in .github/**, README.md, AGENTS.md"
+          ]
+        },
+        "status": "done",
+        "updated_at": "2026-02-12T03:35:03.820298Z"
+      },
+      "spec": "# fn-4-modernize-ci-add-code-coverage-and.2 Delete stale build directory and update README\n\n## Description\nDelete the entire `build/` directory (4 legacy files from Azure DevOps era, none referenced by current CI) and update README.md to remove stale build environment references including UWP framing.\n\n**Size:** S\n**Files:** `build/sign-package.ps1` (delete), `build/SignClient.json` (delete), `build/Install-WindowsSdkISO.ps1` (delete), `build/templates/gitversion-run.yml` (delete), `README.md`\n\n## Approach\n\n- `git rm -r build/` \u2014 confirmed no references from any current workflow, `.gitignore`, or `.gitattributes`\n  - `sign-package.ps1`: legacy SignClient signing (2020), replaced by Azure Key Vault signing in ci.yml\n  - `SignClient.json`: config for legacy SignClient tool, references old Azure AD client IDs\n  - `Install-WindowsSdkISO.ps1`: UWP Windows SDK installer (2023), project no longer targets UWP\n  - `templates/gitversion-run.yml`: Azure DevOps pipeline template using `##vso[task.setvariable]` syntax\n- Update `README.md`:\n  - **Title/intro** (L1-5): remove or replace \"Windows Runtime Component\" UWP-only framing \u2014 the project now targets browserwasm and desktop (Skia)\n  - **Build Notes section** (L76-82): remove Visual Studio 2019 reference, remove Legacy Edge / Monaco v0.22.3 limitation framing, state current requirements: .NET 10 SDK, targets `net10.0-browserwasm` and `net10.0-desktop`\n- Verify no dangling references in `.github/**`, `README.md`, or `AGENTS.md` (scoped scan \u2014 ignore `.flow/` docs, `packages/build/` in .gitignore, and `dotnet build` commands)\n\n## Key context\n\n- The `.gitignore` entry at L175-176 references `packages/build/` (NuGet packages), NOT the top-level `build/` directory \u2014 deletion is safe.\n- `.flow/` task docs may reference `build/` historically \u2014 these are out of scan scope.\n- `SignClient.json` contains Azure AD client IDs in git history \u2014 credentials are not revoked by file deletion, but they are not active secrets.\n- README.md L3 says \"A Windows Runtime Component wrapper\" and L82 says it won't move beyond Monaco v0.22.3 due to Legacy Edge \u2014 both are outdated.\n\n## Acceptance\n- [ ] `build/` directory fully deleted (all 4 files removed)\n- [ ] No top-level `build/` references in `.github/**`, `README.md`, or `AGENTS.md` (except `packages/build/` in .gitignore and `dotnet build` commands)\n- [ ] README.md title/intro: removed or replaced stale \"Windows Runtime Component\" UWP-only framing\n- [ ] README.md \"Build Notes\" states: .NET 10 SDK required, targets `net10.0-browserwasm` and `net10.0-desktop`\n- [ ] README.md \"Build Notes\": no VS 2019, no Legacy Edge, no Monaco v0.22.3 limitation\n\n## Done summary\nDeleted the entire build/ directory (4 legacy Azure DevOps files: sign-package.ps1, SignClient.json, Install-WindowsSdkISO.ps1, templates/gitversion-run.yml) and modernized README.md to replace UWP \"Windows Runtime Component\" framing with Uno Platform targeting browserwasm and desktop, updating Build Notes to require .NET 10 SDK with no VS 2019/Legacy Edge/Monaco v0.22.3 references.\n## Evidence\n- Commits: ac1392f1267be7f8dc4fbbb6860952159a43ff82\n- Tests: grep scan for build/ references in .github/**, README.md, AGENTS.md\n- PRs:"
+    },
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-11T22:10:40.784668Z",
+        "depends_on": [
+          "fn-4-modernize-ci-add-code-coverage-and.1"
+        ],
+        "epic": "fn-4-modernize-ci-add-code-coverage-and",
+        "id": "fn-4-modernize-ci-add-code-coverage-and.3",
+        "impl": null,
+        "priority": null,
+        "review": null,
+        "spec_path": ".flow/tasks/fn-4-modernize-ci-add-code-coverage-and.3.md",
+        "status": "todo",
+        "sync": null,
+        "title": "Add code coverage collection and reporting to CI",
+        "updated_at": "2026-02-11T22:46:42.404602Z"
+      },
+      "id": "fn-4-modernize-ci-add-code-coverage-and.3",
+      "runtime": {
+        "assignee": "claire@novotny.org",
+        "claim_note": "",
+        "claimed_at": "2026-02-12T03:43:07.777306Z",
+        "evidence": {
+          "commits": [
+            "5371fa48da7505956a50db26a62a905b06fdb530"
+          ],
+          "prs": [],
+          "tests": [
+            "dotnet restore MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj",
+            "dotnet build MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj --no-restore"
+          ]
+        },
+        "status": "done",
+        "updated_at": "2026-02-12T03:49:24.181650Z"
+      },
+      "spec": "# fn-4-modernize-ci-add-code-coverage-and.3 Add code coverage collection and reporting to CI\n\n## Description\nAdd full MonacoEditorComponent code coverage collection and merged reporting across all CI test jobs, following the Humanizer project pattern (`Microsoft.Testing.Extensions.CodeCoverage` + ReportGenerator).\n\nCoverage spans three CI jobs:\n- **`build` (ubuntu)**: unit tests + WASM Playwright tests (the bulk of coverage)\n- **`desktop-tests` (windows)**: DesktopCDP integration tests\n- **`build-macos` (macOS)**: WASM tests (overlaps with ubuntu, but catches platform-specific paths)\n\nA final `coverage-report` job merges all results into a single combined report.\n\n**Size:** L\n**Files:** `MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj`, `Directory.Packages.props`, `.github/workflows/ci.yml` (all test jobs + new merge job)\n\n**Depends on:** Task .1 (both edit `ci.yml`)\n\n## Approach\n\nFollow the [Humanizer](https://github.com/Humanizr/Humanizer) reference implementation:\n\n1. **Add coverage package via central package management:**\n   - Add version entry in `Directory.Packages.props`: `<PackageVersion Include=\"Microsoft.Testing.Extensions.CodeCoverage\" Version=\"18.0.4\" />`\n   - Add package reference in `MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj`: `<PackageReference Include=\"Microsoft.Testing.Extensions.CodeCoverage\" PrivateAssets=\"all\" />`\n\n2. **Update ALL test-running CI jobs** in `ci.yml`:\n   - **`build` job** (ubuntu, L~80): Add `--coverage` and `--results-directory ${{ runner.temp }}/TestResults` to `dotnet test`\n   - **`desktop-tests` job** (windows, L~119): Add `--coverage` and `--results-directory ${{ runner.temp }}/TestResults` to `dotnet test`\n   - **`build-macos` job** (macOS ARM): Add `--coverage` and `--results-directory ${{ runner.temp }}/TestResults` to `dotnet test`\n\n3. **Upload per-job coverage artifacts:**\n   - Each job uploads `${{ runner.temp }}/TestResults/**/*.cobertura.xml` as a uniquely named artifact:\n     - `coverage-ubuntu` (from `build` job)\n     - `coverage-windows` (from `desktop-tests` job)\n     - `coverage-macos` (from `build-macos` job)\n   - Use `actions/upload-artifact` with `if-no-files-found: warn` (non-blocking)\n\n4. **Add `coverage-report` merge job:**\n   - `needs: [build, desktop-tests, build-macos]`\n   - `if: always()` (runs even if some test jobs fail, to get partial coverage)\n   - Runs on `ubuntu-latest`\n   - Downloads all three coverage artifacts via `actions/download-artifact`\n   - Uses `danielpalme/ReportGenerator-GitHub-Action` to merge all Cobertura XMLs:\n     - Input: `**/coverage-*/**/*.cobertura.xml`\n     - Output: `./CoverageReport/`\n     - Report types: `HtmlInline;Cobertura;MarkdownSummaryGithub;Badges`\n   - Publishes merged report via `actions/upload-artifact` as `coverage-report`\n   - Adds GitHub Step Summary from the MarkdownSummaryGithub output\n\n5. **Add coverage configuration** (optional `testconfig.json` or inline):\n   - Format: Cobertura\n   - Exclude generated code: `GeneratedCodeAttribute`, `ExcludeFromCodeCoverageAttribute`, `DebuggerHiddenAttribute`, `DebuggerNonUserCodeAttribute`\n\n## Key context\n\n- Humanizer uses `Microsoft.Testing.Extensions.CodeCoverage` v18.0.4 (Microsoft's first-party tool), NOT coverlet.\n- This project uses central package management (`ManagePackageVersionsCentrally=true` in `Directory.Build.props`). All package versions must go in `Directory.Packages.props`.\n- The `build` job (ubuntu) runs unit tests + WASM Playwright tests via `--filter-not-trait \"Category=DesktopCDP\"`. This covers the majority of code paths.\n- The `desktop-tests` job (windows) runs DesktopCDP integration tests via `--filter-trait \"Category=DesktopCDP\"`. This covers WebView2/CDP-specific paths.\n- The `build-macos` job runs WASM tests (same filter as ubuntu). This overlaps with ubuntu coverage but catches any macOS-specific code paths.\n- Humanizer does NOT enforce coverage thresholds \u2014 coverage is informational only. Follow this approach.\n- ReportGenerator's `MarkdownSummaryGithub` report type generates a GitHub-flavored markdown summary that can be injected into the job summary via `$GITHUB_STEP_SUMMARY`.\n- Coverage instrumentation adds ~10-20% overhead to test execution time per job.\n- The merge job is lightweight (just downloads artifacts and runs ReportGenerator).\n\n## Acceptance\n- [ ] `Microsoft.Testing.Extensions.CodeCoverage` version pinned in `Directory.Packages.props`\n- [ ] `MonacoEditorComponent.Tests.csproj` references `Microsoft.Testing.Extensions.CodeCoverage` with `PrivateAssets=\"all\"`\n- [ ] `build` CI job (ubuntu) passes `--coverage` and `--results-directory` flags, uploads `coverage-ubuntu` artifact\n- [ ] `desktop-tests` CI job (windows) passes `--coverage` and `--results-directory` flags, uploads `coverage-windows` artifact\n- [ ] `build-macos` CI job passes `--coverage` and `--results-directory` flags, uploads `coverage-macos` artifact\n- [ ] `coverage-report` merge job downloads all coverage artifacts, runs ReportGenerator, uploads combined `coverage-report`\n- [ ] GitHub Step Summary shows coverage summary from merged report\n- [ ] Generated/excluded code filtered from coverage\n- [ ] Coverage collection does not break existing test execution in any job\n- [ ] Merge job runs with `if: always()` so partial coverage is available when some jobs fail\n\n## Done summary\nAdded code coverage collection and merged reporting to CI. Microsoft.Testing.Extensions.CodeCoverage v18.0.4 is added to the test project, all three CI test jobs (ubuntu, windows, macOS) now pass --coverage and --results-directory flags with per-job artifact uploads, and a new coverage-report merge job uses ReportGenerator to produce combined HTML/Cobertura reports with GitHub Step Summary output.\n## Evidence\n- Commits: 5371fa48da7505956a50db26a62a905b06fdb530\n- Tests: dotnet restore MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj, dotnet build MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj --no-restore\n- PRs:"
+    },
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-11T22:37:30.259205Z",
+        "depends_on": [],
+        "epic": "fn-4-modernize-ci-add-code-coverage-and",
+        "id": "fn-4-modernize-ci-add-code-coverage-and.4",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-4-modernize-ci-add-code-coverage-and.4.md",
+        "status": "todo",
+        "title": "Create ts-morph Monaco type extractor (Node.js parser)",
+        "updated_at": "2026-02-11T22:47:00.639111Z"
+      },
+      "id": "fn-4-modernize-ci-add-code-coverage-and.4",
+      "runtime": {
+        "assignee": "claire@novotny.org",
+        "claim_note": "",
+        "claimed_at": "2026-02-12T03:52:48.081037Z",
+        "evidence": {
+          "commits": [
+            "323d8ee",
+            "d65fc2b"
+          ],
+          "prs": [],
+          "tests": [
+            "npx tsc --noEmit",
+            "npx tsx src/index.ts ../../node_modules/monaco-editor/monaco.d.ts -o output/model.json",
+            "dotnet build MonacoEditorComponent.slnx --no-restore"
+          ]
+        },
+        "status": "done",
+        "updated_at": "2026-02-12T04:15:57.940140Z"
+      },
+      "spec": "# fn-4-modernize-ci-add-code-coverage-and.4 Create ts-morph Monaco type extractor (Node.js parser)\n\n## Description\nCreate a Node.js tool using ts-morph that parses `monaco.d.ts` and produces a versioned intermediate JSON model. This replaces the broken TypeDoc 0.20.37 + TypedocConverter pipeline.\n\n**Size:** M\n**Files:** `tools/monaco-type-extractor/` (new): `package.json`, `tsconfig.json`, `src/index.ts`, `src/extractor.ts`, `src/model.ts`\n\n## Approach\n\n- Use ts-morph (v27+) which bundles its own TS compiler and handles TS 5.x natively\n- **Execution:** `npx tsx src/index.ts` for dev, `npm run build && node dist/index.js` for CI. Define in `package.json` scripts and use consistently everywhere.\n- Parse `monaco.d.ts` via `project.addSourceFileAtPath()`\n- Walk nested `declare namespace monaco { ... }` blocks\n- Extract into a versioned intermediate JSON schema (`schemaVersion` field)\n\n**Schema must capture (beyond basic types):**\n- Interfaces: properties (name, structured type info, optional, readonly), methods (name, parameters, return type, overloads), inheritance chain, generic type parameters\n- Enums: members with values, distinguish string-backed vs numeric\n- Type aliases: resolve to underlying type, handle literal unions (-> string enums)\n- Union/intersection types: decomposed structurally (not just type text)\n- Index signatures, callable types, readonly modifiers\n- Namespace hierarchy (`monaco.editor`, `monaco.languages`)\n- JSDoc comments\n\n**Deterministic ordering:** All output arrays sorted alphabetically by name (namespaces -> types -> members -> properties). This prevents snapshot churn.\n\n## Key context\n\n- ts-morph v27 bundles its own TypeScript compiler \u2014 no version conflicts with the project's root TS version\n- Monaco's `monaco.d.ts` uses nested `declare namespace monaco { ... }` blocks \u2014 extractor must walk into module declarations\n- Current pipeline extracts ~100+ interfaces and ~30+ enums from Monaco's API surface\n- The intermediate model must distinguish string-backed enums (need `JsonStringEnumConverter`) from numeric enums (no converter) \u2014 this is a critical distinction for the .NET emitter\n- The JSON schema is the contract between this tool and the .NET emitter \u2014 it must be versioned and documented\n- Reference real-world ts-morph parsers: `elastic/elasticsearch-specification`, `lynx-family/lynx`, `RoryDuncan/ts2cs`\n\n## Acceptance\n- [ ] `tools/monaco-type-extractor/` exists with `package.json` (tsx + ts-morph deps), `tsconfig.json`, TypeScript source\n- [ ] Execution works via `npx tsx src/index.ts <path>` (same command in package.json scripts, CLI, and CI)\n- [ ] Extractor parses current `monaco.d.ts` (TS 5.x) without errors\n- [ ] Intermediate JSON has `schemaVersion` field for forward compatibility\n- [ ] JSON captures: interfaces (properties with structured type info, methods with overloads, inheritance), enums (string vs numeric distinguished), type aliases, union/intersection decomposition, index signatures, namespaces\n- [ ] All output arrays sorted alphabetically (deterministic ordering)\n- [ ] Schema documented as TypeScript types in `src/model.ts`\n\n## Done summary\nCreated ts-morph Monaco type extractor in tools/monaco-type-extractor/ that parses monaco.d.ts (TS 5.x) and produces a versioned intermediate JSON model (schemaVersion 1) with structured type decomposition including interfaces, enums (string vs numeric), type aliases, classes, functions, union/intersection types, index signatures, and namespaces. All output arrays sorted alphabetically for deterministic ordering.\n## Evidence\n- Commits: 323d8ee, d65fc2b\n- Tests: npx tsc --noEmit, npx tsx src/index.ts ../../node_modules/monaco-editor/monaco.d.ts -o output/model.json, dotnet build MonacoEditorComponent.slnx --no-restore\n- PRs:"
+    },
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-11T22:37:30.402495Z",
+        "depends_on": [
+          "fn-4-modernize-ci-add-code-coverage-and.4"
+        ],
+        "epic": "fn-4-modernize-ci-add-code-coverage-and",
+        "id": "fn-4-modernize-ci-add-code-coverage-and.5",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-4-modernize-ci-add-code-coverage-and.5.md",
+        "status": "todo",
+        "title": "Create .NET CLI tool for C# type emission from intermediate model",
+        "updated_at": "2026-02-11T22:47:18.549882Z"
+      },
+      "id": "fn-4-modernize-ci-add-code-coverage-and.5",
+      "runtime": {
+        "assignee": "claire@novotny.org",
+        "claim_note": "",
+        "claimed_at": "2026-02-12T04:18:38.636182Z",
+        "evidence": {
+          "commits": [
+            "45db184",
+            "ea12f0f",
+            "b08aea2",
+            "67fe97b",
+            "10fc88b",
+            "ee8d1c5"
+          ],
+          "prs": [],
+          "tests": [
+            "dotnet build MonacoEditorComponent.slnx --no-restore",
+            "dotnet run --project tools/MonacoTypeEmitter (573 files emitted)",
+            "deterministic output check (two runs identical)",
+            "JSON error handling check",
+            "constructor assignment verification"
+          ]
+        },
+        "status": "done",
+        "updated_at": "2026-02-12T05:18:01.246130Z"
+      },
+      "spec": "# fn-4-modernize-ci-add-code-coverage-and.5 Create .NET CLI tool for C# type emission from intermediate model\n\n## Description\nCreate a .NET CLI tool that reads the intermediate JSON model from Task .4 and emits C# files matching existing patterns in `MonacoEditorComponent/Monaco/`.\n\n**Size:** M\n**Files:** `tools/MonacoTypeEmitter/` (new): `MonacoTypeEmitter.csproj`, `Program.cs`, emitter logic. Add to `MonacoEditorComponent.slnx`.\n\n**Depends on:** Task .4 (intermediate JSON schema)\n\n## Approach\n\n- .NET console app (`OutputType=Exe`, `net10.0`)\n- Read intermediate JSON via `System.Text.Json` deserialization\n- Emit C# matching all existing patterns:\n  - **String-backed enums:** `[JsonConverter(typeof(JsonStringEnumConverter<T>))]` + `[JsonStringEnumMemberName(\"value\")]` + `[EnumMember(Value = \"value\")]`\n  - **Numeric enums:** plain with integer values, no converter\n  - **Model classes:** `public sealed class` with auto-properties, nullable for optional\n  - **Interface types:** `[JsonConverter(typeof(InterfaceToClassConverter<IFoo, Foo>))]` pairing\n  - **Namespace mapping:** `monaco.editor` -> `Monaco.Editor`, `monaco.languages` -> `Monaco.Languages`\n  - **Constructor defaults:** Match `CompletionItem`-style primary constructor patterns where present\n  - **Attribute omission policy:** No explicit `[JsonPropertyName]` when global CamelCase policy in `MonacoJsonContext` handles it; only emit when the JSON name differs from CamelCase of the C# name\n- Deterministic file output ordering (same namespace/type order as JSON input)\n- All emitted files get `// <auto-generated />` + `#nullable enable`\n\n**`.generator-ignore` migration:**\n- Migrate from filename-only matching to repo-relative path matching (e.g., `MonacoEditorComponent/Monaco/Editor/CompletionItem.cs`)\n- Validate all protected files resolve uniquely; fail generation on ambiguous matches\n- Load ignore list from config file in `tools/MonacoTypeEmitter/`\n\n## Key context\n\n- `MonacoJsonContext` uses global CamelCase + WhenWritingNull \u2014 emitter must conform\n- 15 files in current `.generator-ignore` \u2014 these are hand-tuned and must never be overwritten\n- The tool absorbs all 7 transforms from `postprocess-stj.ps1` \u2014 no separate post-processor\n- Could use `PackAsTool` for NuGet distribution, but a simple console app is fine for internal use\n\n## Acceptance\n- [ ] `tools/MonacoTypeEmitter/` project builds with `dotnet build`\n- [ ] Added to `MonacoEditorComponent.slnx`\n- [ ] Reads intermediate JSON and emits C# files\n- [ ] String-backed enums: `JsonStringEnumConverter<T>` + `JsonStringEnumMemberName` + `EnumMember`\n- [ ] Numeric enums: no converter, integer values only\n- [ ] Model classes: sealed, nullable auto-properties for optional fields\n- [ ] Interfaces: `InterfaceToClassConverter<IFoo, Foo>` pattern\n- [ ] Constructor defaults and interface-to-concrete pairing match existing patterns (e.g., `CompletionItem`)\n- [ ] `[JsonPropertyName]` only emitted when JSON name differs from CamelCase C# name\n- [ ] All files: `// <auto-generated />` + `#nullable enable`\n- [ ] `.generator-ignore` migrated to repo-relative path matching with ambiguity validation\n- [ ] Deterministic output ordering\n\n## Done summary\nCreated .NET CLI tool (MonacoTypeEmitter) that reads the intermediate JSON model from the ts-morph type extractor and emits C# files matching all existing patterns in MonacoEditorComponent/Monaco/. The tool handles enums (string-backed and numeric), type alias string literal unions, interfaces with InterfaceToClassConverter pairing, concrete classes, model classes with constructors, generic types, index signatures, call signatures, cross-namespace using directives, JsonPropertyName policy, and repo-relative .generator-ignore path matching. Produces 573 deterministic C# files from the real Monaco 0.54.0 model.\n## Evidence\n- Commits: 45db184, ea12f0f, b08aea2, 67fe97b, 10fc88b, ee8d1c5\n- Tests: dotnet build MonacoEditorComponent.slnx --no-restore, dotnet run --project tools/MonacoTypeEmitter (573 files emitted), deterministic output check (two runs identical), JSON error handling check, constructor assignment verification\n- PRs:"
+    },
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-11T22:37:30.556599Z",
+        "depends_on": [
+          "fn-4-modernize-ci-add-code-coverage-and.4",
+          "fn-4-modernize-ci-add-code-coverage-and.5"
+        ],
+        "epic": "fn-4-modernize-ci-add-code-coverage-and",
+        "id": "fn-4-modernize-ci-add-code-coverage-and.6",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-4-modernize-ci-add-code-coverage-and.6.md",
+        "status": "todo",
+        "title": "Add generator pipeline tests and replace old GenerateMonacoTypings scripts",
+        "updated_at": "2026-02-11T22:47:33.938433Z"
+      },
+      "id": "fn-4-modernize-ci-add-code-coverage-and.6",
+      "runtime": {
+        "assignee": "claire@novotny.org",
+        "claim_note": "",
+        "claimed_at": "2026-02-12T05:27:54.605181Z",
+        "evidence": {
+          "commits": [
+            "695be92",
+            "320e72c",
+            "cfd1951",
+            "7d2be84"
+          ],
+          "prs": [],
+          "tests": [
+            "dotnet test --project tools/MonacoTypeEmitter.Tests/MonacoTypeEmitter.Tests.csproj (19 passed)"
+          ]
+        },
+        "status": "done",
+        "updated_at": "2026-02-12T06:35:15.510896Z"
+      },
+      "spec": "# fn-4-modernize-ci-add-code-coverage-and.6 Add generator pipeline tests\n\n## Description\nAdd comprehensive tests for the new generator pipeline. This task is tests only \u2014 migration/cleanup is Task .7.\n\n**Size:** M\n**Files:** `tools/MonacoTypeEmitter.Tests/` (new test project)\n\n**Depends on:** Tasks .4 and .5\n\n## Approach\n\n**Three test levels:**\n\n1. **Snapshot tests** (Verify): Feed known `.d.ts` fragments to extractor -> intermediate JSON -> emitter -> compare C# output against `.verified.cs` snapshots. At least 5 cases: string enum, numeric enum, interface with properties, model class, namespace hierarchy.\n   - Require deterministic ordering in both JSON and emitted files to prevent churn.\n\n2. **Smoke test (full pipeline with serialization validation)**: Parse real `monaco.d.ts` -> intermediate JSON -> emit C# -> build emitted files in an isolated temp project that references `InterfaceToClassConverter`, `MonacoJsonContext` patterns -> run a minimal serialization contract subset against emitted types. This goes beyond \"does it compile?\" to validate JSON round-trip fidelity.\n\n3. **Round-trip tests**: For key types (MarkerData, CompletionItem, CursorStyle, MarkerSeverity), generate C# from the intermediate model, then verify serialization output matches the existing golden baselines in `SerializationContractTests.cs`.\n\n## Key context\n\n- The smoke test is the critical one \u2014 it would have caught the TypedocConverter breakage immediately.\n- Verify (snapshot testing) integrates with xunit.v3 and supports net10.0.\n- The isolated temp project for the smoke test ensures emitted code compiles in a realistic context (with real converters/serialization), not just syntactically.\n- `SerializationContractTests.cs` (1218 lines, ~40 tests) already validates wire format for all major types \u2014 this is the correctness baseline for round-trip tests.\n\n## Acceptance\n- [ ] `tools/MonacoTypeEmitter.Tests/` project exists, added to solution\n- [ ] Snapshot tests: at least 5 cases (string enum, numeric enum, interface, model class, namespace) with `.verified.cs` files\n- [ ] Smoke test: full pipeline (parse -> emit -> compile -> serialization contract subset passes)\n- [ ] Smoke test compiles emitted files in isolated project with real converter/context references (not just syntax check)\n- [ ] Round-trip tests: key types (MarkerData, CompletionItem, CursorStyle, MarkerSeverity) serialize identically to existing golden baselines\n- [ ] Deterministic ordering verified: re-running generator produces identical output\n- [ ] All existing tests still pass (`dotnet test MonacoEditorComponent.Tests`)\n\n## Done summary\nAdded MonacoTypeEmitter.Tests project with 19 tests across three levels: 6 snapshot tests (custom SnapshotAssert with verified baselines), 4 smoke tests (full pipeline emission + enum compilation + serialization attribute validation + deterministic ordering + model validation), and 9 round-trip tests (golden baseline verification for MarkerSeverity, BuiltinTheme, CompletionItemKind, MarkerData, CompletionItem, TextEditorCursorStyle, string enum emission path, wire-format compatibility chain, and structural validity). CursorStyle coverage uses TextEditorCursorStyle (emittable numeric enum) and BuiltinTheme (same string enum code path) because CursorStyle is hand-tuned and on the ignore list.\n## Evidence\n- Commits: 695be92, 320e72c, cfd1951, 7d2be84\n- Tests: dotnet test --project tools/MonacoTypeEmitter.Tests/MonacoTypeEmitter.Tests.csproj (19 passed)\n- PRs:"
+    },
+    {
+      "data": {
+        "assignee": "claire@novotny.org",
+        "claim_note": "",
+        "claimed_at": "2026-02-12T08:22:10.611Z",
+        "created_at": "2026-02-11T22:45:51.096848Z",
+        "depends_on": [
+          "fn-4-modernize-ci-add-code-coverage-and.4",
+          "fn-4-modernize-ci-add-code-coverage-and.5",
+          "fn-4-modernize-ci-add-code-coverage-and.6"
+        ],
+        "epic": "fn-4-modernize-ci-add-code-coverage-and",
+        "evidence": {
+          "commits": [
+            "e2fe5cc"
+          ],
+          "prs": [],
+          "tests": [
+            "dotnet build MonacoEditorComponent.slnx --no-restore",
+            "dotnet test --project tools/MonacoTypeEmitter.Tests/MonacoTypeEmitter.Tests.csproj (19 passed)",
+            "grep -rn GenerateMonacoTypings|TypedocConverter (no results)"
+          ]
+        },
+        "id": "fn-4-modernize-ci-add-code-coverage-and.7",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-4-modernize-ci-add-code-coverage-and.7.md",
+        "status": "done",
+        "title": "Migrate off old GenerateMonacoTypings and clean up",
+        "updated_at": "2026-02-12T08:22:22.283Z"
+      },
+      "id": "fn-4-modernize-ci-add-code-coverage-and.7",
+      "runtime": {
+        "assignee": "claire@novotny.org",
+        "claim_note": "",
+        "claimed_at": "2026-02-12T07:53:09.274713Z",
+        "evidence": {
+          "commits": [
+            "e2fe5cc"
+          ],
+          "prs": [],
+          "tests": [
+            "dotnet build MonacoEditorComponent.slnx --no-restore",
+            "dotnet test --project tools/MonacoTypeEmitter.Tests/MonacoTypeEmitter.Tests.csproj (19 passed)",
+            "grep -rn GenerateMonacoTypings|TypedocConverter (no results)"
+          ]
+        },
+        "status": "done",
+        "updated_at": "2026-02-12T08:16:02.458276Z"
+      },
+      "spec": "# fn-4-modernize-ci-add-code-coverage-and.7 Migrate off old GenerateMonacoTypings and clean up\n\n## Description\nMigrate from old GenerateMonacoTypings/ pipeline to new tools, delete old scripts, and clean up all references.\n\n**Size:** S\n**Files:** `GenerateMonacoTypings/` (delete all), `AGENTS.md`, `README.md`, `.gitignore`, `.gitattributes`\n\n**Depends on:** Tasks .4, .5, .6 (new tools working + tests green)\n\n## Approach\n\n1. Run new generator against current `monaco.d.ts`, diff output against existing `MonacoEditorComponent/Monaco/` (excluding ignored files)\n2. Resolve any differences\n3. Delete `GenerateMonacoTypings/` (all: generate-typings.ps1, postprocess-stj.ps1, package.json, README.md, .generator-ignore \u2014 note: `output/` does not exist on disk, it is gitignored)\n4. Update AGENTS.md: \"Key Directories\" section \u2192 reference `tools/monaco-type-extractor/` and `tools/MonacoTypeEmitter/`\n5. Update README.md: reference new tools\n6. Update `.gitignore` (lines 289-291: comment + `GenerateMonacoTypings/output/` and `GenerateMonacoTypings/.temp/`) and `.gitattributes` (line 68: comment referencing `GenerateMonacoTypings/.generator-ignore`): remove old paths, add new. Note: preserve nearby entries added by task .6 (lines 293-294: `*.received.cs` snapshot test pattern)\n<!-- Updated by plan-sync: fn-4.6 shifted .gitignore line numbers from 287-288 to 289-291 and added *.received.cs at 293-294 -->\n7. Verify: `grep -rn \"GenerateMonacoTypings\\|TypedocConverter\" . --include=\"*.md\" --include=\"*.yml\" --include=\"*.cs\" --include=\"*.ps1\" --include=\"*.json\" | grep -v \".flow/\"` returns no results\n## Acceptance\n- [ ] `GenerateMonacoTypings/` directory fully deleted\n- [ ] No `GenerateMonacoTypings` or `TypedocConverter` references in repo (excluding `.flow/` history docs) \u2014 verified by grep\n- [ ] AGENTS.md references new `tools/` directories\n- [ ] README.md references new generator tool\n- [ ] `.gitignore` and `.gitattributes` updated (old paths removed, new paths added)\n- [ ] All tests still pass\n## Done summary\nMigrated off old GenerateMonacoTypings pipeline: deleted the directory and all 5 files, updated AGENTS.md/README.md/.gitignore/.gitattributes/install-dependencies.ps1 to reference new tools/ directory, verified no stale references remain.\n## Evidence\n- Commits: e2fe5cc e2fe5cc\n- Tests: dotnet build (0 errors), dotnet test MonacoTypeEmitter.Tests (19 passed), grep verification (no stale refs) dotnet build MonacoEditorComponent.slnx --no-restore, dotnet test --project tools/MonacoTypeEmitter.Tests/MonacoTypeEmitter.Tests.csproj (19 passed), grep -rn GenerateMonacoTypings|TypedocConverter (no results)\n- PRs: N/A"
+    }
+  ]
+}

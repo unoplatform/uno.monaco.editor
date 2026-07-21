@@ -1,5 +1,3 @@
-﻿//namespace Monaco.Helpers {
-    interface DebugLogger {
-        log(message: string);
-   }
-//}
+export interface DebugLogger {
+    log(message: string): void;
+}

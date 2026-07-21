@@ -1,5 +1,5 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -7,47 +7,17 @@ namespace Monaco.Editor
     /// <summary>
     /// Enable tab completion.
     /// </summary>
-    [JsonConverter(typeof(TabCompletionConverter))]
-    public enum TabCompletion { Off, On, OnlySnippets };
-
-    internal class TabCompletionConverter : JsonConverter
+    [JsonConverter(typeof(JsonStringEnumConverter<TabCompletion>))]
+    public enum TabCompletion
     {
-        public override bool CanConvert(Type t) => t == typeof(TabCompletion) || t == typeof(TabCompletion?);
-
-        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
-        {
-            if (reader.TokenType == JsonToken.Null) return null;
-            var value = serializer.Deserialize<string>(reader);
-            return value switch
-            {
-                "off" => TabCompletion.Off,
-                "on" => TabCompletion.On,
-                "onlySnippets" => TabCompletion.OnlySnippets,
-                _ => throw new Exception("Cannot unmarshal type TabCompletion"),
-            };
-        }
-
-        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
-        {
-            if (untypedValue == null)
-            {
-                serializer.Serialize(writer, null);
-                return;
-            }
-            var value = (TabCompletion)untypedValue;
-            switch (value)
-            {
-                case TabCompletion.Off:
-                    serializer.Serialize(writer, "off");
-                    return;
-                case TabCompletion.On:
-                    serializer.Serialize(writer, "on");
-                    return;
-                case TabCompletion.OnlySnippets:
-                    serializer.Serialize(writer, "onlySnippets");
-                    return;
-            }
-            throw new Exception("Cannot marshal type TabCompletion");
-        }
-    }
+        [JsonStringEnumMemberName("off")]
+        [EnumMember(Value = "off")]
+        Off,
+        [JsonStringEnumMemberName("on")]
+        [EnumMember(Value = "on")]
+        On,
+        [JsonStringEnumMemberName("onlySnippets")]
+        [EnumMember(Value = "onlySnippets")]
+        OnlySnippets,
+    };
 }

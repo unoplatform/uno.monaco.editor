@@ -1,6 +1,8 @@
-﻿///<reference path="../monaco-editor/monaco.d.ts" />
+import * as monaco from 'monaco-editor';
+import { EditorContext } from './otherScriptsToBeOrganized';
+import { callParentEventAsync } from './asyncCallbackHelpers';
 
-const registerCodeLensProvider = function (unused: any, languageId) {
+export const registerCodeLensProvider = function (unused: any, languageId: string) {
     return monaco.languages.registerCodeLensProvider(languageId, {
         provideCodeLenses: function (model, token) {
             var element = EditorContext.getElementFromModel(model);
@@ -14,7 +16,6 @@ const registerCodeLensProvider = function (unused: any, languageId) {
                     return list;
                 }
                 return null;
-
             });
         },
         resolveCodeLens: function (model, codeLens, token) {
@@ -26,6 +27,5 @@ const registerCodeLensProvider = function (unused: any, languageId) {
                 return null;
             });
         }
-        // TODO: onDidChange, don't know what this does.
     });
 }

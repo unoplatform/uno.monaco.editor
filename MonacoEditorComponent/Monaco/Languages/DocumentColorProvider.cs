@@ -1,5 +1,4 @@
-﻿using Monaco.Editor;
-using Newtonsoft.Json;
+using Monaco.Editor;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Windows.Foundation;
@@ -8,7 +7,7 @@ namespace Monaco.Languages
 {
     /// <summary>
     /// A provider of colors for editor models.
-    /// <seealso href="https://microsoft.github.io/monaco-editor/api/interfaces/monaco.languages.documentcolorprovider.html">monaco.languages.DocumentColorProvider</seealso>
+    /// <seealso href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor_editor_api.languages.DocumentColorProvider.html">monaco.languages.DocumentColorProvider</seealso>
     /// </summary>
     public interface DocumentColorProvider
     {

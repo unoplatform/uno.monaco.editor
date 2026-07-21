@@ -1,5 +1,5 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -9,43 +9,14 @@ namespace Monaco.Editor
     /// changed
     /// by mouse.
     /// </summary>
-    [JsonConverter(typeof(CursorSurroundingLinesStyleConverter))]
-    public enum CursorSurroundingLinesStyle { All, Default };
-
-    internal class CursorSurroundingLinesStyleConverter : JsonConverter
+    [JsonConverter(typeof(JsonStringEnumConverter<CursorSurroundingLinesStyle>))]
+    public enum CursorSurroundingLinesStyle
     {
-        public override bool CanConvert(Type t) => t == typeof(CursorSurroundingLinesStyle) || t == typeof(CursorSurroundingLinesStyle?);
-
-        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
-        {
-            if (reader.TokenType == JsonToken.Null) return null;
-            var value = serializer.Deserialize<string>(reader);
-            return value switch
-            {
-                "all" => CursorSurroundingLinesStyle.All,
-                "default" => CursorSurroundingLinesStyle.Default,
-                _ => throw new Exception("Cannot unmarshal type CursorSurroundingLinesStyle"),
-            };
-        }
-
-        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
-        {
-            if (untypedValue == null)
-            {
-                serializer.Serialize(writer, null);
-                return;
-            }
-            var value = (CursorSurroundingLinesStyle)untypedValue;
-            switch (value)
-            {
-                case CursorSurroundingLinesStyle.All:
-                    serializer.Serialize(writer, "all");
-                    return;
-                case CursorSurroundingLinesStyle.Default:
-                    serializer.Serialize(writer, "default");
-                    return;
-            }
-            throw new Exception("Cannot marshal type CursorSurroundingLinesStyle");
-        }
-    }
+        [JsonStringEnumMemberName("all")]
+        [EnumMember(Value = "all")]
+        All,
+        [JsonStringEnumMemberName("default")]
+        [EnumMember(Value = "default")]
+        Default,
+    };
 }

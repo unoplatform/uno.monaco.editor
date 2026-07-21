@@ -1,14 +1,13 @@
-﻿<Application
+<Application
     x:Class="MonacoEditorTestApp.App"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:MonacoEditorTestApp"
     xmlns:muxc="using:Microsoft.UI.Xaml.Controls">
-
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <muxc:XamlControlsResources ControlsResourcesVersion="Version2"/>
+                <muxc:XamlControlsResources ControlsResourcesVersion="Version2" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

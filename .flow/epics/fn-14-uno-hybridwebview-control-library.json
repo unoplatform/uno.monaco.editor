@@ -1,0 +1,18 @@
+{
+  "branch_name": "fn-14-uno-hybridwebview-control-library",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-02-16T20:55:53.950305Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "fn-14-uno-hybridwebview-control-library",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/fn-14-uno-hybridwebview-control-library.md",
+  "status": "done",
+  "title": "Uno HybridWebView control library",
+  "updated_at": "2026-02-16T21:14:56.250919Z"
+}

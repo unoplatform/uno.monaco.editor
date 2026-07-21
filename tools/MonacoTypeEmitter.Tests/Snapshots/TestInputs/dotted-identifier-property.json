@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "sourceFile": "test.d.ts",
+  "extractedAt": "2026-01-01T00:00:00.000Z",
+  "namespaces": [
+    {
+      "name": "monaco.editor",
+      "interfaces": [
+        {
+          "name": "IGlobalEditorOptions",
+          "documentation": "Configuration options for the editor.",
+          "typeParameters": [],
+          "extends": [],
+          "properties": [
+            {
+              "name": "'semanticHighlighting.enabled'",
+              "documentation": "Controls whether the semanticHighlighting is shown for the languages that support it.",
+              "type": {
+                "kind": "union",
+                "types": [
+                  { "kind": "literal", "value": true },
+                  { "kind": "literal", "value": false },
+                  { "kind": "literal", "value": "configuredByTheme" }
+                ]
+              },
+              "isOptional": true,
+              "isReadonly": false
+            },
+            {
+              "name": "tabSize",
+              "documentation": "The number of spaces a tab is equal to.",
+              "type": { "kind": "primitive", "name": "number" },
+              "isOptional": true,
+              "isReadonly": false
+            }
+          ],
+          "methods": [],
+          "indexSignatures": [],
+          "callSignatures": []
+        }
+      ],
+      "enums": [],
+      "typeAliases": [],
+      "classes": [],
+      "functions": []
+    }
+  ]
+}

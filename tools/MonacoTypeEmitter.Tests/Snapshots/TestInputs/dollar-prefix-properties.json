@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "sourceFile": "test.d.ts",
+  "extractedAt": "2026-01-01T00:00:00.000Z",
+  "namespaces": [
+    {
+      "name": "monaco.languages.json",
+      "interfaces": [
+        {
+          "name": "IJSONSchema",
+          "documentation": "A JSON Schema definition.",
+          "typeParameters": [],
+          "extends": [],
+          "properties": [
+            {
+              "name": "$comment",
+              "type": { "kind": "primitive", "name": "string" },
+              "isOptional": true,
+              "isReadonly": false
+            },
+            {
+              "name": "$id",
+              "type": { "kind": "primitive", "name": "string" },
+              "isOptional": true,
+              "isReadonly": false
+            },
+            {
+              "name": "$ref",
+              "type": { "kind": "primitive", "name": "string" },
+              "isOptional": true,
+              "isReadonly": false
+            },
+            {
+              "name": "$schema",
+              "type": { "kind": "primitive", "name": "string" },
+              "isOptional": true,
+              "isReadonly": false
+            },
+            {
+              "name": "title",
+              "type": { "kind": "primitive", "name": "string" },
+              "isOptional": true,
+              "isReadonly": false
+            }
+          ],
+          "methods": [],
+          "indexSignatures": [],
+          "callSignatures": []
+        }
+      ],
+      "enums": [],
+      "typeAliases": [],
+      "classes": [],
+      "functions": []
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-11T08:38:04.562773Z",
+  "depends_on": [
+    "fn-2-type-generation-pipeline-and.1"
+  ],
+  "epic": "fn-2-type-generation-pipeline-and",
+  "id": "fn-2-type-generation-pipeline-and.7",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-2-type-generation-pipeline-and.7.md",
+  "status": "todo",
+  "title": "Modernize type generation pipeline for STJ output",
+  "updated_at": "2026-02-11T08:51:42.415610Z"
+}

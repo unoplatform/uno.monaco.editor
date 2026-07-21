@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-12T05:29:26.377145Z",
+  "depends_on": [],
+  "epic": "fn-6-bug-fixes-disposal-resize-and-test",
+  "id": "fn-6-bug-fixes-disposal-resize-and-test.1",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-6-bug-fixes-disposal-resize-and-test.1.md",
+  "status": "todo",
+  "title": "Merge PR #37 WASM resize fix and remove dead layout code",
+  "updated_at": "2026-02-12T05:46:57.710275Z"
+}

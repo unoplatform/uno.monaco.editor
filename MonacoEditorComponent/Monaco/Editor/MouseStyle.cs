@@ -1,5 +1,5 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -8,47 +8,17 @@ namespace Monaco.Editor
     /// Control the mouse pointer style, either 'text' or 'default' or 'copy'
     /// Defaults to 'text'
     /// </summary>
-    [JsonConverter(typeof(MouseStyleConverter))]
-    public enum MouseStyle { Copy, Default, Text };
-
-    internal class MouseStyleConverter : JsonConverter
+    [JsonConverter(typeof(JsonStringEnumConverter<MouseStyle>))]
+    public enum MouseStyle
     {
-        public override bool CanConvert(Type t) => t == typeof(MouseStyle) || t == typeof(MouseStyle?);
-
-        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
-        {
-            if (reader.TokenType == JsonToken.Null) return null;
-            var value = serializer.Deserialize<string>(reader);
-            return value switch
-            {
-                "copy" => MouseStyle.Copy,
-                "default" => MouseStyle.Default,
-                "text" => MouseStyle.Text,
-                _ => throw new Exception("Cannot unmarshal type MouseStyle"),
-            };
-        }
-
-        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
-        {
-            if (untypedValue == null)
-            {
-                serializer.Serialize(writer, null);
-                return;
-            }
-            var value = (MouseStyle)untypedValue;
-            switch (value)
-            {
-                case MouseStyle.Copy:
-                    serializer.Serialize(writer, "copy");
-                    return;
-                case MouseStyle.Default:
-                    serializer.Serialize(writer, "default");
-                    return;
-                case MouseStyle.Text:
-                    serializer.Serialize(writer, "text");
-                    return;
-            }
-            throw new Exception("Cannot marshal type MouseStyle");
-        }
-    }
+        [JsonStringEnumMemberName("copy")]
+        [EnumMember(Value = "copy")]
+        Copy,
+        [JsonStringEnumMemberName("default")]
+        [EnumMember(Value = "default")]
+        Default,
+        [JsonStringEnumMemberName("text")]
+        [EnumMember(Value = "text")]
+        Text,
+    };
 }

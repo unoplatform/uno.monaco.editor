@@ -1,52 +1,51 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net9.0;net10.0</TargetFrameworks>
-		<Title>Monaco Editor Component WASM</Title>
-		<NoWarn>$(NoWarn);Uno0001;CA1416;CS1998;CS0067</NoWarn>
+		<TargetFrameworks>net10.0</TargetFrameworks>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<Title>Monaco Editor Component</Title>
+		<!--
+			SYSLIB1031: Monaco.Uri and System.Uri both appear as discovered types in
+			MonacoJsonContext (from IMarkdownString.Uris and IRelatedInformation.Resource).
+			The source generator picks the first and warns about the TypeInfo property name
+			collision. This is safe — both types serialize correctly via their own metadata.
+			A dedicated test (UriCollision_BothTypesSerializeCorrectly) validates this.
+			Cannot use #pragma in user code because SG diagnostics are emitted on generated files.
+		-->
+		<NoWarn>$(NoWarn);Uno0001;CA1416;CS1998;CS0067;SYSLIB1031</NoWarn>
 		<PackageId>Uno.Monaco.Editor</PackageId>
 		<DebugSymbols>true</DebugSymbols>
 		<DebugType>portable</DebugType>
-		<DefineConstants>$(DefineConstants);__WASM__</DefineConstants>
+
     <GenerateLibraryLayout>true</GenerateLibraryLayout>
 		<MonoRuntimeDebuggerEnabled>true</MonoRuntimeDebuggerEnabled>
 		<Product>Uno.Monaco.Editor</Product>
-		<Description>A WASM wrapper around the web-based Monaco Editor. Designed for use with the Uno Platform</Description>
+		<Description>A cross-platform wrapper around the web-based Monaco Editor for WASM and Desktop (Skia). Designed for use with the Uno Platform</Description>
     <Authors>Uno Platform</Authors>
     <Copyright>Copyright (C) 2015-$([System.DateTime]::UtcNow.Year) Uno Platform inc. - all rights reserved</Copyright>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>    
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<RepositoryUrl>https://github.com/unoplatform/uno.monaco.editor</RepositoryUrl>
 		<PackageProjectUrl>https://github.com/unoplatform/uno.monaco.editor</PackageProjectUrl>
-    <PackageTags>wasm monaco editor controls</PackageTags>
+    <PackageTags>wasm desktop skia monaco editor controls</PackageTags>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<GeneratePackageOnBuild Condition="'$(Configuration)'=='Release'">true</GeneratePackageOnBuild>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<TypeScriptToolsVersion>Latest</TypeScriptToolsVersion>
+		<JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
     <!-- pick the first TFM from TargetFrameworks -->
-    <IncludeContentInPack>false</IncludeContentInPack>    
+    <IncludeContentInPack>false</IncludeContentInPack>
     <_PrimaryTfm>$([System.String]::Copy('$(TargetFrameworks)').Split(';')[0])</_PrimaryTfm>
     <AllowedOutputExtensionsInPackageBuildOutputFolder>
       $(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb
     </AllowedOutputExtensionsInPackageBuildOutputFolder>
 	</PropertyGroup>
 
-	<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
-		<TypeScriptRemoveComments>false</TypeScriptRemoveComments>
-		<TypeScriptSourceMap>true</TypeScriptSourceMap>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(Configuration)' == 'Release'">
-		<TypeScriptRemoveComments>true</TypeScriptRemoveComments>
-		<TypeScriptSourceMap>false</TypeScriptSourceMap>
-	</PropertyGroup>
-		
 	<ItemGroup>
-		<PackageReference Include="Newtonsoft.Json" />
 		<PackageReference Include="Nito.AsyncEx" />
+		<PackageReference Include="StreamJsonRpc" />
 		<PackageReference Include="Uno.CommunityToolkit.WinUI" />
 		<PackageReference Include="Uno.WinUI" />
 		<PackageReference Include="Uno.Core.Extensions.Logging" />
 		<PackageReference Include="Uno.Core.Extensions.Logging.Singleton" />
-		<PackageReference Include="Microsoft.TypeScript.MSBuild" PrivateAssets="all" />		
 	</ItemGroup>
 
 	<ItemGroup>
@@ -56,18 +55,101 @@
 		</Page>
 	</ItemGroup>
 
-	<ItemGroup>
+	<!-- ============================================================ -->
+	<!-- TypeScript/JavaScript resources                               -->
+	<!-- esbuild replaces tsc; TypeScript MSBuild package removed.     -->
+	<!-- Monaco is bundled from node_modules (no vendored directory).  -->
+	<!-- ============================================================ -->
 
-    <TypeScriptCompile Include="tsconfig.json" />
-		
-		<Content Include="monaco-editor\*.txt" />
-		<Content Include="monaco-editor\LICENSE" PackagePath="monaco-editor\LICENSE.txt" />
-		<Content Include="monaco-editor\min\**\*.*" />
-		
+	<!-- Exclude TypeScript source from compile (esbuild handles it) -->
+	<ItemGroup>
+		<None Remove="ts-helpermethods\**\*.ts" />
+		<None Remove="tsconfig.json" />
+	</ItemGroup>
+
+	<!-- WASM: EmbeddedResource for main bundle + CSS + workers -->
+	<ItemGroup>
 		<EmbeddedResource Include="Properties\MonacoEditorComponent.rd.xml" />
 		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.js" />
-    <EmbeddedResource Include="monaco-editor\min\vs\loader.js" />
-
+		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.css" Condition="Exists('WasmScripts\uno-monaco-helpers.css')" />
+		<EmbeddedResource Include="WasmScripts\workers\editor.worker.js" Condition="Exists('WasmScripts\workers\editor.worker.js')" />
+		<EmbeddedResource Include="WasmScripts\workers\json.worker.js" Condition="Exists('WasmScripts\workers\json.worker.js')" />
+		<EmbeddedResource Include="WasmScripts\workers\css.worker.js" Condition="Exists('WasmScripts\workers\css.worker.js')" />
+		<EmbeddedResource Include="WasmScripts\workers\html.worker.js" Condition="Exists('WasmScripts\workers\html.worker.js')" />
+		<EmbeddedResource Include="WasmScripts\workers\ts.worker.js" Condition="Exists('WasmScripts\workers\ts.worker.js')" />
 	</ItemGroup>
-  
+
+	<!-- Desktop: Content files copied to output directory -->
+	<ItemGroup>
+		<Content Include="DesktopContent\editor.html" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\editor.html" />
+		<Content Include="DesktopContent\uno-monaco-helpers.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\uno-monaco-helpers.js" Condition="Exists('DesktopContent\uno-monaco-helpers.js')" />
+		<Content Include="DesktopContent\uno-monaco-helpers.css" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\uno-monaco-helpers.css" Condition="Exists('DesktopContent\uno-monaco-helpers.css')" />
+		<Content Include="DesktopContent\workers\editor.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\editor.worker.js" Condition="Exists('DesktopContent\workers\editor.worker.js')" />
+		<Content Include="DesktopContent\workers\json.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\json.worker.js" Condition="Exists('DesktopContent\workers\json.worker.js')" />
+		<Content Include="DesktopContent\workers\css.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\css.worker.js" Condition="Exists('DesktopContent\workers\css.worker.js')" />
+		<Content Include="DesktopContent\workers\html.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\html.worker.js" Condition="Exists('DesktopContent\workers\html.worker.js')" />
+		<Content Include="DesktopContent\workers\ts.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\ts.worker.js" Condition="Exists('DesktopContent\workers\ts.worker.js')" />
+	</ItemGroup>
+
+	<!--
+		Include repository-root README in NuGet package.
+		The standard <None Pack="true"/> pattern does not work here because the Uno SDK's
+		GenerateLibraryLayout=true packing flow does not propagate Pack metadata from None
+		items to the package file list. Injecting into _PackageFiles via a target is the
+		workaround recommended for Uno Platform library projects.
+	-->
+	<Target Name="_IncludeReadmeInPackage" BeforeTargets="GenerateNuspec">
+		<ItemGroup>
+			<_PackageFiles Include="..\README.md" PackagePath="/" />
+		</ItemGroup>
+	</Target>
+
+	<!-- Rebuild Monaco JS bundles when TypeScript sources change -->
+	<ItemGroup>
+		<MonacoBundleInput Include="ts-helpermethods\**\*.ts" />
+		<MonacoBundleInput Include="ts-helpermethods\esbuild.config.mjs" />
+		<MonacoBundleInput Include="..\package.json" />
+		<MonacoBundleInput Include="..\package-lock.json" />
+	</ItemGroup>
+
+	<Target Name="BuildMonacoBundlesWhenSourcesChange"
+		BeforeTargets="CoreCompile"
+		Inputs="@(MonacoBundleInput)"
+		Outputs="WasmScripts\uno-monaco-helpers.js;DesktopContent\uno-monaco-helpers.js">
+		<Message Importance="high" Text="Monaco TypeScript sources changed — rebuilding JS bundles..." />
+		<Exec Command="npm install" WorkingDirectory="$(MSBuildThisFileDirectory).." StandardOutputImportance="low" Condition="!Exists('$(MSBuildThisFileDirectory)..\node_modules')" />
+		<Exec Command="node MonacoEditorComponent/ts-helpermethods/esbuild.config.mjs" WorkingDirectory="$(MSBuildThisFileDirectory).." />
+	</Target>
+
+	<!-- Auto-restore Monaco JS bundles when missing (clean checkout) -->
+	<Target Name="RestoreMonacoBundles"
+		BeforeTargets="CoreCompile"
+		Condition="!Exists('WasmScripts\uno-monaco-helpers.js')">
+		<Message Importance="high" Text="Monaco JS bundles not found — running npm install and esbuild..." />
+		<Exec Command="npm install" WorkingDirectory="$(MSBuildThisFileDirectory).." StandardOutputImportance="low" />
+		<Exec Command="node MonacoEditorComponent/ts-helpermethods/esbuild.config.mjs" WorkingDirectory="$(MSBuildThisFileDirectory).." />
+	</Target>
+
+	<!-- Safety net: fail with clear message if bundles still missing after restore -->
+	<Target Name="ValidateEsbuildBundles" BeforeTargets="CoreCompile" DependsOnTargets="RestoreMonacoBundles">
+		<Error
+			Condition="!Exists('WasmScripts\uno-monaco-helpers.js')"
+			Text="esbuild bundle not found at WasmScripts\uno-monaco-helpers.js. Run 'npm install &amp;&amp; npm run build' from the repository root." />
+		<Error
+			Condition="!Exists('WasmScripts\workers\editor.worker.js')"
+			Text="Worker bundle not found at WasmScripts\workers\editor.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root." />
+		<Error
+			Condition="!Exists('WasmScripts\workers\json.worker.js')"
+			Text="Worker bundle not found at WasmScripts\workers\json.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root." />
+		<Error
+			Condition="!Exists('WasmScripts\workers\css.worker.js')"
+			Text="Worker bundle not found at WasmScripts\workers\css.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root." />
+		<Error
+			Condition="!Exists('WasmScripts\workers\html.worker.js')"
+			Text="Worker bundle not found at WasmScripts\workers\html.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root." />
+		<Error
+			Condition="!Exists('WasmScripts\workers\ts.worker.js')"
+			Text="Worker bundle not found at WasmScripts\workers\ts.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root." />
+	</Target>
+
 </Project>

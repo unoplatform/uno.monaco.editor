@@ -1,24 +1,33 @@
 using System.ComponentModel;
+using System.Linq;
+using System.Text.Json;
 
 using Monaco.Languages;
+using Monaco.Serialization;
 
-using Newtonsoft.Json;
 
 namespace Monaco
 {
     /// <summary>
-    /// Helper to static Monaco.Languages Namespace methods.
-    /// https://microsoft.github.io/monaco-editor/api/modules/monaco.languages.html
+    /// Provides access to the <c>monaco.languages.*</c> registration APIs, including
+    /// completion, hover, code-action, code-lens, and color providers.
     /// </summary>
+    /// <remarks>
+    /// Obtain an instance from <see cref="CodeEditor.Languages"/>. Do not construct directly.
+    /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/modules/editor_editor_api.languages.html">monaco.languages</see>.
+    /// </remarks>
     [method: Obsolete("Use <Editor Instance>.Languages.* instead of constructing your own LanguagesHelper.")]
-    [method: EditorBrowsable(EditorBrowsableState.Never)]    /// <summary>
-                                                             /// Helper to static Monaco.Languages Namespace methods.
-                                                             /// https://microsoft.github.io/monaco-editor/api/modules/monaco.languages.html
-                                                             /// </summary>
+    [method: EditorBrowsable(EditorBrowsableState.Never)]
     public sealed partial class LanguagesHelper(CodeEditor editor)
     {
         private readonly WeakReference<CodeEditor> _editor = new(editor);
 
+        /// <summary>
+        /// Gets the list of registered language identifiers and their extension points.
+        /// </summary>
+        /// <returns>A list of <see cref="ILanguageExtensionPoint"/> instances, or
+        /// <see langword="null"/> if the editor reference has been collected.</returns>
+        /// <remarks>Wraps Monaco <c>languages.getLanguages</c>.</remarks>
         public async Task<IList<ILanguageExtensionPoint>?> GetLanguagesAsync()
         {
             if (_editor.TryGetTarget(out var editor))
@@ -29,14 +38,29 @@ namespace Monaco
             return null;
         }
 
+        /// <summary>
+        /// Registers a new language with Monaco.
+        /// </summary>
+        /// <param name="language">The language extension point describing the language to register.</param>
+        /// <remarks>Wraps Monaco <c>languages.register</c>.</remarks>
         public async Task RegisterAsync(ILanguageExtensionPoint language)
         {
             if (_editor.TryGetTarget(out var editor))
             {
-                await editor.InvokeScriptAsync("monaco.languages.register", language).AsAsyncAction();
+                // Use the registerLanguage helper (not the raw monaco.languages.register):
+                // the bridge prepends the editor element as the first argument to invoked
+                // methods, and monaco.languages.register takes only the descriptor, so calling
+                // it raw would pass the element as the language and silently fail to register.
+                await editor.InvokeScriptAsync("registerLanguage", language).AsAsyncAction();
             }
         }
 
+        /// <summary>
+        /// Registers a code action provider for the specified language.
+        /// </summary>
+        /// <param name="languageId">The language identifier (e.g., <c>"csharp"</c>).</param>
+        /// <param name="provider">The provider implementation.</param>
+        /// <remarks>Wraps Monaco <c>languages.registerCodeActionProvider</c>.</remarks>
         public async Task RegisterCodeActionProviderAsync(string languageId, CodeActionProvider provider)
         {
             if (_editor.TryGetTarget(out var editor))
@@ -46,8 +70,8 @@ namespace Monaco
                 {
                     if (args != null && args.Length >= 2)
                     {
-                        var range = JsonConvert.DeserializeObject<Range>(args[0]);
-                        var context = JsonConvert.DeserializeObject<CodeActionContext>(args[1]);
+                        var range = JsonSerializer.Deserialize(args[0], MonacoJsonContext.Default.Range);
+                        var context = JsonSerializer.Deserialize(args[1], MonacoJsonContext.Default.CodeActionContext);
 
                         if (editor.GetModel() is { } model
                             && range is not null
@@ -57,7 +81,7 @@ namespace Monaco
 
                             if (list != null)
                             {
-                                return JsonConvert.SerializeObject(list);
+                                return JsonSerializer.Serialize(list, MonacoJsonContext.Relaxed.CodeActionList);
                             }
                         }
                     }
@@ -70,6 +94,12 @@ namespace Monaco
             }
         }
 
+        /// <summary>
+        /// Registers a code lens provider for the specified language.
+        /// </summary>
+        /// <param name="languageId">The language identifier (e.g., <c>"csharp"</c>).</param>
+        /// <param name="provider">The provider implementation.</param>
+        /// <remarks>Wraps Monaco <c>languages.registerCodeLensProvider</c>.</remarks>
         public async Task RegisterCodeLensProviderAsync(string languageId, CodeLensProvider provider)
         {
             if (_editor.TryGetTarget(out var editor) && editor._parentAccessor is not null)
@@ -83,7 +113,7 @@ namespace Monaco
 
                         if (list != null)
                         {
-                            return JsonConvert.SerializeObject(list);
+                            return JsonSerializer.Serialize(list, MonacoJsonContext.Relaxed.CodeLensList);
                         }
                     }
 
@@ -96,13 +126,13 @@ namespace Monaco
                     if (args != null && args.Length >= 1)
                     {
                         if (editor.GetModel() is { } model
-                            && JsonConvert.DeserializeObject<CodeLens>(args[0]) is { } codeLens)
+                            && JsonSerializer.Deserialize(args[0], MonacoJsonContext.Default.CodeLens) is { } codeLens)
                         {
                             var lens = await provider.ResolveCodeLensAsync(model, codeLens);
 
                             if (lens != null)
                             {
-                                return JsonConvert.SerializeObject(lens);
+                                return JsonSerializer.Serialize(lens, MonacoJsonContext.Relaxed.CodeLens);
                             }
                         }
                     }
@@ -115,6 +145,12 @@ namespace Monaco
             }
         }
 
+        /// <summary>
+        /// Registers a document color provider for the specified language.
+        /// </summary>
+        /// <param name="languageId">The language identifier (e.g., <c>"css"</c>).</param>
+        /// <param name="provider">The provider implementation.</param>
+        /// <remarks>Wraps Monaco <c>languages.registerColorProvider</c>.</remarks>
         public async Task RegisterColorProviderAsync(string languageId, DocumentColorProvider provider)
         {
             if (_editor.TryGetTarget(out var editor)
@@ -128,13 +164,13 @@ namespace Monaco
                     if (args != null && args.Length >= 1)
                     {
                         if (editor.GetModel() is { } model
-                        && JsonConvert.DeserializeObject<ColorInformation>(args[0]) is { } colorInformation)
+                        && JsonSerializer.Deserialize(args[0], MonacoJsonContext.Default.ColorInformation) is { } colorInformation)
                         {
                             var items = await provider.ProvideColorPresentationsAsync(model, colorInformation);
 
                             if (items != null)
                             {
-                                return JsonConvert.SerializeObject(items);
+                                return JsonSerializer.Serialize(items.ToArray(), MonacoJsonContext.Relaxed.ColorPresentationArray);
                             }
                         }
                     }
@@ -151,7 +187,7 @@ namespace Monaco
 
                         if (items != null)
                         {
-                            return JsonConvert.SerializeObject(items);
+                            return JsonSerializer.Serialize(items.ToArray(), MonacoJsonContext.Relaxed.ColorInformationArray);
                         }
                     }
 
@@ -163,6 +199,12 @@ namespace Monaco
             }
         }
 
+        /// <summary>
+        /// Registers a completion item provider for the specified language.
+        /// </summary>
+        /// <param name="languageId">The language identifier (e.g., <c>"javascript"</c>).</param>
+        /// <param name="provider">The provider implementation.</param>
+        /// <remarks>Wraps Monaco <c>languages.registerCompletionItemProvider</c>.</remarks>
         public async Task RegisterCompletionItemProviderAsync(string languageId, CompletionItemProvider provider)
         {
             if (_editor.TryGetTarget(out var editor)
@@ -175,15 +217,15 @@ namespace Monaco
                     if (args != null && args.Length >= 2)
                     {
                         if (editor.GetModel() is { } model
-                        && JsonConvert.DeserializeObject<Position>(args[0]) is { } position
-                        && JsonConvert.DeserializeObject<CompletionContext>(args[1]) is { } completionContext)
+                        && JsonSerializer.Deserialize(args[0], MonacoJsonContext.Default.Position) is { } position
+                        && JsonSerializer.Deserialize(args[1], MonacoJsonContext.Default.CompletionContext) is { } completionContext)
                         {
                             var items = await provider.ProvideCompletionItemsAsync(model, position, completionContext);
 
                             if (items != null)
                             {
                                 System.Diagnostics.Debug.WriteLine("Items: " + items);
-                                var serialized = JsonConvert.SerializeObject(items);
+                                var serialized = JsonSerializer.Serialize(items, MonacoJsonContext.Relaxed.CompletionList);
                                 System.Diagnostics.Debug.WriteLine("Items in JSON: " + serialized);
                                 return serialized;
                             }
@@ -199,13 +241,13 @@ namespace Monaco
                     if (args != null && args.Length >= 1)
                     {
                         if (editor.GetModel() is { } model
-                        && JsonConvert.DeserializeObject<CompletionItem>(args[0]) is { } requestedItem)
+                        && JsonSerializer.Deserialize(args[0], MonacoJsonContext.Default.CompletionItem) is { } requestedItem)
                         {
                             var completionItem = await provider.ResolveCompletionItemAsync(model, requestedItem);
 
                             if (completionItem != null)
                             {
-                                return JsonConvert.SerializeObject(completionItem);
+                                return JsonSerializer.Serialize(completionItem, MonacoJsonContext.Relaxed.CompletionItem);
                             }
                         }
                     }
@@ -218,6 +260,12 @@ namespace Monaco
             }
         }
 
+        /// <summary>
+        /// Registers a hover information provider for the specified language.
+        /// </summary>
+        /// <param name="languageId">The language identifier (e.g., <c>"typescript"</c>).</param>
+        /// <param name="provider">The provider implementation.</param>
+        /// <remarks>Wraps Monaco <c>languages.registerHoverProvider</c>.</remarks>
         public async Task RegisterHoverProviderAsync(string languageId, HoverProvider provider)
         {
             if (_editor.TryGetTarget(out var editor)
@@ -227,18 +275,41 @@ namespace Monaco
                 // TODO: Add Incremented Id so that we can register multiple providers per language?
                 editor._parentAccessor.RegisterEvent("HoverProvider" + languageId, async (args) =>
                 {
-                    System.Diagnostics.Debug.WriteLine($"Hover provider.......... {args != null}");
+                    var requestId = Guid.NewGuid().ToString("N")[..8];
+                    System.Diagnostics.Debug.WriteLine($"Hover provider start [{requestId}] args={args?.Length ?? 0}");
                     if (args != null && args.Length >= 1)
                     {
-                        if (editor.GetModel() is { } model
-                        && JsonConvert.DeserializeObject<Position>(args[0]) is { } position)
+                        try
                         {
-                            var hover = await provider.ProvideHover(model, position);
+                                if (JsonSerializer.Deserialize(args[0], MonacoJsonContext.Default.Position) is { } position)
+                                {
+                                    var model = editor.GetModel() ?? new Monaco.Editor.ModelHelper(editor);
+                                    var hoverTask = provider.ProvideHover(model, position);
+                                    Hover? hover;
+                                    if (hoverTask.IsCompletedSuccessfully)
+                                    {
+                                        hover = hoverTask.Result;
+                                    }
+                                    else
+                                    {
+                                        hover = await hoverTask.ConfigureAwait(false);
+                                    }
+                                    if (hover != null)
+                                    {
+                                        System.Diagnostics.Debug.WriteLine($"Hover provider complete [{requestId}] hasHover=True");
+                                        return JsonSerializer.Serialize(hover, MonacoJsonContext.Relaxed.Hover);
+                                    }
 
-                            if (hover != null)
-                            {
-                                return JsonConvert.SerializeObject(hover);
+                                System.Diagnostics.Debug.WriteLine($"Hover provider complete [{requestId}] hasHover=False");
                             }
+                        }
+                        catch (JsonException ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Hover provider parse failed [{requestId}]: {ex}");
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Hover provider failed [{requestId}]: {ex}");
                         }
                     }
 

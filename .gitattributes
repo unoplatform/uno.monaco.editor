@@ -61,3 +61,30 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+###############################################################################
+# Mark generated/machine-generated files so GitHub collapses their diffs.
+# Hand-authored helpers and .flow specs are explicitly excluded below so they
+# remain visible for code review. See tools/MonacoTypeEmitter/.generator-ignore
+# for the canonical list of hand-tuned files.
+###############################################################################
+MonacoEditorComponent/Monaco/Editor/**/*.cs  linguist-generated=true
+MonacoEditorComponent/Monaco/Helpers/**/*.cs linguist-generated=true
+MonacoEditorComponent/Monaco/Languages/**/*.cs linguist-generated=true
+.flow/**/*.json                              linguist-generated=true
+.flow/usage.md                               linguist-generated=true
+
+# Hand-tuned files that live inside generated directories (from .generator-ignore).
+# These must stay visible in PR diffs.
+MonacoEditorComponent/Monaco/Editor/StandaloneEditorConstructionOptions.cs linguist-generated=false
+MonacoEditorComponent/Monaco/Helpers/CssStyleBroker.cs  linguist-generated=false
+MonacoEditorComponent/Monaco/Helpers/CssGlyphStyle.cs   linguist-generated=false
+MonacoEditorComponent/Monaco/Helpers/CssLineStyle.cs    linguist-generated=false
+MonacoEditorComponent/Monaco/Helpers/CssInlineStyle.cs  linguist-generated=false
+MonacoEditorComponent/Monaco/Helpers/ICssStyle.cs       linguist-generated=false
+MonacoEditorComponent/Monaco/Helpers/TextDecoration.cs  linguist-generated=false
+MonacoEditorComponent/Monaco/Languages/CodeActionProvider.cs       linguist-generated=false
+MonacoEditorComponent/Monaco/Languages/CodeLensProvider.cs         linguist-generated=false
+MonacoEditorComponent/Monaco/Languages/CompletionItemProvider.cs   linguist-generated=false
+MonacoEditorComponent/Monaco/Languages/DocumentColorProvider.cs    linguist-generated=false
+MonacoEditorComponent/Monaco/Languages/HoverProvider.cs            linguist-generated=false

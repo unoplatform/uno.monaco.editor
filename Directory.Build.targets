@@ -1,6 +1,5 @@
 ﻿<Project>
   <ItemGroup>
-    <SourceRoot Condition="'$(ArtifactsPath)' != '' and !HasTrailingSlash('$(ArtifactsPath)')" Include="$(ArtifactsPath)\" />
-    <SourceRoot Condition="'$(ArtifactsPath)' != '' and HasTrailingSlash('$(ArtifactsPath)')" Include="$(ArtifactsPath)" />
+    <SourceRoot Include="$([MSBuild]::EnsureTrailingSlash('$(MSBuildThisFileDirectory)'))" />
   </ItemGroup>
 </Project>

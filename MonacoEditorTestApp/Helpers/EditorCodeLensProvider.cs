@@ -12,44 +12,35 @@ using Windows.Foundation;
 
 namespace MonacoEditorTestApp.Helpers
 {
-    public class EditorCodeLensProvider : CodeLensProvider
+    public class EditorCodeLensProvider(string commandId) : CodeLensProvider
     {
-        private string _commandId;
+        private readonly string _commandId = commandId;
 
-        public EditorCodeLensProvider(string commandId)
+        public async Task<CodeLensList> ProvideCodeLensesAsync(IModel model)
         {
-            _commandId = commandId;
-        }
 
-        public IAsyncOperation<CodeLensList> ProvideCodeLensesAsync(IModel model)
-        {
-            return AsyncInfo.Run(async delegate (CancellationToken cancellationToken)
+            return new CodeLensList()
             {
-                return new CodeLensList()
-                {
-                    Lenses = new CodeLens[] {
-                        new CodeLens()
+                Lenses = [
+                        new()
                         {
-                            Id = "Third Line",
-                            Range = new Range(4, 1, 5, 1),
+                            Id = "Second Line",
+                            Range = new Monaco.Range(2, 1, 3, 1),
                             Command = new Command()
                             {
                                 Id = _commandId,
-                                Title = "Third Line Command",
-                                Arguments = new object[] { "First Argument" , 5, new float[] { 4.5f, 0.3f } }, // Note: This 3rd element array will come back as a JArray TODO?
+                                Title = "Second Line Command",
+                                Arguments = ["Arg 1" , 5, new float[] { 4.5f, 0.3f }], // Note: This 3rd element array will come back as a JArray TODO?
                                 Tooltip = "This is a CodeLens Command"
                             }
                         }
-                    }
-                };
-            });
+                    ]
+            };
         }
 
-        public IAsyncOperation<CodeLens> ResolveCodeLensAsync(IModel model, CodeLens codeLens)
+        public async Task<CodeLens> ResolveCodeLensAsync(IModel model, CodeLens codeLens)
         {
-            return AsyncInfo.Run(delegate (CancellationToken cancelationToken) {
-                return Task.FromResult(codeLens);
-            });                
+            return codeLens;
         }
     }
 }

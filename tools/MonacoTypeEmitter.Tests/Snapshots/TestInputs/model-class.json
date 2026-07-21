@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "sourceFile": "test.d.ts",
+  "extractedAt": "2026-01-01T00:00:00.000Z",
+  "namespaces": [
+    {
+      "name": "monaco",
+      "interfaces": [],
+      "enums": [],
+      "typeAliases": [],
+      "classes": [
+        {
+          "name": "Uri",
+          "documentation": "A universal resource identifier representing either a file on disk or another resource.",
+          "typeParameters": [],
+          "implements": [],
+          "properties": [
+            {
+              "name": "scheme",
+              "documentation": "scheme is the 'http' part of 'http://www.example.com/some/path?query#fragment'.",
+              "type": { "kind": "primitive", "name": "string" },
+              "isOptional": false,
+              "isReadonly": true
+            },
+            {
+              "name": "authority",
+              "documentation": "authority is the 'www.example.com' part.",
+              "type": { "kind": "primitive", "name": "string" },
+              "isOptional": false,
+              "isReadonly": true
+            },
+            {
+              "name": "path",
+              "documentation": "path is the '/some/path' part.",
+              "type": { "kind": "primitive", "name": "string" },
+              "isOptional": false,
+              "isReadonly": true
+            },
+            {
+              "name": "query",
+              "documentation": "query is the 'query' part.",
+              "type": { "kind": "primitive", "name": "string" },
+              "isOptional": false,
+              "isReadonly": true
+            },
+            {
+              "name": "fragment",
+              "documentation": "fragment is the 'fragment' part.",
+              "type": { "kind": "primitive", "name": "string" },
+              "isOptional": false,
+              "isReadonly": true
+            }
+          ],
+          "methods": [
+            {
+              "name": "toString",
+              "documentation": "Returns a string representation of this Uri.",
+              "typeParameters": [],
+              "parameters": [],
+              "returnType": { "kind": "primitive", "name": "string" },
+              "overloads": [],
+              "isStatic": false
+            }
+          ],
+          "constructors": [],
+          "indexSignatures": []
+        }
+      ],
+      "functions": []
+    }
+  ]
+}

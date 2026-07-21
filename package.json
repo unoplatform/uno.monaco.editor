@@ -1,0 +1,18 @@
+{
+  "name": "uno.monaco.editor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Build tooling for Uno Monaco Editor component",
+  "scripts": {
+    "build": "node MonacoEditorComponent/ts-helpermethods/esbuild.config.mjs",
+    "build:watch": "node MonacoEditorComponent/ts-helpermethods/esbuild.config.mjs --watch"
+  },
+  "dependencies": {
+    "monaco-editor": "^0.52.2",
+    "vscode-jsonrpc": "^8.2.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.2",
+    "typescript": "^5.7.3"
+  }
+}

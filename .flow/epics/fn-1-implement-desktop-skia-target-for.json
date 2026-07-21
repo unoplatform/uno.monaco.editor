@@ -1,0 +1,18 @@
+{
+  "branch_name": "fn-1-implement-desktop-skia-target-for",
+  "completion_review_status": "ship",
+  "completion_reviewed_at": "2026-02-11T16:51:32.544220Z",
+  "created_at": "2026-02-10T20:44:27.872086Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "fn-1-implement-desktop-skia-target-for",
+  "next_task": 1,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-02-11T05:56:02.316280Z",
+  "spec_path": ".flow/specs/fn-1-implement-desktop-skia-target-for.md",
+  "status": "done",
+  "title": "Implement Desktop (Skia) Target for Monaco Editor",
+  "updated_at": "2026-02-11T16:51:42.544975Z"
+}

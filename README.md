@@ -1,88 +1,165 @@
-Monaco Editor UWP
-=================
-A *Windows Runtime Component* wrapper around the web-based [Monaco Editor](https://microsoft.github.io/monaco-editor/).  This allows the Monaco Editor to be more easily consumed directly in XAML for C# UWP based projects.
+# Uno.Monaco.Editor
 
-This project is not affiliated with the Monaco team and is provided for convenience.  Please direct issues related to the use of this control wrapper to this repository.
+A cross-platform [Uno Platform](https://platform.uno/) wrapper around the [Monaco Editor](https://microsoft.github.io/monaco-editor/), bringing the same code editor that powers VS Code to .NET applications targeting WebAssembly and Desktop (Skia).
 
-This control is still in an early alpha state.  Currently, every minor version change may signal breaking changes.
+[![NuGet](https://img.shields.io/nuget/v/Uno.Monaco.Editor?style=flat-square)](https://www.nuget.org/packages/Uno.Monaco.Editor)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/unoplatform/uno.monaco.editor/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/unoplatform/uno.monaco.editor/actions/workflows/ci.yml)
 
+> This project is not affiliated with the Monaco team and is provided for convenience. Please direct issues related to this control wrapper to this repository.
 
-Supported Features
-------------------
-The following Monaco Editor features are currently supported by this component bridge:
+## Key Features
 
-- Two-way Text Binding
-- Code Language for Syntax Highlighting
-- Stand Alone Code [Editor Options](https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.ieditoroptions.html)
-- [Markers](https://microsoft.github.io/monaco-editor/api/modules/monaco.editor.html#setmodelmarkers) and [Decorations](https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.imodeldeltadecoration.html) (See #35)
-- [Actions](https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.istandalonecodeeditor.html#addaction) and [Commands](https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.istandalonecodeeditor.html#addcommand)
-- Basic [Language Features](https://code.visualstudio.com/api/language-extensions/programmatic-language-features)
-  - [CodeAction](https://microsoft.github.io/monaco-editor/api/modules/monaco.languages.html#registercodeactionprovider) (Commands and/or Edits)
-  - [CodeLens](https://microsoft.github.io/monaco-editor/api/modules/monaco.languages.html#registercodelensprovider) (onDidChange not supported)
-  - [Color](https://microsoft.github.io/monaco-editor/api/modules/monaco.languages.html#registercolorprovider)
-  - [CompletionItem](https://microsoft.github.io/monaco-editor/api/modules/monaco.languages.html#registercompletionitemprovider) (IntelliSense, Snippets)
-  - [Hover](https://microsoft.github.io/monaco-editor/api/modules/monaco.languages.html#registerhoverprovider)
-- Basic [ITextModel](https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.itextmodel.html) Support (including [FindMatches](https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.itextmodel.html#findmatches))
-- KeyDown Events
-- Responds Appropriately to Programmatic Focus Events
-- Render Aware: Only displays once Loading is complete.
-- Out-of-process WebView usage.
+- **IntelliSense and completions** -- register custom completion providers with snippet support
+- **Syntax highlighting** -- set the code language to get full Monaco syntax highlighting
+- **Themes** -- automatic light/dark/high-contrast theme switching based on system settings
+- **Decorations and markers** -- strongly-typed C# abstractions for line decorations and diagnostic markers
+- **Language providers** -- CodeAction, CodeLens, Color, Completion, and Hover provider bridges
+- **Actions and commands** -- register custom editor actions and keybinding commands
+- **Editor options** -- full `StandaloneEditorConstructionOptions` support through `CodeEditor.Options`
+- **Two-way text binding** -- bind editor content to C# properties with change notifications
+- **Dual-platform support** -- single codebase runs on both `net10.0-browserwasm` and `net10.0-desktop`
 
-Usage
------
+## Platform Support
 
-A NuGet Package is provided:
+| Feature | WASM (browserwasm) | Desktop (Windows/macOS/Linux) |
+|---------|:------------------:|:-----------------------------:|
+| Text editing and syntax highlighting | Supported | Supported |
+| Editor options and themes | Supported | Supported |
+| Decorations and markers | Supported | Supported |
+| Language providers (Completion, Hover, etc.) | Supported | Supported |
+| `AddActionAsync` / `AddCommandAsync` | Supported | Supported |
+| `PostWebMessage` | Not supported | Supported |
+| Interop mechanism | JSImport / JSExport | JSON-RPC over WebView2 |
+
+`AddActionAsync` and `AddCommandAsync` work on both WASM and desktop platforms. On WASM they use JSExport callbacks; on desktop they use JSON-RPC bridge routing. See [architecture docs](docs/architecture.md#platform-api-parity) for details.
+
+## Getting Started
+
+### Prerequisites
+
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) with the `wasm-tools` workload (for WASM targets)
+- [Uno Platform project](https://platform.uno/docs/articles/getting-started.html) targeting `net10.0-browserwasm` and/or `net10.0-desktop`
+
+### Install
+
+Add the NuGet package to your project:
 
 ```
-Install-Package Monaco.Editor -Version 0.9.0-beta
+dotnet add package Uno.Monaco.Editor
 ```
 
-Look at the TestApp for current usage and basic examples.
-See [changelog](changelog.md) for more info.
+### Minimal Example
 
+**XAML:**
 
-Monaco API Notes
-----------------
-This project maintains two tenants with regards to the core web-based [Monaco API](https://microsoft.github.io/monaco-editor/api/index.html):
+```xml
+<Page x:Class="MyApp.MainPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:monaco="using:Monaco">
 
-  1. Keep API names and patterns as closely mapped as possible to enable straight-forward re-usage of existing TypeScript examples.
-  2. Swap types to existing C#/WinRT based ones for easier interop with the calling application.
+    <monaco:CodeEditor x:Name="Editor"
+                       CodeLanguage="csharp"
+                       VerticalAlignment="Stretch"
+                       HorizontalAlignment="Stretch" />
+</Page>
+```
 
-Effectively, we want this project to be as easy to integrate with existing C#/WinRT skills/knowledge as possible as well as providing a similar enough API that it's easy to still utilize any existing knowledge bases for the Monaco API.
+**C# code-behind:**
 
-There are some common caveats though called out here:
+```csharp
+using Monaco;
 
-  - Pretty much all functions are asynchronous and end with the C# `Async` naming suffix convention.
-  - The `Monaco.Languages` namespace is mapped through the `CodeEditor` instance, so call `<Editor Instance>.Languages.*` for any of [those APIs](https://microsoft.github.io/monaco-editor/api/modules/monaco.languages.html). E.g.
+public sealed partial class MainPage : Page
+{
+    public MainPage()
+    {
+        this.InitializeComponent();
+        Editor.EditorLoaded += Editor_Loaded;
+    }
 
-    ```javascript
-    // JavaScript
-    monaco.languages.registerColorProvider("colorLanguage", ...
-    ```
+    private void Editor_Loaded(object sender, RoutedEventArgs e)
+    {
+        // Set initial content
+        Editor.Text = "Console.WriteLine(\"Hello, Monaco!\");";
 
-    ```csharp
-    // C#
-    var MonacoEditor = new CodeEditor(); // Either done through XAML or elsewhere once.
-    ...
-    MonacoEditor.Languages.RegisterColorProviderAsync("colorLanguage", ...
-    ```
-    This is required due to need to execute the code within a particular WebView instance hosting the Monaco control, there is no global execution context. Therefore, you must register any language providers individually to each `CodeEditor` instance.
-  - Returns using `IAsyncOperation<T>` usually need to use the `AsyncInfo.Run` system interop helper. See Issue #45.
-  - `Uri` class is not mapped yet to a built-in C# type. See Issue #33.
-  - Keyboard Events can't use the built-in system `KeyRoutedEventArgs` class as it is sealed. (See https://github.com/microsoft/microsoft-ui-xaml/issues/5475)
-  - Decorations use CSS class names in Monaco, this has been ported to be a strongly-typed abstraction per type of styled element required for use of decorations. Each style type has a set or properties using common WinRT types associated with styling UI elements like `SolidColorBrush`, `TextDecoration`, `FontStyle`, etc... If a property is missing that you require, please open an issue or PR to modify the corresponding `ICssStyle` implementations.
+        // Configure editor options
+        Editor.Options.FontSize = 14;
+        Editor.Options.Minimap = new EditorMinimapOptions { Enabled = false };
+    }
+}
+```
 
+## Usage Overview
 
-Build Notes
------------
-Built using Visual Studio 2019 for Windows 10 17763 and above.
+- **[Architecture](docs/architecture.md)** -- internal design, dual-platform interop, lifecycle state machine, and serialization layer
+- **[Changelog](CHANGELOG.md)** -- release history, breaking changes, and migration guide
+- **[Getting Started Guide](docs/getting-started.md)** -- step-by-step tutorials for WASM and Desktop targets
+- **[API Cookbook](docs/cookbook.md)** -- common scenarios: set text/language, listen to changes, register providers, add decorations
 
-The **released** complete Monaco v0.21.3 build is used as a reference, this is not included in this repository and can be downloaded from the [Monaco site](https://microsoft.github.io/monaco-editor/).  The contents of its uncompressed 'package' directory should be placed in the *MonacoEditorComponent/monaco-editor* directory.  The `install-dependencies.ps1` PowerShell script can install this for you automatically.
+The `MonacoEditorTestApp` project in this repository provides a working playground with examples of text binding, language providers, decorations, markers, and theme switching.
 
-This component currently won't move beyond Monaco v0.22.3 as it is the last version compatible with the UWP WebView component running the Legacy Microsoft Edge engine. However, that version seems to have other issues running in Edge as well, so we have last tested with v0.21.3. In the future we'll investigate moving to WebView2.
+### Monaco API Conventions
 
-In order to re-generate C# typings from a version of Monaco, see the GenerateMonacoTypings Node.js project [readme here](GenerateMonacoTypings/README.md).
+The C# API follows Monaco/TypeScript naming as closely as possible while using idiomatic C#/WinRT types:
 
-License
--------
-MIT
+- All interop methods are asynchronous and end with the `Async` suffix.
+- Language APIs are accessed through the editor instance: `editor.Languages.RegisterCompletionItemProviderAsync(...)` (there is no global `monaco.languages` equivalent because each editor instance hosts its own WebView context).
+- `CommandHandler` delegates receive `System.Text.Json.JsonElement` (not Newtonsoft `JObject`).
+
+## Build from Source
+
+### Prerequisites
+
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) with the `wasm-tools` workload
+- [Node.js](https://nodejs.org/) (for TypeScript compilation and Monaco dependencies)
+- [PowerShell](https://github.com/PowerShell/PowerShell) (for `install-dependencies.ps1`)
+
+### Steps
+
+```bash
+# 1. Install Monaco and build TypeScript bundles
+pwsh ./install-dependencies.ps1
+
+# 2. Restore and build the solution
+dotnet restore MonacoEditorComponent.slnx
+dotnet build MonacoEditorComponent.slnx --no-restore
+
+# 3. Build the test app for specific targets
+dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm
+dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-desktop
+```
+
+### Type Generation Pipeline
+
+The C# API surface in `MonacoEditorComponent/Monaco/` is generated from Monaco's TypeScript definitions using a two-stage pipeline:
+
+1. **ts-morph extractor** (`tools/monaco-type-extractor/`): Parses `monaco.d.ts` into a versioned intermediate JSON model.
+2. **.NET CLI emitter** (`tools/MonacoTypeEmitter/`): Emits C# classes with System.Text.Json attributes from the intermediate model.
+
+To regenerate after updating the Monaco version:
+
+```bash
+npx tsx tools/monaco-type-extractor/src/index.ts -- node_modules/monaco-editor/monaco.d.ts \
+    -o tools/monaco-type-extractor/output/model.json
+dotnet run --project tools/MonacoTypeEmitter -- \
+    --input tools/monaco-type-extractor/output/model.json \
+    --output MonacoEditorComponent/Monaco/
+```
+
+## Monaco Version
+
+This package bundles **Monaco Editor 0.52.2** (declared as `^0.52.2` in `package.json`).
+
+## Breaking Changes
+
+See the [Changelog](CHANGELOG.md) for the full list of breaking changes and a step-by-step migration guide from `Monaco.Editor` 2.0.0-dev.60 to `Uno.Monaco.Editor`.
+
+## Contributing
+
+See [AGENTS.md](AGENTS.md) for development workflow, code conventions, and commit guidelines.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).

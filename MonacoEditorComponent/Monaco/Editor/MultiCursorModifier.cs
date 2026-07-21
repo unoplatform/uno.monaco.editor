@@ -1,5 +1,5 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -8,43 +8,14 @@ namespace Monaco.Editor
     /// The modifier to be used to add multiple cursors with the mouse.
     /// Defaults to 'alt'
     /// </summary>
-    [JsonConverter(typeof(MultiCursorModifierConverter))]
-    public enum MultiCursorModifier { Alt, CtrlCmd };
-
-    internal class MultiCursorModifierConverter : JsonConverter
+    [JsonConverter(typeof(JsonStringEnumConverter<MultiCursorModifier>))]
+    public enum MultiCursorModifier
     {
-        public override bool CanConvert(Type t) => t == typeof(MultiCursorModifier) || t == typeof(MultiCursorModifier?);
-
-        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
-        {
-            if (reader.TokenType == JsonToken.Null) return null;
-            var value = serializer.Deserialize<string>(reader);
-            return value switch
-            {
-                "alt" => MultiCursorModifier.Alt,
-                "ctrlCmd" => MultiCursorModifier.CtrlCmd,
-                _ => throw new Exception("Cannot unmarshal type MultiCursorModifier"),
-            };
-        }
-
-        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
-        {
-            if (untypedValue == null)
-            {
-                serializer.Serialize(writer, null);
-                return;
-            }
-            var value = (MultiCursorModifier)untypedValue;
-            switch (value)
-            {
-                case MultiCursorModifier.Alt:
-                    serializer.Serialize(writer, "alt");
-                    return;
-                case MultiCursorModifier.CtrlCmd:
-                    serializer.Serialize(writer, "ctrlCmd");
-                    return;
-            }
-            throw new Exception("Cannot marshal type MultiCursorModifier");
-        }
-    }
+        [JsonStringEnumMemberName("alt")]
+        [EnumMember(Value = "alt")]
+        Alt,
+        [JsonStringEnumMemberName("ctrlCmd")]
+        [EnumMember(Value = "ctrlCmd")]
+        CtrlCmd,
+    };
 }

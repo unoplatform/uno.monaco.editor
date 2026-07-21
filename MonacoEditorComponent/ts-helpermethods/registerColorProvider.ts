@@ -1,10 +1,10 @@
-﻿///<reference path="../monaco-editor/monaco.d.ts" />
+import * as monaco from 'monaco-editor';
+import { EditorContext } from './otherScriptsToBeOrganized';
+import { callParentEventAsync } from './asyncCallbackHelpers';
 
-const registerColorProvider = function (unused: any, languageId) {
-
+export const registerColorProvider = function (unused: any, languageId: string) {
     return monaco.languages.registerColorProvider(languageId, {
         provideColorPresentations: function (model, colorInfo, token) {
-
             var element = EditorContext.getElementFromModel(model);
 
             return callParentEventAsync(element, "ProvideColorPresentations" + languageId, [JSON.stringify(colorInfo)]).then(result => {

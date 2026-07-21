@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>MonacoTypeEmitter.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3.mtp-v2" />
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MonacoTypeEmitter\MonacoTypeEmitter.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Snapshots\TestInputs\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Verified baselines are text comparison files, not compilable source -->
+    <Compile Remove="Snapshots\Verified\*.verified.cs" />
+    <Compile Remove="Snapshots\Verified\*.received.cs" />
+    <Content Include="Snapshots\Verified\*.verified.cs" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

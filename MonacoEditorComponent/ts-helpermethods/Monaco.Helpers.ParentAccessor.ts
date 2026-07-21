@@ -1,4 +1,12 @@
-﻿class ParentAccessor {
+import { isDesktopHost, getConnection, sendRequestWithTimeout, releaseConnection, RUNTIME_REQUEST_TIMEOUT_MS } from './bridge/jsonRpcBridge';
+
+/**
+ * Module-level flag: true when running in a WebView2/WKWebView host (desktop),
+ * false when running under Uno WASM Bootstrap (browser).
+ */
+const _isDesktop: boolean = isDesktopHost();
+
+export class ParentAccessor {
     private _managedOwner: any;
     private static _managedGetJsonValue: (managedOwner: any, name: string) => string;
     private static _managedCallAction: (managedOwner: any, name: string) => boolean;
@@ -13,6 +21,11 @@
     }
 
     public static async setup() {
+        if (_isDesktop) {
+            // No JSExport setup needed on desktop -- JSON-RPC bridge handles everything
+            return;
+        }
+
         let anyModule = (<any>window).Module;
 
         if (anyModule.getAssemblyExports !== undefined) {
@@ -29,59 +42,92 @@
     }
 
     public getJsonValue(name: string): string {
+        if (_isDesktop) {
+            // Sync path should not be called on desktop; callers must use getJsonValueAsync
+            throw new Error('ParentAccessor.getJsonValue is not available on desktop. Use getJsonValueAsync instead.');
+        }
         return ParentAccessor._managedGetJsonValue(this._managedOwner, name);
     }
 
-    public callAction(name: string): boolean {
+    public async getJsonValueAsync(name: string): Promise<string> {
+        if (_isDesktop) {
+            return await sendRequestWithTimeout<string>(
+                getConnection(), 'parentAccessor/getJsonValue', { name }
+            );
+        }
+        return ParentAccessor._managedGetJsonValue(this._managedOwner, name);
+    }
+
+    public callAction(name: string): boolean | void {
+        if (_isDesktop) {
+            getConnection().sendNotification('parentAccessor/callAction', { name });
+            return;
+        }
         return ParentAccessor._managedCallAction(this._managedOwner, name);
     }
 
-    public callActionWithParameters(name: string, parameter1: string, parameter2: string): boolean {
+    public callActionWithParameters(name: string, parameter1: string, parameter2: string): boolean | void {
+        if (_isDesktop) {
+            getConnection().sendNotification('parentAccessor/callActionWithParameters', {
+                name,
+                parameters: [parameter1, parameter2]
+            });
+            return;
+        }
         return ParentAccessor._managedCallActionWithParameters(this._managedOwner, name, [parameter1, parameter2]);
     }
 
-    public callActionWithParameters2(name: string, parameters: string[]): boolean {
+    public callActionWithParameters2(name: string, parameters: string[]): boolean | void {
+        if (_isDesktop) {
+            getConnection().sendNotification('parentAccessor/callActionWithParameters', {
+                name,
+                parameters
+            });
+            return;
+        }
         return ParentAccessor._managedCallActionWithParameters(this._managedOwner, name, parameters);
     }
 
+    /**
+     * Release this accessor's reference to the page-global JSON-RPC connection.
+     * On desktop, decrements the connection reference count. The connection is only
+     * disposed when the last editor releases it.
+     */
     public close(): void {
+        if (_isDesktop) {
+            releaseConnection();
+            return;
+        }
         ParentAccessor._managedClose(this._managedOwner);
     }
 
-    //getChildValue(name: string, child: string): Promise<any>;
-    //getJsonValue(name: string): Promise<string>;
-    //getValue(name: string): Promise<any>;
     public async setValue(name: string, value: string): Promise<void> {
+        if (_isDesktop) {
+            getConnection().sendNotification('parentAccessor/setValue', { name, value });
+            return;
+        }
         ParentAccessor._managedSetValue(this._managedOwner, name, value);
     }
 
     public setValueWithType(name: string, value: string, type: string) {
+        if (_isDesktop) {
+            getConnection().sendNotification('parentAccessor/setValueWithType', { name, value, typeName: type });
+            return;
+        }
         ParentAccessor._managedSetValueWithType(this._managedOwner, name, value, type);
     }
 
-    //callActionWithParameters(name: string, parameter1: string, parameter2: string): boolean;
-    public callEvent(name: string, parameter1: string, parameter2: string) {
+    public async callEvent(name: string, parameter1: string, parameter2: string): Promise<string | null> {
+        if (_isDesktop) {
+            // Use longer runtime timeout for event/provider callbacks (may be slow under load)
+            return await sendRequestWithTimeout<string | null>(
+                getConnection(), 'parentAccessor/callEvent', {
+                    name,
+                    parameters: [parameter1, parameter2]
+                },
+                RUNTIME_REQUEST_TIMEOUT_MS
+            );
+        }
         return ParentAccessor._managedCallEvent(this._managedOwner, name, [parameter1, parameter2]);
     }
 }
-
-
-
-////namespace Monaco.Helpers {
-//    interface ParentAccessor {
-//        callAction(name: string): boolean;
-//        callActionWithParameters(name: string, parameters: string[]): boolean;
-//        callEvent(name: string, parameters: string[]): Promise<string>
-//        close();
-//        getChildValue(name: string, child: string): Promise<any>;
-//        getJsonValue(name: string): Promise<string>;
-//        getValue(name: string): Promise<any>;
-//        setValue(name: string, value: any): Promise<undefined>;
-//        setValue(name: string, value: string, type: string): Promise<undefined>;
-//        setValueWithType(name: string, value: string, type: string);
-//        callActionWithParameters(name: string, parameter1: string, parameter2: string): boolean;
-//        callEvent(name: string, callbackMethod: string, parameter1: string, parameter2: string);
-//        getJsonValue(name: string, returnId: string);
-//}
-
-////}

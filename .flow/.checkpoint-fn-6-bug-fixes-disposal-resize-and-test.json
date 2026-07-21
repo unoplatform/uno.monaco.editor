@@ -1,0 +1,151 @@
+{
+  "created_at": "2026-02-12T05:37:39.179655Z",
+  "epic": {
+    "data": {
+      "branch_name": "fn-6-bug-fixes-disposal-resize-and-test",
+      "completion_review_status": "unknown",
+      "completion_reviewed_at": null,
+      "created_at": "2026-02-12T05:28:15.255594Z",
+      "default_impl": null,
+      "default_review": null,
+      "default_sync": null,
+      "depends_on_epics": [],
+      "id": "fn-6-bug-fixes-disposal-resize-and-test",
+      "next_task": 1,
+      "plan_review_status": "unknown",
+      "plan_reviewed_at": null,
+      "spec_path": ".flow/specs/fn-6-bug-fixes-disposal-resize-and-test.md",
+      "status": "open",
+      "title": "Bug fixes, disposal, resize, and test coverage",
+      "updated_at": "2026-02-12T05:29:11.543498Z"
+    },
+    "spec": "# Bug Fixes, Disposal, Resize, and Test Coverage\n\n## Overview\n\nComprehensive bug-fixing epic for the `uno.monaco.editor` control and test app. Addresses 14+ confirmed bugs found through deep codebase analysis, covering resize/layout issues, initialization race conditions, incomplete disposal, data correctness problems, and error handling gaps. Also expands unit test coverage to 85%+ on both WASM and Desktop platforms.\n\n## Scope\n\n### In Scope\n- Merge PR #37 (WASM ResizeObserver fix)\n- Fix initialization race condition (dual init paths)\n- Complete `Dispose()` implementation (C# + JS-side cleanup)\n- Fix event handler leaks in `OnApplyTemplate`\n- Fix `DecorationsProperty`/`MarkersProperty` type registration\n- Fix `updateSelectedContent.ts` EOL handling\n- Fix `RunScriptHelperAsync` null reference\n- Fix async void exception swallowing in property callbacks\n- Fix WASM EditorContext leak (no `disposeEditor` called)\n- Fix test app tab close disposal\n- Add unit tests for lifecycle, disposal, and data correctness\n- Configure code coverage reporting (85%+ target)\n\n### Out of Scope\n- Desktop content delivery completion (folder mapping / Task 3 from fn-1)\n- New feature additions\n- Monaco editor version upgrade\n- Formatting or style-only changes\n\n## Approach\n\nWork from foundational fixes upward:\n1. **Resize fix** (PR #37 merge) \u2014 standalone, no deps\n2. **Lifecycle/init fixes** \u2014 deduplicate init paths, fix event handler leaks\n3. **Disposal/cleanup** \u2014 complete `Dispose()`, add WASM JS cleanup, fix tab close\n4. **Data correctness** \u2014 property types, EOL, null safety, error handling\n5. **Test coverage** \u2014 unit tests for all fixes, configure coverage tooling\n6. **Coverage gaps** \u2014 systematic expansion to reach 85%+\n\n## Quick commands\n\n```bash\n# Build and verify\ndotnet build MonacoEditorComponent.slnx --no-restore\n\n# Run unit tests\ndotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj\n\n# Run with coverage\ndotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -- --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml\n```\n\n## Risks\n\n- PR #37 may have merge conflicts with current branch (mitigate: review diff before cherry-pick)\n- 85% coverage target may be hard for code paths requiring live WebView2/WASM runtime (mitigate: mock-based unit tests + existing Playwright integration tests count toward coverage)\n- Disposal changes may affect test app behavior (mitigate: verify on both WASM and Desktop targets)\n\n## Acceptance\n\n- [ ] All 14 identified bugs have fixes or documented rationale for deferral\n- [ ] PR #37 resize fix is merged and working\n- [ ] `Dispose()` comprehensively cleans up all resources (C# events, TS Monaco instance, DOM)\n- [ ] No initialization race conditions (single init path)\n- [ ] Unit test coverage >= 85% on `MonacoEditorComponent` assembly\n- [ ] `dotnet build MonacoEditorComponent.slnx` succeeds\n- [ ] `dotnet test` passes (unit tests + available integration tests)\n- [ ] changelog.md updated with bug fix entries\n\n## References\n\n- PR #37: https://github.com/unoplatform/uno.monaco.editor/pull/37\n- PR #38: https://github.com/unoplatform/uno.monaco.editor/pull/38\n- Monaco ResizeObserver: https://github.com/microsoft/monaco-editor/issues/3051\n- Monaco dispose issues: https://github.com/microsoft/monaco-editor/issues/4702\n- Uno WASM resize lag: https://github.com/unoplatform/uno/issues/22144\n- Monaco multi-instance themes: https://github.com/microsoft/monaco-editor/issues/4425\n- Memory pitfalls: `.flow/memory/pitfalls.md`\n"
+  },
+  "epic_id": "fn-6-bug-fixes-disposal-resize-and-test",
+  "schema_version": 2,
+  "tasks": [
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-12T05:29:26.377145Z",
+        "depends_on": [],
+        "epic": "fn-6-bug-fixes-disposal-resize-and-test",
+        "id": "fn-6-bug-fixes-disposal-resize-and-test.1",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-6-bug-fixes-disposal-resize-and-test.1.md",
+        "status": "todo",
+        "title": "Merge PR #37 WASM resize fix and remove dead layout code",
+        "updated_at": "2026-02-12T05:32:49.963152Z"
+      },
+      "id": "fn-6-bug-fixes-disposal-resize-and-test.1",
+      "runtime": null,
+      "spec": "# fn-6-bug-fixes-disposal-resize-and-test.1 Merge PR #37 WASM resize fix and remove dead layout code\n\n## Description\n\n**Size**: S \u2014 cherry-pick + cleanup\n\n**Problem**: The WASM presenter uses `LayoutUpdated` to fire `NativeMethods.RefreshLayout()` on every layout pass, causing excessive JS interop calls and performance issues. PR #37 (https://github.com/unoplatform/uno.monaco.editor/pull/37) replaces this with a TS-side `ResizeObserver` that only fires on actual size changes.\n\n**Files**:\n- `MonacoEditorComponent/CodeEditor/WasmCodeEditorPresenter.cs` \u2014 remove `LayoutUpdated` handler (~L33-39)\n- `MonacoEditorComponent/ts-helpermethods/` \u2014 PR #37 adds ResizeObserver in TS\n- Any files touched by PR #37 diff\n\n**Approach**:\n1. Review PR #37 diff for conflicts with current branch\n2. Cherry-pick or merge PR #37 commits\n3. Remove the `LayoutUpdated` += handler and `RefreshLayout()` call in `WasmCodeEditorPresenter` if not already done by the PR\n4. Remove `NativeMethods.RefreshLayout()` P/Invoke if now unused\n5. Verify build succeeds for both browserwasm and desktop targets\n6. Smoke-test: confirm editor resizes properly in WASM test app\n\n**Key context**:\n- Monaco v0.20+ uses `ResizeObserver` internally when `automaticLayout: true` is set \u2014 see https://github.com/microsoft/monaco-editor/issues/3051\n- The old `LayoutUpdated` approach fires on every frame, not just resizes\n- PR was authored against an older branch; watch for merge conflicts in `WasmCodeEditorPresenter.cs`\n\n## Acceptance\n- [ ] PR #37 changes are incorporated into the branch\n- [ ] `WasmCodeEditorPresenter` no longer uses `LayoutUpdated` for resize\n- [ ] `dotnet build MonacoEditorComponent.slnx --no-restore` succeeds\n- [ ] `dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm` succeeds\n- [ ] Editor visually resizes when browser window changes in WASM (manual verification note)\n\n## Done summary\nTBD\n\n## Evidence\n- Commits:\n- Tests:\n- PRs:\n"
+    },
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-12T05:29:27.529295Z",
+        "depends_on": [
+          "fn-6-bug-fixes-disposal-resize-and-test.1"
+        ],
+        "epic": "fn-6-bug-fixes-disposal-resize-and-test",
+        "id": "fn-6-bug-fixes-disposal-resize-and-test.2",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-6-bug-fixes-disposal-resize-and-test.2.md",
+        "status": "todo",
+        "title": "Fix initialization race condition and event handler leaks",
+        "updated_at": "2026-02-12T05:33:03.566230Z"
+      },
+      "id": "fn-6-bug-fixes-disposal-resize-and-test.2",
+      "runtime": null,
+      "spec": "# fn-6-bug-fixes-disposal-resize-and-test.2 Fix initialization race condition and event handler leaks\n\n## Description\n\n**Size**: M \u2014 lifecycle state machine refactor + event handler fixes\n\n**Problem**: Two related bugs in the control's lifecycle:\n\n1. **Dual initialization paths** (BUG 2): Both `WebView_NavigationCompleted` (~`CodeEditor.Events.cs:155`) and `CodeEditorLoaded` (~`CodeEditor.Events.cs:345`) set `_initialized = true` and call `ApplyInitialPropertyValues()`. If the WebView navigates before the Loaded event, properties get applied twice. If Loaded fires first but WebView hasn't navigated, properties are applied to a non-ready editor.\n\n2. **Event handler leaks** (BUG 3): `OnApplyTemplate` (~`CodeEditor.cs:299-301`) does `+=` on `NavigationCompleted` and `NewWindowRequested` without first doing `-=`. If `OnApplyTemplate` is called more than once (template re-application, theme changes), handlers stack up and fire multiple times.\n\n**Files**:\n- `MonacoEditorComponent/CodeEditor/CodeEditor.cs` \u2014 `OnApplyTemplate`, constructor\n- `MonacoEditorComponent/CodeEditor/CodeEditor.Events.cs` \u2014 `WebView_NavigationCompleted`, `CodeEditorLoaded`, initialization logic\n- `MonacoEditorComponent/CodeEditor/CodeEditor.Properties.cs` \u2014 `ApplyInitialPropertyValues()`\n\n**Approach**:\n1. Unify initialization into a single gated path: editor is ready only when BOTH conditions are met (WebView navigated + control loaded). Use a small state enum or two booleans with a shared `TryInitialize()` method.\n2. Guard `OnApplyTemplate` event subscriptions: `-=` before `+=` for `NavigationCompleted`, `NewWindowRequested`, and any other WebView event handlers.\n3. Add `_initialized` guard to `ApplyInitialPropertyValues()` so it's truly idempotent.\n4. Ensure `Unloaded` event properly resets initialization state for re-use scenarios.\n\n**Key context**:\n- Pattern reference: `.flow/memory/pitfalls.md` entries on lifecycle and event handler leaks\n- Uno Platform controls can have `OnApplyTemplate` called multiple times (theme changes, visual tree rebuilds)\n- WebView2 `NavigationCompleted` fires asynchronously after navigation; `Loaded` fires when control enters visual tree\n\n## Acceptance\n- [ ] Single initialization path \u2014 `ApplyInitialPropertyValues()` called exactly once when both WebView and control are ready\n- [ ] `OnApplyTemplate` uses `-=` before `+=` for all event subscriptions\n- [ ] Re-applying template does not cause double event handler subscriptions\n- [ ] `dotnet build MonacoEditorComponent.slnx --no-restore` succeeds\n- [ ] Existing tests continue to pass\n\n## Done summary\nTBD\n\n## Evidence\n- Commits:\n- Tests:\n- PRs:\n"
+    },
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-12T05:29:33.837351Z",
+        "depends_on": [
+          "fn-6-bug-fixes-disposal-resize-and-test.2"
+        ],
+        "epic": "fn-6-bug-fixes-disposal-resize-and-test",
+        "id": "fn-6-bug-fixes-disposal-resize-and-test.3",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-6-bug-fixes-disposal-resize-and-test.3.md",
+        "status": "todo",
+        "title": "Complete Dispose implementation and WASM JS cleanup",
+        "updated_at": "2026-02-12T05:33:14.099278Z"
+      },
+      "id": "fn-6-bug-fixes-disposal-resize-and-test.3",
+      "runtime": null,
+      "spec": "# fn-6-bug-fixes-disposal-resize-and-test.3 Complete Dispose implementation and WASM JS cleanup\n\n## Description\n\n**Size**: M \u2014 disposal chain across C# and JS\n\n**Problem**: Multiple disposal/cleanup gaps:\n\n1. **Incomplete `Dispose()`** (BUG 4): `CodeEditor.Dispose()` (~`CodeEditor.cs:418-427`) only disposes `_cssBroker` and `_parentAccessor`. Missing: presenter disposal, WebView event unsubscription, WebView disposal, TS-side `editor.dispose()`, `_initialized` reset.\n\n2. **WASM EditorContext leak** (BUG 11): `EditorContext._editors` map in `otherScriptsToBeOrganized.ts:6` is never cleaned because WASM code path never calls `disposeEditor`. Each editor instance leaks its Monaco model and view.\n\n3. **Test app tab close** (from test app): `TabView_TabCloseRequested` in `MainPage.xaml.cs:44-47` removes tab item but never calls `Dispose()` on the `EditorControl`, leaving everything alive.\n\n**Files**:\n- `MonacoEditorComponent/CodeEditor/CodeEditor.cs` \u2014 `Dispose()` method\n- `MonacoEditorComponent/CodeEditor/CodeEditor.Events.cs` \u2014 event unsubscription\n- `MonacoEditorComponent/CodeEditor/WasmCodeEditorPresenter.cs` \u2014 WASM-specific cleanup\n- `MonacoEditorComponent/CodeEditor/DesktopCodeEditorPresenter.cs` \u2014 Desktop-specific cleanup\n- `MonacoEditorComponent/ts-helpermethods/otherScriptsToBeOrganized.ts` \u2014 `disposeEditor()` function, `EditorContext._editors` cleanup\n- `MonacoEditorTestApp/MainPage.xaml.cs` \u2014 `TabView_TabCloseRequested`\n\n**Approach**:\n1. Implement comprehensive `Dispose(bool disposing)` pattern:\n   - Unsubscribe all C# events (`Loaded`, `Unloaded`, `SizeChanged`, etc.)\n   - Invoke JS `disposeEditor()` to clean up Monaco instance\n   - Dispose presenter, WebView, bridge handler\n   - Set `_initialized = false`, `_disposed = true`\n   - Guard public methods against use-after-dispose\n2. Add/fix `disposeEditor()` in TS to remove from `EditorContext._editors` map and call `editor.dispose()`\n3. Add WASM-specific cleanup: call `disposeEditor()` via JS interop in `WasmCodeEditorPresenter`\n4. Fix test app: call `Dispose()` on `EditorControl` in `TabView_TabCloseRequested`\n\n**Key context**:\n- Monaco `editor.dispose()` must be called or the editor leaks DOM nodes and event listeners \u2014 see https://github.com/microsoft/monaco-editor/issues/4702\n- The `Bridge/WebView2JsonRpcMessageHandler.cs` already has a proper `Dispose()` with `_disposed` guard \u2014 follow that pattern\n- `getEditorForElement` auto-creates context on miss (BUG 12) \u2014 consider making it return null/throw if element not found, to surface bugs instead of masking them\n\n## Acceptance\n- [ ] `CodeEditor.Dispose()` cleans up all resources: events, presenter, WebView, JS-side Monaco instance\n- [ ] WASM path calls `disposeEditor()` on cleanup\n- [ ] `EditorContext._editors` map is cleaned when an editor is disposed\n- [ ] Test app `TabView_TabCloseRequested` calls `Dispose()` on the editor\n- [ ] `_disposed` guard prevents use-after-dispose\n- [ ] `dotnet build MonacoEditorComponent.slnx --no-restore` succeeds\n- [ ] `dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm` succeeds\n\n## Done summary\nTBD\n\n## Evidence\n- Commits:\n- Tests:\n- PRs:\n"
+    },
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-12T05:29:35.125933Z",
+        "depends_on": [],
+        "epic": "fn-6-bug-fixes-disposal-resize-and-test",
+        "id": "fn-6-bug-fixes-disposal-resize-and-test.4",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-6-bug-fixes-disposal-resize-and-test.4.md",
+        "status": "todo",
+        "title": "Fix data correctness bugs and error handling",
+        "updated_at": "2026-02-12T05:33:44.698419Z"
+      },
+      "id": "fn-6-bug-fixes-disposal-resize-and-test.4",
+      "runtime": null,
+      "spec": "# fn-6-bug-fixes-disposal-resize-and-test.4 Fix data correctness bugs and error handling\n\n## Description\n\n**Size**: M \u2014 multiple independent fixes across C# and TS\n\n**Problem**: Several data correctness and error handling bugs that can run in parallel with lifecycle fixes:\n\n1. **DependencyProperty type mismatch** (BUG 8): `DecorationsProperty` (~`CodeEditor.Properties.cs:174`) registered as `typeof(IModelDeltaDecoration)` but CLR property type is `IObservableVector<IModelDeltaDecoration>`. Same for `MarkersProperty` (~`CodeEditor.Properties.cs:227`). This causes silent failures when the property system tries to assign values.\n\n2. **EOL handling** (BUG 7): `updateSelectedContent.ts:18-21` uses `\\r` for line splitting instead of `\\n`. Fails on non-Windows platforms (WASM in particular runs in browsers which use `\\n`).\n\n3. **Null reference in RunScriptHelperAsync** (BUG 6): `WebViewExtensions.cs:45` \u2014 `returnstring.Contains(\"wv_internal_error\")` will throw `NullReferenceException` if `returnstring` is null.\n\n4. **Async void exception swallowing** (BUG 9): Property changed callbacks in `CodeEditor.Properties.cs:30` use `async void` which swallows exceptions silently. Should at minimum log failures.\n\n5. **SelectedText fire-and-forget** (BUG 10): `SelectedTextProperty` changed callback (~`CodeEditor.Properties.cs:60`) uses `_ =` to discard the async task, hiding failures.\n\n6. **Desktop navigation allowlist** (BUG 5): `DesktopCodeEditorPresenter.cs:238` \u2014 `AllowedFileContentRoot` is never set so `IsNavigationAllowed` blocks all `file://` navigation, preventing content from loading.\n\n7. **sanitize/desanitize ordering** (BUG 13): `asyncCallbackHelpers.ts:251-265` \u2014 `%` replacement ordering means double-encoding can occur.\n\n**Files**:\n- `MonacoEditorComponent/CodeEditor/CodeEditor.Properties.cs` \u2014 property registrations, callbacks\n- `MonacoEditorComponent/ts-helpermethods/updateSelectedContent.ts` \u2014 EOL fix\n- `MonacoEditorComponent/Extensions/WebViewExtensions.cs` \u2014 null check\n- `MonacoEditorComponent/CodeEditor/DesktopCodeEditorPresenter.cs` \u2014 navigation allowlist\n- `MonacoEditorComponent/ts-helpermethods/asyncCallbackHelpers.ts` \u2014 sanitize ordering\n\n**Approach**:\n1. Fix `DecorationsProperty` and `MarkersProperty` type registration to use the correct collection types\n2. Replace `\\r` with `\\n` (or use a regex for `\\r?\\n` to handle both) in `updateSelectedContent.ts`\n3. Add null-conditional (`?.`) check before `.Contains()` in `WebViewExtensions`\n4. Replace async void with proper async Task callbacks wrapped in error handling, or add try-catch with logging\n5. Set `AllowedFileContentRoot` in `DesktopCodeEditorPresenter` during initialization to the content delivery path\n6. Fix sanitize/desanitize to handle `%` first during sanitize and last during desanitize to prevent double-encoding\n\n**Key context**:\n- DependencyProperty type must match CLR property type exactly or the property system silently fails\n- WinRT/Uno `IObservableVector<T>` is the correct type for collection dependency properties\n- The `\\r` vs `\\n` issue is particularly impactful on WASM where the browser always uses `\\n`\n\n## Acceptance\n- [ ] `DecorationsProperty` and `MarkersProperty` registered with correct collection type\n- [ ] `updateSelectedContent.ts` handles both `\\n` and `\\r\\n` line endings\n- [ ] `RunScriptHelperAsync` is null-safe\n- [ ] Property changed callbacks have error handling (no silent exception swallowing)\n- [ ] Desktop navigation allowlist is properly configured\n- [ ] sanitize/desanitize handles `%` without double-encoding\n- [ ] `dotnet build MonacoEditorComponent.slnx --no-restore` succeeds\n- [ ] All existing tests pass\n\n## Done summary\nTBD\n\n## Evidence\n- Commits:\n- Tests:\n- PRs:\n"
+    },
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-12T05:29:37.981366Z",
+        "depends_on": [
+          "fn-6-bug-fixes-disposal-resize-and-test.3",
+          "fn-6-bug-fixes-disposal-resize-and-test.4"
+        ],
+        "epic": "fn-6-bug-fixes-disposal-resize-and-test",
+        "id": "fn-6-bug-fixes-disposal-resize-and-test.5",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-6-bug-fixes-disposal-resize-and-test.5.md",
+        "status": "todo",
+        "title": "Add unit tests for lifecycle disposal and data correctness",
+        "updated_at": "2026-02-12T05:34:12.832748Z"
+      },
+      "id": "fn-6-bug-fixes-disposal-resize-and-test.5",
+      "runtime": null,
+      "spec": "# fn-6-bug-fixes-disposal-resize-and-test.5 Add unit tests for lifecycle disposal and data correctness\n\n## Description\n\n**Size**: L \u2014 new test authoring across multiple bug fix areas\n\n**Problem**: The bug fixes in tasks 2-4 need regression tests to prevent reintroduction. Current test coverage is low for:\n- Control lifecycle (init, dispose, re-template)\n- Event handler subscription/unsubscription\n- Property value propagation with correct types\n- Error handling paths\n- TS helper correctness (EOL, sanitize)\n\n**Files**:\n- `MonacoEditorComponent.Tests/` \u2014 existing test project (xUnit v3)\n- New test files for each bug fix area\n\n**Approach**:\n1. **Lifecycle tests**:\n   - Test that `TryInitialize` only completes when both conditions are met\n   - Test that `OnApplyTemplate` called twice doesn't double-subscribe events\n   - Test that `Dispose()` sets `_disposed = true` and unsubscribes events\n   - Test that methods throw/no-op after dispose\n\n2. **Property tests**:\n   - Test `DecorationsProperty` accepts `IObservableVector<IModelDeltaDecoration>` values\n   - Test `MarkersProperty` accepts correct collection type\n   - Test `SelectedTextProperty` change callback error handling\n\n3. **Data correctness tests**:\n   - Test `updateSelectedContent` with `\\n`, `\\r\\n`, and `\\r` line endings\n   - Test sanitize/desanitize round-trip with `%`, `'`, `\\n`, `\\r` characters\n   - Test `RunScriptHelperAsync` with null return value\n\n4. **Integration-like tests** (if feasible without live WebView):\n   - Test editor creation and disposal cycle\n   - Test tab close triggers proper cleanup\n\n**Key context**:\n- xUnit v3 is the test framework; use `Microsoft.Testing.Extensions.CodeCoverage` (not coverlet) for coverage\n- See MEMORY.md for xUnit v3 fixture patterns (collection fixtures cannot inject each other)\n- Tests needing WebView2 should be marked with appropriate skip conditions for CI\n- Focus on testable C# logic; TS tests can use the existing build pipeline if available\n\n## Acceptance\n- [ ] Unit tests exist for initialization state machine (single-init, idempotent)\n- [ ] Unit tests exist for event handler leak prevention\n- [ ] Unit tests exist for `Dispose()` completeness\n- [ ] Unit tests exist for property type correctness\n- [ ] Unit tests exist for EOL handling in `updateSelectedContent`\n- [ ] Unit tests exist for sanitize/desanitize round-trip\n- [ ] Unit tests exist for null-safety in `RunScriptHelperAsync`\n- [ ] All tests pass: `dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj`\n- [ ] No skipped tests without documented reason\n\n## Done summary\nTBD\n\n## Evidence\n- Commits:\n- Tests:\n- PRs:\n"
+    },
+    {
+      "data": {
+        "assignee": null,
+        "claim_note": "",
+        "claimed_at": null,
+        "created_at": "2026-02-12T05:29:40.406449Z",
+        "depends_on": [
+          "fn-6-bug-fixes-disposal-resize-and-test.5"
+        ],
+        "epic": "fn-6-bug-fixes-disposal-resize-and-test",
+        "id": "fn-6-bug-fixes-disposal-resize-and-test.6",
+        "priority": null,
+        "spec_path": ".flow/tasks/fn-6-bug-fixes-disposal-resize-and-test.6.md",
+        "status": "todo",
+        "title": "Configure coverage reporting and fill gaps to 85 percent",
+        "updated_at": "2026-02-12T05:34:31.139183Z"
+      },
+      "id": "fn-6-bug-fixes-disposal-resize-and-test.6",
+      "runtime": null,
+      "spec": "# fn-6-bug-fixes-disposal-resize-and-test.6 Configure coverage reporting and fill gaps to 85 percent\n\n## Description\n\n**Size**: M \u2014 coverage tooling setup + targeted test additions\n\n**Problem**: Need to reach 85%+ code coverage on the `MonacoEditorComponent` assembly across both WASM and Desktop TFMs. Current coverage is unknown \u2014 need to measure baseline first, then fill gaps.\n\n**Files**:\n- `MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj` \u2014 add coverage packages/config\n- `MonacoEditorComponent.Tests/` \u2014 new test files for uncovered paths\n- `.github/workflows/` \u2014 optional CI coverage integration\n- `Directory.Build.props` \u2014 optional coverage thresholds\n\n**Approach**:\n1. **Configure coverage tooling**:\n   - Ensure `Microsoft.Testing.Extensions.CodeCoverage` is referenced in test csproj\n   - Configure coverage output format (Cobertura XML for CI, HTML for local review)\n   - Set coverage collection command: `dotnet test --project ... -- --coverage --coverage-output-format cobertura`\n   - Add coverage report generation (e.g., `reportgenerator` global tool)\n\n2. **Measure baseline**:\n   - Run coverage collection\n   - Generate report to identify uncovered code paths\n   - Focus on `MonacoEditorComponent` namespace (exclude test project, test app)\n\n3. **Fill coverage gaps** (prioritize by risk):\n   - Untested public API methods on `CodeEditor`\n   - Error handling branches\n   - Platform-specific paths (WASM vs Desktop presenters)\n   - Bridge/interop code paths\n   - Extension methods\n\n4. **Set coverage threshold**:\n   - Configure minimum 85% line coverage as a build gate if CI supports it\n   - Document how to check coverage locally\n\n**Key context**:\n- `Microsoft.Testing.Extensions.CodeCoverage` is the correct tool for xUnit v3 (.NET 10) \u2014 not coverlet\n- Coverage command: `dotnet test --project <path> -- --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml`\n- Some code paths (live WebView2 interop, WASM JS interop) may be hard to unit test \u2014 document exclusions with `[ExcludeFromCodeCoverage]` where appropriate, with justification\n- Don't pad coverage with trivial tests; focus on meaningful assertions\n\n## Acceptance\n- [ ] Coverage tooling configured and documented in AGENTS.md or README\n- [ ] Baseline coverage report generated\n- [ ] Line coverage >= 85% on `MonacoEditorComponent` assembly\n- [ ] Coverage gaps filled with meaningful tests (not trivial/padding)\n- [ ] `[ExcludeFromCodeCoverage]` used sparingly with documented rationale\n- [ ] `dotnet test` passes with coverage collection enabled\n- [ ] Coverage report artifacts generated (Cobertura XML)\n\n## Done summary\nTBD\n\n## Evidence\n- Commits:\n- Tests:\n- PRs:\n"
+    }
+  ]
+}

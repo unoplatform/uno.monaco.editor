@@ -1,10 +1,13 @@
-﻿using CommunityToolkit.WinUI;
+using System.Collections.Concurrent;
+using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
+
+using CommunityToolkit.WinUI;
 
 using Microsoft.UI.Dispatching;
 
-using Newtonsoft.Json;
-
-using System.Reflection;
+using Monaco.Serialization;
 
 using Windows.Foundation.Metadata;
 
@@ -15,7 +18,7 @@ namespace Monaco.Helpers
     /// Not Thread Safe.
     /// </summary>
     [AllowForWeb]
-    public sealed partial class ParentAccessor : IDisposable
+    public sealed partial class ParentAccessor : IParentAccessor
     {
         private readonly WeakReference<ICodeEditorPresenter> parent;
         private readonly Type typeinfo;
@@ -24,12 +27,18 @@ namespace Monaco.Helpers
         private readonly Dictionary<string, Action<string[]>> action_parameters;
         private Dictionary<string, Func<string[], Task<string>?>>? events;
 
-        private List<Assembly> Assemblies { get; set; } = [];
+        /// <summary>
+        /// AOT-safe type info lookup for <see cref="SetValue(string, string, string)"/>.
+        /// Keyed by both fully-qualified name and short name for backward compatibility.
+        /// Thread-safe: may be read during SetValue while written via RegisterTypeInfo.
+        /// </summary>
+        private readonly ConcurrentDictionary<string, JsonTypeInfo> _typeInfoMap;
 
         /// <summary>
-        /// Constructs a new reflective parent Accessor for the provided object.
+        /// Initializes a new instance of the <see cref="ParentAccessor"/> class.
         /// </summary>
-        /// <param name="parent">Object to provide Property Access.</param>
+        /// <param name="parent">The presenter to provide reflective property access for.</param>
+        /// <param name="queue">The UI thread dispatcher used to marshal callbacks.</param>
         public ParentAccessor(ICodeEditorPresenter parent, DispatcherQueue queue)
         {
             _queue = queue;
@@ -39,6 +48,7 @@ namespace Monaco.Helpers
             actions = [];
             action_parameters = [];
             events = [];
+            _typeInfoMap = MonacoJsonContext.BuildTypeInfoMap();
 
             PartialCtor(parent);
         }
@@ -50,12 +60,18 @@ namespace Monaco.Helpers
         /// </summary>
         /// <param name="name">String Key.</param>
         /// <param name="action">Action to perform.</param>
-        internal void RegisterAction(string name, Action action)
+        public void RegisterAction(string name, Action action)
         {
             actions?[name] = action;
         }
 
-        internal void RegisterActionWithParameters(string name, Action<string[]> action)
+        /// <summary>
+        /// Registers an action with string parameters from the .NET side which can be called
+        /// from within the JavaScript code.
+        /// </summary>
+        /// <param name="name">String key to identify the action.</param>
+        /// <param name="action">Action to perform with string parameters.</param>
+        public void RegisterActionWithParameters(string name, Action<string[]> action)
         {
             action_parameters[name] = action;
         }
@@ -65,7 +81,7 @@ namespace Monaco.Helpers
         /// </summary>
         /// <param name="name">String Key.</param>
         /// <param name="function">Event to call.</param>
-        internal void RegisterEvent(string name, Func<string[], Task<string>?> function)
+        public void RegisterEvent(string name, Func<string[], Task<string>?> function)
         {
             events?[name] = function;
         }
@@ -78,31 +94,52 @@ namespace Monaco.Helpers
         /// <returns></returns>
         public async Task<string?> CallEvent(string name, string[] parameters)
         {
-            string? result = null;
+            if (_queue.HasThreadAccess)
+            {
+                return await CallEventDirectAsync(name, parameters).ConfigureAwait(false);
+            }
 
+            string? result = null;
             await _queue.EnqueueAsync(async () =>
             {
-                if (events is not null
-                    && events.TryGetValue(name, out Func<string[], Task<string>?>? value))
-                {
-                    var task = value?.Invoke(parameters);
-                    if (task != null)
-                    {
-                        result = await task;
-                    }
-                }
-            });
+                result = await CallEventDirectAsync(name, parameters).ConfigureAwait(false);
+            }).ConfigureAwait(false);
 
             return result;
         }
 
-        /// <summary>
-        /// Adds an Assembly to use for looking up types by name for <see cref="SetValue(string, string, string)"/>.
-        /// </summary>
-        /// <param name="assembly">Assembly to add.</param>
-        internal void AddAssemblyForTypeLookup(Assembly assembly)
+        private async Task<string?> CallEventDirectAsync(string name, string[] parameters)
         {
-            Assemblies.Add(assembly);
+            if (events is not null
+                && events.TryGetValue(name, out Func<string[], Task<string>?>? value))
+            {
+                var task = value?.Invoke(parameters);
+                if (task != null)
+                {
+                    return await task.ConfigureAwait(false);
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Registers a <see cref="JsonTypeInfo"/> for AOT-safe deserialization in
+        /// <see cref="SetValue(string, string, string)"/>.
+        /// </summary>
+        /// <param name="name">Type name key (fully-qualified or short name).</param>
+        /// <param name="info">The <see cref="JsonTypeInfo"/> to register.</param>
+        public void RegisterTypeInfo(string name, JsonTypeInfo info)
+        {
+            _typeInfoMap[name] = info;
+        }
+
+        /// <summary>
+        /// Obsolete: Assembly scanning is no longer used. Use <see cref="RegisterTypeInfo"/> instead.
+        /// </summary>
+        [Obsolete("Use RegisterTypeInfo instead. Assembly scanning is not AOT-compatible.")]
+        public void AddAssemblyForTypeLookup(Assembly assembly)
+        {
+            // No-op: retained for API compatibility during migration.
         }
 
         /// <summary>
@@ -115,11 +152,14 @@ namespace Monaco.Helpers
             if (actions is not null &&
                 actions.TryGetValue(name, out Action? value))
             {
-                // TODO: Not sure if this a problem too?
-                _queue.EnqueueAsync(() =>
+                if (_queue.HasThreadAccess)
                 {
                     value?.Invoke();
-                });
+                }
+                else
+                {
+                    _queue.EnqueueAsync(() => value?.Invoke());
+                }
                 return true;
             }
 
@@ -136,10 +176,14 @@ namespace Monaco.Helpers
         {
             if (action_parameters.TryGetValue(name, out Action<string[]>? value))
             {
-                _queue.EnqueueAsync(() =>
+                if (_queue.HasThreadAccess)
                 {
                     value?.Invoke(parameters);
-                });
+                }
+                else
+                {
+                    _queue.EnqueueAsync(() => value?.Invoke(parameters));
+                }
                 return true;
             }
 
@@ -153,8 +197,17 @@ namespace Monaco.Helpers
         /// <returns>Property Value or null.</returns>
         public async Task<object?> GetValue(string name)
         {
-            object? result = null;
+            if (_queue.HasThreadAccess)
+            {
+                if (parent.TryGetTarget(out var tobj))
+                {
+                    var propinfo = typeinfo.GetProperty(name);
+                    return propinfo?.GetValue(tobj);
+                }
+                return null;
+            }
 
+            object? result = null;
             await _queue.EnqueueAsync(() =>
             {
                 if (parent.TryGetTarget(out var tobj))
@@ -162,11 +215,20 @@ namespace Monaco.Helpers
                     var propinfo = typeinfo.GetProperty(name);
                     result = propinfo?.GetValue(tobj);
                 }
-            });
+            }).ConfigureAwait(false);
 
             return result;
         }
 
+        /// <summary>
+        /// Returns the JSON-serialized value of the specified property using
+        /// <see cref="MonacoJsonContext.Relaxed"/>.
+        /// </summary>
+        /// <param name="name">Property name on the parent object.</param>
+        /// <returns>The JSON string, or <c>"null"</c> if the property value is <see langword="null"/>.</returns>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the property type is not registered in <see cref="MonacoJsonContext"/>.
+        /// </exception>
         public string GetJsonValue(string name)
         {
             if (parent.TryGetTarget(out var tobj))
@@ -174,17 +236,29 @@ namespace Monaco.Helpers
                 var propinfo = typeinfo.GetProperty(name);
                 var obj = propinfo?.GetValue(tobj);
 
-                return JsonConvert.SerializeObject(obj, new JsonSerializerSettings()
+                if (obj is null)
                 {
-                    NullValueHandling = NullValueHandling.Ignore
-                });
+                    return "null";
+                }
+
+                try
+                {
+                    return JsonSerializer.Serialize(obj, obj.GetType(), MonacoJsonContext.Relaxed.Options);
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException)
+                {
+                    throw new InvalidOperationException(
+                        $"Type '{obj.GetType().FullName}' is not registered in MonacoJsonContext. " +
+                        "Register it as a [JsonSerializable] attribute on MonacoJsonContext to enable AOT-safe serialization.",
+                        ex);
+                }
             }
-            return "{}";
+            return "null";
         }
 
         /// <summary>
         /// Returns the winrt primative object value for a child property off of the specified Property.
-        /// 
+        ///
         /// Useful for providing complex types to users of Parent but still access primatives in JavaScript.
         /// </summary>
         /// <param name="name">Parent Property name.</param>
@@ -192,13 +266,26 @@ namespace Monaco.Helpers
         /// <returns>Value of Child Property or null.</returns>
         public async Task<object?> GetChildValue(string name, string child)
         {
-            object? result = null;
+            if (_queue.HasThreadAccess)
+            {
+                if (parent.TryGetTarget(out var tobj))
+                {
+                    var propinfo = typeinfo.GetProperty(name);
+                    var prop = propinfo?.GetValue(tobj);
+                    if (prop != null)
+                    {
+                        var childinfo = prop.GetType().GetProperty(child);
+                        return childinfo?.GetValue(prop);
+                    }
+                }
+                return null;
+            }
 
+            object? result = null;
             await _queue.EnqueueAsync(() =>
             {
                 if (parent.TryGetTarget(out var tobj))
                 {
-                    // TODO: Support params for multi-level digging?
                     var propinfo = typeinfo.GetProperty(name);
                     var prop = propinfo?.GetValue(tobj);
                     if (prop != null)
@@ -207,7 +294,7 @@ namespace Monaco.Helpers
                         result = childinfo?.GetValue(prop);
                     }
                 }
-            });
+            }).ConfigureAwait(false);
 
             return result;
         }
@@ -216,94 +303,86 @@ namespace Monaco.Helpers
         /// Sets the value for the specified Property.
         /// </summary>
         /// <param name="name">Parent Property name.</param>
-        /// <param name="value">Value to set.</param>
+        /// <param name="newValue">Value to set.</param>
         public async Task SetValue(string name, object newValue)
         {
-            await _queue.EnqueueAsync(() =>
+            if (_queue.HasThreadAccess)
             {
-                if (parent.TryGetTarget(out var tobj))
-                {
-                    var propinfo = typeinfo.GetProperty(name); // TODO: Cache these?
-                    tobj.IsSettingValue = true;
+                SetValueDirect(name, newValue);
+                return;
+            }
 
-                    try
-                    {
-                        object? value = newValue;
-
-                        if (value is string valueAsString)
-                        {
-                            value = Desanitize(valueAsString);
-                        }
-
-                        propinfo?.SetValue(tobj, newValue);
-                    }
-                    finally
-                    {
-                        tobj.IsSettingValue = false;
-                    }
-                }
-            });
+            await _queue.EnqueueAsync(() => SetValueDirect(name, newValue)).ConfigureAwait(false);
         }
 
         /// <summary>
         /// Sets the value for the specified Property after deserializing the value as the given type name.
+        /// Uses AOT-safe FQN-keyed type info lookup instead of runtime <see cref="Type.GetType(string)"/>.
         /// </summary>
-        /// <param name="name"></param>
-        /// <param name="value"></param>
-        /// <param name="type"></param>
+        /// <param name="name">Property name on the parent object.</param>
+        /// <param name="newValue">JSON string to deserialize.</param>
+        /// <param name="type">Type name (fully-qualified or short name).</param>
         public async Task SetValue(string name, string newValue, string type)
         {
-            await _queue.EnqueueAsync(() =>
+            if (_queue.HasThreadAccess)
             {
-                if (parent.TryGetTarget(out var tobj))
-                {
-                    var propinfo = typeinfo.GetProperty(name);
-                    var typeobj = LookForTypeByName(type);
+                SetValueWithTypeDirect(name, newValue, type);
+                return;
+            }
 
-                    if (typeobj is not null)
-                    {
-
-                        var obj = JsonConvert.DeserializeObject(newValue, typeobj);
-
-                        tobj.IsSettingValue = true;
-                        try
-                        {
-                            propinfo?.SetValue(tobj, obj);
-                        }
-                        finally
-                        {
-                            tobj.IsSettingValue = false;
-                        }
-                    }
-                }
-            });
+            await _queue.EnqueueAsync(() => SetValueWithTypeDirect(name, newValue, type)).ConfigureAwait(false);
         }
 
-        private Type? LookForTypeByName(string name)
+        private void SetValueDirect(string name, object newValue)
         {
-            // First search locally
-            var result = Type.GetType(name);
-
-            if (result != null)
+            if (parent.TryGetTarget(out var tobj))
             {
-                return result;
-            }
-
-            // Search in Other Assemblies
-            foreach (var assembly in Assemblies)
-            {
-                foreach (var typeInfo in assembly.ExportedTypes)
+                var propinfo = typeinfo.GetProperty(name);
+                tobj.IsSettingValue = true;
+                try
                 {
-                    if (typeInfo.Name == name)
-                    {
-                        return typeInfo;
-                    }
+                    // Desanitization is handled at the JSExport boundary
+                    // (ManagedSetValue in ParentAccessor.wasm.cs). Do not
+                    // desanitize here -- callers pass already-decoded values.
+                    propinfo?.SetValue(tobj, newValue);
+                }
+                finally
+                {
+                    tobj.IsSettingValue = false;
                 }
             }
-
-            return null;
         }
 
+        private void SetValueWithTypeDirect(string name, string newValue, string type)
+        {
+            if (parent.TryGetTarget(out var tobj))
+            {
+                var propinfo = typeinfo.GetProperty(name);
+
+                if (!_typeInfoMap.TryGetValue(type, out var jsonTypeInfo))
+                {
+                    throw new InvalidOperationException(
+                        $"Type '{type}' is not registered for deserialization. " +
+                        "Register it in MonacoJsonContext or call RegisterTypeInfo.");
+                }
+
+                var obj = JsonSerializer.Deserialize(newValue, jsonTypeInfo);
+
+                tobj.IsSettingValue = true;
+                try
+                {
+                    propinfo?.SetValue(tobj, obj);
+                }
+                finally
+                {
+                    tobj.IsSettingValue = false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Releases all registered actions and events.
+        /// </summary>
         public void Dispose()
         {
             actions?.Clear();

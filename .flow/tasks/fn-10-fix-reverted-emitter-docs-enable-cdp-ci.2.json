@@ -1,0 +1,13 @@
+{
+  "created_at": "2026-02-12T19:49:06.571750Z",
+  "depends_on": [
+    "fn-10-fix-reverted-emitter-docs-enable-cdp-ci.1"
+  ],
+  "epic": "fn-10-fix-reverted-emitter-docs-enable-cdp-ci",
+  "id": "fn-10-fix-reverted-emitter-docs-enable-cdp-ci.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-10-fix-reverted-emitter-docs-enable-cdp-ci.2.md",
+  "status": "todo",
+  "title": "Regenerate Monaco types with XML docs and re-enable CS1591",
+  "updated_at": "2026-02-12T21:45:25.553439Z"
+}

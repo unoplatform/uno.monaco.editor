@@ -12,21 +12,36 @@ namespace Monaco
     partial class CodeEditor : IParentAccessorAcceptor
     {
         /// <summary>
-        /// Construct to help with syntax for accessing Monaco.Language.* APIs.
+        /// Gets the helper for accessing <c>monaco.languages.*</c> registration APIs such as
+        /// completion, hover, code-action, and code-lens providers.
         /// </summary>
+        /// <remarks>
+        /// Wraps <see href="https://microsoft.github.io/monaco-editor/typedoc/modules/editor_editor_api.languages.html">monaco.languages</see>.
+        /// </remarks>
         public LanguagesHelper Languages { get; }
 
+        /// <summary>
+        /// Gets or sets a value indicating whether the editor text is currently being set
+        /// by the bridge layer, suppressing re-entrant change notifications.
+        /// </summary>
         public bool IsSettingValue { get; set; }
 
         /// <summary>
-        /// Get or Set the CodeEditor Text.
+        /// Gets or sets the text content of the editor.
         /// </summary>
+        /// <remarks>
+        /// Setting this property after the editor is loaded invokes the Monaco
+        /// <c>editor.setValue</c> API via <c>updateContent</c>. Changes originating
+        /// from JavaScript are pushed back through the bridge and suppress re-entrant
+        /// notifications via <see cref="IsSettingValue"/>.
+        /// </remarks>
         public string Text
         {
             get => (string)GetValue(TextProperty);
             set => SetValue(TextProperty, value);
         }
 
+        /// <summary>Identifies the <see cref="Text"/> dependency property.</summary>
         public static DependencyProperty TextProperty { get; } = DependencyProperty.Register(nameof(Text), typeof(string), typeof(CodeEditor), new PropertyMetadata(string.Empty, async (d, e) =>
         {
             if (d is CodeEditor codeEditor)
@@ -42,7 +57,7 @@ namespace Monaco
         }));
 
         /// <summary>
-        /// Get the current Primary Selected CodeEditor Text.
+        /// Gets or sets the currently selected text in the primary selection of the editor.
         /// </summary>
         public string SelectedText
         {
@@ -50,6 +65,7 @@ namespace Monaco
             set => SetValue(SelectedTextProperty, value);
         }
 
+        /// <summary>Identifies the <see cref="SelectedText"/> dependency property.</summary>
         public static DependencyProperty SelectedTextProperty { get; } = DependencyProperty.Register(nameof(SelectedText), typeof(string), typeof(CodeEditor), new PropertyMetadata(string.Empty, (d, e) =>
         {
             if (d is CodeEditor codeEditor)
@@ -64,25 +80,33 @@ namespace Monaco
             }
         }));
 
+        /// <summary>
+        /// Gets or sets the current primary selection range in the editor.
+        /// </summary>
         public Selection SelectedRange
         {
             get => (Selection)GetValue(SelectedRangeProperty);
             set => SetValue(SelectedRangeProperty, value);
         }
 
+        /// <summary>Identifies the <see cref="SelectedRange"/> dependency property.</summary>
         public static DependencyProperty SelectedRangeProperty { get; } = DependencyProperty.Register(nameof(SelectedRange), typeof(Selection), typeof(CodeEditor), new PropertyMetadata(null));
 
         /// <summary>
-        /// Set the Syntax Language for the Code CodeEditor.
-        /// 
-        /// Note: Most likely to change or move location.
+        /// Gets or sets the syntax language identifier for the editor (e.g., <c>"csharp"</c>,
+        /// <c>"javascript"</c>, <c>"xml"</c>).
         /// </summary>
+        /// <remarks>
+        /// Wraps Monaco <c>editor.setModelLanguage</c>. Changing this property also updates
+        /// <see cref="Options"/>.<see cref="StandaloneEditorConstructionOptions.Language"/>.
+        /// </remarks>
         public string CodeLanguage
         {
             get => (string)GetValue(CodeLanguageProperty);
             set => SetValue(CodeLanguageProperty, value);
         }
 
+        /// <summary>Identifies the <see cref="CodeLanguage"/> dependency property.</summary>
         public static DependencyProperty CodeLanguageProperty { get; } = DependencyProperty.Register(nameof(CodeLanguage), typeof(string), typeof(CodeEditor), new PropertyMetadata("xml", (d, e) =>
         {
             if (d is not CodeEditor editor) return;
@@ -90,7 +114,7 @@ namespace Monaco
         }));
 
         /// <summary>
-        /// Set the ReadOnly option for the Code CodeEditor.
+        /// Gets or sets a value indicating whether the editor is in read-only mode.
         /// </summary>
         public bool ReadOnly
         {
@@ -98,6 +122,7 @@ namespace Monaco
             set => SetValue(ReadOnlyProperty, value);
         }
 
+        /// <summary>Identifies the <see cref="ReadOnly"/> dependency property.</summary>
         public static DependencyProperty ReadOnlyProperty { get; } = DependencyProperty.Register(nameof(ReadOnly), typeof(bool), typeof(CodeEditor), new PropertyMetadata(false, (d, e) =>
         {
             if (d is not CodeEditor editor) return;
@@ -105,14 +130,21 @@ namespace Monaco
         }));
 
         /// <summary>
-        /// Get or set the CodeEditor Options. Node: Will overwrite CodeLanguage.
+        /// Gets or sets the Monaco editor construction options.
         /// </summary>
+        /// <remarks>
+        /// Setting this property replaces the entire options object and may overwrite
+        /// pass-through properties such as <see cref="CodeLanguage"/> and <see cref="ReadOnly"/>.
+        /// Changes to individual properties on the existing <see cref="StandaloneEditorConstructionOptions"/>
+        /// instance are automatically forwarded to Monaco via <c>updateOptions</c>.
+        /// </remarks>
         public StandaloneEditorConstructionOptions Options
         {
             get => (StandaloneEditorConstructionOptions)GetValue(OptionsProperty);
             set => SetValue(OptionsProperty, value);
         }
 
+        /// <summary>Identifies the <see cref="Options"/> dependency property.</summary>
         public static DependencyProperty OptionsProperty { get; } = DependencyProperty.Register(
             nameof(Options),
             typeof(StandaloneEditorConstructionOptions),
@@ -134,14 +166,20 @@ namespace Monaco
                 }));
 
         /// <summary>
-        /// Get or Set the CodeEditor Text.
+        /// Gets or sets a value indicating whether the glyph margin is visible in the editor.
         /// </summary>
+        /// <remarks>
+        /// The glyph margin is the leftmost column in the editor used to display icons for
+        /// breakpoints, bookmarks, and other decorations.
+        /// Wraps Monaco <see cref="StandaloneEditorConstructionOptions.GlyphMargin"/>.
+        /// </remarks>
         public bool HasGlyphMargin
         {
             get => (bool)GetValue(HasGlyphMarginProperty);
             set => SetValue(HasGlyphMarginProperty, value);
         }
 
+        /// <summary>Identifies the <see cref="HasGlyphMargin"/> dependency property.</summary>
         public static DependencyProperty HasGlyphMarginProperty { get; } = DependencyProperty.Register(nameof(HasGlyphMargin), typeof(bool), typeof(CodeEditor), new PropertyMetadata(false, (d, e) =>
         {
             if (d is not CodeEditor editor) return;
@@ -171,6 +209,7 @@ namespace Monaco
             }
         }
 
+        /// <summary>Identifies the <see cref="Decorations"/> dependency property.</summary>
         public static DependencyProperty DecorationsProperty { get; } = DependencyProperty.Register(nameof(Decorations), typeof(IModelDeltaDecoration), typeof(CodeEditor), new PropertyMetadata(null, async (d, e) =>
         {
             if (d is CodeEditor editor)
@@ -224,6 +263,7 @@ namespace Monaco
             }
         }
 
+        /// <summary>Identifies the <see cref="Markers"/> dependency property.</summary>
         public static DependencyProperty MarkersProperty { get; } = DependencyProperty.Register(nameof(Markers), typeof(IMarkerData), typeof(CodeEditor), new PropertyMetadata(null, async (d, e) =>
         {
             if (d is CodeEditor editor)

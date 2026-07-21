@@ -1,6 +1,4 @@
-﻿//namespace Monaco.Helpers {
-interface ThemeAccessor {
-    getCurrentThemeName();
-    getIsHighContrast();
-    }
-//}
+export interface ThemeAccessor {
+    getCurrentThemeName(): string;
+    getIsHighContrast(): string;
+}

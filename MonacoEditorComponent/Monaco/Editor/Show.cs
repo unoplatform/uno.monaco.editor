@@ -1,5 +1,5 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -12,43 +12,14 @@ namespace Monaco.Editor
     /// mouse is over the gutter.
     /// Defaults to 'mouseover'.
     /// </summary>
-    [JsonConverter(typeof(ShowConverter))]
-    public enum Show { Always, Mouseover };
-
-    internal class ShowConverter : JsonConverter
+    [JsonConverter(typeof(JsonStringEnumConverter<Show>))]
+    public enum Show
     {
-        public override bool CanConvert(Type t) => t == typeof(Show) || t == typeof(Show?);
-
-        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
-        {
-            if (reader.TokenType == JsonToken.Null) return null;
-            var value = serializer.Deserialize<string>(reader);
-            return value switch
-            {
-                "always" => Show.Always,
-                "mouseover" => Show.Mouseover,
-                _ => throw new Exception("Cannot unmarshal type Show"),
-            };
-        }
-
-        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
-        {
-            if (untypedValue == null)
-            {
-                serializer.Serialize(writer, null);
-                return;
-            }
-            var value = (Show)untypedValue;
-            switch (value)
-            {
-                case Show.Always:
-                    serializer.Serialize(writer, "always");
-                    return;
-                case Show.Mouseover:
-                    serializer.Serialize(writer, "mouseover");
-                    return;
-            }
-            throw new Exception("Cannot marshal type Show");
-        }
-    }
+        [JsonStringEnumMemberName("always")]
+        [EnumMember(Value = "always")]
+        Always,
+        [JsonStringEnumMemberName("mouseover")]
+        [EnumMember(Value = "mouseover")]
+        Mouseover,
+    };
 }

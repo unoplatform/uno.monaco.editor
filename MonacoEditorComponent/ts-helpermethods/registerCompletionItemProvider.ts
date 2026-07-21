@@ -1,6 +1,8 @@
-﻿///<reference path="../monaco-editor/monaco.d.ts" />
+import * as monaco from 'monaco-editor';
+import { EditorContext } from './otherScriptsToBeOrganized';
+import { callParentEventAsync, stringifyForMarshalling } from './asyncCallbackHelpers';
 
-const registerCompletionItemProvider = function (element:any, languageId, characters) {
+export const registerCompletionItemProvider = function (element: any, languageId: string, characters: string[]) {
     var editorContext = EditorContext.getEditorForElement(element);
 
     return monaco.languages.registerCompletionItemProvider(languageId, {

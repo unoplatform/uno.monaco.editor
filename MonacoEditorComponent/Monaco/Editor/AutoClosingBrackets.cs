@@ -1,5 +1,5 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Editor
 {
@@ -8,51 +8,20 @@ namespace Monaco.Editor
     /// Options for auto closing brackets.
     /// Defaults to language defined behavior.
     /// </summary>
-    [JsonConverter(typeof(AutoClosingBracketsConverter))]
-    public enum AutoClosingBrackets { Always, BeforeWhitespace, LanguageDefined, Never };
-
-    internal class AutoClosingBracketsConverter : JsonConverter
+    [JsonConverter(typeof(JsonStringEnumConverter<AutoClosingBrackets>))]
+    public enum AutoClosingBrackets
     {
-        public override bool CanConvert(Type t) => t == typeof(AutoClosingBrackets) || t == typeof(AutoClosingBrackets?);
-
-        public override object? ReadJson(JsonReader reader, Type t, object? existingValue, JsonSerializer serializer)
-        {
-            if (reader.TokenType == JsonToken.Null) return null;
-            var value = serializer.Deserialize<string>(reader);
-            return value switch
-            {
-                "always" => AutoClosingBrackets.Always,
-                "beforeWhitespace" => AutoClosingBrackets.BeforeWhitespace,
-                "languageDefined" => AutoClosingBrackets.LanguageDefined,
-                "never" => AutoClosingBrackets.Never,
-                _ => throw new Exception("Cannot unmarshal type AutoClosingBrackets"),
-            };
-        }
-
-        public override void WriteJson(JsonWriter writer, object? untypedValue, JsonSerializer serializer)
-        {
-            if (untypedValue == null)
-            {
-                serializer.Serialize(writer, null);
-                return;
-            }
-            var value = (AutoClosingBrackets)untypedValue;
-            switch (value)
-            {
-                case AutoClosingBrackets.Always:
-                    serializer.Serialize(writer, "always");
-                    return;
-                case AutoClosingBrackets.BeforeWhitespace:
-                    serializer.Serialize(writer, "beforeWhitespace");
-                    return;
-                case AutoClosingBrackets.LanguageDefined:
-                    serializer.Serialize(writer, "languageDefined");
-                    return;
-                case AutoClosingBrackets.Never:
-                    serializer.Serialize(writer, "never");
-                    return;
-            }
-            throw new Exception("Cannot marshal type AutoClosingBrackets");
-        }
-    }
+        [JsonStringEnumMemberName("always")]
+        [EnumMember(Value = "always")]
+        Always,
+        [JsonStringEnumMemberName("beforeWhitespace")]
+        [EnumMember(Value = "beforeWhitespace")]
+        BeforeWhitespace,
+        [JsonStringEnumMemberName("languageDefined")]
+        [EnumMember(Value = "languageDefined")]
+        LanguageDefined,
+        [JsonStringEnumMemberName("never")]
+        [EnumMember(Value = "never")]
+        Never,
+    };
 }

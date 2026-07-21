@@ -1,0 +1,20 @@
+{
+  "branch_name": "fn-5-comprehensive-documentation-overhaul",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-02-12T04:44:43.759305Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [
+    "fn-4-modernize-ci-add-code-coverage-and"
+  ],
+  "id": "fn-5-comprehensive-documentation-overhaul",
+  "next_task": 1,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-02-12T05:09:43.570563Z",
+  "spec_path": ".flow/specs/fn-5-comprehensive-documentation-overhaul.md",
+  "status": "open",
+  "title": "Comprehensive documentation overhaul",
+  "updated_at": "2026-02-12T05:09:43.578022Z"
+}

@@ -1,8 +1,10 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices.JavaScript;
+using System.Text.Json;
 
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
+using Monaco.Editor;
+using Monaco.Serialization;
 
 namespace Monaco.Extensions
 {
@@ -39,27 +41,26 @@ namespace Monaco.Extensions
 
         private static async Task<T?> RunScriptHelperAsync<T>(ICodeEditorPresenter _view, string script)
         {
-            var returnstring = NativeMethods.InvokeJS(_view.ElementId, script);
+            // Use InvokeScriptWithElementAsync so scripts referencing `element` work on all platforms.
+            // WASM: InvokeJS already defines element via document.getElementById(elementId).
+            // Desktop: wraps the script with element = document.getElementById("editor-container").
+            var returnstring = await _view.InvokeScriptWithElementAsync(script);
 
             // TODO: Need to decode the error correctly
-            if (returnstring.Contains("wv_internal_error"))
+            if (!string.IsNullOrEmpty(returnstring)
+                && returnstring.Contains("wv_internal_error", StringComparison.Ordinal))
             {
                 throw new JavaScriptInnerException(returnstring, "");
             }
 
             if (!string.IsNullOrEmpty(returnstring) && returnstring != "\"\"" && returnstring != "null")
             {
-                return JsonConvert.DeserializeObject<T>(returnstring);
+                return JsonSerializer.Deserialize<T>(returnstring, MonacoJsonContext.Default.Options);
             }
 
             return default;
         }
 
-        private static readonly JsonSerializerSettings _settings = new()
-        {
-            NullValueHandling = NullValueHandling.Ignore,
-            ContractResolver = new CamelCasePropertyNamesContractResolver()
-        };
 
         public static async Task InvokeScriptAsync(
             this ICodeEditorPresenter _view,
@@ -119,14 +120,30 @@ namespace Monaco.Extensions
                         {
                             return item.ToString();
                         }
-                        else if (item is string)
+                        else if (item is string s)
                         {
-                            return JsonConvert.ToString(item);
+                            return JsonSerializer.Serialize(s, MonacoJsonContext.Relaxed.Options);
+                        }
+                        else if (item is IActionDescriptor actionDescriptor)
+                        {
+                            // Serialize as a deterministic JSON object without anonymous types.
+                            // Anonymous payload types are not part of the source-generated context
+                            // and can throw NotSupportedException on desktop bridge calls.
+                            var contextMenuGroupId = JsonSerializer.Serialize(actionDescriptor.ContextMenuGroupId, MonacoJsonContext.Relaxed.Options);
+                            // Monaco expects a JSON number. Serialize single using invariant
+                            // formatting to avoid requiring source-generated metadata for float.
+                            var contextMenuOrder = actionDescriptor.ContextMenuOrder.ToString(CultureInfo.InvariantCulture);
+                            var id = JsonSerializer.Serialize(actionDescriptor.Id, MonacoJsonContext.Relaxed.Options);
+                            var keybindingContext = JsonSerializer.Serialize(actionDescriptor.KeybindingContext, MonacoJsonContext.Relaxed.Options);
+                            var keybindings = JsonSerializer.Serialize(actionDescriptor.Keybindings, MonacoJsonContext.Relaxed.Options);
+                            var label = JsonSerializer.Serialize(actionDescriptor.Label, MonacoJsonContext.Relaxed.Options);
+                            var precondition = JsonSerializer.Serialize(actionDescriptor.Precondition, MonacoJsonContext.Relaxed.Options);
+                            return $$"""{"contextMenuGroupId":{{contextMenuGroupId}},"contextMenuOrder":{{contextMenuOrder}},"id":{{id}},"keybindingContext":{{keybindingContext}},"keybindings":{{keybindings}},"label":{{label}},"precondition":{{precondition}}}""";
                         }
                         else
                         {
                             // TODO: Need JSON.parse?
-                            return JsonConvert.SerializeObject(item, _settings);
+                            return JsonSerializer.Serialize(item, item?.GetType() ?? typeof(object), MonacoJsonContext.Relaxed.Options);
                         }
                     })];
                 }
@@ -135,15 +152,30 @@ namespace Monaco.Extensions
                     sanitizedargs = [.. args.Select(item => item?.ToString())];
                 }
 
-                var script = method + "(element," + string.Join(",", sanitizedargs) + ");";
+                // Use InvokeMethodAsync so the presenter handles element resolution per-platform.
+                // WASM: InvokeJS defines `element` via document.getElementById(elementId).
+                // Desktop: wraps the call with element definition from editor-container div.
+                var returnstring = await _view.InvokeMethodAsync(method, sanitizedargs!);
 
-                System.Diagnostics.Debug.WriteLine($"Script {script})");
+                System.Diagnostics.Debug.WriteLine($"InvokeMethodAsync {method} result: {returnstring}");
 
+                if (!string.IsNullOrEmpty(returnstring)
+                    && returnstring.Contains("wv_internal_error", StringComparison.Ordinal))
+                {
+                    throw new JavaScriptInnerException(returnstring, "");
+                }
 
-                return await RunScriptAsync<T>(_view, script, member, file, line);
+                if (!string.IsNullOrEmpty(returnstring) && returnstring != "\"\"" && returnstring != "null")
+                {
+                    return JsonSerializer.Deserialize<T>(returnstring, MonacoJsonContext.Default.Options);
+                }
+
+                return default;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not InvalidOperationException and not NotSupportedException)
             {
+                // Let STJ metadata/AOT failures propagate so they are not silently hidden.
+                // Only catch non-serialization exceptions (network, JS interop, etc.).
                 System.Diagnostics.Debug.WriteLine($"Error {ex.Message} {ex.StackTrace} {ex.InnerException?.Message})");
                 return default;
             }

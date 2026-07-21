@@ -11,9 +11,17 @@ partial class ParentAccessor
 
     partial void PartialCtor(ICodeEditorPresenter parent)
     {
-        _instances.Add(parent, this);
+        _instances.AddOrUpdate(parent, this);
 
         Console.WriteLine($"ParentAccessor ctor {parent.GetType()}/{parent.GetHashCode():X8}");
+    }
+
+    /// <summary>
+    /// Removes the registration for the given presenter, allowing safe re-initialization.
+    /// </summary>
+    internal static void RemoveInstance(ICodeEditorPresenter presenter)
+    {
+        _instances.Remove(presenter);
     }
 
     [JSExport]
@@ -27,7 +35,8 @@ partial class ParentAccessor
             json = json.Replace(@"\r\n", Environment.NewLine);
             json = json.Replace(@"\t", "\t");
             System.Diagnostics.Debug.WriteLine($"Trimmed: {json}");
-            _ = parentAccessor.SetValue(name, value);
+            // Pass the desanitized/processed json, not the raw value
+            _ = parentAccessor.SetValue(name, json);
         }
         else
         {
@@ -54,17 +63,12 @@ partial class ParentAccessor
         }
     }
 
-    public static string? Santize(string? jsonString)
-    {
-        if (jsonString == null) return null;
-
-        var replacements = @"%&\""'{}:,";
-        for (var i = 0; i < replacements.Length; i++)
-        {
-            jsonString = jsonString.Replace(replacements[i] + "", "%" + (int)replacements[i]);
-        }
-        return jsonString;
-    }
+    /// <summary>
+    /// Encodes special characters in a JSON string for safe transport through the WASM bridge.
+    /// </summary>
+    /// <param name="jsonString">The JSON string to sanitize, or <see langword="null"/>.</param>
+    /// <returns>The encoded string, or <see langword="null"/> if the input was <see langword="null"/>.</returns>
+    public static string? Santize(string? jsonString) => BridgeEncoding.Sanitize(jsonString);
 
     [JSExport]
     internal static string ManagedGetJsonValue([JSMarshalAs<JSType.Any>] object managedOwner, string name)
@@ -113,24 +117,15 @@ partial class ParentAccessor
         }
     }
 
-    private static string? Desanitize(string? parameter)
-    {
-        // System.Diagnostics.Debug.WriteLine($"Encoded String: {parameter}");
-        if (parameter == null) return parameter;
-        var replacements = @"&\""'{}:,%";
-        // System.Diagnostics.Debug.WriteLine($"Replacements: >{replacements}<");
-        for (int i = 0; i < replacements.Length; i++)
-        {
-            //   System.Diagnostics.Debug.WriteLine($"Replacing: >%{(int)replacements[i]}< with >{(char)replacements[i] + "" }< ");
-            parameter = parameter.Replace($"%{(int)replacements[i]}", (char)replacements[i] + "");
-        }
+    private static string? Desanitize(string? parameter) => BridgeEncoding.Desanitize(parameter);
 
-        parameter = parameter.Replace(@"\\""", @"""");
-
-        // System.Diagnostics.Debug.WriteLine($"Decoded String: {parameter}");
-        return parameter;
-    }
-
+    /// <summary>
+    /// JSExport entry point: invokes a registered event callback for the specified presenter owner.
+    /// </summary>
+    /// <param name="managedOwner">The managed presenter object passed from JavaScript.</param>
+    /// <param name="name">The event name.</param>
+    /// <param name="parameters">The sanitized JSON parameter strings.</param>
+    /// <returns>The desanitized result string, or <see langword="null"/>.</returns>
     [JSExport]
     public static async Task<string?> ManagedCallEvent([JSMarshalAs<JSType.Any>] object managedOwner, string name, string[] parameters)
     {
@@ -145,6 +140,10 @@ partial class ParentAccessor
         }
     }
 
+    /// <summary>
+    /// JSExport entry point: disposes the <see cref="ParentAccessor"/> for the specified owner.
+    /// </summary>
+    /// <param name="managedOwner">The managed presenter object passed from JavaScript.</param>
     [JSExport]
     public static void ManagedClose([JSMarshalAs<JSType.Any>] object managedOwner)
     {

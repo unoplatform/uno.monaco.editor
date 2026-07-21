@@ -1,0 +1,42 @@
+{
+  "iisSettings": {
+    "windowsAuthentication": false,
+    "anonymousAuthentication": true,
+    "iisExpress": {
+      "applicationUrl": "http://localhost:8080",
+      "sslPort": 0
+    }
+  },
+  "profiles": {
+    // This profile is first in order for dotnet run to pick it up by default
+    "MonacoEditorTestApp (WebAssembly)": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5000",
+      "inspectUri": "{wsProtocol}://{url.hostname}:{url.port}/_framework/debug/ws-proxy?browser={browserInspectUri}",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "MonacoEditorTestApp (WebAssembly IIS Express)": {
+      "commandName": "IISExpress",
+      "launchBrowser": true,
+      "inspectUri": "{wsProtocol}://{url.hostname}:{url.port}/_framework/debug/ws-proxy?browser={browserInspectUri}",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "MonacoEditorTestApp (Desktop)": {
+      "commandName": "Project",
+      "environmentVariables": {}
+    },
+    "MonacoEditorTestApp (Desktop WSL2)": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DISPLAY": ":0",
+        "GDK_GL": "gles"
+      }
+    }
+  }
+}

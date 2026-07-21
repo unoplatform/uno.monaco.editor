@@ -11,6 +11,10 @@ on:
       - release/*/*
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -18,7 +22,8 @@ env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
   DOTNET_NOLOGO: 1
   NUGET_XMLDOC_MODE: skip
-  ARTIFACTS_DIR: ${{ github.workspace }}/artifacts
+  ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
+  PLAYWRIGHT_VERSION: '1.58.0'
 
 # Required secrets for signing and publishing jobs:
 # - SIGN_AZURE_CLIENT_ID: Azure client ID for code signing
@@ -61,20 +66,60 @@ jobs:
       - name: Install workloads
         run: dotnet workload install wasm-tools wasm-tools-net9
 
+      - name: Install WebKitGTK (Linux WebView2 runtime)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -yq --no-install-recommends libgtk-3-0t64 libwebkit2gtk-4.1-0
+
+      - name: Install npm dependencies and build Monaco bundles
+        run: npm install && npm run build
+
       - name: Prepare artifacts directory
         run: |
-          rm -rf "${{ env.ARTIFACTS_DIR }}"
-          mkdir -p "${{ env.ARTIFACTS_DIR }}/log"
+          rm -rf "${{ env.ARTIFACTS_PATH }}"
+          mkdir -p "${{ env.ARTIFACTS_PATH }}/log"
 
-      - name: Build solution
-        run: dotnet build MonacoEditorComponent.slnx -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_DIR }}" /bl:"${{ env.ARTIFACTS_DIR }}/log/build.binlog"
+      - name: Build library
+        run: dotnet build MonacoEditorComponent/MonacoEditorComponent.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}" /bl:"${{ env.ARTIFACTS_PATH }}/log/build.binlog"
+
+      - name: Build test project
+        run: dotnet build MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}"
+
+      - name: Build WASM test app
+        run: dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}"
+
+      - name: Install Playwright browsers
+        uses: ./.github/actions/install-playwright
+        with:
+          playwright-version: ${{ env.PLAYWRIGHT_VERSION }}
+
+      - name: Run tests
+        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}" --no-build --coverage --coverage-output-format cobertura --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=DesktopCDP" --report-xunit --report-xunit-filename test-results.xml
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts-ubuntu
+          path: |
+            ${{ runner.temp }}/TestResults/test-results.xml
+            **/test-artifacts/**
+          if-no-files-found: ignore
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-ubuntu
+          path: ${{ runner.temp }}/TestResults/**/*.cobertura.xml
+          if-no-files-found: warn
 
       - name: Upload packages
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: NuGet
-          path: ${{ env.ARTIFACTS_DIR }}/package/release
+          path: ${{ env.ARTIFACTS_PATH }}/package/release
           if-no-files-found: warn
 
       - name: Upload logs
@@ -82,13 +127,175 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: logs
-          path: ${{ env.ARTIFACTS_DIR }}/log
+          path: ${{ env.ARTIFACTS_PATH }}/log
+          if-no-files-found: warn
+
+  desktop-tests:
+    name: Desktop Tests (Windows)
+    runs-on: windows-latest
+    needs: build
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install workloads
+        run: dotnet workload install wasm-tools
+
+      - name: Install npm dependencies and build Monaco bundles
+        run: npm install && npm run build
+
+      - name: Build test project
+        run: dotnet build MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}"
+
+      - name: Build desktop test app
+        run: dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-desktop -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}"
+
+      - name: Install Playwright browsers
+        uses: ./.github/actions/install-playwright
+        with:
+          playwright-version: ${{ env.PLAYWRIGHT_VERSION }}
+
+      # Windows runners have WebView2 Runtime + Edge pre-installed and support CDP.
+      # DesktopCDP tests are enabled here; WASM Playwright tests are covered by Ubuntu.
+      - name: Run tests (unit + DesktopCDP)
+        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}" --no-build --coverage --coverage-output-format cobertura --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=WasmPlaywright" --report-xunit --report-xunit-filename desktop-test-results.xml
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts-windows
+          path: |
+            ${{ runner.temp }}/TestResults/desktop-test-results.xml
+            **/test-artifacts/**
+          if-no-files-found: ignore
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-windows
+          path: ${{ runner.temp }}/TestResults/**/*.cobertura.xml
+          if-no-files-found: warn
+
+  build-macos:
+    name: Build (macOS ARM)
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install workloads
+        run: dotnet workload install wasm-tools
+
+      - name: Install npm dependencies and build Monaco bundles
+        run: npm install && npm run build
+
+      - name: Build library
+        run: dotnet build MonacoEditorComponent/MonacoEditorComponent.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}"
+
+      - name: Build test project
+        run: dotnet build MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}"
+
+      - name: Build WASM test app
+        run: dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-browserwasm -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}"
+
+      - name: Build desktop test app
+        run: dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-desktop -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}"
+
+      - name: Install Playwright browsers
+        uses: ./.github/actions/install-playwright
+        with:
+          playwright-version: ${{ env.PLAYWRIGHT_VERSION }}
+
+      # WASM Playwright tests are already covered by the ubuntu job.
+      # macOS ARM validates builds + unit tests; exclude DesktopCDP (headless) and WasmPlaywright (slow startup on ARM).
+      - name: Run tests
+        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}" --no-build --coverage --coverage-output-format cobertura --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=DesktopCDP" --filter-not-trait "Category=WasmPlaywright" --report-xunit --report-xunit-filename test-results.xml
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts-macos
+          path: |
+            ${{ runner.temp }}/TestResults/test-results.xml
+            **/test-artifacts/**
+          if-no-files-found: ignore
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-macos
+          path: ${{ runner.temp }}/TestResults/**/*.cobertura.xml
+          if-no-files-found: warn
+
+  coverage-report:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    needs: [build, desktop-tests, build-macos]
+    if: always()
+    steps:
+      - name: Download coverage (ubuntu)
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-ubuntu
+          path: ./coverage-ubuntu
+        continue-on-error: true
+
+      - name: Download coverage (windows)
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-windows
+          path: ./coverage-windows
+        continue-on-error: true
+
+      - name: Download coverage (macOS)
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-macos
+          path: ./coverage-macos
+        continue-on-error: true
+
+      - name: Merge and generate report
+        uses: danielpalme/ReportGenerator-GitHub-Action@5.4.7
+        with:
+          reports: '**/coverage-*/**/*.cobertura.xml'
+          targetdir: ./CoverageReport
+          reporttypes: 'HtmlInline;Cobertura;MarkdownSummaryGithub;Badges'
+          assemblyfilters: '+MonacoEditorComponent'
+          classfilters: '-*.Generated*'
+
+      - name: Publish coverage summary
+        run: cat ./CoverageReport/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: ./CoverageReport
           if-no-files-found: warn
 
   sign:
     name: Sign
     runs-on: windows-latest
-    needs: build
+    needs: [build, desktop-tests, build-macos]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/'))
     environment: PackageSign
     permissions:
@@ -102,13 +309,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: NuGet
-          path: ${{ env.ARTIFACTS_DIR }}
+          path: ${{ env.ARTIFACTS_PATH }}
 
       - name: Export relative artifacts path
         shell: pwsh
         run: |
-          $relativePath = [System.IO.Path]::GetRelativePath((Get-Location), "${{ env.ARTIFACTS_DIR }}")
-          "ARTIFACTS_DIR_REL=$relativePath" | Out-File -FilePath $env:GITHUB_ENV -Append
+          $relativePath = [System.IO.Path]::GetRelativePath((Get-Location), "${{ env.ARTIFACTS_PATH }}")
+          "ARTIFACTS_PATH_REL=$relativePath" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -127,8 +334,8 @@ jobs:
       - name: Sign artifacts
         shell: pwsh
         run: >-
-          ./sign code azure-key-vault "${{ env.ARTIFACTS_DIR_REL }}/**/*.nupkg" --publisher-name "uno.monaco.editor"
-          --description "Uno Monaco Editor UWP"
+          ./sign code azure-key-vault "${{ env.ARTIFACTS_PATH_REL }}/**/*.nupkg" --publisher-name "uno.monaco.editor"
+          --description "Uno Monaco Editor"
           --description-url "https://github.com/${{ github.repository }}"
           --azure-key-vault-url "${{ secrets.SIGN_KEY_VAULT_URL }}"
           --azure-key-vault-certificate "${{ secrets.SIGN_KEY_VAULT_CERTIFICATE_ID }}"
@@ -138,7 +345,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: NuGet-Signed
-          path: ${{ env.ARTIFACTS_DIR }}
+          path: ${{ env.ARTIFACTS_PATH }}
 
   publish_dev:
     name: Publish Dev

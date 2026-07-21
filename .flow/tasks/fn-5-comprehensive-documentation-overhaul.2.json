@@ -1,0 +1,14 @@
+{
+  "assignee": "claire@novotny.org",
+  "claim_note": "",
+  "claimed_at": "2026-02-12T12:09:32.434005Z",
+  "created_at": "2026-02-12T04:45:35.213426Z",
+  "depends_on": [],
+  "epic": "fn-5-comprehensive-documentation-overhaul",
+  "id": "fn-5-comprehensive-documentation-overhaul.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-5-comprehensive-documentation-overhaul.2.md",
+  "status": "done",
+  "title": "Rewrite CHANGELOG to Keep a Changelog format with breaking changes",
+  "updated_at": "2026-02-12T12:32:05.285680Z"
+}

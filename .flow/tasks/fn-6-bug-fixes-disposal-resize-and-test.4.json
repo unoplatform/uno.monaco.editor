@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-12T05:29:35.125933Z",
+  "depends_on": [],
+  "deps": [
+    "fn-6-bug-fixes-disposal-resize-and-test.2"
+  ],
+  "epic": "fn-6-bug-fixes-disposal-resize-and-test",
+  "id": "fn-6-bug-fixes-disposal-resize-and-test.4",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-6-bug-fixes-disposal-resize-and-test.4.md",
+  "status": "todo",
+  "title": "Fix data correctness bugs and error handling",
+  "updated_at": "2026-02-12T06:01:09.375375Z"
+}

@@ -1,87 +1,19 @@
-﻿type MethodWithReturnId = (parameter: string) => void;
+import * as monaco from 'monaco-editor';
+import { ParentAccessor } from './Monaco.Helpers.ParentAccessor';
+import { isDesktopHost, getConnection, sendRequestWithTimeout, retainConnection } from './bridge/jsonRpcBridge';
+import { Disposable } from 'vscode-jsonrpc/browser';
+import { EditorContext, changeTheme } from './otherScriptsToBeOrganized';
+
+type MethodWithReturnId = (parameter: string) => void;
 type NumberCallback = (parameter: any) => void;
 
-const initializeMonacoEditor = (managedOwner: any, element: any) => {
-    {
-      //  console.debug("Grabbing Monaco Options");
+/**
+ * Module-level flag: true when running in a WebView2/WKWebView host (desktop),
+ * false when running under Uno WASM Bootstrap (browser).
+ */
+const _isDesktop: boolean = isDesktopHost();
 
-        var opt = {}
-    };
-
-    //console.debug("Getting Host container");
-    //console.debug("Creating Editor");
-    const editor = monaco.editor.create(element, opt);
-    var editorContext = EditorContext.registerEditorForElement(element, editor);
-
-    (<any>editorContext).Debug = new DebugLogger(managedOwner);
-    (<any>editorContext).Keyboard = new KeyboardListener(managedOwner);
-    (<any>editorContext).Accessor = new ParentAccessor(managedOwner);
-    (<any>editorContext).Theme = new ThemeListener(managedOwner);
-
-    //console.debug("Getting Editor model");
-    editorContext.model = editor.getModel();
-
-    // Listen for Content Changes
-    //console.debug("Listening for changes in the editor model - " + (!editorContext.model));
-
-    editorContext.model.onDidChangeContent((event) => {
-        {
-            editorContext.Accessor.setValue("Text", stringifyForMarshalling(editorContext.model.getValue()));
-        }
-    });
-
-    // Listen for Selection Changes
-    //console.debug("Listening for changes in the editor selection");
-    editor.onDidChangeCursorSelection((event) => {
-        {
-            if (!editorContext.modifingSelection) {
-                {
-                    editorContext.Accessor.setValue("SelectedText", stringifyForMarshalling(editorContext.model.getValueInRange(event.selection)));
-                    editorContext.Accessor.setValueWithType("SelectedRange", stringifyForMarshalling(JSON.stringify(event.selection)), "Selection");
-                }
-            }
-        }
-    });
-
-    // Set theme
-    //console.debug("Getting parent theme value");
-    let theme = getParentJsonValue(element, "RequestedTheme");
-    theme = {
-        "0": "Default",
-        "1": "Light",
-        "2": "Dark"
-    }
-    [theme];
-    //console.debug("Current theme value - " + theme);
-    if (theme == "Default") {
-        {
-    //        console.debug("Loading default theme");
-
-            theme = getThemeCurrentThemeName(element);
-        }
-    }
-  //  console.debug("Changing theme");
-    changeTheme(element, theme, getThemeIsHighContrast(element));
-
-    // Update Monaco Size when we receive a window resize event
-//    console.debug("Listen for resize events on the window and resize the editor");
-    window.addEventListener("resize", () => {
-        {
-            editor.layout();
-        }
-    });
-
-    // Disable WebView Scrollbar so Monaco Scrollbar can do heavy lifting
-    document.body.style.overflow = 'hidden';
-
-    // Callback to Parent that we're loaded
- //   console.debug("Loaded Monaco");
-    editorContext.Accessor.callAction("Loaded");
-
-   // console.debug("Ending Monaco Load");
-};
-
-class DebugLogger {
+class DebugLoggerImpl {
     private _managedOwner: any;
 
     constructor(managedOwner: any) {
@@ -92,13 +24,12 @@ class DebugLogger {
     }
 }
 
-class KeyboardListener {
+class KeyboardListenerImpl {
     private _managedOwner: any;
 
     constructor(managedOwner: any) {
         this._managedOwner = managedOwner;
     }
-
 
     public static async setup() {
     }
@@ -114,6 +45,11 @@ class ThemeListener {
     }
 
     public static async setup() {
+        if (_isDesktop) {
+            // No JSExport setup needed on desktop -- JSON-RPC bridge handles theme queries
+            return;
+        }
+
         let anyModule = (<any>window).Module;
 
         if (anyModule.getAssemblyExports !== undefined) {
@@ -125,117 +61,417 @@ class ThemeListener {
     }
 
     public getIsHighContrast(): boolean {
+        if (_isDesktop) {
+            throw new Error('ThemeListener.getIsHighContrast is not available on desktop. Use getIsHighContrastAsync instead.');
+        }
+        return ThemeListener._managedGetIsHighContrast(this._managedOwner);
+    }
+
+    public async getIsHighContrastAsync(): Promise<boolean> {
+        if (_isDesktop) {
+            const result = await sendRequestWithTimeout<string>(
+                getConnection(), 'theme/getProperty', { name: 'isHighContrast' }
+            );
+            return result === 'true' || result === 'True';
+        }
         return ThemeListener._managedGetIsHighContrast(this._managedOwner);
     }
 
     public getCurrentThemeName(): string {
+        if (_isDesktop) {
+            throw new Error('ThemeListener.getCurrentThemeName is not available on desktop. Use getCurrentThemeNameAsync instead.');
+        }
+        return ThemeListener._managedGetCurrentThemeName(this._managedOwner);
+    }
+
+    public async getCurrentThemeNameAsync(): Promise<string> {
+        if (_isDesktop) {
+            return await sendRequestWithTimeout<string>(
+                getConnection(), 'theme/getProperty', { name: 'currentThemeName' }
+            );
+        }
         return ThemeListener._managedGetCurrentThemeName(this._managedOwner);
     }
 }
 
-globalThis.createMonacoEditor = async (managedOwner: any, elementId: string, basePath: string) => {
-  //  console.debug("Create dynamic style element");
-    var head = document.head || document.getElementsByTagName('head')[0];
-    var style = document.createElement('style');
-    style.id = 'dynamic';
-    head.appendChild(style);
+/**
+ * Registers C#->JS JSON-RPC handlers on the connection.
+ * Only called on desktop. These handlers allow the C# host to invoke
+ * editor operations via JSON-RPC instead of InvokeScriptAsync.
+ * Returns an array of Disposables for deterministic cleanup.
+ */
+function registerDesktopHandlers(editorContext: EditorContext): Disposable[] {
+    const connection = getConnection();
+    const disposables: Disposable[] = [];
 
-    await DebugLogger.setup();
-    await KeyboardListener.setup();
-    await ParentAccessor.setup();
-    await ThemeListener.setup();
+    // editor/getValue -- returns the current editor text
+    disposables.push(
+        connection.onRequest('editor/getValue', () => {
+            return editorContext.editor.getValue();
+        })
+    );
 
-//    console.debug("Starting Monaco Load");
+    // editor/updateOptions -- push updated editor options to Monaco
+    disposables.push(
+        connection.onNotification('editor/updateOptions', (params: { options: any }) => {
+            if (params && params.options && typeof params.options === 'object') {
+                editorContext.editor.updateOptions(params.options);
+            }
+        })
+    );
 
-    (<any>window).require.config({ paths: { 'vs': `${basePath}/MonacoEditorComponent/monaco-editor/min/vs` } });
-    (<any>window).require(['vs/editor/editor.main'], function () {
-        initializeMonacoEditor(managedOwner, document.getElementById(elementId));
-    });
+    // editor/lifecycleUpdate -- writes lifecycle counts to document.body.dataset for Playwright testability (Task 8)
+    disposables.push(
+        connection.onNotification('editor/lifecycleUpdate', (params: { loading: number, loaded: number }) => {
+            document.body.dataset.lifecycleLoading = String(params.loading);
+            document.body.dataset.lifecycleLoaded = String(params.loaded);
+        })
+    );
+
+    return disposables;
 }
 
-const replaceAll = (str: string, find: string, rep: string): string => {
-    if (find == "\\")
-    {
+function cleanupEditorRuntimeState(editorContext: EditorContext): void {
+    const resizeObserver = (editorContext as any)._resizeObserver as ResizeObserver | undefined;
+    if (resizeObserver) {
+        resizeObserver.disconnect();
+        (editorContext as any)._resizeObserver = undefined;
+    }
+
+    const disposables = (editorContext as any)._rpcHandlerDisposables as Disposable[] | undefined;
+    if (disposables) {
+        for (const d of disposables) {
+            d.dispose();
+        }
+        (editorContext as any)._rpcHandlerDisposables = undefined;
+    }
+
+    if (editorContext.editor) {
+        editorContext.editor.dispose();
+    }
+}
+
+/**
+ * Initial state pushed from C# on desktop to eliminate async RPC round-trips.
+ * When provided, JS uses these values directly instead of calling back to C#.
+ */
+interface InitialState {
+    requestedTheme: number;
+    themeName: string;
+    isHighContrast: boolean;
+    text: string;
+    language: string;
+    readOnly: boolean;
+}
+
+/**
+ * Initialize the Monaco editor instance.
+ * On desktop with initialState provided, theme/text/language are applied synchronously
+ * from the pushed values -- no async RPC round-trips needed.
+ * On WASM (or desktop without initialState), property reads use the existing paths.
+ */
+export const initializeMonacoEditor = async (managedOwner: any, element: any, initialState?: InitialState) => {
+    // Re-init guard: when createMonacoEditor is invoked repeatedly for the same element,
+    // tear down previous editor/runtime hooks first to avoid duplicated handlers and
+    // leaked editor instances during async lifecycle races.
+    const existingContext = EditorContext.tryGetEditorForElement(element);
+    if (existingContext?.editor) {
+        cleanupEditorRuntimeState(existingContext);
+    }
+
+    // When initial state is provided, pass theme + language + readOnly to monaco.editor.create()
+    // so the editor renders correctly from the first frame.
+    var opt: any = {};
+    let initialThemeName: string | null = null;
+    let initialIsHighContrast = false;
+
+    if (initialState) {
+        console.log(`[initializeMonacoEditor] Using pushed initial state: theme=${initialState.themeName}, lang=${initialState.language}`);
+
+        // Determine Monaco theme ID from initial state
+        initialIsHighContrast = initialState.isHighContrast;
+        initialThemeName = initialState.themeName;
+
+        let monacoTheme = 'vs';
+        if (initialIsHighContrast) {
+            monacoTheme = 'hc-black';
+        } else if (initialThemeName === 'Dark') {
+            monacoTheme = 'vs-dark';
+        }
+
+        opt = {
+            theme: monacoTheme,
+            language: initialState.language || 'plaintext',
+            readOnly: initialState.readOnly || false,
+            value: initialState.text || '',
+        };
+    } else if (_isDesktop) {
+        // Desktop fallback when initial state payload is missing/invalid:
+        // avoid async bridge round-trips during init and choose a best-effort theme.
+        const prefersDark = typeof window.matchMedia === 'function'
+            && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        opt = {
+            theme: prefersDark ? 'vs-dark' : 'vs',
+            language: 'plaintext',
+            readOnly: false,
+            value: '',
+        };
+    }
+
+    const editor = monaco.editor.create(element, opt);
+    var editorContext = EditorContext.registerEditorForElement(element, editor);
+
+    (<any>editorContext).Debug = new DebugLoggerImpl(managedOwner);
+    (<any>editorContext).Keyboard = new KeyboardListenerImpl(managedOwner);
+    (<any>editorContext).Accessor = new ParentAccessor(managedOwner);
+    (<any>editorContext).Theme = new ThemeListener(managedOwner);
+
+    editorContext.model = editor.getModel()!;
+
+    // Listen for Content Changes
+    editorContext.model.onDidChangeContent((event) => {
+        editorContext.Accessor.setValue("Text", stringifyForMarshalling(editorContext.model.getValue()));
+    });
+
+    // Listen for Selection Changes
+    editor.onDidChangeCursorSelection((event) => {
+        if (!editorContext.modifingSelection) {
+            editorContext.Accessor.setValue("SelectedText", stringifyForMarshalling(editorContext.model.getValueInRange(event.selection)));
+            editorContext.Accessor.setValueWithType("SelectedRange", stringifyForMarshalling(JSON.stringify(event.selection)), "Selection");
+        }
+    });
+
+    // Apply theme:
+    // - Desktop with initial state: theme already applied in monaco.editor.create options.
+    // - Desktop without initial state: use local fallback theme (already applied in options).
+    // - WASM without initial state: use existing async property path.
+    if (!initialState) {
+        if (_isDesktop) {
+            console.warn('[initializeMonacoEditor] Missing pushed initial state on desktop; using local fallback theme');
+        }
+        else {
+        // Set theme -- async on desktop (JSON-RPC with timeout), sync on WASM (JSExport)
+        // Wrapped in try-catch so editor init completes even if theme RPC stalls (CI cold-start).
+        try {
+            const themeInitStart = performance.now();
+
+            const t0 = performance.now();
+            let theme: any = await editorContext.Accessor.getJsonValueAsync("RequestedTheme");
+            const t1 = performance.now();
+            if (_isDesktop) {
+                console.log(`[initializeMonacoEditor] getJsonValueAsync("RequestedTheme"): ${(t1 - t0).toFixed(1)}ms, result=${theme}`);
+            }
+
+            theme = {
+                "0": "Default",
+                "1": "Light",
+                "2": "Dark"
+            }[theme];
+
+            if (theme == "Default") {
+                const t2 = performance.now();
+                theme = await (editorContext as any).Theme.getCurrentThemeNameAsync();
+                const t3 = performance.now();
+                if (_isDesktop) {
+                    console.log(`[initializeMonacoEditor] getCurrentThemeNameAsync: ${(t3 - t2).toFixed(1)}ms, result=${theme}`);
+                }
+            }
+
+            const t4 = performance.now();
+            const isHighContrast = await (editorContext as any).Theme.getIsHighContrastAsync();
+            const t5 = performance.now();
+            if (_isDesktop) {
+                console.log(`[initializeMonacoEditor] getIsHighContrastAsync: ${(t5 - t4).toFixed(1)}ms, result=${isHighContrast}`);
+            }
+
+            changeTheme(element, theme, isHighContrast as any);
+
+            const themeInitEnd = performance.now();
+            const cumulativeMs = themeInitEnd - themeInitStart;
+            if (_isDesktop) {
+                console.log(`[initializeMonacoEditor] Theme init cumulative: ${cumulativeMs.toFixed(1)}ms` +
+                    (cumulativeMs > 16 ? ' (EXCEEDS 16ms frame budget)' : ''));
+            }
+        } catch (err) {
+            console.warn('[initializeMonacoEditor] Theme initialization failed, using defaults:', err);
+            changeTheme(element, 'Light', 'false');
+        }
+        }
+    } else {
+        console.log(`[initializeMonacoEditor] Skipped async theme init -- using pushed initial state`);
+    }
+
+    // Track parent element size changes via ResizeObserver for deterministic cleanup.
+    // This replaces the old window "resize" listener that fired on every window resize
+    // even when the editor's container didn't change size.
+    const resizeObserver = new ResizeObserver(() => { editor.layout(); });
+    resizeObserver.observe(element);
+    (editorContext as any)._resizeObserver = resizeObserver;
+
+    // Disable WebView Scrollbar so Monaco Scrollbar can do heavy lifting
+    document.body.style.overflow = 'hidden';
+
+    // Register C#->JS JSON-RPC handlers on desktop; track disposables for cleanup
+    if (_isDesktop) {
+        if (!(editorContext as any)._connectionRetained) {
+            retainConnection();
+            (editorContext as any)._connectionRetained = true;
+        }
+        const handlerDisposables = registerDesktopHandlers(editorContext);
+        // Store disposables on context for deterministic teardown
+        (editorContext as any)._rpcHandlerDisposables = handlerDisposables;
+    }
+
+    // Callback to Parent that we're loaded
+    editorContext.Accessor.callAction("Loaded");
+};
+
+/**
+ * Dispose an editor context: disconnects ResizeObserver, unregisters RPC handlers,
+ * disposes Monaco editor, removes context map entry, and releases the connection reference.
+ */
+export const disposeEditor = (element: any) => {
+    const editorContext = EditorContext.tryGetEditorForElement(element);
+    if (!editorContext) return;
+
+    cleanupEditorRuntimeState(editorContext);
+
+    // Remove from context map
+    EditorContext.removeEditorForElement(element);
+
+    // Release the connection reference on desktop (disposes only when last editor releases)
+    if (_isDesktop && (editorContext as any)._connectionRetained && editorContext.Accessor) {
+        editorContext.Accessor.close();
+        (editorContext as any)._connectionRetained = false;
+    }
+};
+
+export const replaceAll = (str: string, find: string, rep: string): string => {
+    if (find == "\\") {
         find = "\\\\";
     }
     return (`${str}`).replace(new RegExp(find, "g"), rep);
 }
 
-const sanitize = (jsonString: string): string => {
+export const sanitize = (jsonString: string): string => {
     if (jsonString == null) {
-        //console.log('Sanitized is null');
-        return null;
+        return null as any;
     }
 
     const replacements = "%&\\\"'{}:,";
     for (let i = 0; i < replacements.length; i++) {
         jsonString = replaceAll(jsonString, replacements.charAt(i), `%${replacements.charCodeAt(i)}`);
     }
-    //console.log('Sanitized: ' + jsonString);
     return jsonString;
 }
 
-const desantize = (parameter: string): string => {
-    //System.Diagnostics.Debug.WriteLine($"Encoded String: {parameter}");
+export const desanitize = (parameter: string): string => {
     if (parameter == null) return parameter;
     const replacements = "&\\\"'{}:,%";
-    //System.Diagnostics.Debug.WriteLine($"Replacements: >{replacements}<");
-    for (let i = 0; i < replacements.length; i++)
-    {
-        //console.log("Replacing: >%" + replacements.charCodeAt(i) + "< with >" + replacements.charAt(i) + "< ");
+    for (let i = 0; i < replacements.length; i++) {
         parameter = replaceAll(parameter, "%" + replacements.charCodeAt(i), replacements.charAt(i));
     }
-
-    //console.log("Decoded String: " + parameter );
     return parameter;
 }
 
-const stringifyForMarshalling = (value: any): string => sanitize(value)
-
-const getParentValue = (element:any, name: string): any => {
-    return EditorContext.getEditorForElement(element).Accessor.getJsonValue(name);
+/**
+ * On desktop, values arrive as clean JSON via JSON-RPC -- no sanitize encoding needed.
+ * On WASM, apply sanitize encoding for the JSExport marshalling path.
+ */
+export const stringifyForMarshalling = (value: string): string => {
+    if (_isDesktop) {
+        return value;
+    }
+    return sanitize(value);
 }
 
-const getParentJsonValue = (element: any, name: string): string =>
-    EditorContext.getEditorForElement(element).Accessor.getJsonValue(name);
+/**
+ * callParentEventAsync -- invoke a named event handler and return the result.
+ * On desktop, parameters are sent as clean JSON (no sanitize/desanitize).
+ * On WASM, parameters are sanitized for JSExport marshalling.
+ */
+export const callParentEventAsync = async (element: any, name: string, parameters: string[]): Promise<string | null> => {
+    if (_isDesktop) {
+        // Desktop: send parameters as clean JSON array via JSON-RPC
+        const result = await EditorContext.getEditorForElement(element).Accessor.callEvent(
+            name,
+            parameters != null && parameters.length > 0 ? parameters[0] : null as any,
+            parameters != null && parameters.length > 1 ? parameters[1] : null as any);
+        return result;
+    }
 
-const getThemeIsHighContrast = (element: any): boolean =>
-    EditorContext.getEditorForElement(element).Theme.getIsHighContrast() == "true";
-
-const getThemeCurrentThemeName = (element: any): string =>
-    EditorContext.getEditorForElement(element).Theme.getCurrentThemeName();
-
-const callParentEventAsync = async (element: any, name: string, parameters: string[]): Promise<string> =>
-{
+    // WASM: sanitize parameters for JSExport marshalling
     let result = await EditorContext.getEditorForElement(element).Accessor.callEvent(name,
-        parameters != null && parameters.length > 0 ? stringifyForMarshalling(parameters[0]) : null,
-        parameters != null && parameters.length > 1 ? stringifyForMarshalling(parameters[1]) : null);
+        parameters != null && parameters.length > 0 ? stringifyForMarshalling(parameters[0]) : null as any,
+        parameters != null && parameters.length > 1 ? stringifyForMarshalling(parameters[1]) : null as any);
 
     if (result) {
-        result = desantize(result);
-    } else {
-        // console.debug('No Parent event result for ' + name);
+        result = desanitize(result);
     }
 
     return result;
 }
 
-const callParentActionWithParameters = (element: any, name: string, parameters: string[]): boolean =>
+export const callParentActionWithParameters = (element: any, name: string, parameters: string[]): boolean | void =>
     EditorContext.getEditorForElement(element).Accessor.callActionWithParameters(name,
-        parameters != null && parameters.length > 0 ? stringifyForMarshalling(parameters[0]) : null,
-        parameters != null && parameters.length > 1 ? stringifyForMarshalling(parameters[1]) : null);
+        parameters != null && parameters.length > 0 ? stringifyForMarshalling(parameters[0]) : null as any,
+        parameters != null && parameters.length > 1 ? stringifyForMarshalling(parameters[1]) : null as any);
 
-globalThis.InvokeJS = (elementId: string, command: string): string => {
-    var r = eval(`var element = globalThis.document.getElementById(\"${elementId}\"); ${command}`) || "";
+export const createMonacoEditor = async (managedOwner: any, elementId: string, basePath: string, initialStatePayload?: InitialState | string) => {
+    (globalThis as any).__unoMonacoInitError = null;
+    (globalThis as any).__unoMonacoInitComplete = false;
+
+    // Ensure a single <style id="dynamic"> element exists (editor.html already provides one on desktop)
+    if (!document.getElementById('dynamic')) {
+        var head = document.head || document.getElementsByTagName('head')[0];
+        var style = document.createElement('style');
+        style.id = 'dynamic';
+        head.appendChild(style);
+    }
+
+    // Parse/normalize initial state if provided (pushed from C# on desktop).
+    // Supports both JSON object payload (preferred) and JSON string payload (legacy).
+    let initialState: InitialState | undefined;
+    if (typeof initialStatePayload === 'string') {
+        if (initialStatePayload.length > 0) {
+            try {
+                initialState = JSON.parse(initialStatePayload) as InitialState;
+                console.log(`[createMonacoEditor] Parsed initial state (string): theme=${initialState.themeName}`);
+            } catch (err) {
+                console.warn('[createMonacoEditor] Failed to parse initial state JSON string:', err);
+            }
+        }
+    } else if (initialStatePayload && typeof initialStatePayload === 'object') {
+        initialState = initialStatePayload as InitialState;
+        console.log(`[createMonacoEditor] Parsed initial state (object): theme=${initialState.themeName}`);
+    }
+
+    await DebugLoggerImpl.setup();
+    await KeyboardListenerImpl.setup();
+    await ParentAccessor.setup();
+    await ThemeListener.setup();
+
+    try {
+        await initializeMonacoEditor(managedOwner, document.getElementById(elementId), initialState);
+        (globalThis as any).__unoMonacoInitComplete = true;
+    } catch (err) {
+        (globalThis as any).__unoMonacoInitError = String(err);
+        console.error('[createMonacoEditor] initializeMonacoEditor failed:', err);
+    }
+
+    // Emit editor/ready notification on desktop after Monaco init completes.
+    // Sent even on partial init failure so the C# side can proceed.
+    if (_isDesktop) {
+        getConnection().sendNotification('editor/ready', { protocolVersion: 1 });
+    }
+}
+
+export const InvokeJS = (elementId: string, command: string): string => {
+    var r = eval(`var element = globalThis.document.getElementById("${elementId}"); ${command}`) || "";
     return JSON.stringify(r);
 }
 
-globalThis.refreshLayout = (elementId: string) => {
-    EditorContext.getEditorForElement(document.getElementById(elementId)).editor.layout();
-}
-
-globalThis.languageIdFromExtension = (extension: string): string => {
-
+export const languageIdFromExtension = (extension: string): string => {
     if (extension != null) {
         const lower = extension.toLowerCase();
         const langs = monaco.languages.getLanguages();
@@ -243,7 +479,7 @@ globalThis.languageIdFromExtension = (extension: string): string => {
             if (!l.extensions) continue;
             if (l.extensions.some(ext => lower.endsWith(ext))) return l.id;
         }
-    }   
+    }
 
     return 'plaintext';
 }

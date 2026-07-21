@@ -10,45 +10,73 @@ using Windows.UI.ViewManagement;
 
 namespace Monaco.Helpers
 {
-    public delegate void ThemeChangedEvent(ThemeListener sender);
+    /// <summary>
+    /// Event arguments for the <see cref="IThemeListener.ThemeChanged"/> event.
+    /// </summary>
+    public class ThemeChangedEventArgs : EventArgs
+    {
+        /// <summary>Gets the theme listener that detected the change.</summary>
+        public IThemeListener Listener { get; }
+
+        /// <summary>Initializes a new instance of the <see cref="ThemeChangedEventArgs"/> class.</summary>
+        public ThemeChangedEventArgs(IThemeListener listener) => Listener = listener;
+    }
 
     /// <summary>
     /// Class which listens for changes to Application Theme or High Contrast Modes 
     /// and Signals an Event when they occur.
     /// </summary>
     [AllowForWeb]
-    public sealed partial class ThemeListener // This is a copy of the Toolkit ThemeListener, for some reason if we try and use it directly it's not read by the WebView
+    public sealed partial class ThemeListener : IThemeListener, IDisposable // This is a copy of the Toolkit ThemeListener, for some reason if we try and use it directly it's not read by the WebView
     {
         private readonly DispatcherQueue _queue;
         private readonly ICodeEditorPresenter _owner;
 
-        public string CurrentThemeName { get { return CurrentTheme.ToString(); } } // For Web Retrieval
+        /// <inheritdoc />
+        public string CurrentThemeName { get { return CurrentTheme.ToString(); } }
 
+        /// <inheritdoc />
         public ApplicationTheme CurrentTheme { get; set; }
+
+        /// <inheritdoc />
         public bool IsHighContrast { get; set; }
 
-        public event ThemeChangedEvent? ThemeChanged;
+        /// <inheritdoc />
+        public event EventHandler<ThemeChangedEventArgs>? ThemeChanged;
 
         private readonly AccessibilitySettings _accessible = new();
         private readonly UISettings _settings = new();
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ThemeListener"/> class using the
+        /// current thread's dispatcher.
+        /// </summary>
+        /// <param name="presenter">The presenter that owns this listener.</param>
         public ThemeListener(ICodeEditorPresenter presenter) : this(presenter, null) { }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ThemeListener"/> class.
+        /// </summary>
+        /// <param name="presenter">The presenter that owns this listener.</param>
+        /// <param name="queue">The UI thread dispatcher. When <see langword="null"/>, the
+        /// current thread's dispatcher is used.</param>
         public ThemeListener(ICodeEditorPresenter presenter, DispatcherQueue? queue)
         {
             _queue = queue ?? DispatcherQueue.GetForCurrentThread();
             _owner = presenter;
 
             CurrentTheme = Application.Current.RequestedTheme;
-#if !__WASM__
-            IsHighContrast = _accessible.HighContrast;
-#endif
+            if (!OperatingSystem.IsBrowser())
+            {
+                IsHighContrast = _accessible.HighContrast;
+            }
 
             _accessible.HighContrastChanged += Accessible_HighContrastChanged;
             _settings.ColorValuesChanged += Settings_ColorValuesChanged;
 
             // Fallback in case either of the above fail, we'll check when we get activated next.
-            if (Window.Current?.CoreWindow is not null)
+            // Window.Current is only available on WASM -- desktop uses ThemeListenerDesktop.
+            if (OperatingSystem.IsBrowser() && Window.Current?.CoreWindow is not null)
             {
                 Window.Current.CoreWindow.Activated += CoreWindow_Activated;
             }
@@ -58,15 +86,32 @@ namespace Monaco.Helpers
 
         partial void PartialCtor();
 
-        ~ThemeListener()
+        private bool _disposed;
+
+        /// <summary>
+        /// Deterministically unsubscribes from OS event sources to prevent
+        /// leaked listeners and duplicate callbacks across re-init cycles.
+        /// </summary>
+        public void Dispose()
         {
+            if (_disposed) return;
+            _disposed = true;
+
             _accessible.HighContrastChanged -= Accessible_HighContrastChanged;
             _settings.ColorValuesChanged -= Settings_ColorValuesChanged;
 
-            if (Window.Current?.CoreWindow is not null)
+            if (OperatingSystem.IsBrowser() && Window.Current?.CoreWindow is not null)
             {
                 Window.Current.CoreWindow.Activated -= CoreWindow_Activated;
             }
+        }
+
+        /// <summary>
+        /// Releases unmanaged resources via <see cref="Dispose"/>.
+        /// </summary>
+        ~ThemeListener()
+        {
+            Dispose();
         }
 
         private void Accessible_HighContrastChanged(AccessibilitySettings sender, object args)
@@ -133,7 +178,7 @@ namespace Monaco.Helpers
                 CurrentTheme = Application.Current.RequestedTheme;
             }
 
-            ThemeChanged?.Invoke(this);
+            ThemeChanged?.Invoke(this, new ThemeChangedEventArgs(this));
         }
     }
 }

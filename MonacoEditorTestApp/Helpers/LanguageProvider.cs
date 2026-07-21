@@ -11,56 +11,55 @@ namespace MonacoEditorTestApp.Helpers
 {
     public class LanguageProvider : CompletionItemProvider
     {
-        public string[] TriggerCharacters => new string[] { "c" };
+        public string[] TriggerCharacters => ["c"];
 
-        public IAsyncOperation<CompletionList> ProvideCompletionItemsAsync(IModel document, Position position, CompletionContext context)
+        public async Task<CompletionList> ProvideCompletionItemsAsync(IModel document, Position position, CompletionContext context)
         {
-            return AsyncInfo.Run(async delegate (CancellationToken cancelationToken)
+            var textUntilPosition = await document.GetValueInRangeAsync(new Monaco.Range(1, 1, position.LineNumber, position.Column));
+
+            if (textUntilPosition is not null && textUntilPosition.EndsWith("boo"))
             {
-                var textUntilPosition = await document.GetValueInRangeAsync(new Range(1, 1, position.LineNumber, position.Column));
-
-                if (textUntilPosition.EndsWith("boo"))
-                {
-                    return new CompletionList()
-                    {
-                        Suggestions = new[]
-                        {
-                            new CompletionItem("booyah", "booyah", CompletionItemKind.Folder),
-                            new CompletionItem("booboo", "booboo", CompletionItemKind.File),
-                        }
-                    };
-                }
-                else if (context.TriggerKind == CompletionTriggerKind.TriggerCharacter)
-                {
-                    return new CompletionList()
-                    {
-                        Suggestions = new[]
-                        {
-                            new CompletionItem("class", "class", CompletionItemKind.Keyword),
-                            new CompletionItem("cookie", "cookie", CompletionItemKind.Reference),
-                        }
-                    };
-                }
-
                 return new CompletionList()
                 {
-                    Suggestions = new[]
-                    {
+                    Suggestions =
+                    [
+                            new CompletionItem("booyah", "booyah", CompletionItemKind.Folder),
+                            new CompletionItem("booboo", "booboo", CompletionItemKind.File),
+                        ]
+                };
+            }
+            else if (context.TriggerKind == CompletionTriggerKind.TriggerCharacter)
+            {
+                return new CompletionList()
+                {
+                    Suggestions =
+                    [
+                            new CompletionItem("class", "class", CompletionItemKind.Keyword),
+                            new CompletionItem("cookie", "cookie", CompletionItemKind.Reference),
+                        ]
+                };
+            }
+
+            return new CompletionList()
+            {
+                Suggestions =
+                [
                         new CompletionItem("foreach", "foreach (var ${2:element} in ${1:array}) {\n\t$0\n}", CompletionItemKind.Snippet)
                         {
                             InsertTextRules = CompletionItemInsertTextRule.InsertAsSnippet
                         }
-                    }
-                };
-            });
+                    ]
+            };
         }
 
-        public IAsyncOperation<CompletionItem> ResolveCompletionItemAsync(IModel model, CompletionItem item)
+        public async Task<CompletionItem> ResolveCompletionItemAsync(IModel model, Position position, CompletionItem item)
         {
-            return AsyncInfo.Run(delegate (CancellationToken cancelationToken)
-            {
-                return Task.FromResult(item); // throw new NotImplementedException();
-            });
+            return item;
+        }
+
+        public Task<CompletionItem> ResolveCompletionItemAsync(IModel model, CompletionItem item)
+        {
+            throw new NotImplementedException();
         }
     }
 }

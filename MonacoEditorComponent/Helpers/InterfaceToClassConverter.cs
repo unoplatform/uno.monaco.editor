@@ -1,34 +1,26 @@
-﻿using Newtonsoft.Json;
 using System;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Monaco.Helpers
 {
     /// <summary>
-    /// Used to upcast an interface to its object type during deserialization of JSON.
+    /// STJ converter: deserializes an interface as its concrete class.
     /// </summary>
     /// <typeparam name="TInterface">Type of base Interface.</typeparam>
     /// <typeparam name="TClass">Type of class to use for deserializing object with interface.</typeparam>
-    internal class InterfaceToClassConverter<TInterface, TClass> : JsonConverter where TClass : TInterface, new()
+    internal class InterfaceToClassConverter<TInterface, TClass> : System.Text.Json.Serialization.JsonConverter<TInterface>
+        where TClass : TInterface
     {
-        public override bool CanConvert(Type objectType)
+        public override TInterface? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            // We only want to convert objects that are of the interface.
-            return objectType == typeof(TInterface);
+            return JsonSerializer.Deserialize<TClass>(ref reader, options);
         }
 
-        public override object? ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
+        public override void Write(Utf8JsonWriter writer, TInterface value, JsonSerializerOptions options)
         {
-            // Use the implementation type for the deserialization of the interface.
-            var pop = new TClass();
-
-            serializer.Populate(reader, pop);
-
-            return pop;
+            JsonSerializer.Serialize(writer, value, typeof(TClass), options);
         }
-
-        public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
-        {
-            serializer.Serialize(writer, value);
-        }        
     }
+
 }

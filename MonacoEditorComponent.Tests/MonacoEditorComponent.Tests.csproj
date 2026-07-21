@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<OutputType>Exe</OutputType>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<NoWarn>$(NoWarn);CA1416;xUnit1051</NoWarn>
+		<RootNamespace>MonacoEditorComponent.Tests</RootNamespace>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="xunit.v3.mtp-v2" />
+		<PackageReference Include="Microsoft.Playwright.Xunit.v3" />
+		<!--
+			ExcludeAssets build/buildTransitive: skip the Playwright targets that copy the
+			.playwright driver folder into the output (they misbehave under UseArtifactsOutput).
+			GeneratePathProperty: expose $(PkgMicrosoft_Playwright) so we can point the driver
+			search path at the NuGet package root (which contains .playwright/) instead.
+		-->
+		<PackageReference Include="Microsoft.Playwright" ExcludeAssets="build;buildTransitive" GeneratePathProperty="true" />
+		<PackageReference Include="StreamJsonRpc" />
+		<PackageReference Include="Nerdbank.Streams" />
+		<PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" PrivateAssets="all" />
+		<PackageReference Include="Microsoft.Testing.Extensions.TrxReport" PrivateAssets="all" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\MonacoEditorComponent\MonacoEditorComponent.csproj" />
+	</ItemGroup>
+
+	<!--
+		Surface the Microsoft.Playwright NuGet package path to runtime so DesktopAppFixture
+		can set PLAYWRIGHT_DRIVER_SEARCH_PATH locally (CI sets it explicitly). Version-agnostic
+		via the GeneratePathProperty above; resolved at build time, never hardcoded.
+	-->
+	<ItemGroup>
+		<AssemblyMetadata Include="PlaywrightPackagePath" Value="$(PkgMicrosoft_Playwright)" />
+	</ItemGroup>
+
+</Project>

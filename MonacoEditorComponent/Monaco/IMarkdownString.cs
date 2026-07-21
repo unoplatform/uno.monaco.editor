@@ -1,4 +1,3 @@
-﻿using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Linq;
 using Windows.Foundation.Metadata;
@@ -19,25 +18,21 @@ namespace Monaco
         /// <summary>
         /// Gets or sets a value indicating whether this Markdown content is trusted.
         /// </summary>
-        [JsonProperty("isTrusted")]
         public bool IsTrusted { get; set; } = isTrusted;
         
         /// <summary>
         /// Gets or sets a value indicating whether theme icons should be supported in this Markdown.
         /// </summary>
-        [JsonProperty("supportThemeIcons", NullValueHandling =NullValueHandling.Ignore)]
         public bool? SupportThemeIcons { get; set; }
 
         /// <summary>
         /// Gets or sets a mapping of URI strings used in the Markdown.
         /// </summary>
-        [JsonProperty("uris", NullValueHandling = NullValueHandling.Ignore)]
         public IDictionary<string, Uri>? Uris { get; set; }
 
         /// <summary>
         /// Gets or sets the Markdown string value.
         /// </summary>
-        [JsonProperty("value")]
         public string? Value { get; set; } = svalue;
 
         public IMarkdownString(string? svalue) : this(svalue, false) { }
