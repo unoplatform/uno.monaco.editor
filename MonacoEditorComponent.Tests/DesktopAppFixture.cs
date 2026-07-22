@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
@@ -25,7 +26,7 @@ namespace MonacoEditorComponent.Tests;
 ///
 /// <para><b>Agent-driven testing pattern (Playwright MCP)</b>:
 /// An AI agent can also connect to a running desktop app for ad-hoc verification
-/// using the Playwright MCP server with <c>--cdp-endpoint http://localhost:{port}</c>.
+/// using the Playwright MCP server with <c>--cdp-endpoint http://127.0.0.1:{port}</c>.
 /// This provides <c>browser_snapshot</c> for accessibility tree inspection,
 /// <c>browser_evaluate</c> for JS assertions, and <c>browser_click</c> for
 /// interaction testing. This is a development convenience, not automated CI.</para>
@@ -370,7 +371,7 @@ public sealed class DesktopAppFixture : IAsyncLifetime
 
             try
             {
-                var response = await httpClient.GetAsync(versionUrl);
+                using var response = await httpClient.GetAsync(versionUrl);
                 if (response.IsSuccessStatusCode)
                 {
                     // Record the runtime that actually answered CDP (the "Browser" field,
@@ -384,7 +385,7 @@ public sealed class DesktopAppFixture : IAsyncLifetime
                         var dir = Path.GetDirectoryName(_processLogPath);
                         if (!string.IsNullOrEmpty(dir))
                         {
-                            await File.WriteAllTextAsync(Path.Combine(dir, "cdp-version.txt"), versionBody);
+                            await File.WriteAllTextAsync(Path.Join(dir, "cdp-version.txt"), versionBody);
                         }
                     }
                     catch { /* best-effort */ }
@@ -463,16 +464,23 @@ public sealed class DesktopAppFixture : IAsyncLifetime
                 }
             }
         }
-        catch (Exception ex)
+        catch (IOException ex)
+        {
+            // Covers DirectoryNotFound/FileNotFound/PathTooLong (all derive from IOException).
+            sb.AppendLine($"DevToolsActivePort probe failed: {ex.Message}");
+        }
+        catch (UnauthorizedAccessException ex)
         {
             sb.AppendLine($"DevToolsActivePort probe failed: {ex.Message}");
         }
 
-        // 2. Edge remote-debugging policy (0 => CDP disabled by policy).
-        sb.AppendLine("--- Edge policies (HKLM) ---")
-          .AppendLine(await RunCaptureAsync("reg", @"query ""HKLM\SOFTWARE\Policies\Microsoft\Edge"" /s"));
-        sb.AppendLine("--- Edge policies (HKCU) ---")
-          .AppendLine(await RunCaptureAsync("reg", @"query ""HKCU\SOFTWARE\Policies\Microsoft\Edge"" /s"));
+        // 2. Edge remote-debugging policy (0 => CDP disabled by policy). Query the specific
+        //    value rather than dumping the whole policy tree (/s), which is large and noisy.
+        //    A "unable to find" result means the policy is unset (i.e. not disabling CDP).
+        sb.AppendLine("--- Edge RemoteDebuggingAllowed (HKLM) ---")
+          .AppendLine(await RunCaptureAsync("reg", @"query ""HKLM\SOFTWARE\Policies\Microsoft\Edge"" /v RemoteDebuggingAllowed"));
+        sb.AppendLine("--- Edge RemoteDebuggingAllowed (HKCU) ---")
+          .AppendLine(await RunCaptureAsync("reg", @"query ""HKCU\SOFTWARE\Policies\Microsoft\Edge"" /v RemoteDebuggingAllowed"));
 
         // 3. Is anything listening on the requested port?
         sb.AppendLine($"--- netstat (port {_cdpPort}) ---")
@@ -491,10 +499,11 @@ public sealed class DesktopAppFixture : IAsyncLifetime
             var dir = Path.GetDirectoryName(_processLogPath);
             if (!string.IsNullOrEmpty(dir))
             {
-                await File.WriteAllTextAsync(Path.Combine(dir, "cdp-diagnostics.txt"), diagnostics);
+                await File.WriteAllTextAsync(Path.Join(dir, "cdp-diagnostics.txt"), diagnostics);
             }
         }
-        catch { /* best-effort */ }
+        catch (IOException) { /* best-effort */ }
+        catch (UnauthorizedAccessException) { /* best-effort */ }
 
         return diagnostics;
     }
@@ -502,6 +511,8 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     /// <summary>Runs a console command and returns combined stdout+stderr (best-effort).</summary>
     private static async Task<string> RunCaptureAsync(string fileName, string arguments, int timeoutMs = 10_000)
     {
+        string Failed(Exception ex) => $"(command '{fileName} {arguments}' failed: {ex.Message})";
+
         try
         {
             using var proc = new Process
@@ -517,18 +528,39 @@ public sealed class DesktopAppFixture : IAsyncLifetime
                 },
             };
             proc.Start();
-            var stdoutTask = proc.StandardOutput.ReadToEndAsync();
-            var stderrTask = proc.StandardError.ReadToEndAsync();
+
+            // Bound the stream reads by the same timeout token as the exit wait so a
+            // process that never exits (or whose Kill fails) can't hang log collection
+            // indefinitely -- the reads are cancelled when the token fires.
             using var cts = new CancellationTokenSource(timeoutMs);
-            try { await proc.WaitForExitAsync(cts.Token); }
-            catch (OperationCanceledException) { try { proc.Kill(entireProcessTree: true); } catch { /* best-effort */ } }
-            var output = ($"{await stdoutTask}{await stderrTask}").Trim();
+            var stdoutTask = proc.StandardOutput.ReadToEndAsync(cts.Token);
+            var stderrTask = proc.StandardError.ReadToEndAsync(cts.Token);
+            try
+            {
+                await proc.WaitForExitAsync(cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                try { proc.Kill(entireProcessTree: true); }
+                catch (InvalidOperationException) { /* already exited */ }
+                catch (Win32Exception) { /* OS refused termination */ }
+                catch (NotSupportedException) { /* unsupported on platform */ }
+            }
+
+            var output = $"{await ReadOrEmptyAsync(stdoutTask)}{await ReadOrEmptyAsync(stderrTask)}".Trim();
             return string.IsNullOrEmpty(output) ? "(no output)" : output;
         }
-        catch (Exception ex)
-        {
-            return $"(command '{fileName} {arguments}' failed: {ex.Message})";
-        }
+        catch (Win32Exception ex) { return Failed(ex); }
+        catch (InvalidOperationException ex) { return Failed(ex); }
+        catch (IOException ex) { return Failed(ex); }
+    }
+
+    /// <summary>Awaits a bounded stream read, returning empty on cancellation/I-O failure (best-effort).</summary>
+    private static async Task<string> ReadOrEmptyAsync(Task<string> readTask)
+    {
+        try { return await readTask; }
+        catch (OperationCanceledException) { return string.Empty; }
+        catch (IOException) { return string.Empty; }
     }
 
     /// <summary>
@@ -540,8 +572,23 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     /// </summary>
     private string CaptureLogSnapshot()
     {
+        // Keep only the most recent lines: the tail is the relevant diagnostic near a
+        // failure, and the full buffer can make exceptions unreadably large.
+        const int maxLines = 200;
         var lines = GetLinesAfter(0);
-        return lines.Count > 0 ? string.Join(Environment.NewLine, lines) : "(no log)";
+        if (lines.Count == 0)
+        {
+            return "(no log)";
+        }
+        if (lines.Count <= maxLines)
+        {
+            return string.Join(Environment.NewLine, lines);
+        }
+
+        var omitted = lines.Count - maxLines;
+        var tail = lines.GetRange(lines.Count - maxLines, maxLines);
+        return $"(... {omitted} earlier line(s) omitted; showing last {maxLines} ...)" +
+            Environment.NewLine + string.Join(Environment.NewLine, tail);
     }
 
     private async Task<IPage> FindMonacoPage()
