@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Text;
 using System.Text.RegularExpressions;
 
 using Microsoft.Playwright;
@@ -375,9 +376,126 @@ public sealed class DesktopAppFixture : IAsyncLifetime
             await Task.Delay(CdpPollIntervalMs);
         }
 
+        var cdpDiagnostics = await CollectCdpDiagnosticsAsync();
         throw new TimeoutException(
             $"CDP endpoint at {versionUrl} did not become ready within {CdpReadyTimeoutMs}ms.\n" +
+            $"CDP diagnostics:\n{cdpDiagnostics}\n" +
             $"Process log:\n{CaptureLogSnapshot()}");
+    }
+
+    /// <summary>
+    /// Best-effort, Windows-only diagnostics gathered when the CDP endpoint never became
+    /// ready. Answers the key question the readiness timeout cannot: did WebView2/Chromium
+    /// even start a remote-debugging listener, and if not, why?
+    /// <list type="bullet">
+    /// <item><description><c>DevToolsActivePort</c> present under the user-data folder =&gt;
+    /// the listener started (line 1 is the actual port; if it differs from the requested
+    /// port, the fixture polled the wrong one).</description></item>
+    /// <item><description>Absent =&gt; remote debugging never started (policy or the
+    /// <c>WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS</c> flag was not honored).</description></item>
+    /// <item><description>Edge <c>RemoteDebuggingAllowed</c> policy = 0 disables CDP entirely.</description></item>
+    /// </list>
+    /// Also written to <c>test-artifacts/cdp-diagnostics.txt</c> for the uploaded artifact.
+    /// </summary>
+    private async Task<string> CollectCdpDiagnosticsAsync()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return "(CDP diagnostics collected on Windows only)";
+        }
+
+        var sb = new StringBuilder();
+
+        // 1. DevToolsActivePort: the decisive signal for whether a listener started.
+        try
+        {
+            var found = Directory.Exists(_userDataFolder)
+                ? Directory.GetFiles(_userDataFolder, "DevToolsActivePort", SearchOption.AllDirectories)
+                : [];
+            if (found.Length == 0)
+            {
+                sb.AppendLine("DevToolsActivePort: NOT FOUND under user-data folder " +
+                    "=> remote debugging never started (arg/policy not honored).");
+            }
+            else
+            {
+                foreach (var file in found)
+                {
+                    // Read with FileShare.ReadWrite in case Chromium still holds it open.
+                    using var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    using var reader = new StreamReader(fs);
+                    var content = (await reader.ReadToEndAsync()).Trim();
+                    sb.AppendLine($"DevToolsActivePort ({file}):").AppendLine(content)
+                      .AppendLine($"(requested port was {_cdpPort})");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            sb.AppendLine($"DevToolsActivePort probe failed: {ex.Message}");
+        }
+
+        // 2. Edge remote-debugging policy (0 => CDP disabled by policy).
+        sb.AppendLine("--- Edge policies (HKLM) ---")
+          .AppendLine(await RunCaptureAsync("reg", @"query ""HKLM\SOFTWARE\Policies\Microsoft\Edge"" /s"));
+        sb.AppendLine("--- Edge policies (HKCU) ---")
+          .AppendLine(await RunCaptureAsync("reg", @"query ""HKCU\SOFTWARE\Policies\Microsoft\Edge"" /s"));
+
+        // 3. Is anything listening on the requested port?
+        sb.AppendLine($"--- netstat (port {_cdpPort}) ---")
+          .AppendLine(await RunCaptureAsync("cmd", $"/c netstat -ano -p tcp | findstr {_cdpPort}"));
+
+        // 4. WebView2 Evergreen runtime version.
+        sb.AppendLine("--- WebView2 runtime version ---")
+          .AppendLine(await RunCaptureAsync("reg",
+              @"query ""HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"" /v pv"));
+
+        var diagnostics = sb.ToString();
+
+        // Persist to the uploaded artifacts directory for reliable capture.
+        try
+        {
+            var dir = Path.GetDirectoryName(_processLogPath);
+            if (!string.IsNullOrEmpty(dir))
+            {
+                await File.WriteAllTextAsync(Path.Combine(dir, "cdp-diagnostics.txt"), diagnostics);
+            }
+        }
+        catch { /* best-effort */ }
+
+        return diagnostics;
+    }
+
+    /// <summary>Runs a console command and returns combined stdout+stderr (best-effort).</summary>
+    private static async Task<string> RunCaptureAsync(string fileName, string arguments, int timeoutMs = 10_000)
+    {
+        try
+        {
+            using var proc = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    Arguments = arguments,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                },
+            };
+            proc.Start();
+            var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+            var stderrTask = proc.StandardError.ReadToEndAsync();
+            using var cts = new CancellationTokenSource(timeoutMs);
+            try { await proc.WaitForExitAsync(cts.Token); }
+            catch (OperationCanceledException) { try { proc.Kill(entireProcessTree: true); } catch { /* best-effort */ } }
+            var output = ($"{await stdoutTask}{await stderrTask}").Trim();
+            return string.IsNullOrEmpty(output) ? "(no output)" : output;
+        }
+        catch (Exception ex)
+        {
+            return $"(command '{fileName} {arguments}' failed: {ex.Message})";
+        }
     }
 
     /// <summary>
