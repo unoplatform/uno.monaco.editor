@@ -100,6 +100,18 @@ public sealed class DesktopAppFixture : IAsyncLifetime
             },
         };
 
+        // WebView2 runtime v150 disables the CDP loopback endpoint when the host runs at
+        // High Integrity Level (elevated), which is how the windows-latest CI runner
+        // executes -- so --remote-debugging-port silently produces no listener there
+        // (WebView2Feedback #5640). When CI provides a pre-v150 Fixed Version runtime via
+        // WEBVIEW2_BROWSER_EXECUTABLE_FOLDER, forward it so the app uses that runtime and
+        // CDP works again. Unset locally (developers run non-elevated) => Evergreen runtime.
+        var fixedRuntimeFolder = Environment.GetEnvironmentVariable("WEBVIEW2_BROWSER_EXECUTABLE_FOLDER");
+        if (!string.IsNullOrEmpty(fixedRuntimeFolder))
+        {
+            startInfo.Environment["WEBVIEW2_BROWSER_EXECUTABLE_FOLDER"] = fixedRuntimeFolder;
+        }
+
         _appProcess = Process.Start(startInfo)
             ?? throw new InvalidOperationException("Failed to start MonacoEditorTestApp desktop process.");
 
@@ -361,6 +373,21 @@ public sealed class DesktopAppFixture : IAsyncLifetime
                 var response = await httpClient.GetAsync(versionUrl);
                 if (response.IsSuccessStatusCode)
                 {
+                    // Record the runtime that actually answered CDP (the "Browser" field,
+                    // e.g. "Edg/149.0.4022.98"). This is authoritative for which WebView2
+                    // runtime loaded: the machine's Evergreen version in the registry is
+                    // not, once a Fixed Version runtime is pinned via
+                    // WEBVIEW2_BROWSER_EXECUTABLE_FOLDER (WebView2Feedback #5640).
+                    try
+                    {
+                        var versionBody = await response.Content.ReadAsStringAsync();
+                        var dir = Path.GetDirectoryName(_processLogPath);
+                        if (!string.IsNullOrEmpty(dir))
+                        {
+                            await File.WriteAllTextAsync(Path.Combine(dir, "cdp-version.txt"), versionBody);
+                        }
+                    }
+                    catch { /* best-effort */ }
                     return; // CDP is ready.
                 }
             }

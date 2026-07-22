@@ -163,6 +163,29 @@ jobs:
         with:
           playwright-version: ${{ env.PLAYWRIGHT_VERSION }}
 
+      # WebView2 runtime v150 disabled the CDP remote-debugging endpoint for hosts running
+      # at High Integrity Level (WebView2Feedback #5640). GitHub windows-latest runs steps
+      # elevated, so the runner's Evergreen runtime (150.x) yields no CDP listener. Pin a
+      # pre-regression Fixed Version runtime (149.0.4022.98, #5640's last-working build,
+      # distributed as a stable NuGet package) and point WebView2 at it via
+      # WEBVIEW2_BROWSER_EXECUTABLE_FOLDER so DesktopCDP tests can attach.
+      - name: Pin WebView2 Fixed Version runtime 149 (CDP workaround, WebView2Feedback #5640)
+        shell: pwsh
+        run: |
+          $version = '149.0.4022.98'
+          $zip = Join-Path $env:RUNNER_TEMP 'wv2-fv.zip'
+          $dest = Join-Path $env:RUNNER_TEMP 'wv2-fv'
+          $url = "https://api.nuget.org/v3-flatcontainer/webview2.runtime.x64/$version/webview2.runtime.x64.$version.nupkg"
+          Write-Host "Downloading WebView2 Fixed Version runtime $version"
+          $ProgressPreference = 'SilentlyContinue'  # IWR progress stream cripples large downloads
+          Invoke-WebRequest -Uri $url -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dest -Force
+          $exe = Get-ChildItem -Path $dest -Recurse -Filter 'msedgewebview2.exe' | Select-Object -First 1
+          if (-not $exe) { throw "msedgewebview2.exe not found under $dest" }
+          $folder = $exe.Directory.FullName
+          Write-Host "WEBVIEW2_BROWSER_EXECUTABLE_FOLDER=$folder"
+          "WEBVIEW2_BROWSER_EXECUTABLE_FOLDER=$folder" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       # Windows runners have WebView2 Runtime + Edge pre-installed and support CDP.
       # DesktopCDP tests are enabled here; WASM Playwright tests are covered by Ubuntu.
       - name: Run tests (unit + DesktopCDP)
