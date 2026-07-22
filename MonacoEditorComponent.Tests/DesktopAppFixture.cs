@@ -114,7 +114,7 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         // silently dropped and no CDP listener starts. When elevated, additionally publish
         // the switch through the HKLM AdditionalBrowserArguments policy, which survives
         // elevation. Non-elevated (local dev) keeps using the env var and leaves HKLM alone.
-        if (OperatingSystem.IsWindows() && Environment.IsPrivilegedProcess)
+        if (await IsHostHighIntegrityAsync())
         {
             await PublishHklmBrowserArgumentsAsync($"--remote-debugging-port={_cdpPort}");
         }
@@ -498,6 +498,13 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         sb.AppendLine("--- Edge RemoteDebuggingAllowed (HKCU) ---")
           .AppendLine(await RunCaptureAsync("reg", @"query ""HKCU\SOFTWARE\Policies\Microsoft\Edge"" /v RemoteDebuggingAllowed"));
 
+        // 2b. The AdditionalBrowserArguments we publish via HKLM policy for elevated CDP
+        //     (WebView2Feedback #5640). Present with our --remote-debugging-port => the
+        //     write took effect (so the runtime is ignoring HKLM); absent => the write was
+        //     skipped (gate) or failed (perms). Read while still live (DisposeAsync reverts).
+        sb.AppendLine("--- HKLM WebView2 AdditionalBrowserArguments (elevated CDP write) ---")
+          .AppendLine(await RunCaptureAsync("reg", $@"query ""{WebView2PolicyKey}"" /v AdditionalBrowserArguments"));
+
         // 3. Is anything listening on the requested port?
         sb.AppendLine($"--- netstat (port {_cdpPort}) ---")
           .AppendLine(await RunCaptureAsync("cmd", $"/c netstat -ano -p tcp | findstr {_cdpPort}"));
@@ -577,6 +584,24 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         try { return await readTask; }
         catch (OperationCanceledException) { return string.Empty; }
         catch (IOException) { return string.Empty; }
+    }
+
+    /// <summary>
+    /// True when the current process runs at High (or System) Integrity Level on Windows.
+    /// Uses the mandatory-label SID from <c>whoami /groups</c> rather than
+    /// <see cref="Environment.IsPrivilegedProcess"/>, which keys off UAC token elevation and
+    /// returns false on CI runners where UAC is disabled but the process is still High IL --
+    /// the exact condition under which WebView2 v150 drops the WEBVIEW2_* switches (#5640).
+    /// </summary>
+    private static async Task<bool> IsHostHighIntegrityAsync()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return false;
+        }
+        var groups = await RunCaptureAsync("whoami", "/groups");
+        return groups.Contains("S-1-16-12288", StringComparison.Ordinal)   // High
+            || groups.Contains("S-1-16-16384", StringComparison.Ordinal);  // System
     }
 
     /// <summary>
