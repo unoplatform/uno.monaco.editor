@@ -48,6 +48,11 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     private string _processLogPath = string.Empty;
     private int _cdpPort;
     private CancellationTokenSource? _logCaptureCts;
+    private bool _wroteHklmBrowserArgs;
+
+    // Machine-wide WebView2 policy key. Arguments published here survive an elevated host
+    // process, unlike the WEBVIEW2_* environment variables (WebView2Feedback #5640).
+    private const string WebView2PolicyKey = @"HKLM\SOFTWARE\Policies\Microsoft\Edge\WebView2";
 
     // In-memory log lines for cursor-based query API.
     private readonly List<string> _logLines = [];
@@ -101,16 +106,17 @@ public sealed class DesktopAppFixture : IAsyncLifetime
             },
         };
 
-        // WebView2 runtime v150 disables the CDP loopback endpoint when the host runs at
-        // High Integrity Level (elevated), which is how the windows-latest CI runner
-        // executes -- so --remote-debugging-port silently produces no listener there
-        // (WebView2Feedback #5640). When CI provides a pre-v150 Fixed Version runtime via
-        // WEBVIEW2_BROWSER_EXECUTABLE_FOLDER, forward it so the app uses that runtime and
-        // CDP works again. Unset locally (developers run non-elevated) => Evergreen runtime.
-        var fixedRuntimeFolder = Environment.GetEnvironmentVariable("WEBVIEW2_BROWSER_EXECUTABLE_FOLDER");
-        if (!string.IsNullOrEmpty(fixedRuntimeFolder))
+        // WebView2 runtime v150 hardened elevated (High Integrity Level) hosts: switches
+        // supplied through user-writable channels (WEBVIEW2_* env vars, HKCU policy) are
+        // ignored -- only HKLM policy and API args are honored (WebView2Feedback #5640,
+        // "by design"). The windows-latest CI runner executes elevated, so the
+        // --remote-debugging-port set above via WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS is
+        // silently dropped and no CDP listener starts. When elevated, additionally publish
+        // the switch through the HKLM AdditionalBrowserArguments policy, which survives
+        // elevation. Non-elevated (local dev) keeps using the env var and leaves HKLM alone.
+        if (OperatingSystem.IsWindows() && Environment.IsPrivilegedProcess)
         {
-            startInfo.Environment["WEBVIEW2_BROWSER_EXECUTABLE_FOLDER"] = fixedRuntimeFolder;
+            await PublishHklmBrowserArgumentsAsync($"--remote-debugging-port={_cdpPort}");
         }
 
         _appProcess = Process.Start(startInfo)
@@ -198,6 +204,17 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         if (!string.IsNullOrEmpty(_userDataFolder) && Directory.Exists(_userDataFolder))
         {
             try { Directory.Delete(_userDataFolder, recursive: true); } catch { /* best-effort */ }
+        }
+
+        // Revert the machine-wide WebView2 policy set for elevated CDP (WebView2Feedback #5640).
+        if (_wroteHklmBrowserArgs)
+        {
+            try
+            {
+                await RunCaptureAsync("reg", $@"delete ""{WebView2PolicyKey}"" /v AdditionalBrowserArguments /f");
+            }
+            catch { /* best-effort */ }
+            _wroteHklmBrowserArgs = false;
         }
     }
 
@@ -375,10 +392,8 @@ public sealed class DesktopAppFixture : IAsyncLifetime
                 if (response.IsSuccessStatusCode)
                 {
                     // Record the runtime that actually answered CDP (the "Browser" field,
-                    // e.g. "Edg/149.0.4022.98"). This is authoritative for which WebView2
-                    // runtime loaded: the machine's Evergreen version in the registry is
-                    // not, once a Fixed Version runtime is pinned via
-                    // WEBVIEW2_BROWSER_EXECUTABLE_FOLDER (WebView2Feedback #5640).
+                    // e.g. "Edg/150.0.4078.65") to test-artifacts. Useful confirmation of
+                    // exactly which WebView2 runtime served the session.
                     try
                     {
                         var versionBody = await response.Content.ReadAsStringAsync();
@@ -388,7 +403,8 @@ public sealed class DesktopAppFixture : IAsyncLifetime
                             await File.WriteAllTextAsync(Path.Join(dir, "cdp-version.txt"), versionBody);
                         }
                     }
-                    catch { /* best-effort */ }
+                    catch (IOException) { /* best-effort */ }
+                    catch (UnauthorizedAccessException) { /* best-effort */ }
                     return; // CDP is ready.
                 }
             }
@@ -561,6 +577,30 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         try { return await readTask; }
         catch (OperationCanceledException) { return string.Empty; }
         catch (IOException) { return string.Empty; }
+    }
+
+    /// <summary>
+    /// Publishes WebView2 browser arguments through the machine-wide (HKLM) policy so they
+    /// survive an elevated host process. WebView2 v150 ignores the user-writable channels
+    /// (WEBVIEW2_* environment variables, HKCU policy) when the host runs at High Integrity
+    /// Level -- only HKLM policy and API args are honored (WebView2Feedback #5640). Called
+    /// only when elevated (the sole case that needs it); best-effort and reverted in
+    /// <see cref="DisposeAsync"/>. A pre-existing machine policy value is left untouched.
+    /// </summary>
+    private async Task PublishHklmBrowserArgumentsAsync(string arguments)
+    {
+        // Do not clobber a value the machine already defines (the CI runner defines none).
+        var existing = await RunCaptureAsync("reg", $@"query ""{WebView2PolicyKey}"" /v AdditionalBrowserArguments");
+        if (existing.Contains("AdditionalBrowserArguments", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        // Set the flag before writing so DisposeAsync reverts the machine policy even if the
+        // add result cannot be parsed; deleting an absent value is a harmless no-op.
+        _wroteHklmBrowserArgs = true;
+        await RunCaptureAsync("reg",
+            $@"add ""{WebView2PolicyKey}"" /v AdditionalBrowserArguments /t REG_SZ /d ""{arguments}"" /f");
     }
 
     /// <summary>
