@@ -19,7 +19,7 @@ namespace MonacoEditorComponent.Tests;
 /// macOS (WKWebView) and Linux (WebKitGTK) are not Chromium and do not support CDP.</para>
 ///
 /// <para><b>Deterministic readiness</b>: The fixture does NOT rely on arbitrary delays.
-/// It polls <c>http://localhost:{port}/json/version</c> to confirm CDP is ready,
+/// It polls <c>http://127.0.0.1:{port}/json/version</c> to confirm CDP is ready,
 /// then waits for the Monaco editor page via Playwright page enumeration.</para>
 ///
 /// <para><b>Agent-driven testing pattern (Playwright MCP)</b>:
@@ -107,7 +107,14 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         _ = CaptureProcessOutputAsync(_appProcess, _processLogPath, _logCaptureCts.Token);
 
         // 5. Deterministic readiness: poll CDP version endpoint.
-        var cdpEndpoint = $"http://localhost:{_cdpPort}";
+        // Use the IPv4 loopback literal, not "localhost": WebView2/Chromium's
+        // --remote-debugging-port (with no --remote-debugging-address) binds to
+        // 127.0.0.1 only. On runners where "localhost" resolves to IPv6 (::1) first,
+        // the CDP endpoint is unreachable (connection refused) and readiness polling
+        // times out even though the app itself started fine. This also matches the
+        // port reserved via IPAddress.Loopback in GetAvailablePort(). The endpoint
+        // feeds both the readiness poll below and ConnectOverCDPAsync in step 6.
+        var cdpEndpoint = $"http://127.0.0.1:{_cdpPort}";
         await WaitForCdpReady(cdpEndpoint);
 
         // 6. Connect Playwright via CDP.
@@ -343,10 +350,9 @@ public sealed class DesktopAppFixture : IAsyncLifetime
             if (_appProcess is { HasExited: true })
             {
                 var exitCode = _appProcess.ExitCode;
-                var logContent = File.Exists(_processLogPath) ? File.ReadAllText(_processLogPath) : "(no log)";
                 throw new InvalidOperationException(
                     $"MonacoEditorTestApp process exited unexpectedly with code {exitCode} before CDP was ready.\n" +
-                    $"Process log:\n{logContent}");
+                    $"Process log:\n{CaptureLogSnapshot()}");
             }
 
             try
@@ -369,10 +375,22 @@ public sealed class DesktopAppFixture : IAsyncLifetime
             await Task.Delay(CdpPollIntervalMs);
         }
 
-        var logOnTimeout = File.Exists(_processLogPath) ? File.ReadAllText(_processLogPath) : "(no log)";
         throw new TimeoutException(
             $"CDP endpoint at {versionUrl} did not become ready within {CdpReadyTimeoutMs}ms.\n" +
-            $"Process log:\n{logOnTimeout}");
+            $"Process log:\n{CaptureLogSnapshot()}");
+    }
+
+    /// <summary>
+    /// Returns the captured process stdout/stderr as a single string from the in-memory
+    /// buffer. Reading the on-disk log file directly is unsafe on Windows: the background
+    /// <see cref="CaptureProcessOutputAsync"/> writer holds it open, and a concurrent
+    /// reader's implicit FileShare.Read does not grant the writer's Write access, which
+    /// surfaces as an IOException that masks the real readiness diagnostic.
+    /// </summary>
+    private string CaptureLogSnapshot()
+    {
+        var lines = GetLinesAfter(0);
+        return lines.Count > 0 ? string.Join(Environment.NewLine, lines) : "(no log)";
     }
 
     private async Task<IPage> FindMonacoPage()
