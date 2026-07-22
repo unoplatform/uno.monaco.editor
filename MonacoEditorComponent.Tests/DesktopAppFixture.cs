@@ -213,7 +213,8 @@ public sealed class DesktopAppFixture : IAsyncLifetime
             {
                 await RunCaptureAsync("reg", $@"delete ""{WebView2PolicyKey}"" /v AdditionalBrowserArguments /f");
             }
-            catch { /* best-effort */ }
+            catch (InvalidOperationException) { /* best-effort */ }
+            catch (Win32Exception) { /* best-effort */ }
             _wroteHklmBrowserArgs = false;
         }
     }
@@ -616,7 +617,11 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     {
         // Do not clobber a value the machine already defines (the CI runner defines none).
         var existing = await RunCaptureAsync("reg", $@"query ""{WebView2PolicyKey}"" /v AdditionalBrowserArguments");
-        if (existing.Contains("AdditionalBrowserArguments", StringComparison.OrdinalIgnoreCase))
+        // Match the actual reg-query success line ("AdditionalBrowserArguments  REG_SZ  ..."),
+        // not a bare substring: RunCaptureAsync's own failure text echoes the queried value
+        // name in the command it reports, so a substring check would read a reg-launch failure
+        // as "value already exists" and skip the write -- leaving CDP broken on elevated runners.
+        if (Regex.IsMatch(existing, @"AdditionalBrowserArguments\s+REG_", RegexOptions.IgnoreCase))
         {
             return;
         }
