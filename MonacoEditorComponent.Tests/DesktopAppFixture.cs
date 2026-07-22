@@ -406,6 +406,12 @@ public sealed class DesktopAppFixture : IAsyncLifetime
 
         var sb = new StringBuilder();
 
+        // 0. Integrity level of this process (== the spawned app's IL, since the app is
+        //    launched as a child). WebView2 runtime v150 disables the CDP loopback
+        //    endpoint when the host runs at High Mandatory Level (WebView2Feedback #5640).
+        sb.AppendLine("--- process integrity level (whoami /groups | Mandatory) ---")
+          .AppendLine(await RunCaptureAsync("cmd", "/c whoami /groups | findstr /i Mandatory"));
+
         // 1. DevToolsActivePort: the decisive signal for whether a listener started.
         try
         {
