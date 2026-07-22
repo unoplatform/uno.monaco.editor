@@ -7,7 +7,11 @@
   -->
   <ItemGroup>
     <PackageVersion Include="Nito.AsyncEx" Version="5.1.2" />
-    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.9" />
+    <!-- Security pin: 10.0.0-10.0.9 have known high-severity vulnerabilities; 10.0.10 is the first
+         patched release. Applied via a direct PackageReference in MonacoEditorTestApp: this repo does
+         not set CentralPackageTransitivePinningEnabled, so CPM does not pin transitive versions on its
+         own and a direct reference is needed for the pin to take effect. -->
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.10" />
     <PackageVersion Include="StreamJsonRpc" Version="2.25.28" />
     <PackageVersion Include="Uno.CommunityToolkit.WinUI" Version="7.1.204" />
     <PackageVersion Include="Uno.WinUI" Version="6.5.153" />
