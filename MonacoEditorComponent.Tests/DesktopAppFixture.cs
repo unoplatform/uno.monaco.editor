@@ -52,7 +52,13 @@ public sealed class DesktopAppFixture : IAsyncLifetime
 
     // Machine-wide WebView2 policy key. Arguments published here survive an elevated host
     // process, unlike the WEBVIEW2_* environment variables (WebView2Feedback #5640).
+    // Per the WebView2 loader contract, AdditionalBrowserArguments is a SUBKEY whose value
+    // is named by the AppId (AUMID / compiled code name), with "*" as the all-apps wildcard --
+    // NOT a value named "AdditionalBrowserArguments" under the WebView2 key. Writing it at the
+    // wrong level is silently ignored by the loader. See CreateCoreWebView2EnvironmentWithOptions.
     private const string WebView2PolicyKey = @"HKLM\SOFTWARE\Policies\Microsoft\Edge\WebView2";
+    private const string WebView2AdditionalArgsKey = WebView2PolicyKey + @"\AdditionalBrowserArguments";
+    private const string WebView2AppIdWildcard = "*";
 
     // In-memory log lines for cursor-based query API.
     private readonly List<string> _logLines = [];
@@ -218,7 +224,7 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         {
             try
             {
-                await RunCaptureAsync("reg", $@"delete ""{WebView2PolicyKey}"" /v AdditionalBrowserArguments /f");
+                await RunCaptureAsync("reg", $@"delete ""{WebView2AdditionalArgsKey}"" /v {WebView2AppIdWildcard} /f");
             }
             catch (InvalidOperationException) { /* best-effort */ }
             catch (Win32Exception) { /* best-effort */ }
@@ -510,8 +516,8 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         //     (WebView2Feedback #5640). Present with our --remote-debugging-port => the
         //     write took effect (so the runtime is ignoring HKLM); absent => the write was
         //     skipped (gate) or failed (perms). Read while still live (DisposeAsync reverts).
-        sb.AppendLine("--- HKLM WebView2 AdditionalBrowserArguments (elevated CDP write) ---")
-          .AppendLine(await RunCaptureAsync("reg", $@"query ""{WebView2PolicyKey}"" /v AdditionalBrowserArguments"));
+        sb.AppendLine("--- HKLM WebView2 AdditionalBrowserArguments\\* (elevated CDP write) ---")
+          .AppendLine(await RunCaptureAsync("reg", $@"query ""{WebView2AdditionalArgsKey}"" /v {WebView2AppIdWildcard}"));
 
         // 3. Is anything listening on the requested port? Match the exact ":{port}" token
         //    (port followed by a non-digit) so e.g. 5000 does not also match 15000/50001.
@@ -639,13 +645,12 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     /// </summary>
     private async Task PublishHklmBrowserArgumentsAsync(string arguments)
     {
-        // Do not clobber a value the machine already defines (the CI runner defines none).
-        var existing = await RunCaptureAsync("reg", $@"query ""{WebView2PolicyKey}"" /v AdditionalBrowserArguments");
-        // Match the actual reg-query success line ("AdditionalBrowserArguments  REG_SZ  ..."),
-        // not a bare substring: RunCaptureAsync's own failure text echoes the queried value
-        // name in the command it reports, so a substring check would read a reg-launch failure
-        // as "value already exists" and skip the write -- leaving CDP broken on elevated runners.
-        if (Regex.IsMatch(existing, @"AdditionalBrowserArguments\s+REG_", RegexOptions.IgnoreCase))
+        // Do not clobber a wildcard value the machine already defines (the CI runner defines none).
+        // Detect it via the REG_ type token on the query's value line, not a bare substring:
+        // RunCaptureAsync's own failure text echoes the queried command, so a substring check
+        // would read a reg-launch failure as "value already exists" and skip the write.
+        var existing = await RunCaptureAsync("reg", $@"query ""{WebView2AdditionalArgsKey}"" /v {WebView2AppIdWildcard}");
+        if (Regex.IsMatch(existing, @"\bREG_", RegexOptions.IgnoreCase))
         {
             return;
         }
@@ -654,13 +659,13 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         // verification below throws; deleting an absent value is a harmless no-op.
         _wroteHklmBrowserArgs = true;
         var addOutput = await RunCaptureAsync("reg",
-            $@"add ""{WebView2PolicyKey}"" /v AdditionalBrowserArguments /t REG_SZ /d ""{arguments}"" /f");
+            $@"add ""{WebView2AdditionalArgsKey}"" /v {WebView2AppIdWildcard} /t REG_SZ /d ""{arguments}"" /f");
 
         // reg can fail without throwing (e.g. access denied / locked-down policy) -- RunCaptureAsync
         // just returns its output. Confirm the value actually landed and fail fast with the reg
         // output, rather than letting CDP readiness time out ~30s later with an indirect error.
-        var verify = await RunCaptureAsync("reg", $@"query ""{WebView2PolicyKey}"" /v AdditionalBrowserArguments");
-        if (!Regex.IsMatch(verify, @"AdditionalBrowserArguments\s+REG_", RegexOptions.IgnoreCase))
+        var verify = await RunCaptureAsync("reg", $@"query ""{WebView2AdditionalArgsKey}"" /v {WebView2AppIdWildcard}");
+        if (!Regex.IsMatch(verify, @"\bREG_", RegexOptions.IgnoreCase))
         {
             throw new InvalidOperationException(
                 "Failed to publish the HKLM WebView2 AdditionalBrowserArguments policy required for elevated " +
