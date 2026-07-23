@@ -111,10 +111,17 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         // ignored -- only HKLM policy and API args are honored (WebView2Feedback #5640,
         // "by design"). The windows-latest CI runner executes elevated, so the
         // --remote-debugging-port set above via WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS is
-        // silently dropped and no CDP listener starts. When elevated, additionally publish
-        // the switch through the HKLM AdditionalBrowserArguments policy, which survives
-        // elevation. Non-elevated (local dev) keeps using the env var and leaves HKLM alone.
-        if (await IsHostHighIntegrityAsync())
+        // silently dropped and no CDP listener starts. There, additionally publish the
+        // switch through the HKLM AdditionalBrowserArguments policy, which survives elevation.
+        //
+        // Restrict this machine-wide write to CI (GITHUB_ACTIONS) on top of the integrity
+        // check: writing HKLM policy affects other WebView2 hosts on the machine and could
+        // linger if the run is interrupted before DisposeAsync reverts it. CI runners are
+        // ephemeral, so that is acceptable there; a developer running elevated locally is not
+        // modified (they keep the env var, which is enough at Medium IL / pre-v150 anyway).
+        var isCi = string.Equals(
+            Environment.GetEnvironmentVariable("GITHUB_ACTIONS"), "true", StringComparison.OrdinalIgnoreCase);
+        if (isCi && await IsHostHighIntegrityAsync())
         {
             await PublishHklmBrowserArgumentsAsync($"--remote-debugging-port={_cdpPort}");
         }
@@ -506,9 +513,10 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         sb.AppendLine("--- HKLM WebView2 AdditionalBrowserArguments (elevated CDP write) ---")
           .AppendLine(await RunCaptureAsync("reg", $@"query ""{WebView2PolicyKey}"" /v AdditionalBrowserArguments"));
 
-        // 3. Is anything listening on the requested port?
+        // 3. Is anything listening on the requested port? Match the exact ":{port}" token
+        //    (port followed by a non-digit) so e.g. 5000 does not also match 15000/50001.
         sb.AppendLine($"--- netstat (port {_cdpPort}) ---")
-          .AppendLine(await RunCaptureAsync("cmd", $"/c netstat -ano -p tcp | findstr {_cdpPort}"));
+          .AppendLine(await RunCaptureAsync("cmd", $"/c netstat -ano -p tcp | findstr /r \":{_cdpPort}[^0-9]\""));
 
         // 4. WebView2 Evergreen runtime version.
         sb.AppendLine("--- WebView2 runtime version ---")
