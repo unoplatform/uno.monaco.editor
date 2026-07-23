@@ -405,10 +405,10 @@ public sealed class DesktopAppFixture : IAsyncLifetime
                     try
                     {
                         var versionBody = await response.Content.ReadAsStringAsync();
-                        var dir = Path.GetDirectoryName(_processLogPath);
-                        if (!string.IsNullOrEmpty(dir))
+                        var versionPath = ArtifactSiblingPath("cdp-version.txt");
+                        if (versionPath is not null)
                         {
-                            await File.WriteAllTextAsync(Path.Join(dir, "cdp-version.txt"), versionBody);
+                            await File.WriteAllTextAsync(versionPath, versionBody);
                         }
                     }
                     catch (IOException) { /* best-effort */ }
@@ -447,7 +447,7 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     /// <c>WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS</c> flag was not honored).</description></item>
     /// <item><description>Edge <c>RemoteDebuggingAllowed</c> policy = 0 disables CDP entirely.</description></item>
     /// </list>
-    /// Also written to <c>test-artifacts/cdp-diagnostics.txt</c> for the uploaded artifact.
+    /// Also written to <c>test-artifacts/{run}-cdp-diagnostics.txt</c> for the uploaded artifact.
     /// </summary>
     private async Task<string> CollectCdpDiagnosticsAsync()
     {
@@ -528,10 +528,10 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         // Persist to the uploaded artifacts directory for reliable capture.
         try
         {
-            var dir = Path.GetDirectoryName(_processLogPath);
-            if (!string.IsNullOrEmpty(dir))
+            var diagnosticsPath = ArtifactSiblingPath("cdp-diagnostics.txt");
+            if (diagnosticsPath is not null)
             {
-                await File.WriteAllTextAsync(Path.Join(dir, "cdp-diagnostics.txt"), diagnostics);
+                await File.WriteAllTextAsync(diagnosticsPath, diagnostics);
             }
         }
         catch (IOException) { /* best-effort */ }
@@ -596,6 +596,22 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     }
 
     /// <summary>
+    /// Builds an artifact path sharing the timestamped base name of the process log
+    /// (e.g. <c>desktop-fixture-{timestamp}-cdp-version.txt</c>) so a run's diagnostics group
+    /// together and don't overwrite each other across parallel fixture instances or retries.
+    /// Returns null when the log directory cannot be determined.
+    /// </summary>
+    private string? ArtifactSiblingPath(string suffix)
+    {
+        var dir = Path.GetDirectoryName(_processLogPath);
+        if (string.IsNullOrEmpty(dir))
+        {
+            return null;
+        }
+        return Path.Join(dir, $"{Path.GetFileNameWithoutExtension(_processLogPath)}-{suffix}");
+    }
+
+    /// <summary>
     /// True when the current process runs at High (or System) Integrity Level on Windows.
     /// Uses the mandatory-label SID from <c>whoami /groups</c> rather than
     /// <see cref="Environment.IsPrivilegedProcess"/>, which keys off UAC token elevation and
@@ -635,10 +651,22 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         }
 
         // Set the flag before writing so DisposeAsync reverts the machine policy even if the
-        // add result cannot be parsed; deleting an absent value is a harmless no-op.
+        // verification below throws; deleting an absent value is a harmless no-op.
         _wroteHklmBrowserArgs = true;
-        await RunCaptureAsync("reg",
+        var addOutput = await RunCaptureAsync("reg",
             $@"add ""{WebView2PolicyKey}"" /v AdditionalBrowserArguments /t REG_SZ /d ""{arguments}"" /f");
+
+        // reg can fail without throwing (e.g. access denied / locked-down policy) -- RunCaptureAsync
+        // just returns its output. Confirm the value actually landed and fail fast with the reg
+        // output, rather than letting CDP readiness time out ~30s later with an indirect error.
+        var verify = await RunCaptureAsync("reg", $@"query ""{WebView2PolicyKey}"" /v AdditionalBrowserArguments");
+        if (!Regex.IsMatch(verify, @"AdditionalBrowserArguments\s+REG_", RegexOptions.IgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Failed to publish the HKLM WebView2 AdditionalBrowserArguments policy required for elevated " +
+                $"CDP (WebView2Feedback #5640).{Environment.NewLine}reg add output: {addOutput}{Environment.NewLine}" +
+                $"reg query output: {verify}");
+        }
     }
 
     /// <summary>
