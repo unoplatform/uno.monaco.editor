@@ -165,6 +165,10 @@ jobs:
 
       # Windows runners have WebView2 Runtime + Edge pre-installed and support CDP.
       # DesktopCDP tests are enabled here; WASM Playwright tests are covered by Ubuntu.
+      # Note: the fixture always sets --remote-debugging-port via the WEBVIEW2_* env var, and
+      # because this runner executes elevated (High Integrity Level) -- where WebView2 v150
+      # drops that env var (WebView2Feedback #5640) -- it additionally publishes the switch
+      # through the HKLM WebView2 policy. See DesktopAppFixture.PublishHklmBrowserArgumentsAsync.
       - name: Run tests (unit + DesktopCDP)
         run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}" --no-build --coverage --coverage-output-format cobertura --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=WasmPlaywright" --report-xunit --report-xunit-filename desktop-test-results.xml
 

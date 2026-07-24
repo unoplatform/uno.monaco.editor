@@ -1,7 +1,9 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Text;
 using System.Text.RegularExpressions;
 
 using Microsoft.Playwright;
@@ -19,12 +21,12 @@ namespace MonacoEditorComponent.Tests;
 /// macOS (WKWebView) and Linux (WebKitGTK) are not Chromium and do not support CDP.</para>
 ///
 /// <para><b>Deterministic readiness</b>: The fixture does NOT rely on arbitrary delays.
-/// It polls <c>http://localhost:{port}/json/version</c> to confirm CDP is ready,
+/// It polls <c>http://127.0.0.1:{port}/json/version</c> to confirm CDP is ready,
 /// then waits for the Monaco editor page via Playwright page enumeration.</para>
 ///
 /// <para><b>Agent-driven testing pattern (Playwright MCP)</b>:
 /// An AI agent can also connect to a running desktop app for ad-hoc verification
-/// using the Playwright MCP server with <c>--cdp-endpoint http://localhost:{port}</c>.
+/// using the Playwright MCP server with <c>--cdp-endpoint http://127.0.0.1:{port}</c>.
 /// This provides <c>browser_snapshot</c> for accessibility tree inspection,
 /// <c>browser_evaluate</c> for JS assertions, and <c>browser_click</c> for
 /// interaction testing. This is a development convenience, not automated CI.</para>
@@ -46,6 +48,17 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     private string _processLogPath = string.Empty;
     private int _cdpPort;
     private CancellationTokenSource? _logCaptureCts;
+    private bool _wroteHklmBrowserArgs;
+
+    // Machine-wide WebView2 policy key. Arguments published here survive an elevated host
+    // process, unlike the WEBVIEW2_* environment variables (WebView2Feedback #5640).
+    // Per the WebView2 loader contract, AdditionalBrowserArguments is a SUBKEY whose value
+    // is named by the AppId (AUMID / compiled code name), with "*" as the all-apps wildcard --
+    // NOT a value named "AdditionalBrowserArguments" under the WebView2 key. Writing it at the
+    // wrong level is silently ignored by the loader. See CreateCoreWebView2EnvironmentWithOptions.
+    private const string WebView2PolicyKey = @"HKLM\SOFTWARE\Policies\Microsoft\Edge\WebView2";
+    private const string WebView2AdditionalArgsKey = WebView2PolicyKey + @"\AdditionalBrowserArguments";
+    private const string WebView2AppIdWildcard = "*";
 
     // In-memory log lines for cursor-based query API.
     private readonly List<string> _logLines = [];
@@ -99,6 +112,26 @@ public sealed class DesktopAppFixture : IAsyncLifetime
             },
         };
 
+        // WebView2 runtime v150 hardened elevated (High Integrity Level) hosts: switches
+        // supplied through user-writable channels (WEBVIEW2_* env vars, HKCU policy) are
+        // ignored -- only HKLM policy and API args are honored (WebView2Feedback #5640,
+        // "by design"). The windows-latest CI runner executes elevated, so the
+        // --remote-debugging-port set above via WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS is
+        // silently dropped and no CDP listener starts. There, additionally publish the
+        // switch through the HKLM AdditionalBrowserArguments policy, which survives elevation.
+        //
+        // Restrict this machine-wide write to CI (GITHUB_ACTIONS) on top of the integrity
+        // check: writing HKLM policy affects other WebView2 hosts on the machine and could
+        // linger if the run is interrupted before DisposeAsync reverts it. CI runners are
+        // ephemeral, so that is acceptable there; a developer running elevated locally is not
+        // modified (they keep the env var, which is enough at Medium IL / pre-v150 anyway).
+        var isCi = string.Equals(
+            Environment.GetEnvironmentVariable("GITHUB_ACTIONS"), "true", StringComparison.OrdinalIgnoreCase);
+        if (isCi && await IsHostHighIntegrityAsync())
+        {
+            await PublishHklmBrowserArgumentsAsync($"--remote-debugging-port={_cdpPort}");
+        }
+
         _appProcess = Process.Start(startInfo)
             ?? throw new InvalidOperationException("Failed to start MonacoEditorTestApp desktop process.");
 
@@ -107,7 +140,14 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         _ = CaptureProcessOutputAsync(_appProcess, _processLogPath, _logCaptureCts.Token);
 
         // 5. Deterministic readiness: poll CDP version endpoint.
-        var cdpEndpoint = $"http://localhost:{_cdpPort}";
+        // Use the IPv4 loopback literal, not "localhost": WebView2/Chromium's
+        // --remote-debugging-port (with no --remote-debugging-address) binds to
+        // 127.0.0.1 only. On runners where "localhost" resolves to IPv6 (::1) first,
+        // the CDP endpoint is unreachable (connection refused) and readiness polling
+        // times out even though the app itself started fine. This also matches the
+        // port reserved via IPAddress.Loopback in GetAvailablePort(). The endpoint
+        // feeds both the readiness poll below and ConnectOverCDPAsync in step 6.
+        var cdpEndpoint = $"http://127.0.0.1:{_cdpPort}";
         await WaitForCdpReady(cdpEndpoint);
 
         // 6. Connect Playwright via CDP.
@@ -177,6 +217,18 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         if (!string.IsNullOrEmpty(_userDataFolder) && Directory.Exists(_userDataFolder))
         {
             try { Directory.Delete(_userDataFolder, recursive: true); } catch { /* best-effort */ }
+        }
+
+        // Revert the machine-wide WebView2 policy set for elevated CDP (WebView2Feedback #5640).
+        if (_wroteHklmBrowserArgs)
+        {
+            try
+            {
+                await RunCaptureAsync("reg", $@"delete ""{WebView2AdditionalArgsKey}"" /v {WebView2AppIdWildcard} /f");
+            }
+            catch (InvalidOperationException) { /* best-effort */ }
+            catch (Win32Exception) { /* best-effort */ }
+            _wroteHklmBrowserArgs = false;
         }
     }
 
@@ -343,17 +395,30 @@ public sealed class DesktopAppFixture : IAsyncLifetime
             if (_appProcess is { HasExited: true })
             {
                 var exitCode = _appProcess.ExitCode;
-                var logContent = File.Exists(_processLogPath) ? File.ReadAllText(_processLogPath) : "(no log)";
                 throw new InvalidOperationException(
                     $"MonacoEditorTestApp process exited unexpectedly with code {exitCode} before CDP was ready.\n" +
-                    $"Process log:\n{logContent}");
+                    $"Process log:\n{CaptureLogSnapshot()}");
             }
 
             try
             {
-                var response = await httpClient.GetAsync(versionUrl);
+                using var response = await httpClient.GetAsync(versionUrl);
                 if (response.IsSuccessStatusCode)
                 {
+                    // Record the runtime that actually answered CDP (the "Browser" field,
+                    // e.g. "Edg/150.0.4078.65") to test-artifacts. Useful confirmation of
+                    // exactly which WebView2 runtime served the session.
+                    try
+                    {
+                        var versionBody = await response.Content.ReadAsStringAsync();
+                        var versionPath = ArtifactSiblingPath("cdp-version.txt");
+                        if (versionPath is not null)
+                        {
+                            await File.WriteAllTextAsync(versionPath, versionBody);
+                        }
+                    }
+                    catch (IOException) { /* best-effort */ }
+                    catch (UnauthorizedAccessException) { /* best-effort */ }
                     return; // CDP is ready.
                 }
             }
@@ -369,10 +434,284 @@ public sealed class DesktopAppFixture : IAsyncLifetime
             await Task.Delay(CdpPollIntervalMs);
         }
 
-        var logOnTimeout = File.Exists(_processLogPath) ? File.ReadAllText(_processLogPath) : "(no log)";
+        var cdpDiagnostics = await CollectCdpDiagnosticsAsync();
         throw new TimeoutException(
             $"CDP endpoint at {versionUrl} did not become ready within {CdpReadyTimeoutMs}ms.\n" +
-            $"Process log:\n{logOnTimeout}");
+            $"CDP diagnostics:\n{cdpDiagnostics}\n" +
+            $"Process log:\n{CaptureLogSnapshot()}");
+    }
+
+    /// <summary>
+    /// Best-effort, Windows-only diagnostics gathered when the CDP endpoint never became
+    /// ready. Answers the key question the readiness timeout cannot: did WebView2/Chromium
+    /// even start a remote-debugging listener, and if not, why?
+    /// <list type="bullet">
+    /// <item><description><c>DevToolsActivePort</c> present under the user-data folder =&gt;
+    /// the listener started (line 1 is the actual port; if it differs from the requested
+    /// port, the fixture polled the wrong one).</description></item>
+    /// <item><description>Absent =&gt; remote debugging never started (policy or the
+    /// <c>WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS</c> flag was not honored).</description></item>
+    /// <item><description>Edge <c>RemoteDebuggingAllowed</c> policy = 0 disables CDP entirely.</description></item>
+    /// </list>
+    /// Also written to <c>test-artifacts/{run}-cdp-diagnostics.txt</c> for the uploaded artifact.
+    /// </summary>
+    private async Task<string> CollectCdpDiagnosticsAsync()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return "(CDP diagnostics collected on Windows only)";
+        }
+
+        var sb = new StringBuilder();
+
+        // 0. Integrity level of this process (== the spawned app's IL, since the app is
+        //    launched as a child). WebView2 runtime v150 disables the CDP loopback
+        //    endpoint when the host runs at High Mandatory Level (WebView2Feedback #5640).
+        sb.AppendLine("--- process integrity level (whoami /groups | Mandatory) ---")
+          .AppendLine(await RunCaptureAsync("cmd", "/c whoami /groups | findstr /i Mandatory"));
+
+        // 1. DevToolsActivePort: the decisive signal for whether a listener started.
+        try
+        {
+            var found = Directory.Exists(_userDataFolder)
+                ? Directory.GetFiles(_userDataFolder, "DevToolsActivePort", SearchOption.AllDirectories)
+                : [];
+            if (found.Length == 0)
+            {
+                sb.AppendLine("DevToolsActivePort: NOT FOUND under user-data folder " +
+                    "=> remote debugging never started (arg/policy not honored).");
+            }
+            else
+            {
+                foreach (var file in found)
+                {
+                    // Read with FileShare.ReadWrite in case Chromium still holds it open.
+                    using var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    using var reader = new StreamReader(fs);
+                    var content = (await reader.ReadToEndAsync()).Trim();
+                    sb.AppendLine($"DevToolsActivePort ({file}):").AppendLine(content)
+                      .AppendLine($"(requested port was {_cdpPort})");
+                }
+            }
+        }
+        catch (IOException ex)
+        {
+            // Covers DirectoryNotFound/FileNotFound/PathTooLong (all derive from IOException).
+            sb.AppendLine($"DevToolsActivePort probe failed: {ex.Message}");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            sb.AppendLine($"DevToolsActivePort probe failed: {ex.Message}");
+        }
+
+        // 2. Edge remote-debugging policy (0 => CDP disabled by policy). Query the specific
+        //    value rather than dumping the whole policy tree (/s), which is large and noisy.
+        //    A "unable to find" result means the policy is unset (i.e. not disabling CDP).
+        sb.AppendLine("--- Edge RemoteDebuggingAllowed (HKLM) ---")
+          .AppendLine(await RunCaptureAsync("reg", @"query ""HKLM\SOFTWARE\Policies\Microsoft\Edge"" /v RemoteDebuggingAllowed"));
+        sb.AppendLine("--- Edge RemoteDebuggingAllowed (HKCU) ---")
+          .AppendLine(await RunCaptureAsync("reg", @"query ""HKCU\SOFTWARE\Policies\Microsoft\Edge"" /v RemoteDebuggingAllowed"));
+
+        // 2b. The AdditionalBrowserArguments we publish via HKLM policy for elevated CDP
+        //     (WebView2Feedback #5640). Present with our --remote-debugging-port => the
+        //     write took effect (so the runtime is ignoring HKLM); absent => the write was
+        //     skipped (gate) or failed (perms). Read while still live (DisposeAsync reverts).
+        sb.AppendLine("--- HKLM WebView2 AdditionalBrowserArguments\\* (elevated CDP write) ---")
+          .AppendLine(await RunCaptureAsync("reg", $@"query ""{WebView2AdditionalArgsKey}"" /v {WebView2AppIdWildcard}"));
+
+        // 3. Is anything listening on the requested port? Match the exact ":{port}" token
+        //    (port followed by a non-digit) so e.g. 5000 does not also match 15000/50001.
+        sb.AppendLine($"--- netstat (port {_cdpPort}) ---")
+          .AppendLine(await RunCaptureAsync("cmd", $"/c netstat -ano -p tcp | findstr /r \":{_cdpPort}[^0-9]\""));
+
+        // 4. WebView2 Evergreen runtime version.
+        sb.AppendLine("--- WebView2 runtime version ---")
+          .AppendLine(await RunCaptureAsync("reg",
+              @"query ""HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"" /v pv"));
+
+        var diagnostics = sb.ToString();
+
+        // Persist to the uploaded artifacts directory for reliable capture.
+        try
+        {
+            var diagnosticsPath = ArtifactSiblingPath("cdp-diagnostics.txt");
+            if (diagnosticsPath is not null)
+            {
+                await File.WriteAllTextAsync(diagnosticsPath, diagnostics);
+            }
+        }
+        catch (IOException) { /* best-effort */ }
+        catch (UnauthorizedAccessException) { /* best-effort */ }
+
+        return diagnostics;
+    }
+
+    /// <summary>Runs a console command and returns combined stdout+stderr (best-effort).</summary>
+    private static async Task<string> RunCaptureAsync(string fileName, string arguments, int timeoutMs = 10_000)
+    {
+        string Failed(Exception ex) => $"(command '{fileName} {arguments}' failed: {ex.Message})";
+
+        try
+        {
+            using var proc = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    Arguments = arguments,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                },
+            };
+            proc.Start();
+
+            // Bound the stream reads by the same timeout token as the exit wait so a
+            // process that never exits (or whose Kill fails) can't hang log collection
+            // indefinitely -- the reads are cancelled when the token fires.
+            using var cts = new CancellationTokenSource(timeoutMs);
+            var stdoutTask = proc.StandardOutput.ReadToEndAsync(cts.Token);
+            var stderrTask = proc.StandardError.ReadToEndAsync(cts.Token);
+            try
+            {
+                await proc.WaitForExitAsync(cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                try { proc.Kill(entireProcessTree: true); }
+                catch (InvalidOperationException) { /* already exited */ }
+                catch (Win32Exception) { /* OS refused termination */ }
+                catch (NotSupportedException) { /* unsupported on platform */ }
+            }
+
+            var output = $"{await ReadOrEmptyAsync(stdoutTask)}{await ReadOrEmptyAsync(stderrTask)}".Trim();
+            return string.IsNullOrEmpty(output) ? "(no output)" : output;
+        }
+        catch (Win32Exception ex) { return Failed(ex); }
+        catch (InvalidOperationException ex) { return Failed(ex); }
+        catch (IOException ex) { return Failed(ex); }
+    }
+
+    /// <summary>Awaits a bounded stream read, returning empty on cancellation/I-O failure (best-effort).</summary>
+    private static async Task<string> ReadOrEmptyAsync(Task<string> readTask)
+    {
+        try { return await readTask; }
+        catch (OperationCanceledException) { return string.Empty; }
+        catch (IOException) { return string.Empty; }
+    }
+
+    /// <summary>
+    /// Builds an artifact path sharing the timestamped base name of the process log
+    /// (e.g. <c>desktop-fixture-{timestamp}-cdp-version.txt</c>) so a run's diagnostics group
+    /// together and don't overwrite each other across parallel fixture instances or retries.
+    /// Returns null when the log directory cannot be determined.
+    /// </summary>
+    private string? ArtifactSiblingPath(string suffix)
+    {
+        var dir = Path.GetDirectoryName(_processLogPath);
+        if (string.IsNullOrEmpty(dir))
+        {
+            return null;
+        }
+        return Path.Join(dir, $"{Path.GetFileNameWithoutExtension(_processLogPath)}-{suffix}");
+    }
+
+    /// <summary>
+    /// True when the current process runs at High (or System) Integrity Level on Windows.
+    /// Uses the mandatory-label SID from <c>whoami /groups</c> rather than
+    /// <see cref="Environment.IsPrivilegedProcess"/>, which keys off UAC token elevation and
+    /// returns false on CI runners where UAC is disabled but the process is still High IL --
+    /// the exact condition under which WebView2 v150 drops the WEBVIEW2_* switches (#5640).
+    /// </summary>
+    private static async Task<bool> IsHostHighIntegrityAsync()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return false;
+        }
+        var groups = await RunCaptureAsync("whoami", "/groups");
+        return groups.Contains("S-1-16-12288", StringComparison.Ordinal)   // High
+            || groups.Contains("S-1-16-16384", StringComparison.Ordinal);  // System
+    }
+
+    /// <summary>
+    /// Publishes WebView2 browser arguments through the machine-wide (HKLM) policy so they
+    /// survive an elevated host process. WebView2 v150 ignores the user-writable channels
+    /// (WEBVIEW2_* environment variables, HKCU policy) when the host runs at High Integrity
+    /// Level -- only HKLM policy and API args are honored (WebView2Feedback #5640). Called
+    /// only when elevated (the sole case that needs it); best-effort and reverted in
+    /// <see cref="DisposeAsync"/>. A pre-existing machine policy value is left untouched.
+    /// </summary>
+    /// <remarks>
+    /// SINGLE-WRITER ASSUMPTION: the <c>*</c> wildcard is one machine-global registry slot, but
+    /// each fixture instance picks its own <c>_cdpPort</c>. The write/skip/revert dance here is
+    /// race-free ONLY because the desktop tests share a single, serialized fixture instance via
+    /// <c>[Collection("DesktopCDP")]</c> + <c>ICollectionFixture&lt;DesktopAppFixture&gt;</c> (see
+    /// <c>DesktopCdpCollection</c>). If these tests are ever moved to a per-class
+    /// <c>IClassFixture</c> or split across parallel collections, two concurrent instances would
+    /// collide on this slot: the second would find the first's value, skip its own write, inherit
+    /// the wrong port and time out, and whichever disposes first would delete the value out from
+    /// under the other. Such a refactor must key the value per app/port (or otherwise serialize
+    /// this write) instead of using <c>*</c>.
+    /// </remarks>
+    private async Task PublishHklmBrowserArgumentsAsync(string arguments)
+    {
+        // Do not clobber a wildcard value the machine already defines (the CI runner defines none).
+        // Detect it via the REG_ type token on the query's value line, not a bare substring:
+        // RunCaptureAsync's own failure text echoes the queried command, so a substring check
+        // would read a reg-launch failure as "value already exists" and skip the write.
+        var existing = await RunCaptureAsync("reg", $@"query ""{WebView2AdditionalArgsKey}"" /v {WebView2AppIdWildcard}");
+        if (Regex.IsMatch(existing, @"\bREG_", RegexOptions.IgnoreCase))
+        {
+            return;
+        }
+
+        // Set the flag before writing so DisposeAsync reverts the machine policy even if the
+        // verification below throws; deleting an absent value is a harmless no-op.
+        _wroteHklmBrowserArgs = true;
+        var addOutput = await RunCaptureAsync("reg",
+            $@"add ""{WebView2AdditionalArgsKey}"" /v {WebView2AppIdWildcard} /t REG_SZ /d ""{arguments}"" /f");
+
+        // reg can fail without throwing (e.g. access denied / locked-down policy) -- RunCaptureAsync
+        // just returns its output. Confirm the value actually landed and fail fast with the reg
+        // output, rather than letting CDP readiness time out ~30s later with an indirect error.
+        var verify = await RunCaptureAsync("reg", $@"query ""{WebView2AdditionalArgsKey}"" /v {WebView2AppIdWildcard}");
+        if (!Regex.IsMatch(verify, @"\bREG_", RegexOptions.IgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Failed to publish the HKLM WebView2 AdditionalBrowserArguments policy required for elevated " +
+                $"CDP (WebView2Feedback #5640).{Environment.NewLine}reg add output: {addOutput}{Environment.NewLine}" +
+                $"reg query output: {verify}");
+        }
+    }
+
+    /// <summary>
+    /// Returns the captured process stdout/stderr as a single string from the in-memory
+    /// buffer. Reading the on-disk log file directly is unsafe on Windows: the background
+    /// <see cref="CaptureProcessOutputAsync"/> writer holds it open, and a concurrent
+    /// reader's implicit FileShare.Read does not grant the writer's Write access, which
+    /// surfaces as an IOException that masks the real readiness diagnostic.
+    /// </summary>
+    private string CaptureLogSnapshot()
+    {
+        // Keep only the most recent lines: the tail is the relevant diagnostic near a
+        // failure, and the full buffer can make exceptions unreadably large.
+        const int maxLines = 200;
+        var lines = GetLinesAfter(0);
+        if (lines.Count == 0)
+        {
+            return "(no log)";
+        }
+        if (lines.Count <= maxLines)
+        {
+            return string.Join(Environment.NewLine, lines);
+        }
+
+        var omitted = lines.Count - maxLines;
+        var tail = lines.GetRange(lines.Count - maxLines, maxLines);
+        return $"(... {omitted} earlier line(s) omitted; showing last {maxLines} ...)" +
+            Environment.NewLine + string.Join(Environment.NewLine, tail);
     }
 
     private async Task<IPage> FindMonacoPage()
