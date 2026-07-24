@@ -1,4 +1,4 @@
-# Uno.Monaco.Editor
+# DO NOT MERGE: random edit
 
 A cross-platform [Uno Platform](https://platform.uno/) wrapper around the [Monaco Editor](https://microsoft.github.io/monaco-editor/), bringing the same code editor that powers VS Code to .NET applications targeting WebAssembly and Desktop (Skia).
 
@@ -23,7 +23,7 @@ A cross-platform [Uno Platform](https://platform.uno/) wrapper around the [Monac
 ## Platform Support
 
 | Feature | WASM (browserwasm) | Desktop (Windows/macOS/Linux) |
-|---------|:------------------:|:-----------------------------:|
+|---------|-------------------:|:-----------------------------:|
 | Text editing and syntax highlighting | Supported | Supported |
 | Editor options and themes | Supported | Supported |
 | Decorations and markers | Supported | Supported |
