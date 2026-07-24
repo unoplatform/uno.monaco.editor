@@ -643,6 +643,18 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     /// only when elevated (the sole case that needs it); best-effort and reverted in
     /// <see cref="DisposeAsync"/>. A pre-existing machine policy value is left untouched.
     /// </summary>
+    /// <remarks>
+    /// SINGLE-WRITER ASSUMPTION: the <c>*</c> wildcard is one machine-global registry slot, but
+    /// each fixture instance picks its own <c>_cdpPort</c>. The write/skip/revert dance here is
+    /// race-free ONLY because the desktop tests share a single, serialized fixture instance via
+    /// <c>[Collection("DesktopCDP")]</c> + <c>ICollectionFixture&lt;DesktopAppFixture&gt;</c> (see
+    /// <c>DesktopCdpCollection</c>). If these tests are ever moved to a per-class
+    /// <c>IClassFixture</c> or split across parallel collections, two concurrent instances would
+    /// collide on this slot: the second would find the first's value, skip its own write, inherit
+    /// the wrong port and time out, and whichever disposes first would delete the value out from
+    /// under the other. Such a refactor must key the value per app/port (or otherwise serialize
+    /// this write) instead of using <c>*</c>.
+    /// </remarks>
     private async Task PublishHklmBrowserArgumentsAsync(string arguments)
     {
         // Do not clobber a wildcard value the machine already defines (the CI runner defines none).
