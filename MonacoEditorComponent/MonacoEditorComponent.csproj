@@ -88,6 +88,15 @@
 		rather than the type:'module' Monaco 0.52 requests by default). Desktop is unaffected:
 		it gets its worker copies from the Content items below, next to editor.html, where a real
 		"workers/" subdirectory does exist.
+
+		OPEN QUESTION, do not treat the CSS entry below as verified: the shell task keys CSS off a
+		separate "WasmCSS" folder prefix, so a .css under WasmScripts appears to be dropped. It is
+		absent from config.uno_dependencies, absent from wwwroot/package_<hash>/, and never
+		requested in the dev-server log, which suggests it is dead payload in the same way the
+		workers were. It was NOT removed here because, unlike the workers, no browser check has
+		confirmed the visual consequence: Monaco also injects theme CSS at runtime via
+		createStyleSheet, so the editor may render correctly without it. Resolve by checking
+		whether the file must move to a WasmCSS folder or can simply be dropped for WASM.
 	-->
 	<ItemGroup>
 		<EmbeddedResource Include="Properties\MonacoEditorComponent.rd.xml" />
