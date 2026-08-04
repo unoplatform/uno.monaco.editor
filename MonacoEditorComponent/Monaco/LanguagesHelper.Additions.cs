@@ -42,7 +42,7 @@ namespace Monaco
         /// Accepts bare extensions ("cs", ".cs"), filenames ("test.cs"),
         /// and full paths ("src/foo/test.cs") for parity with JS behavior.
         /// </summary>
-        private static string LanguageIdFromExtensionDesktop(string? extension)
+        internal static string LanguageIdFromExtensionDesktop(string? extension)
         {
             if (string.IsNullOrEmpty(extension)) return "plaintext";
 
@@ -72,6 +72,9 @@ namespace Monaco
                 "cs" or "csx" => "csharp",
                 "css" => "css",
                 "dart" => "dart",
+                // Registered by the component rather than by Monaco -- see
+                // ts-helpermethods/languages/diff.ts.
+                "diff" or "patch" => "diff",
                 "dockerfile" => "dockerfile",
                 "fs" or "fsi" or "fsx" => "fsharp",
                 "go" => "go",

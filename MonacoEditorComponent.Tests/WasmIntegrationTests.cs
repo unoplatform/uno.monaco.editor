@@ -146,6 +146,37 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
             throw;
         }
     }
+
+    /// <summary>
+    /// Monaco ships no <c>diff</c> grammar, so the component bundles and registers one.
+    /// Running the real tokenizer is the only way to confirm the grammar compiles and that
+    /// its rule order resolves the ambiguous markers correctly -- see
+    /// <see cref="DiffLanguageTokenizationCases"/>.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "WasmPlaywright")]
+    public async Task DiffLanguage_RegisteredAndTokenizesAllDialects()
+    {
+        _currentTestName = nameof(DiffLanguage_RegisteredAndTokenizesAllDialects);
+        try
+        {
+            var isRegistered = await _fixture.Page.EvaluateAsync<bool>(
+                DiffLanguageTokenizationCases.IsRegisteredExpression);
+
+            Assert.True(isRegistered, "Expected the bundled 'diff' language to be registered at bundle load.");
+
+            var tokenTypes = await _fixture.Page.EvaluateAsync<string>(
+                DiffLanguageTokenizationCases.TokenizeExpression,
+                DiffLanguageTokenizationCases.Sample);
+
+            Assert.Equal(DiffLanguageTokenizationCases.ExpectedTokens, tokenTypes);
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
 }
 
 /// <summary>
