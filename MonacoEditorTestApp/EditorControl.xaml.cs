@@ -719,10 +719,12 @@ namespace MonacoEditorTestApp
 
         /// <summary>
         /// Languages offered when Monaco doesn't report its registry (for example if the
-        /// script call fails), so the dropdown is never empty.
+        /// script call fails), so the dropdown is never empty. Includes <c>diff</c>, which
+        /// the component registers itself rather than getting from Monaco -- the fallback
+        /// path is precisely where it would otherwise be unreachable.
         /// </summary>
         private static readonly string[] FallbackLanguages =
-            ["csharp", "css", "html", "javascript", "json", "markdown", "plaintext", "python", "typescript", "xml"];
+            ["csharp", "css", "diff", "html", "javascript", "json", "markdown", "plaintext", "python", "typescript", "xml"];
 
         private async Task PopulateLanguageComboBoxAsync()
         {
@@ -760,8 +762,7 @@ namespace MonacoEditorTestApp
                 SyncLanguageComboBox();
 
                 // Reports the end state, so a low count (fallback) or an empty dropdown
-                // is distinguishable from a populated one -- the catch below is invisible
-                // in Release builds, where Debug.WriteLine is compiled out.
+                // is distinguishable from a populated one.
                 Debug.WriteLine($"Language dropdown: {reported} reported, {LanguageComboBox.Items.Count} listed");
                 if (Environment.GetEnvironmentVariable("MONACO_DIAGNOSTICS") == "1")
                 {
@@ -772,7 +773,20 @@ namespace MonacoEditorTestApp
             }
             catch (Exception ex)
             {
+                // Deliberately broad, and deliberately swallowed. This runs unawaited to
+                // populate a convenience dropdown, so anything escaping here surfaces as an
+                // unobserved task exception and can take down the sample. The failures worth
+                // surviving are interop ones -- a failed script call, a bridge that dropped --
+                // which arrive as platform-specific exception types on WASM and desktop, so
+                // filtering by type would let exactly the expected case through.
                 Debug.WriteLine($"PopulateLanguageComboBoxAsync failed: {ex}");
+                if (Environment.GetEnvironmentVariable("MONACO_DIAGNOSTICS") == "1")
+                {
+                    // Debug.WriteLine is compiled out of Release builds, which would otherwise
+                    // make this failure completely silent in exactly the configuration the
+                    // integration tests run.
+                    Console.WriteLine($"LANGUAGE_DROPDOWN:failed={ex.GetType().Name}");
+                }
             }
         }
 
