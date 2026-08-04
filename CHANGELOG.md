@@ -49,6 +49,7 @@ Monaco Editor version: **0.52.2** (declared `^0.52.2` in `package.json`; resolve
 - **CI pipeline**: migrated from Azure Pipelines to GitHub Actions with NuGet signing
 - **Versioning**: switched to Nerdbank.GitVersioning
 - **Build system**: migrated to `.slnx` solution format, modernized `Directory.Build.props`
+- **Production JS bundles**: one-shot esbuild builds are now minified with no source maps (watch builds stay unminified with inline maps), cutting the bundled JavaScript from 46.7 MB to 12.8 MB; `--no-minify`, `--minify`, and `--sourcemap` override the defaults
 
 ### Deprecated
 
@@ -61,9 +62,11 @@ Monaco Editor version: **0.52.2** (declared `^0.52.2` in `package.json`; resolve
 - **Legacy `GenerateMonacoTypings` MSBuild target**: replaced by the new `ts-morph` + .NET CLI emitter pipeline
 - **AMD script loading**: replaced by ESM module bundling with esbuild
 - **`build/` directory**: stale build artifacts directory removed
+- **Worker bundles as WASM embedded resources**: the five Monaco language-worker bundles are no longer embedded for WebAssembly. Uno flattens `WasmScripts\workers\*.worker.js` to dot-joined names while `MonacoEnvironment.getWorkerUrl` resolves them under a `workers/` subdirectory, so they always 404 and Monaco fell back to main-thread language services — they were ~8.5 MB of unreachable payload. Desktop is unaffected
 
 ### Fixed
 
+- Fix `DirectoryNotFoundException` on desktop when the control is consumed from the NuGet package: `DesktopContent` is now probed at both `<output>/DesktopContent` and `<output>/MonacoEditorComponent/DesktopContent` (the layout `GenerateLibraryLayout` produces), and the probe requires `editor.html` rather than merely the directory
 - Fix `automaticLayout` replacing buggy manual `window.resize` handling ([#27](https://github.com/unoplatform/uno.monaco.editor/pull/27))
 - Fix redundant DOM Loading subscription affecting Playground ([#26](https://github.com/unoplatform/uno.monaco.editor/pull/26))
 - Fix highlighting not working ([#25](https://github.com/unoplatform/uno.monaco.editor/pull/25))
