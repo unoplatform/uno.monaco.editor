@@ -29,8 +29,12 @@ public sealed class TryResolveDesktopContentPathTests : IDisposable
 
     public void Dispose()
     {
+        // Best effort cleanup: a temp folder still held by the OS (IOException) or denied by ACLs
+        // (UnauthorizedAccessException) must not fail the test run. Anything else is a real bug
+        // and is deliberately left to propagate.
         try { Directory.Delete(_baseDirectory, recursive: true); }
-        catch { /* best effort cleanup */ }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
     }
 
     /// <summary>

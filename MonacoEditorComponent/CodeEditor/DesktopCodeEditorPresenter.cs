@@ -620,17 +620,9 @@ namespace Monaco
         /// be selected and yield a silently blank WebView2, which is worse than a clear failure.</para>
         /// </summary>
         internal static string? TryResolveDesktopContentPath(string baseDirectory, string libraryLayoutFolderName)
-        {
-            foreach (var candidate in GetDesktopContentCandidates(baseDirectory, libraryLayoutFolderName))
-            {
-                if (File.Exists(Path.Combine(candidate, EditorPageFileName)))
-                {
-                    return candidate;
-                }
-            }
-
-            return null;
-        }
+            => GetDesktopContentCandidates(baseDirectory, libraryLayoutFolderName)
+                .Where(candidate => File.Exists(Path.Combine(candidate, EditorPageFileName)))
+                .FirstOrDefault();
 
         /// <summary>
         /// Resolves the DesktopContent folder for the running application. Content ships either at
