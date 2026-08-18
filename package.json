@@ -5,6 +5,7 @@
   "description": "Build tooling for Uno Monaco Editor component",
   "scripts": {
     "build": "node MonacoEditorComponent/ts-helpermethods/esbuild.config.mjs",
+    "build:dev": "node MonacoEditorComponent/ts-helpermethods/esbuild.config.mjs --no-minify --sourcemap",
     "build:watch": "node MonacoEditorComponent/ts-helpermethods/esbuild.config.mjs --watch"
   },
   "dependencies": {

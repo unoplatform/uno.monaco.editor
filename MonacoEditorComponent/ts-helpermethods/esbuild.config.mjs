@@ -10,7 +10,19 @@
  *
  * Usage:
  *   node MonacoEditorComponent/ts-helpermethods/esbuild.config.mjs
+ *       Production build (one-shot): minified, no source maps. This is what every call
+ *       site uses -- `npm run build`, the MSBuild targets in MonacoEditorComponent.csproj,
+ *       install-dependencies.ps1, and CI.
  *   node MonacoEditorComponent/ts-helpermethods/esbuild.config.mjs --watch
+ *       Development build: unminified, inline source maps, rebuild on change.
+ *
+ * Overrides (apply to both modes):
+ *   --no-minify   Force minification off (debuggable one-shot build).
+ *   --minify      Force minification on; wins over --no-minify. Useful as
+ *                 `--watch --minify --sourcemap` to reproduce a minification-only bug
+ *                 in a fast rebuild loop.
+ *   --sourcemap   Force inline source maps on. There is deliberately no --no-sourcemap:
+ *                 one-shot builds never emit maps unless asked.
  */
 
 import * as esbuild from 'esbuild';
@@ -29,7 +41,16 @@ const desktopContentDir = path.join(componentDir, 'DesktopContent');
 const desktopWorkersDir = path.join(desktopContentDir, 'workers');
 
 const isWatch = process.argv.includes('--watch');
-const isMinify = process.argv.includes('--minify');
+
+// Watch = development: unminified with inline source maps, for debuggability.
+// One-shot = production: minified, no source maps. Every call site invokes this script
+// with no flags (npm run build, the MSBuild targets, install-dependencies.ps1, CI), so the
+// production intent has to live in the default rather than in the callers.
+// --minify wins over --no-minify so `--watch --minify --sourcemap` stays a usable debug
+// loop for problems that only reproduce in minified output.
+const isMinify = process.argv.includes('--minify')
+    || (!isWatch && !process.argv.includes('--no-minify'));
+const mainSourcemap = (isWatch || process.argv.includes('--sourcemap')) ? 'inline' : false;
 
 // Ensure output directories exist
 fs.mkdirSync(workersDir, { recursive: true });
@@ -118,6 +139,12 @@ const commonOptions = {
     platform: 'browser',
     logLevel: 'info',
     minify: isMinify,
+    // Keep third-party license banners (/*! ... */, @license, @preserve) in a block at the
+    // end of every output file. This is already esbuild's default when bundle: true; it is
+    // pinned explicitly because these bundles redistribute Monaco (MIT) and the TypeScript
+    // compiler (Apache-2.0), and that attribution must not silently disappear if esbuild's
+    // default changes or someone sets 'none' while tuning output size.
+    legalComments: 'eof',
     // Monaco ESM distribution includes .ttf font files via CSS @font-face
     // Use dataurl to inline fonts directly into the CSS output (avoids separate file serving)
     loader: {
@@ -140,22 +167,28 @@ async function build() {
         ...commonOptions,
         entryPoints: [path.join(__dirname, 'index.ts')],
         outfile: path.join(wasmScriptsDir, 'uno-monaco-helpers.js'),
-        sourcemap: 'inline',
+        sourcemap: mainSourcemap,
         // Resolve vscode-jsonrpc from its browser entry
         conditions: ['browser', 'import'],
         // Resolve node_modules from root
         nodePaths: [path.join(rootDir, 'node_modules')],
     };
 
-    // Build worker bundles (output to WasmScripts/workers/)
-    const workerBuildOptions = Object.entries(workerEntries).map(([name, entry]) => ({
+    // Build worker bundles (output to WasmScripts/workers/).
+    // Factory so the one-shot path and the watch path cannot drift apart.
+    const createWorkerBuildOptions = (name, entry) => ({
         ...commonOptions,
         entryPoints: [entry],
         outfile: path.join(workersDir, `${name}.js`),
-        // No source maps for workers (not needed for debugging)
+        // No source maps for workers in any mode, including watch: these are third-party
+        // Monaco/TypeScript bundles that are never debugged from source here, and the maps
+        // would dominate their size.
         sourcemap: false,
         nodePaths: [path.join(rootDir, 'node_modules')],
-    }));
+    });
+
+    const workerBuildOptions = Object.entries(workerEntries)
+        .map(([name, entry]) => createWorkerBuildOptions(name, entry));
 
     if (isWatch) {
         // Watch mode: rebuild on change, copy to DesktopContent after each rebuild.
@@ -168,20 +201,16 @@ async function build() {
         console.log('[esbuild] Watching main bundle for changes...');
 
         for (const [name, entry] of Object.entries(workerEntries)) {
-            const opts = {
-                ...commonOptions,
-                entryPoints: [entry],
-                outfile: path.join(workersDir, `${name}.js`),
-                sourcemap: false,
-                nodePaths: [path.join(rootDir, 'node_modules')],
+            const ctx = await esbuild.context({
+                ...createWorkerBuildOptions(name, entry),
                 plugins: [createCopyWorkerPlugin(name)],
-            };
-            const ctx = await esbuild.context(opts);
+            });
             await ctx.watch();
         }
         console.log('[esbuild] Watching worker bundles for changes...');
     } else {
         // Single build
+        console.log(`[esbuild] Mode: ${isMinify ? 'minified' : 'unminified'}, source maps: ${mainSourcemap || 'none'}.`);
         console.log('[esbuild] Building main bundle...');
         await esbuild.build(mainBuildOptions);
 

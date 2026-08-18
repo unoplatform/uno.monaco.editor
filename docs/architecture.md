@@ -410,6 +410,8 @@ flowchart TD
 
 The JavaScript side is built as a single IIFE bundle (`uno-monaco-helpers.js`) from `MonacoEditorComponent/ts-helpermethods/index.ts` using esbuild.
 
+**Build modes:** a one-shot build (`npm run build`, the MSBuild targets, `install-dependencies.ps1`, CI) is a production build — minified, no source maps, third-party license banners preserved at end-of-file (`legalComments: 'eof'`). `npm run build:watch` is a development build — unminified with inline source maps. Overrides: `--no-minify`, `--minify`, `--sourcemap` (or `npm run build:dev` for an unminified, mapped one-shot build). Note that MSBuild only compares timestamps, so run `npm run build` before a Release build or `dotnet pack` if you last ran a watch/dev build.
+
 **Module layout:**
 
 | Module | Responsibility |

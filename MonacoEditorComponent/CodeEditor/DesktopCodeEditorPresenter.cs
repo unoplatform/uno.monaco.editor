@@ -571,17 +571,99 @@ namespace Monaco
         // ============================================================
 
         /// <summary>
-        /// Resolves the DesktopContent folder path from the application's base directory.
-        /// Content files are copied to output via CopyToOutputDirectory="PreserveNewest".
+        /// The editor host page file name inside the DesktopContent folder. Shared by the
+        /// content-root probe and both navigation URI builders, so the file the probe requires
+        /// is exactly the file navigation targets.
         /// </summary>
+        private const string EditorPageFileName = "editor.html";
+
+        /// <summary>
+        /// The main Monaco bundle file name inside the DesktopContent folder. Used only for a
+        /// non-fatal completeness diagnostic; deliberately NOT part of the content-root
+        /// selection predicate (see <see cref="TryResolveDesktopContentPath"/>).
+        /// </summary>
+        private const string HelpersScriptFileName = "uno-monaco-helpers.js";
+
+        /// <summary>The DesktopContent folder name, relative to a candidate root.</summary>
+        private const string DesktopContentFolderName = "DesktopContent";
+
+        /// <summary>
+        /// Returns the candidate DesktopContent roots to probe, in priority order:
+        /// <list type="number">
+        /// <item><c>&lt;baseDirectory&gt;/DesktopContent</c> — produced by a
+        /// <c>ProjectReference</c> to this library, or by a consumer copying the content itself.</item>
+        /// <item><c>&lt;baseDirectory&gt;/&lt;libraryLayoutFolderName&gt;/DesktopContent</c> —
+        /// produced by the NuGet package. <c>GenerateLibraryLayout=true</c> makes Uno pack library
+        /// content under <c>lib/&lt;tfm&gt;/$(AssemblyName)/</c>, and the consumer-side asset
+        /// expansion re-creates that same <c>$(AssemblyName)</c> prefix in both the build output
+        /// and the publish directory.</item>
+        /// </list>
+        /// Root-first is deliberate: a <c>ProjectReference</c> build produces BOTH layouts, so
+        /// probing the root first leaves the existing resolution untouched and makes the
+        /// library-layout probe a pure addition.
+        /// </summary>
+        /// <param name="baseDirectory">The application base directory (normally <see cref="AppContext.BaseDirectory"/>).</param>
+        /// <param name="libraryLayoutFolderName">The Uno library-layout prefix, which is this assembly's simple name.</param>
+        internal static string[] GetDesktopContentCandidates(string baseDirectory, string libraryLayoutFolderName)
+            =>
+            [
+                Path.Combine(baseDirectory, DesktopContentFolderName),
+                Path.Combine(baseDirectory, libraryLayoutFolderName, DesktopContentFolderName),
+            ];
+
+        /// <summary>
+        /// Probes <see cref="GetDesktopContentCandidates"/> in order and returns the first
+        /// candidate that actually contains <c>editor.html</c>, or <see langword="null"/> when
+        /// none does.
+        /// <para>The predicate is the presence of the entry file, not the presence of the
+        /// directory: a present-but-empty or stale <c>DesktopContent</c> directory would otherwise
+        /// be selected and yield a silently blank WebView2, which is worse than a clear failure.</para>
+        /// </summary>
+        internal static string? TryResolveDesktopContentPath(string baseDirectory, string libraryLayoutFolderName)
+            => GetDesktopContentCandidates(baseDirectory, libraryLayoutFolderName)
+                .Where(candidate => File.Exists(Path.Combine(candidate, EditorPageFileName)))
+                .FirstOrDefault();
+
+        /// <summary>
+        /// Resolves the DesktopContent folder for the running application. Content ships either at
+        /// <c>&lt;base&gt;/DesktopContent</c> (ProjectReference) or at
+        /// <c>&lt;base&gt;/&lt;AssemblyName&gt;/DesktopContent</c> (NuGet package, because
+        /// <c>GenerateLibraryLayout=true</c> nests library assets under the assembly name). Both
+        /// are probed; the library-layout folder name is derived from this assembly's name so it
+        /// follows an assembly rename automatically.
+        /// </summary>
+        /// <exception cref="DirectoryNotFoundException">
+        /// Thrown when neither candidate contains <c>editor.html</c>.
+        /// </exception>
         private static string ResolveDesktopContentPath()
         {
-            var contentRoot = Path.Combine(AppContext.BaseDirectory, "DesktopContent");
-            if (!Directory.Exists(contentRoot))
+            var libraryLayoutFolderName =
+                typeof(DesktopCodeEditorPresenter).Assembly.GetName().Name ?? "MonacoEditorComponent";
+
+            var contentRoot = TryResolveDesktopContentPath(AppContext.BaseDirectory, libraryLayoutFolderName);
+            if (contentRoot is null)
             {
-                throw new DirectoryNotFoundException(
-                    $"DesktopContent folder not found at {contentRoot}. " +
-                    "Ensure the MonacoEditorComponent NuGet package content files are present.");
+                var message = new StringBuilder($"Monaco {EditorPageFileName} not found. Probed:");
+                foreach (var candidate in GetDesktopContentCandidates(AppContext.BaseDirectory, libraryLayoutFolderName))
+                {
+                    message.Append(Environment.NewLine)
+                           .Append("  ")
+                           .Append(Path.Combine(candidate, EditorPageFileName));
+                }
+
+                message.Append(Environment.NewLine)
+                       .Append("Ensure the Uno.Monaco.Editor package content files are deployed to the application ")
+                       .Append("output directory (they ship under the assembly-name subfolder when the package is ")
+                       .Append("consumed via PackageReference).");
+
+                throw new DirectoryNotFoundException(message.ToString());
+            }
+
+            if (!File.Exists(Path.Combine(contentRoot, HelpersScriptFileName)))
+            {
+                Debug.WriteLine(
+                    $"DesktopCodeEditorPresenter: {HelpersScriptFileName} is missing from {contentRoot} — " +
+                    "the editor page will load blank.");
             }
 
             return contentRoot;
@@ -624,10 +706,10 @@ namespace Monaco
         /// which works reliably on all WebView2 implementations.
         /// </summary>
         internal static global::System.Uri BuildVirtualHostEditorUri()
-            => new($"http://{AllowedVirtualHost}/editor.html");
+            => new($"http://{AllowedVirtualHost}/{EditorPageFileName}");
 
         internal static global::System.Uri BuildFileEditorUri(string contentRoot)
-            => new(Path.Combine(contentRoot, "editor.html"));
+            => new(Path.Combine(contentRoot, EditorPageFileName));
 
         internal static bool ShouldFallbackToFileNavigation(
             bool isSuccess,

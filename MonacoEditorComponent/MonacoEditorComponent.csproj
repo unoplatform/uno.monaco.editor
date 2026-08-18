@@ -67,16 +67,41 @@
 		<None Remove="tsconfig.json" />
 	</ItemGroup>
 
-	<!-- WASM: EmbeddedResource for main bundle + CSS + workers -->
+	<!--
+		WASM: EmbeddedResource for main bundle + CSS.
+
+		The five worker bundles are deliberately NOT embedded. Uno.Wasm.Bootstrap's shell task
+		flattens WasmScripts\workers\ts.worker.js to the dot-joined name "workers.ts.worker.js"
+		in wwwroot/package_<hash>/, but MonacoEnvironment.getWorkerUrl (ts-helpermethods/index.ts)
+		resolves workers as "<scriptBase>workers/<name>.js" with a slash. No "workers/" directory
+		exists in the deployed output, so every worker request 404s and Monaco falls back to
+		main-thread language services. Verified in a browser: all five URLs returned 404 while
+		the flattened name returned 200, forcing a JSON model produced no markers, and Monaco
+		logged "Could not create web worker(s)".
+
+		Embedding them therefore cost ~8.5 MB of download, main-thread parse time and resident
+		WASM linear memory for files that can never run as workers, and executing each bundle on
+		the main thread clobbered window.onmessage five times during boot.
+
+		Re-add these entries together with the fix to the URL/name mismatch (and prefer a
+		getWorker override over getWorkerUrl, so the worker is constructed as a classic script
+		rather than the type:'module' Monaco 0.52 requests by default). Desktop is unaffected:
+		it gets its worker copies from the Content items below, next to editor.html, where a real
+		"workers/" subdirectory does exist.
+
+		OPEN QUESTION, do not treat the CSS entry below as verified: the shell task keys CSS off a
+		separate "WasmCSS" folder prefix, so a .css under WasmScripts appears to be dropped. It is
+		absent from config.uno_dependencies, absent from wwwroot/package_<hash>/, and never
+		requested in the dev-server log, which suggests it is dead payload in the same way the
+		workers were. It was NOT removed here because, unlike the workers, no browser check has
+		confirmed the visual consequence: Monaco also injects theme CSS at runtime via
+		createStyleSheet, so the editor may render correctly without it. Resolve by checking
+		whether the file must move to a WasmCSS folder or can simply be dropped for WASM.
+	-->
 	<ItemGroup>
 		<EmbeddedResource Include="Properties\MonacoEditorComponent.rd.xml" />
 		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.js" />
 		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.css" Condition="Exists('WasmScripts\uno-monaco-helpers.css')" />
-		<EmbeddedResource Include="WasmScripts\workers\editor.worker.js" Condition="Exists('WasmScripts\workers\editor.worker.js')" />
-		<EmbeddedResource Include="WasmScripts\workers\json.worker.js" Condition="Exists('WasmScripts\workers\json.worker.js')" />
-		<EmbeddedResource Include="WasmScripts\workers\css.worker.js" Condition="Exists('WasmScripts\workers\css.worker.js')" />
-		<EmbeddedResource Include="WasmScripts\workers\html.worker.js" Condition="Exists('WasmScripts\workers\html.worker.js')" />
-		<EmbeddedResource Include="WasmScripts\workers\ts.worker.js" Condition="Exists('WasmScripts\workers\ts.worker.js')" />
 	</ItemGroup>
 
 	<!-- Desktop: Content files copied to output directory -->
