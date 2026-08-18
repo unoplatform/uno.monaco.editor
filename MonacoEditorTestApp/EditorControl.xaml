@@ -63,6 +63,10 @@
                     <x:String>Light</x:String>
                     <x:String>Dark</x:String>
                 </ComboBox>
+                <ComboBox x:Name="LanguageComboBox"
+                          Header="Language"
+                          MaxDropDownHeight="320"
+                          SelectionChanged="ComboBoxLanguage_SelectionChanged" />
                 <Button Content="Set Text"
                         Click="ButtonSetText_Click"
                         TabIndex="2" />

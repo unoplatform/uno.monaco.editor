@@ -118,9 +118,6 @@ namespace MonacoEditorTestApp
 
                 // Ready for Code
 
-                var available_languages = await Editor.Languages.GetLanguagesAsync();
-                //Debugger.Break();
-
                 // Code Lens Action
                 var cmdId = await Editor.AddCommandAsync(0, async (args) =>
                 {
@@ -238,6 +235,12 @@ namespace MonacoEditorTestApp
 
         private async void Editor_Loaded(object sender, RoutedEventArgs e)
         {
+            // Populated here rather than in Editor_Loading: script calls are gated on the
+            // editor being initialized, which only happens once loading completes. Not
+            // awaited so the registrations below (and the test harness markers they lead
+            // to) never wait on it; the method handles its own failures.
+            _ = PopulateLanguageComboBoxAsync();
+
             try
             {
                 await Editor.Languages.RegisterHoverProviderAsync("csharp", new EditorHoverProvider(() => Editor.Text ?? string.Empty));
@@ -296,6 +299,7 @@ namespace MonacoEditorTestApp
                 // DP -> SendScriptAsync -> JS path works end-to-end.
                 Editor.Text = "// test-init-text";
                 Editor.CodeLanguage = "javascript";
+                SyncLanguageComboBox();
                 Console.WriteLine("TEST_INIT_PROPS:text=// test-init-text,lang=javascript");
 
                 // Register a test command (no keybinding) whose callback logs to stdout.
@@ -708,6 +712,106 @@ namespace MonacoEditorTestApp
         private void ButtonChangeLanguage_Click(object sender, RoutedEventArgs e)
         {
             Editor.CodeLanguage = (Editor.CodeLanguage == "csharp") ? "xml" : "csharp";
+
+            // Keep the dropdown showing what the editor is actually using.
+            SyncLanguageComboBox();
+        }
+
+        /// <summary>
+        /// Languages offered when Monaco doesn't report its registry (for example if the
+        /// script call fails), so the dropdown is never empty. Includes <c>diff</c>, which
+        /// the component registers itself rather than getting from Monaco -- the fallback
+        /// path is precisely where it would otherwise be unreachable.
+        /// </summary>
+        private static readonly string[] FallbackLanguages =
+            ["csharp", "css", "diff", "html", "javascript", "json", "markdown", "plaintext", "python", "typescript", "xml"];
+
+        private async Task PopulateLanguageComboBoxAsync()
+        {
+            if (Editor is null)
+            {
+                return;
+            }
+
+            try
+            {
+                var languages = (await Editor.Languages.GetLanguagesAsync() ?? [])
+                    .Select(language => language.Id)
+                    .Where(id => !string.IsNullOrWhiteSpace(id))
+                    .Select(id => id!)
+                    .ToList();
+
+                var reported = languages.Count;
+                if (languages.Count == 0)
+                {
+                    languages.AddRange(FallbackLanguages);
+                }
+
+                // The current language may be one registered at runtime and therefore
+                // missing from the list; without it the dropdown would show nothing.
+                if (Editor.CodeLanguage is { Length: > 0 } current)
+                {
+                    languages.Add(current);
+                }
+
+                LanguageComboBox.ItemsSource = languages
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                SyncLanguageComboBox();
+
+                // Reports the end state, so a low count (fallback) or an empty dropdown
+                // is distinguishable from a populated one.
+                Debug.WriteLine($"Language dropdown: {reported} reported, {LanguageComboBox.Items.Count} listed");
+                if (Environment.GetEnvironmentVariable("MONACO_DIAGNOSTICS") == "1")
+                {
+                    Console.WriteLine($"LANGUAGE_DROPDOWN:reported={reported}"
+                        + $",items={LanguageComboBox.Items.Count}"
+                        + $",selected={LanguageComboBox.SelectedItem}");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Deliberately broad, and deliberately swallowed. This runs unawaited to
+                // populate a convenience dropdown, so anything escaping here surfaces as an
+                // unobserved task exception and can take down the sample. The failures worth
+                // surviving are interop ones -- a failed script call, a bridge that dropped --
+                // which arrive as platform-specific exception types on WASM and desktop, so
+                // filtering by type would let exactly the expected case through.
+                Debug.WriteLine($"PopulateLanguageComboBoxAsync failed: {ex}");
+                if (Environment.GetEnvironmentVariable("MONACO_DIAGNOSTICS") == "1")
+                {
+                    // Debug.WriteLine is compiled out of Release builds, which would otherwise
+                    // make this failure completely silent in exactly the configuration the
+                    // integration tests run.
+                    Console.WriteLine($"LANGUAGE_DROPDOWN:failed={ex.GetType().Name}");
+                }
+            }
+        }
+
+        private void SyncLanguageComboBox()
+        {
+            if (Editor?.CodeLanguage is { Length: > 0 } language)
+            {
+                // No-ops in the handler when the value already matches, so this
+                // doesn't loop back into the editor.
+                LanguageComboBox.SelectedItem = language;
+            }
+        }
+
+        private void ComboBoxLanguage_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // Assigning ItemsSource raises this with no added items, and the dropdown
+            // outlives the editor after Remove; CodeLanguage can't take a null.
+            if (Editor is null
+                || e.AddedItems?.FirstOrDefault()?.ToString() is not { Length: > 0 } language
+                || Editor.CodeLanguage == language)
+            {
+                return;
+            }
+
+            Editor.CodeLanguage = language;
         }
 
         private async void ButtonSetMarker_Click(object sender, RoutedEventArgs e)

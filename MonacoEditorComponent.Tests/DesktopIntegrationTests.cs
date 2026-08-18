@@ -667,6 +667,37 @@ public sealed class DesktopIntegrationTests : IAsyncLifetime
             throw;
         }
     }
+
+    /// <summary>
+    /// Same assertions as the WASM run (see <see cref="DiffLanguageTokenizationCases"/>).
+    /// The grammar is platform-independent, so what this adds is proof that the copy of the
+    /// bundle shipped in <c>DesktopContent/</c> is current -- desktop loads that copy rather
+    /// than the <c>WasmScripts/</c> embedded resource.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "DesktopCDP")]
+    public async Task DiffLanguage_RegisteredAndTokenizesAllDialects()
+    {
+        _currentTestName = nameof(DiffLanguage_RegisteredAndTokenizesAllDialects);
+        try
+        {
+            var isRegistered = await _fixture.Page.EvaluateAsync<bool>(
+                DiffLanguageTokenizationCases.IsRegisteredExpression);
+
+            Assert.True(isRegistered, "Expected the bundled 'diff' language to be registered at bundle load.");
+
+            var tokenTypes = await _fixture.Page.EvaluateAsync<string>(
+                DiffLanguageTokenizationCases.TokenizeExpression,
+                DiffLanguageTokenizationCases.Sample);
+
+            Assert.Equal(DiffLanguageTokenizationCases.ExpectedTokens, tokenTypes);
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
 }
 
 /// <summary>

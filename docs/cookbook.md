@@ -69,6 +69,32 @@ You can also determine the language from a file extension:
 Editor.CodeLanguage = Editor.Languages.GetCodeLanguageFromExtension("Program.cs"); // returns "csharp"
 ```
 
+An identifier Monaco does not know falls back to `plaintext` silently rather than throwing, so an unhighlighted editor -- not an error -- is the symptom of a misspelled or unavailable language. `GetLanguagesAsync()` reports what is actually registered.
+
+### Highlighting diffs
+
+Monaco ships no `diff` grammar of its own: VS Code's diff highlighting comes from a built-in extension carrying a TextMate grammar, and Monaco only supports Monarch. This component bundles a Monarch diff grammar and registers it at startup, so `diff` behaves like any language Monaco does ship -- it appears in `GetLanguagesAsync()`, and `.diff` / `.patch` resolve through `GetCodeLanguageFromExtension` and the `FileExtension` property.
+
+```csharp
+Editor.CodeLanguage = "diff";
+Editor.Text = await File.ReadAllTextAsync(patchPath);
+```
+
+The grammar covers unified/git (`diff -u`), context (`diff -c`), normal (`diff`), and combined (`diff --cc`, merge diffs) output, including hunk ranges, git extended headers, and `\ No newline at end of file`.
+
+Its colors are inherited from whichever built-in theme is active rather than hard-coded, so the editor stays consistent across `vs`, `vs-dark`, `hc-black`, and `hc-light`. That keeps the component from repainting themes the host application owns, at the cost of not exactly reproducing VS Code's green/red diff palette. A custom Monaco theme can target the emitted token types to change that:
+
+| Diff content | Token type |
+|---|---|
+| Inserted lines (`+`, `>`) | `comment.insert.diff` |
+| Deleted lines (`-`, `<`) | `string.delete.diff` |
+| Changed lines (`!`) | `keyword.change.diff` |
+| File and git headers | `type.header.diff` |
+| Hunk ranges (`@@`, `1,2c3,4`) | `keyword.flow.range.diff` |
+| Separators, `\ No newline` | `type.meta.diff` |
+
+Defining a theme is a JavaScript-side operation (`monaco.editor.defineTheme`); there is no C# API for it today.
+
 **Platform support:** WASM and Desktop.
 
 ---

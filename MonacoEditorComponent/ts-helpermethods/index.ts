@@ -56,6 +56,9 @@ import { registerCompletionItemProvider } from './registerCompletionItemProvider
 import { registerLanguage } from './registerLanguage';
 import { updateSelectedContent } from './updateSelectedContent';
 
+// Languages Monaco does not ship, bundled with the component
+import { registerDiffLanguage } from './languages/diff';
+
 // Bridge module
 import { createBridgeConnection, isDesktopHost, getConnection } from './bridge/jsonRpcBridge';
 
@@ -109,6 +112,14 @@ function resolveWorkerUrl(filename: string): string {
         return resolveWorkerUrl('editor.worker.js');
     }
 };
+
+// ---------------------------------------------------------------------------
+// Register bundled languages
+// ---------------------------------------------------------------------------
+
+// Runs at bundle load, before any editor exists, so the language is available to the
+// first model created and is reported by GetLanguagesAsync() whenever C# asks.
+registerDiffLanguage();
 
 // ---------------------------------------------------------------------------
 // Auto-init bridge on desktop
