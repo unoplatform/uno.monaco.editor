@@ -119,18 +119,18 @@ internal static class DiffEditorCases
         "() => monaco.editor.getDiffEditors()[0].getOriginalEditor().getOption(monaco.editor.EditorOption.readOnly)";
 
     /// <summary>
-    /// Waits until the original side is present and writable. Phrased as a wait rather than a
+    /// Waits until the original side is present and locked. Phrased as a wait rather than a
     /// read because WASM delivers the diff options after construction, so a diff editor can
-    /// exist for a moment before <c>originalEditable</c> reaches it.
+    /// exist for a moment before they reach it.
     /// </summary>
-    public const string OriginalEditorWritableExpression =
+    public const string OriginalEditorLockedExpression =
         "() => { const editors = monaco.editor.getDiffEditors(); if (!editors.length) return false;" +
-        " return editors[0].getOriginalEditor().getOption(monaco.editor.EditorOption.readOnly) === false; }";
+        " return editors[0].getOriginalEditor().getOption(monaco.editor.EditorOption.readOnly) === true; }";
 
     /// <summary>
     /// Whether the modified (right) sub-editor is read-only. Asserted alongside
     /// <see cref="OriginalEditorReadOnlyExpression"/>: the two sides lock independently, so
-    /// unlocking the original must not have leaked across to the modified one.
+    /// the original's lock must not have leaked across to the modified one.
     /// </summary>
     public const string ModifiedEditorReadOnlyExpression =
         "() => monaco.editor.getDiffEditors()[0].getModifiedEditor().getOption(monaco.editor.EditorOption.readOnly)";

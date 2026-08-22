@@ -173,27 +173,29 @@ public sealed class DesktopDiffEditorTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// The sample sets <c>OriginalEditable="True"</c>, so this covers the pass-through from the
-    /// dependency property through DiffOptions to Monaco.
+    /// The two documents lock independently -- <c>OriginalEditable</c> governs the original side
+    /// and the inherited <c>ReadOnly</c> the modified one -- and the sample leaves both at their
+    /// defaults, so the original must come up read-only and the modified writable.
     /// </summary>
     /// <remarks>
-    /// On desktop the value rides in the pushed initial state and is handed to
-    /// <c>createDiffEditor</c>, so unlike the WASM counterpart this is the construction path.
+    /// The desktop-specific part is that the diff options are handed to <c>createDiffEditor</c>
+    /// in the pushed initial state rather than applied afterwards, so an empty or malformed
+    /// payload would show up here as the wrong side being locked.
     /// </remarks>
     [Fact]
     [Trait("Category", "DesktopCDP")]
-    public async Task DiffEditor_OriginalEditableUnlocksOnlyTheOriginalSide()
+    public async Task DiffEditor_LocksTheOriginalSideOnly()
     {
-        _currentTestName = nameof(DiffEditor_OriginalEditableUnlocksOnlyTheOriginalSide);
+        _currentTestName = nameof(DiffEditor_LocksTheOriginalSideOnly);
         try
         {
             await _fixture.DiffPage.WaitForFunctionAsync(
-                DiffEditorCases.OriginalEditorWritableExpression,
+                DiffEditorCases.OriginalEditorLockedExpression,
                 null, new PageWaitForFunctionOptions { Timeout = DiffTimeoutMs });
 
             Assert.False(
                 await _fixture.DiffPage.EvaluateAsync<bool>(DiffEditorCases.ModifiedEditorReadOnlyExpression),
-                "OriginalEditable must not leak onto the modified side, which ReadOnly governs.");
+                "The original side's lock must not leak onto the modified side, which ReadOnly governs.");
         }
         catch
         {

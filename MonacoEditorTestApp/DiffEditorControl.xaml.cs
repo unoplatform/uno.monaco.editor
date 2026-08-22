@@ -136,18 +136,34 @@ namespace MonacoEditorTestApp
             => Diff.DiffOptions.IgnoreTrimWhitespace = IgnoreWhitespaceToggle.IsOn;
 
         /// <summary>
-        /// Unlocks the original (left) side at runtime, deliberately through the options object
-        /// rather than the <c>OriginalEditable</c> property: the two are kept in sync both ways,
-        /// and the editor already carries <c>OriginalEditable="True"</c> declaratively, so
-        /// between them the sample drives the pass-through from each end.
+        /// Unlocks the original (left) side, which starts read-only as Monaco's default has it.
+        /// Written through the options object rather than the <c>OriginalEditable</c> property
+        /// deliberately: the two are kept in sync both ways, and this is the direction the
+        /// integration suite cannot reach.
         /// </summary>
         private void OriginalEditable_Toggled(object sender, RoutedEventArgs e)
             => Diff.DiffOptions.OriginalEditable = OriginalEditableToggle.IsOn;
 
         /// <summary>
+        /// Locks the modified (right) side, the counterpart to the toggle above: the inherited
+        /// ReadOnly governs that side, OriginalEditable the original one.
+        /// </summary>
+        /// <remarks>
+        /// Toggled at runtime, this reaches the modified sub-editor rather than the diff
+        /// widget's own option sink, so Monaco keeps drawing the revert arrows and the "Revert
+        /// Block" gutter entries. They are inert -- reverting goes through the modified
+        /// editor's executeEdits, which a read-only editor refuses -- and that difference is
+        /// visible here on purpose: only a ReadOnly already set when the control bootstraps
+        /// suppresses the affordance itself. The "Append text" button below still works
+        /// either way, because it writes the document from C# rather than through the editor.
+        /// </remarks>
+        private void ReadOnly_Toggled(object sender, RoutedEventArgs e)
+            => Diff.ReadOnly = ReadOnlyToggle.IsOn;
+
+        /// <summary>
         /// Edits the modified side from C# to confirm the diff recomputes and DiffUpdated fires.
         /// </summary>
-        private void Mutate_Click(object sender, RoutedEventArgs e)
+        private void AppendText_Click(object sender, RoutedEventArgs e)
             => ModifiedContent += Environment.NewLine + "// appended by the sample";
     }
 }

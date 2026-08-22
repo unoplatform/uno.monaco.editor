@@ -246,30 +246,32 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// The sample sets <c>OriginalEditable="True"</c>, so this covers the pass-through from the
-    /// dependency property through DiffOptions to Monaco.
+    /// The two documents lock independently -- <c>OriginalEditable</c> governs the original side
+    /// and the inherited <c>ReadOnly</c> the modified one -- and the sample leaves both at their
+    /// defaults, so the original must come up read-only and the modified writable.
     /// </summary>
     /// <remarks>
-    /// WASM bootstraps with <c>createDiffEditor({})</c> and receives the diff options afterwards
-    /// through <c>updateDiffOptions</c>, so this is the post-construction delivery path; the
-    /// desktop counterpart covers the pushed initial state instead.
+    /// Nothing here drives <c>OriginalEditable</c> itself: the sample's toggle is a XAML control,
+    /// which CDP cannot reach on desktop, so the two sides' default arrangement is what the
+    /// integration suite can pin. The pass-through in both directions is covered by the sample
+    /// manually instead.
     /// </remarks>
     [Fact]
     [Trait("Category", "WasmPlaywright")]
-    public async Task DiffEditor_OriginalEditableUnlocksOnlyTheOriginalSide()
+    public async Task DiffEditor_LocksTheOriginalSideOnly()
     {
-        _currentTestName = nameof(DiffEditor_OriginalEditableUnlocksOnlyTheOriginalSide);
+        _currentTestName = nameof(DiffEditor_LocksTheOriginalSideOnly);
         try
         {
-            // The option arrives after construction here, so wait for it rather than reading
+            // The diff options arrive after construction on WASM, so wait rather than read
             // once: a diff editor that is merely present may not have been configured yet.
             await _fixture.Page.WaitForFunctionAsync(
-                DiffEditorCases.OriginalEditorWritableExpression,
+                DiffEditorCases.OriginalEditorLockedExpression,
                 null, new PageWaitForFunctionOptions { Timeout = DiffTimeoutMs });
 
             Assert.False(
                 await _fixture.Page.EvaluateAsync<bool>(DiffEditorCases.ModifiedEditorReadOnlyExpression),
-                "OriginalEditable must not leak onto the modified side, which ReadOnly governs.");
+                "The original side's lock must not leak onto the modified side, which ReadOnly governs.");
         }
         catch
         {
