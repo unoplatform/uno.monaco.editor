@@ -17,6 +17,8 @@ A cross-platform [Uno Platform](https://platform.uno/) wrapper around the [Monac
 - **Language providers** -- CodeAction, CodeLens, Color, Completion, and Hover provider bridges
 - **Actions and commands** -- register custom editor actions and keybinding commands
 - **Editor options** -- full `StandaloneEditorConstructionOptions` support through `CodeEditor.Options`
+- **Diff editor** -- `DiffCodeEditor` renders a side-by-side or inline comparison of two documents,
+  with hunk navigation, a `DiffUpdated` event, and `GetLineChangesAsync()` for the computed hunks
 - **Two-way text binding** -- bind editor content to C# properties with change notifications
 - **Dual-platform support** -- single codebase runs on both `net10.0-browserwasm` and `net10.0-desktop`
 
@@ -29,6 +31,7 @@ A cross-platform [Uno Platform](https://platform.uno/) wrapper around the [Monac
 | Decorations and markers | Supported | Supported |
 | Language providers (Completion, Hover, etc.) | Supported | Supported |
 | `AddActionAsync` / `AddCommandAsync` | Supported | Supported |
+| `DiffCodeEditor` (side-by-side / inline diff) | Supported | Supported |
 | `PostWebMessage` | Not supported | Supported |
 | Interop mechanism | JSImport / JSExport | JSON-RPC over WebView2 |
 

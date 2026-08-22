@@ -39,7 +39,8 @@ This file provides guidance to AI agents working in `uno.monaco.editor`.
 - `MonacoEditorComponent/CodeEditor/`: control behavior and interop entry points
 - `MonacoEditorComponent/Monaco/`: Monaco API wrappers (many files generated from typings)
 - `MonacoEditorComponent/ts-helpermethods/`: TypeScript helpers compiled into runtime assets
-- `MonacoEditorComponent/monaco-editor/`: vendored Monaco distribution used by the component
+- `MonacoEditorComponent/WasmScripts/`, `MonacoEditorComponent/DesktopContent/`: built JS/CSS assets.
+  Monaco is bundled from `node_modules` by esbuild; there is no vendored distribution directory
 - `MonacoEditorTestApp/`: functional playground for verifying behavior
 - `tools/monaco-type-extractor/`: ts-morph parser that extracts Monaco API into intermediate JSON
 - `tools/MonacoTypeEmitter/`: .NET CLI tool that emits C# types from intermediate JSON

@@ -41,6 +41,7 @@ using Monaco.Helpers;
 13. [Register a Code Lens Provider](#13-register-a-code-lens-provider)
 14. [Register a Color Provider](#14-register-a-color-provider)
 15. [Work with the Text Model](#15-work-with-the-text-model)
+16. [Show a Diff Between Two Documents](#16-show-a-diff-between-two-documents)
 
 ---
 
@@ -849,6 +850,81 @@ Editor.KeyDown += (sender, e) =>
     }
 };
 ```
+
+**Platform support:** WASM and Desktop.
+
+---
+
+## 16. Show a Diff Between Two Documents
+
+Use `DiffCodeEditor` to compare two documents side by side or inline.
+
+> **Not the same as the `diff` language.** Recipe 1's "Highlighting diffs" section sets
+> `CodeLanguage = "diff"` to *syntax-highlight patch text* in a normal editor. This recipe
+> is the diff **editor**: two documents, computed hunks, and navigation between them.
+
+```xml
+<monaco:DiffCodeEditor x:Name="Diff"
+                       CodeLanguage="csharp"
+                       OriginalText="{x:Bind Before, Mode=TwoWay}"
+                       ModifiedText="{x:Bind After, Mode=TwoWay}"
+                       DiffUpdated="Diff_DiffUpdated" />
+```
+
+The modified (right) document is the editable one. Everything `DiffCodeEditor` inherits from
+`CodeEditorBase` acts on it: `SelectedText`, `Decorations`, `Markers`, `Options`, cursor
+position, actions, and commands. `OriginalLanguage` is optional -- leave it unset and the
+original side follows `CodeLanguage`.
+
+### Configuring the diff
+
+Diff-specific settings live on `DiffOptions`, separate from `Options`. Monaco keeps the two in
+different sinks and each ignores the other's keys, so they are not interchangeable:
+
+```csharp
+Diff.DiffOptions.RenderSideBySide = false;      // inline instead of side by side
+Diff.DiffOptions.IgnoreTrimWhitespace = false;  // treat whitespace changes as changes
+Diff.DiffOptions.DiffAlgorithm = DiffAlgorithm.Advanced;
+Diff.DiffOptions.HideUnchangedRegions = new DiffEditorHideUnchangedRegionsOptions
+{
+    Enabled = true,
+    ContextLineCount = 3,
+};
+```
+
+Changes to individual `DiffOptions` properties are forwarded automatically. The nested
+`Experimental` and `HideUnchangedRegions` objects are plain values, so assign a new instance
+rather than mutating one in place.
+
+### Navigating and reading the hunks
+
+```csharp
+await Diff.GoToDiffAsync(DiffDirection.Next);
+await Diff.RevealFirstDiffAsync();
+```
+
+`DiffUpdated` fires whenever Monaco finishes recomputing, which is the signal that
+`GetLineChangesAsync()` has something to report:
+
+```csharp
+private async void Diff_DiffUpdated(DiffCodeEditor sender, EventArgs args)
+{
+    var changes = await sender.GetLineChangesAsync();
+    if (changes is null) return;
+
+    // A side with no lines reports 0 for both of its line numbers -- that is how a pure
+    // insertion or deletion is encoded, so it must not be read as a line range.
+    var added = changes.Count(c => c.ModifiedEndLineNumber > 0 && c.OriginalEndLineNumber == 0);
+    var removed = changes.Count(c => c.OriginalEndLineNumber > 0 && c.ModifiedEndLineNumber == 0);
+
+    Summary.Text = $"{changes.Length} hunk(s): {added} added, {removed} removed";
+}
+```
+
+`GetLineChangesAsync()` returns an empty array before the first computation completes, which is
+indistinguishable from two identical documents -- so treat `DiffUpdated`, not the return value,
+as the signal that a diff exists. It returns `null` only when the call could not reach the
+editor at all.
 
 **Platform support:** WASM and Desktop.
 
