@@ -645,10 +645,22 @@ public sealed class DesktopIntegrationTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// Verifies that the INIT_COMPLETE diagnostic marker appears in the process
-    /// logs exactly once, confirming that <c>CodeEditorLoaded</c> fired exactly
-    /// once during initialization. Multiple firings would indicate lifecycle bugs.
+    /// Verifies that each editor control emits its INIT_COMPLETE diagnostic marker exactly
+    /// once, confirming that <c>CodeEditorLoaded</c> fired exactly once per control during
+    /// initialization. Multiple firings would indicate lifecycle bugs.
     /// </summary>
+    /// <remarks>
+    /// The test app hosts two controls under the integration harness -- the plain editor
+    /// sample and the diff sample -- so the marker is qualified by control type and counted
+    /// per type. Counting the bare marker would only prove the total, which grows whenever a
+    /// sample surface is added.
+    /// <para>
+    /// Until the marker moved to DiagnosticLog this assertion was vacuous: the marker was
+    /// emitted with Debug.WriteLine, which is [Conditional("DEBUG")] and absent from the
+    /// Release build this suite runs, so the substring match was really counting the
+    /// unrelated INIT_COMPLETE_PROBE recovery line.
+    /// </para>
+    /// </remarks>
     [Fact]
     [Trait("Category", "DesktopCDP")]
     public async Task PresenterLifecycle_InitCompleteOnce()
@@ -657,9 +669,9 @@ public sealed class DesktopIntegrationTests : IAsyncLifetime
         try
         {
             var lines = _fixture.GetLinesAfter(0);
-            var initCompleteCount = lines.Count(l => l.Contains("INIT_COMPLETE"));
 
-            Assert.Equal(1, initCompleteCount);
+            Assert.Equal(1, lines.Count(l => l.Contains("INIT_COMPLETE:CodeEditor")));
+            Assert.Equal(1, lines.Count(l => l.Contains("INIT_COMPLETE:DiffCodeEditor")));
         }
         catch
         {

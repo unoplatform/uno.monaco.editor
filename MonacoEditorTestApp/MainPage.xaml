@@ -8,7 +8,25 @@
       mc:Ignorable="d"
       Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
-    <muxc:TabView x:Name="editors"
-                  AddTabButtonClick="TabView_AddTabButtonClick"
-                  TabCloseRequested="TabView_TabCloseRequested" />
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <!-- Collapsed unless MONACO_DIFF_TAB=1; see MainPage_Loaded. Kept out of the
+                 TabView because TabView virtualizes non-selected tab content, so a diff
+                 editor in a tab is never realized until a human clicks it, and the CDP
+                 harness drives WebView contents rather than the XAML tree. -->
+            <RowDefinition x:Name="DiffPanelRow" Height="0" />
+        </Grid.RowDefinitions>
+
+        <muxc:TabView x:Name="editors"
+                      Grid.Row="0"
+                      AddTabButtonClick="TabView_AddTabButtonClick"
+                      TabCloseRequested="TabView_TabCloseRequested" />
+
+        <ContentControl x:Name="DiffPanelHost"
+                        Grid.Row="1"
+                        Visibility="Collapsed"
+                        HorizontalContentAlignment="Stretch"
+                        VerticalContentAlignment="Stretch" />
+    </Grid>
 </Page>

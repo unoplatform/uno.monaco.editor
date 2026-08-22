@@ -41,6 +41,8 @@ public sealed class WasmAppFixture : IAsyncLifetime
         var repoRoot = FindRepoRoot();
 
         // 0. Create Playwright instance (owned by this fixture).
+        PlaywrightDriverPath.Ensure();
+
         _playwright = await Playwright.CreateAsync();
 
         // 1. Resolve WASM build output directory (Release then Debug fallback).

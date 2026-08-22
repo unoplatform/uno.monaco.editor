@@ -35,7 +35,6 @@ public sealed class DesktopAppFixture : IAsyncLifetime
 {
     private const int CdpPollIntervalMs = 500;
     private const int CdpReadyTimeoutMs = 30_000;
-    private const int MonacoPageTimeoutMs = 10_000;
     // CI cold-start (Windows runner) can take significantly longer than local dev:
     // dotnet run launches the pre-built app, WebView2 initializes, then Monaco loads.
     // 15s was insufficient on CI run 21957402273; 60s provides adequate headroom.
@@ -67,13 +66,19 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     /// <summary>The Playwright page connected to the Monaco WebView2 content.</summary>
     public IPage Page { get; private set; } = null!;
 
+    /// <summary>
+    /// The page hosting the <c>DiffCodeEditor</c> sample. On desktop every editor control owns
+    /// its own WebView2, so this is a different page from <see cref="Page"/>.
+    /// </summary>
+    public IPage DiffPage { get; private set; } = null!;
+
     /// <summary>The Playwright browser context for tracing support.</summary>
     public IBrowserContext Context { get; private set; } = null!;
 
     public async ValueTask InitializeAsync()
     {
         // 0. Create Playwright instance (owned by this fixture).
-        EnsurePlaywrightDriverSearchPath();
+        PlaywrightDriverPath.Ensure();
         _playwright = await Playwright.CreateAsync();
 
         // 1. Pick a random available port for CDP.
@@ -109,6 +114,11 @@ public sealed class DesktopAppFixture : IAsyncLifetime
                 ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = $"--remote-debugging-port={_cdpPort}",
                 ["WEBVIEW2_USER_DATA_FOLDER"] = _userDataFolder,
                 ["MONACO_DIAGNOSTICS"] = "1",
+                // Realizes the DiffCodeEditor sample in an always-visible panel. A diff editor
+                // parked in a TabView tab is never constructed until a human selects the tab,
+                // and CDP drives WebView contents rather than the XAML tree, so there would be
+                // no way to reach it from a test.
+                ["MONACO_DIFF_TAB"] = "1",
             },
         };
 
@@ -153,8 +163,16 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         // 6. Connect Playwright via CDP.
         _browser = await _playwright!.Chromium.ConnectOverCDPAsync(cdpEndpoint);
 
-        // 7. Find the Monaco page.
-        Page = await FindMonacoPage();
+        // 7. Find the Monaco pages. Two WebView2 hosts are live (the plain editor sample and
+        // the diff sample) and they share a URL, so they are told apart by content.
+        // Excluding diff editors is not redundant: monaco.editor.getEditors() lists every code
+        // editor the service knows about, and a diff widget's two sub-editors are standalone
+        // code editors, so the diff page can satisfy a bare getEditors() probe too.
+        Page = await FindEditorPageAsync(
+            "monaco.editor.getEditors().length > 0 && monaco.editor.getDiffEditors().length === 0",
+            "plain editor");
+        DiffPage = await FindEditorPageAsync(
+            "monaco.editor.getDiffEditors().length > 0", "diff editor");
         Context = Page.Context;
 
         // 8. Start tracing for failure artifact collection.
@@ -714,78 +732,55 @@ public sealed class DesktopAppFixture : IAsyncLifetime
             Environment.NewLine + string.Join(Environment.NewLine, tail);
     }
 
-    private async Task<IPage> FindMonacoPage()
+    /// <summary>
+    /// Finds the WebView2 page whose Monaco instance satisfies <paramref name="readyExpression"/>.
+    /// </summary>
+    /// <remarks>
+    /// Probes page content rather than matching URLs: the app hosts more than one WebView2 and
+    /// they all navigate to the same editor.html, so a URL heuristic picks one at random. The
+    /// probe also doubles as a readiness wait, since a page that has not finished loading
+    /// Monaco simply fails to match.
+    /// </remarks>
+    private async Task<IPage> FindEditorPageAsync(string readyExpression, string description)
     {
-        var deadline = DateTime.UtcNow.AddMilliseconds(MonacoPageTimeoutMs);
+        var deadline = DateTime.UtcNow.AddMilliseconds(MonacoReadyTimeoutMs);
+        var probe = $"() => typeof monaco !== 'undefined' && {readyExpression}";
 
         while (DateTime.UtcNow < deadline)
         {
-            if (_browser?.Contexts.Count > 0)
+            foreach (var context in _browser?.Contexts ?? (IReadOnlyList<IBrowserContext>)[])
             {
-                foreach (var context in _browser.Contexts)
+                foreach (var page in context.Pages)
                 {
-                    foreach (var page in context.Pages)
+                    if (page.Url.StartsWith("about:", StringComparison.OrdinalIgnoreCase))
                     {
-                        // The Monaco editor page will have a URL containing the virtual host
-                        // or a file:// URL pointing to the editor HTML.
-                        var url = page.Url;
-                        if (url.Contains("uno-monaco", StringComparison.OrdinalIgnoreCase) ||
-                            url.Contains("monaco", StringComparison.OrdinalIgnoreCase) ||
-                            url.Contains("index.html", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    }
+
+                    try
+                    {
+                        if (await page.EvaluateAsync<bool>(probe))
                         {
                             return page;
                         }
                     }
-
-                    // If no URL match, return first non-blank page.
-                    foreach (var page in context.Pages)
+                    catch
                     {
-                        if (!page.Url.StartsWith("about:", StringComparison.OrdinalIgnoreCase))
-                        {
-                            return page;
-                        }
+                        // The page can be mid-navigation or not yet executing scripts; the
+                        // next sweep retries it.
                     }
                 }
             }
 
-            await Task.Delay(500);
+            await Task.Delay(CdpPollIntervalMs);
         }
 
-        // Last resort: return whatever page exists.
-        if (_browser?.Contexts.Count > 0 && _browser.Contexts[0].Pages.Count > 0)
-        {
-            return _browser.Contexts[0].Pages[0];
-        }
-
+        var seen = string.Join(", ", (_browser?.Contexts ?? []).SelectMany(c => c.Pages).Select(p => p.Url));
         throw new TimeoutException(
-            $"Could not find Monaco editor page within {MonacoPageTimeoutMs}ms. " +
-            "Check that the desktop app started correctly and WebView2 loaded the editor.");
+            $"Could not find the {description} page within {MonacoReadyTimeoutMs}ms. " +
+            $"Pages seen: [{seen}]. Check that the desktop app started and WebView2 loaded the editor.");
     }
 
-    /// <summary>
-    /// Points Playwright at the driver bundled in the Microsoft.Playwright NuGet package
-    /// (the .playwright/ folder) when <c>PLAYWRIGHT_DRIVER_SEARCH_PATH</c> is not already set.
-    /// The project excludes Playwright's build assets (see the .csproj), so the driver is not
-    /// copied next to the test DLL; CI sets this env var explicitly, and this makes local runs
-    /// work without manual setup. No-op when the env var is already set (e.g. on CI).
-    /// </summary>
-    private static void EnsurePlaywrightDriverSearchPath()
-    {
-        const string envVar = "PLAYWRIGHT_DRIVER_SEARCH_PATH";
-        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(envVar)))
-        {
-            return;
-        }
-
-        var packagePath = typeof(DesktopAppFixture).Assembly
-            .GetCustomAttributes<AssemblyMetadataAttribute>()
-            .FirstOrDefault(a => a.Key == "PlaywrightPackagePath")?.Value;
-
-        if (!string.IsNullOrEmpty(packagePath) && Directory.Exists(packagePath))
-        {
-            Environment.SetEnvironmentVariable(envVar, packagePath);
-        }
-    }
 
     private static int GetAvailablePort()
     {

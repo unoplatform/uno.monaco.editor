@@ -38,7 +38,9 @@ namespace Monaco
         /// <remarks>
         /// Pairs with <see cref="GetLineChangesAsync"/>: this event says the diff changed,
         /// that method says what it became. Before the first occurrence
-        /// <see cref="GetLineChangesAsync"/> can legitimately return <see langword="null"/>.
+        /// <see cref="GetLineChangesAsync"/> reports an empty set, which is indistinguishable
+        /// from two identical documents -- so treat this event, not the return value, as the
+        /// signal that a diff has actually been computed.
         /// </remarks>
         public event TypedEventHandler<DiffCodeEditor, EventArgs>? DiffUpdated;
 
@@ -62,6 +64,24 @@ namespace Monaco
             {
                 DiffOptions = new DiffEditorOptions();
             }
+
+            // CodeLanguage forwarding on the base runs through Options.Language and reaches
+            // only the modified model. When OriginalLanguage is unset the original side is
+            // supposed to follow CodeLanguage, so it has to be pushed here as well --
+            // otherwise switching language at runtime re-tokenizes only the right-hand side.
+            // No token is kept: the callback targets this same control, so it dies with it.
+            RegisterPropertyChangedCallback(CodeLanguageProperty, OnCodeLanguageChanged);
+        }
+
+        private async void OnCodeLanguageChanged(DependencyObject sender, DependencyProperty property)
+        {
+            // An explicit OriginalLanguage wins; its own DP callback already pushes it.
+            if (!IsEditorLoaded || !string.IsNullOrEmpty(OriginalLanguage))
+            {
+                return;
+            }
+
+            await InvokeScriptAsync("updateOriginalLanguage", EffectiveOriginalLanguage);
         }
 
         /// <inheritdoc />

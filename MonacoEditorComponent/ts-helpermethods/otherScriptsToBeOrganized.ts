@@ -395,12 +395,22 @@ export const revealFirstDiff = function (element: any) {
 };
 
 /**
- * The computed diff hunks, or null when there is no diff editor or Monaco has not
- * finished computing yet. Pairs with the DiffUpdated callback, which fires whenever
+ * The computed diff hunks. Pairs with the DiffUpdated callback, which fires whenever
  * this value changes.
+ *
+ * Monaco returns null until the first computation completes, but null must not cross
+ * the bridge here: the WASM path coerces a falsy result to "" before serializing
+ * (`eval(...) || ""` in InvokeJS), and `""` then fails to deserialize as an array on
+ * the C# side and raises a spurious InternalException. Normalized to an empty array,
+ * which survives both transports -- callers distinguish "not computed yet" by not
+ * having seen DiffUpdated rather than by the return value.
  */
 export const getLineChanges = function (element: any) {
     var editorContext = EditorContext.tryGetEditorForElement(element);
 
-    return editorContext?.diffEditor ? editorContext.diffEditor.getLineChanges() : null;
+    if (!editorContext?.diffEditor) {
+        return [];
+    }
+
+    return editorContext.diffEditor.getLineChanges() ?? [];
 };

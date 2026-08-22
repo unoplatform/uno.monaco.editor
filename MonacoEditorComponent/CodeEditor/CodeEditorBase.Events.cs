@@ -51,6 +51,7 @@ namespace Monaco
         public new event WebKeyEventHandler? KeyDown;
 
         private IThemeListener? _themeListener;
+        private bool _codeEditorLoadedInFlight;
         private EditorLifecycleState _lifecycleState = EditorLifecycleState.Unloaded;
         private int _desktopInitTimeoutRetryCount;
 
@@ -745,6 +746,19 @@ namespace Monaco
                 return;
             }
 
+            // Re-entrancy guard. Both the "Loaded" bridge callback and
+            // MonitorDesktopInitCompletionAsync's probe can arrive for the same bootstrap, and
+            // the state this method transitions on is only updated after two awaits -- so a
+            // probe landing inside that window still passes the guard above and runs the whole
+            // body a second time, re-applying every initial property and potentially raising
+            // EditorLoaded twice for one initialization cycle.
+            if (_codeEditorLoadedInFlight)
+            {
+                Debug.WriteLine("CodeEditorLoaded: ignoring (already in flight for this bootstrap)");
+                return;
+            }
+
+            _codeEditorLoadedInFlight = true;
             try
             {
                 _view = _view ?? throw new InvalidOperationException("The view not set");
@@ -754,8 +768,15 @@ namespace Monaco
                 // applying initial properties.
                 _initialized = true;
 
-                // Emit canonical init-complete marker for diagnostics (always visible).
-                Debug.WriteLine("INIT_COMPLETE");
+                // Emit canonical init-complete marker for diagnostics.
+                //
+                // Through DiagnosticLog, not Debug.WriteLine: Debug.WriteLine is
+                // [Conditional("DEBUG")] and so compiles out of the Release builds the desktop
+                // integration suite runs against, where this marker is the evidence that
+                // CodeEditorLoaded ran. Qualified by control type so a host with more than one
+                // editor can tell which one initialized, and so the marker cannot be confused
+                // with INIT_COMPLETE_PROBE on a substring match.
+                DesktopCodeEditorPresenter.DiagnosticLog($"INIT_COMPLETE:{GetType().Name}");
 
                 // Layout first to ensure the editor dimensions are correct.
                 await SendScriptAsync("layoutEditor(element);");
@@ -798,6 +819,10 @@ namespace Monaco
                 _desktopBootstrapInFlight = false;
                 Debug.WriteLine($"CodeEditorLoaded failed: {ex}");
                 InternalException?.Invoke(this, ex);
+            }
+            finally
+            {
+                _codeEditorLoadedInFlight = false;
             }
         }
 

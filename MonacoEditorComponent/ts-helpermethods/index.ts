@@ -97,27 +97,42 @@ const _scriptBase: string = (() => {
     return document.baseURI || '';
 })();
 
+/**
+ * Desktop copies the worker bundles into a real "workers/" directory next to editor.html.
+ * On WASM they are embedded resources, and Uno.Wasm.Bootstrap's shell task flattens the
+ * path to a dot-joined name ("workers.editor.worker.js") in package_<hash>/ -- there is no
+ * "workers/" directory in the deployed output, so asking for one 404s.
+ */
 function resolveWorkerUrl(filename: string): string {
-    return _scriptBase + `workers/${filename}`;
+    return isDesktop
+        ? _scriptBase + `workers/${filename}`
+        : _scriptBase + `workers.${filename}`;
+}
+
+/** Map a Monaco language label to the worker bundle that serves it. */
+function workerFileName(label: string): string {
+    if (label === 'json') {
+        return 'json.worker.js';
+    }
+    if (label === 'css' || label === 'scss' || label === 'less') {
+        return 'css.worker.js';
+    }
+    if (label === 'html' || label === 'handlebars' || label === 'razor') {
+        return 'html.worker.js';
+    }
+    if (label === 'typescript' || label === 'javascript') {
+        return 'ts.worker.js';
+    }
+    // The default editor worker, which backs core services including diff computation.
+    return 'editor.worker.js';
 }
 
 (self as any).MonacoEnvironment = {
-    getWorkerUrl: function (_moduleId: string, label: string) {
-        // Map language labels to worker file names
-        if (label === 'json') {
-            return resolveWorkerUrl('json.worker.js');
-        }
-        if (label === 'css' || label === 'scss' || label === 'less') {
-            return resolveWorkerUrl('css.worker.js');
-        }
-        if (label === 'html' || label === 'handlebars' || label === 'razor') {
-            return resolveWorkerUrl('html.worker.js');
-        }
-        if (label === 'typescript' || label === 'javascript') {
-            return resolveWorkerUrl('ts.worker.js');
-        }
-        // Default editor worker
-        return resolveWorkerUrl('editor.worker.js');
+    // getWorker rather than getWorkerUrl: Monaco 0.52's ESM build constructs a getWorkerUrl
+    // result with { type: 'module' }, but these bundles are built as IIFE, so they are
+    // instantiated here as classic workers instead.
+    getWorker: function (_moduleId: string, label: string) {
+        return new Worker(resolveWorkerUrl(workerFileName(label)));
     }
 };
 

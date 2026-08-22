@@ -32,7 +32,28 @@ namespace MonacoEditorTestApp
             //tabItem.Header = "Original item";
             //tabItem.Content = new EditorControl();
             //editors.TabItems.Add(tabItem);
+            // Tab 0 must stay a plain CodeEditor: both integration fixtures gate readiness on
+            // monaco.editor.getEditors(), which does not enumerate diff editors.
             AddEditorTab();
+
+            // The diff sample goes in an always-realized panel rather than a tab whenever a
+            // test harness needs to reach it, because TabView virtualizes non-selected tab
+            // content and neither harness can select a tab: CDP sees WebView contents rather
+            // than the XAML tree, and the WASM app renders its UI to a Skia canvas, so there
+            // is no DOM tab header for Playwright to click either.
+            //
+            // On WASM that is unconditional -- an extra editor in the same document is cheap,
+            // and there is no env var to read in the browser. On desktop each control costs a
+            // whole WebView2, so it stays behind the flag the fixture sets and is a tab
+            // otherwise.
+            if (OperatingSystem.IsBrowser() || Environment.GetEnvironmentVariable("MONACO_DIFF_TAB") == "1")
+            {
+                ShowDiffPanel();
+            }
+            else
+            {
+                AddDiffEditorTab();
+            }
 
             if (Environment.GetEnvironmentVariable("MONACO_SELF_VERIFY") == "1")
             {
@@ -56,6 +77,23 @@ namespace MonacoEditorTestApp
             editors.TabItems.Add(tabItem);
         }
 
+        private void ShowDiffPanel()
+        {
+            DiffPanelRow.Height = new GridLength(1, GridUnitType.Star);
+            DiffPanelHost.Visibility = Visibility.Visible;
+            DiffPanelHost.Content = new DiffEditorControl();
+        }
+
+        private void AddDiffEditorTab()
+        {
+            var tabItem = new TabViewItem
+            {
+                IconSource = new Microsoft.UI.Xaml.Controls.SymbolIconSource() { Symbol = Symbol.Sync },
+                Header = "diff",
+                Content = new DiffEditorControl()
+            };
+            editors.TabItems.Add(tabItem);
+        }
 
         private void TabView_TabCloseRequested(TabView sender, TabViewTabCloseRequestedEventArgs args)
         {

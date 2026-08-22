@@ -47,13 +47,16 @@ namespace Monaco
         /// Gets the diff hunks Monaco has computed for the current pair of documents.
         /// </summary>
         /// <returns>
-        /// The hunks, or <see langword="null"/> when the computation has not finished yet.
-        /// Returns an empty array when the two documents are identical.
+        /// The hunks; empty when the two documents are identical, and also empty before the
+        /// first computation completes. <see langword="null"/> only when the call could not
+        /// reach the editor at all -- it was made before initialization, or the script failed.
         /// </returns>
         /// <remarks>
-        /// Wraps Monaco <c>diffEditor.getLineChanges</c>. Because the result is
-        /// <see langword="null"/> until the first computation completes, pair this with
-        /// <see cref="DiffUpdated"/> rather than calling it immediately after load.
+        /// Wraps Monaco <c>diffEditor.getLineChanges</c>. Monaco itself returns null until the
+        /// first computation completes, but that is normalized to an empty array because null
+        /// cannot survive the WASM interop path. Distinguish "not computed yet" by whether
+        /// <see cref="DiffUpdated"/> has fired, not by the return value, and prefer calling
+        /// this from that event rather than immediately after load.
         /// <para>
         /// A hunk reports 0 for both line numbers on whichever side has no lines, which is how
         /// pure insertions and deletions are encoded -- see <see cref="IChange"/>.

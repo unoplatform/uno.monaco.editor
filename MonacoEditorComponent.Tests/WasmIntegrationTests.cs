@@ -20,6 +20,8 @@ namespace MonacoEditorComponent.Tests;
 [Collection("WasmPlaywright")]
 public sealed class WasmIntegrationTests : IAsyncLifetime
 {
+    private const int DiffTimeoutMs = 30_000;
+
     private readonly WasmAppFixture _fixture;
     private string _currentTestName = "unknown";
     private bool _testFailed;
@@ -52,9 +54,9 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
         {
             // The fixture already waits for Monaco ready.
             var editorCount = await _fixture.Page.EvaluateAsync<int>(
-                "() => monaco.editor.getEditors().length");
+                DiffEditorCases.StandaloneEditorCountExpression);
 
-            Assert.True(editorCount > 0, "Expected at least one Monaco editor instance.");
+            Assert.True(editorCount > 0, "Expected at least one standalone Monaco editor instance.");
         }
         catch
         {
@@ -72,13 +74,14 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
         {
             var testText = $"WASM Playwright test {Guid.NewGuid():N}";
 
-            // Set text via Monaco JS API.
+            // Target the plain editor explicitly: getEditors() also lists the diff widget's two
+            // sub-editors, so indexing into it would depend on construction order.
             await _fixture.Page.EvaluateAsync(
-                $"() => monaco.editor.getEditors()[0].setValue('{testText}')");
+                $"() => {DiffEditorCases.StandaloneEditorsExpressionBody}[0].setValue('{testText}')");
 
             // Read back via Monaco JS API.
             var readBack = await _fixture.Page.EvaluateAsync<string>(
-                "() => monaco.editor.getEditors()[0].getValue()");
+                $"() => {DiffEditorCases.StandaloneEditorsExpressionBody}[0].getValue()");
 
             Assert.Equal(testText, readBack);
         }
@@ -96,15 +99,17 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
         _currentTestName = nameof(LifecycleEvents_EditorLoadedExactlyOnce);
         try
         {
-            // Verify exactly one editor instance exists (lifecycle fired once, not duplicated).
+            // Verify exactly one plain editor instance exists (lifecycle fired once, not
+            // duplicated). Counted excluding diff sub-editors -- see
+            // DiffEditorCases.StandaloneEditorsExpressionBody.
             var editorCount = await _fixture.Page.EvaluateAsync<int>(
-                "() => monaco.editor.getEditors().length");
+                DiffEditorCases.StandaloneEditorCountExpression);
 
             Assert.Equal(1, editorCount);
 
             // Verify the editor has a model (fully loaded, not partial init).
             var hasModel = await _fixture.Page.EvaluateAsync<bool>(
-                "() => monaco.editor.getEditors()[0].getModel() !== null");
+                DiffEditorCases.StandaloneEditorHasModelExpression);
 
             Assert.True(hasModel, "Editor should have a model after lifecycle completes.");
         }
@@ -170,6 +175,68 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
                 DiffLanguageTokenizationCases.Sample);
 
             Assert.Equal(DiffLanguageTokenizationCases.ExpectedTokens, tokenTypes);
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Covers <c>DiffCodeEditor</c> end to end on WASM: both documents load independently,
+    /// the original side follows CodeLanguage, the widget renders, and the diff genuinely
+    /// recomputes when the modified document changes.
+    /// </summary>
+    /// <remarks>
+    /// On WASM there is no editor web worker in the payload, so Monaco computes the diff on
+    /// the main thread through its built-in fallback. This is therefore also the check that
+    /// that fallback path actually produces hunks. See <see cref="DiffEditorCases"/>.
+    /// </remarks>
+    [Fact]
+    [Trait("Category", "WasmPlaywright")]
+    public async Task DiffEditor_LoadsBothSidesAndRecomputesOnEdit()
+    {
+        _currentTestName = nameof(DiffEditor_LoadsBothSidesAndRecomputesOnEdit);
+        try
+        {
+            await _fixture.Page.WaitForFunctionAsync(
+                DiffEditorCases.HasComputedDiffExpression,
+                null, new PageWaitForFunctionOptions { Timeout = DiffTimeoutMs });
+
+            Assert.True(
+                await _fixture.Page.EvaluateAsync<bool>(DiffEditorCases.ModelsAreDistinctExpression),
+                "The original and modified sides must be backed by distinct models.");
+
+            Assert.True(
+                await _fixture.Page.EvaluateAsync<bool>(DiffEditorCases.DiffEditorRootExpression),
+                "Expected Monaco's .monaco-diff-editor root element on the page.");
+
+            var original = await _fixture.Page.EvaluateAsync<string>(DiffEditorCases.OriginalValueExpression);
+            var modified = await _fixture.Page.EvaluateAsync<string>(DiffEditorCases.ModifiedValueExpression);
+
+            Assert.NotEqual(original, modified);
+            Assert.StartsWith(DiffEditorCases.SharedFirstLine, original);
+            Assert.StartsWith(DiffEditorCases.SharedFirstLine, modified);
+
+            // OriginalLanguage is unset on the sample, so the original side must follow
+            // CodeLanguage. Nothing on the base forwards language to the original model, so
+            // this is what keeps DiffCodeEditor's own forwarding honest.
+            Assert.Equal("csharp", await _fixture.Page.EvaluateAsync<string>(DiffEditorCases.OriginalLanguageExpression));
+            Assert.Equal("csharp", await _fixture.Page.EvaluateAsync<string>(DiffEditorCases.ModifiedLanguageExpression));
+
+            // Make the sides identical: the hunk count must fall to zero, proving the diff is
+            // recomputed rather than captured once at construction.
+            await _fixture.Page.EvaluateAsync(DiffEditorCases.SetModifiedValueExpression, original);
+            await _fixture.Page.WaitForFunctionAsync(
+                DiffEditorCases.NoRemainingHunksExpression,
+                null, new PageWaitForFunctionOptions { Timeout = DiffTimeoutMs });
+
+            // Restore, so the shared page is left as other tests in this collection expect.
+            await _fixture.Page.EvaluateAsync(DiffEditorCases.SetModifiedValueExpression, modified);
+            await _fixture.Page.WaitForFunctionAsync(
+                DiffEditorCases.HasComputedDiffExpression,
+                null, new PageWaitForFunctionOptions { Timeout = DiffTimeoutMs });
         }
         catch
         {

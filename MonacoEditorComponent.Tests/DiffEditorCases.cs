@@ -1,0 +1,114 @@
+namespace MonacoEditorComponent.Tests;
+
+/// <summary>
+/// Shared page expressions and expectations for the <c>DiffCodeEditor</c> control, consumed
+/// by both the WASM and desktop integration tests so the two cannot drift apart.
+/// <para>
+/// What these guard is the aliasing the control is built on: <c>EditorContext.editor</c> holds
+/// the <i>modified sub-editor</i> of the diff widget, which is what lets every pre-existing
+/// helper keep working unchanged. If that aliasing regresses, the two documents stop being
+/// independently addressable and <c>getModifiedEditor()</c> stops agreeing with the value the
+/// content listener reports.
+/// </para>
+/// </summary>
+internal static class DiffEditorCases
+{
+    /// <summary>
+    /// The code editors on the page that are <i>not</i> part of a diff widget, as a JS array.
+    /// </summary>
+    /// <remarks>
+    /// <c>monaco.editor.getEditors()</c> lists every code editor the service knows about, and a
+    /// diff widget's original and modified panes are themselves standalone code editors -- so a
+    /// page showing one plain editor and one diff editor reports three. Tests that mean "the
+    /// plain editor" have to subtract the sub-editors rather than index into getEditors().
+    /// </remarks>
+    public const string StandaloneEditorsExpressionBody =
+        "(() => { const subs = new Set(monaco.editor.getDiffEditors()" +
+        ".flatMap(d => [d.getOriginalEditor(), d.getModifiedEditor()]));" +
+        " return monaco.editor.getEditors().filter(e => !subs.has(e)); })()";
+
+    /// <summary>Number of editors on the page that are not part of a diff widget.</summary>
+    public const string StandaloneEditorCountExpression =
+        "() => " + StandaloneEditorsExpressionBody + ".length";
+
+    /// <summary>Whether the first non-diff editor has a model.</summary>
+    public const string StandaloneEditorHasModelExpression =
+        "() => " + StandaloneEditorsExpressionBody + "[0].getModel() !== null";
+
+    /// <summary>Whether the page hosts a Monaco diff editor at all.</summary>
+    public const string IsDiffEditorPresentExpression =
+        "() => typeof monaco !== 'undefined' && monaco.editor.getDiffEditors().length > 0";
+
+    /// <summary>The original (left) document's text.</summary>
+    public const string OriginalValueExpression =
+        "() => monaco.editor.getDiffEditors()[0].getOriginalEditor().getValue()";
+
+    /// <summary>The modified (right) document's text.</summary>
+    public const string ModifiedValueExpression =
+        "() => monaco.editor.getDiffEditors()[0].getModifiedEditor().getValue()";
+
+    /// <summary>The original document's language id.</summary>
+    public const string OriginalLanguageExpression =
+        "() => monaco.editor.getDiffEditors()[0].getOriginalEditor().getModel().getLanguageId()";
+
+    /// <summary>The modified document's language id.</summary>
+    public const string ModifiedLanguageExpression =
+        "() => monaco.editor.getDiffEditors()[0].getModifiedEditor().getModel().getLanguageId()";
+
+    /// <summary>
+    /// The two models must be distinct instances. A regression that pointed both sides at one
+    /// model would still render and still diff (against itself, producing zero hunks), so this
+    /// is checked explicitly rather than inferred from the hunk count.
+    /// </summary>
+    public const string ModelsAreDistinctExpression =
+        "() => { const d = monaco.editor.getDiffEditors()[0];" +
+        " return d.getOriginalEditor().getModel() !== d.getModifiedEditor().getModel(); }";
+
+    /// <summary>
+    /// Number of computed hunks, or -1 while Monaco is still computing. The helper normalizes
+    /// Monaco's null to an empty array, so this reads the widget directly to keep the
+    /// distinction the C# API deliberately drops.
+    /// </summary>
+    public const string LineChangeCountExpression =
+        "() => { const c = monaco.editor.getDiffEditors()[0].getLineChanges(); return c === null ? -1 : c.length; }";
+
+    /// <summary>
+    /// Whether the diff widget's root element carries Monaco's <c>.monaco-diff-editor</c>
+    /// class. Doubles as a check that the diff stylesheet reached the page: the split view,
+    /// overview ruler, and change decorations are all styled off that class, and it is the
+    /// one part of the payload a plain editor never exercises.
+    /// </summary>
+    public const string DiffEditorRootExpression =
+        "() => document.querySelectorAll('.monaco-diff-editor').length > 0";
+
+    /// <summary>
+    /// Waits until Monaco has computed a diff with at least one hunk. Diff computation is
+    /// asynchronous (and on WASM runs on the main thread via Monaco's worker fallback), so
+    /// tests must wait rather than read immediately after load.
+    /// </summary>
+    public const string HasComputedDiffExpression =
+        "() => { const editors = monaco.editor.getDiffEditors();" +
+        " if (!editors.length) return false;" +
+        " const c = editors[0].getLineChanges(); return c !== null && c.length > 0; }";
+
+    /// <summary>
+    /// Whether the diff has been computed and found no differences. Distinct from
+    /// "not computed yet", which reports null rather than an empty array.
+    /// </summary>
+    public const string NoRemainingHunksExpression =
+        "() => { const c = monaco.editor.getDiffEditors()[0].getLineChanges(); return c !== null && c.length === 0; }";
+
+    /// <summary>
+    /// Replaces the modified document's text, so a test can drive a recomputation the same way
+    /// a user typing would. Returns nothing; pair with <see cref="HasComputedDiffExpression"/>.
+    /// </summary>
+    public const string SetModifiedValueExpression =
+        "(value) => monaco.editor.getDiffEditors()[0].getModifiedEditor().getModel().setValue(value)";
+
+    /// <summary>
+    /// The sample the test app loads. Kept in sync with <c>DiffEditorControl</c> only loosely:
+    /// assertions below check structural facts (the sides differ, hunks exist) rather than
+    /// exact text, so tweaking the sample does not break the tests.
+    /// </summary>
+    public const string SharedFirstLine = "using System;";
+}

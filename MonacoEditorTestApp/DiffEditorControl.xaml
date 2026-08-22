@@ -1,0 +1,55 @@
+﻿<UserControl x:Class="MonacoEditorTestApp.DiffEditorControl"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:local="using:MonacoEditorTestApp"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:monaco="using:Monaco"
+      mc:Ignorable="d">
+
+    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    Padding="8">
+            <Button x:Name="PreviousDiffButton"
+                    Content="Previous diff"
+                    Click="PreviousDiff_Click" />
+            <Button x:Name="NextDiffButton"
+                    Content="Next diff"
+                    Click="NextDiff_Click" />
+            <Button x:Name="FirstDiffButton"
+                    Content="Reveal first"
+                    Click="FirstDiff_Click" />
+            <ToggleSwitch x:Name="SideBySideToggle"
+                          Header="Side by side"
+                          IsOn="True"
+                          Toggled="SideBySide_Toggled" />
+            <ToggleSwitch x:Name="IgnoreWhitespaceToggle"
+                          Header="Ignore whitespace"
+                          IsOn="True"
+                          Toggled="IgnoreWhitespace_Toggled" />
+            <Button x:Name="MutateButton"
+                    Content="Edit modified side"
+                    Click="Mutate_Click" />
+        </StackPanel>
+
+        <monaco:DiffCodeEditor x:Name="Diff"
+                               Grid.Row="1"
+                               CodeLanguage="csharp"
+                               OriginalText="{x:Bind OriginalContent, Mode=TwoWay}"
+                               ModifiedText="{x:Bind ModifiedContent, Mode=TwoWay}"
+                               DiffUpdated="Diff_DiffUpdated" />
+
+        <TextBlock x:Name="SummaryText"
+                   Grid.Row="2"
+                   Padding="8"
+                   Text="Waiting for the first diff computation..." />
+    </Grid>
+</UserControl>
