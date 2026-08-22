@@ -33,12 +33,19 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout
+        # Full history: Nerdbank.GitVersioning walks it to compute the version height and
+        # fails the build outright on a shallow clone.
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+
+      - name: Install workloads
+        run: dotnet workload install wasm-tools
 
       # WebKitGTK is the web engine Uno's WebView2 control delegates to on Linux; xvfb
       # provides the display the X11 host requires; mesa gives GL a software rasteriser.
