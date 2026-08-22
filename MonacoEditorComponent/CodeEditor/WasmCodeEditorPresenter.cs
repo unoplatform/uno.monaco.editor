@@ -59,7 +59,7 @@ namespace Monaco
         public event EventHandler<WebViewMessageEventArgs>? MessageReceived;
 
         /// <inheritdoc />
-        public CodeEditor? ParentCodeEditor { get; set; }
+        public CodeEditorBase? ParentCodeEditor { get; set; }
 
         /// <inheritdoc />
         public bool IsSettingValue

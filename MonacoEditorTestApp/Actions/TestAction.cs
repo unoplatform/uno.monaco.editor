@@ -20,7 +20,7 @@ namespace MonacoEditorTestApp.Actions
         public string? Label => "Test Action";
         public string? Precondition => "editorHasSelection";
 
-        public async void Run(CodeEditor editor, object[]? args)
+        public async void Run(CodeEditorBase editor, object[]? args)
         {
             var selectedText = editor.SelectedText ?? string.Empty;
             if (args is { Length: > 0 })

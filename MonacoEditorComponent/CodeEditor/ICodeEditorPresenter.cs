@@ -104,10 +104,10 @@ namespace Monaco
         /// </summary>
         event EventHandler<WebViewMessageEventArgs>? MessageReceived;
 
-        /// <summary>Gets or sets the parent <see cref="CodeEditor"/> that owns this presenter.</summary>
-        public CodeEditor? ParentCodeEditor { get; set; }
+        /// <summary>Gets or sets the parent <see cref="CodeEditorBase"/> that owns this presenter.</summary>
+        public CodeEditorBase? ParentCodeEditor { get; set; }
 
-		/// <summary>Routes a key-down event from JavaScript to the parent editor's <see cref="CodeEditor.KeyDown"/> handler.</summary>
+		/// <summary>Routes a key-down event from JavaScript to the parent editor's <see cref="CodeEditorBase.KeyDown"/> handler.</summary>
 		/// <param name="args">The key event arguments.</param>
 		/// <returns><see langword="true"/> if the event was handled; otherwise, <see langword="false"/>.</returns>
 		public bool TriggerKeyDown(WebKeyEventArgs args);

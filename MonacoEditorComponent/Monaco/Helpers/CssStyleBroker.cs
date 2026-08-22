@@ -5,7 +5,7 @@ using System.Text;
 namespace Monaco.Helpers
 {
     /// <summary>
-    /// Broker to help manage CSS Styles and their usage within each CodeEditor. Lifetime managed by CodeEditor.
+    /// Broker to help manage CSS Styles and their usage within each CodeEditorBase. Lifetime managed by CodeEditorBase.
     /// </summary>
     internal sealed class CssStyleBroker : IDisposable
     {
@@ -14,15 +14,15 @@ namespace Monaco.Helpers
         // Track styles registered to this particular editor.
         private static readonly Dictionary<uint, WeakReference<ICssStyle>> _registry = [];
 
-        private static readonly Dictionary<WeakReference<CodeEditor>, HashSet<uint>> _knownStyles = [];
+        private static readonly Dictionary<WeakReference<CodeEditorBase>, HashSet<uint>> _knownStyles = [];
 
-        private static readonly Dictionary<WeakReference<CodeEditor>, bool> _isDirty = [];
+        private static readonly Dictionary<WeakReference<CodeEditorBase>, bool> _isDirty = [];
 
-        private readonly WeakReference<CodeEditor> _parent;
+        private readonly WeakReference<CodeEditorBase> _parent;
 
-        public CssStyleBroker(CodeEditor codeEditor)
+        public CssStyleBroker(CodeEditorBase codeEditor)
         {
-            _parent = new WeakReference<CodeEditor>(codeEditor);
+            _parent = new WeakReference<CodeEditorBase>(codeEditor);
             _knownStyles.Add(_parent, []);
             _isDirty.Add(_parent, false);
         }
@@ -47,7 +47,7 @@ namespace Monaco.Helpers
 
         public bool AssociateStyles(IModelDeltaDecoration[] decorations)
         {
-            // By construction we assume that decorations will not be null from the call in CodeEditor.DeltaDecorationsHelperAsync.
+            // By construction we assume that decorations will not be null from the call in CodeEditorBase.DeltaDecorationsHelperAsync.
             bool newStyle = _isDirty[_parent]; // Can be set in GetStyles.
 
             _isDirty[_parent] = false; // Reset
