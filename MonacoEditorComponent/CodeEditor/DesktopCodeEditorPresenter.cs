@@ -54,7 +54,7 @@ namespace Monaco
 
             Content = _webView;
 
-            Debug.WriteLine("DesktopCodeEditorPresenter()");
+            DiagnosticLog("DesktopCodeEditorPresenter()");
         }
 
         internal void SetHostVisible(bool isVisible)
@@ -141,7 +141,7 @@ namespace Monaco
             get => _isCoreWebView2Initialized ? _webView.Source : (_pendingSource ?? _webView.Source);
             set
             {
-                Debug.WriteLine($"DesktopCodeEditorPresenter.Source = {value}");
+                DiagnosticLog($"DesktopCodeEditorPresenter.Source = {value}");
                 if (!_isCoreWebView2Initialized)
                 {
                     // Buffer the URI until Launch() completes and security settings are applied.
@@ -167,20 +167,20 @@ namespace Monaco
                 // Idempotency guard: skip if already initialized
                 if (_isCoreWebView2Initialized)
                 {
-                    Debug.WriteLine("DesktopCodeEditorPresenter.Launch: already initialized, skipping");
+                    DiagnosticLog("DesktopCodeEditorPresenter.Launch: already initialized, skipping");
                     return;
                 }
 
                 if (_isLaunchInProgress)
                 {
-                    Debug.WriteLine("DesktopCodeEditorPresenter.Launch: already in progress, skipping");
+                    DiagnosticLog("DesktopCodeEditorPresenter.Launch: already in progress, skipping");
                     return;
                 }
 
                 _isLaunchInProgress = true;
                 ApplyHostVisibility(forceVisibleForInitialization: true);
 
-                Debug.WriteLine($"DesktopCodeEditorPresenter.Launch({GetHashCode():X8})");
+                DiagnosticLog($"DesktopCodeEditorPresenter.Launch({GetHashCode():X8})");
 
                 // Verify WebKitGTK is available before attempting WebView2 initialization on Linux.
                 // EnsureCoreWebView2Async may fail silently or throw cryptic errors without it.
@@ -206,7 +206,7 @@ namespace Monaco
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"DesktopCodeEditorPresenter: Security settings not supported ({ex.GetType().Name})");
+                    DiagnosticLog($"DesktopCodeEditorPresenter: Security settings not supported ({ex.GetType().Name})");
                 }
 
                 // Wire up navigation events using WebView2 CONTROL-level APIs.
@@ -233,7 +233,7 @@ namespace Monaco
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"DesktopCodeEditorPresenter: Core WebMessageReceived not supported ({ex.GetType().Name}), falling back to control event");
+                        DiagnosticLog($"DesktopCodeEditorPresenter: Core WebMessageReceived not supported ({ex.GetType().Name}), falling back to control event");
                         _webView.WebMessageReceived += WebView2_WebMessageReceived;
                         _usingCoreWebMessageReceived = false;
                     }
@@ -246,7 +246,7 @@ namespace Monaco
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"DesktopCodeEditorPresenter: NewWindowRequested not supported ({ex.GetType().Name})");
+                    DiagnosticLog($"DesktopCodeEditorPresenter: NewWindowRequested not supported ({ex.GetType().Name})");
                 }
 
                 // Only mark initialized after all setup succeeds
@@ -256,7 +256,7 @@ namespace Monaco
                 // InitialiseWebObjects), not here. Launch() only initializes CoreWebView2.
                 // CreateBridgeTargets() is the single owner of JsonRpc lifecycle.
 
-                Debug.WriteLine("DesktopCodeEditorPresenter: CoreWebView2 initialized");
+                DiagnosticLog("DesktopCodeEditorPresenter: CoreWebView2 initialized");
 
                 // Configure content serving and navigate to editor.html.
                 var contentRoot = ResolveDesktopContentPath();
@@ -270,7 +270,7 @@ namespace Monaco
                 _pendingSource = null;
                 TeardownJsonRpc();
                 DetachEventHandlers();
-                Debug.WriteLine($"DesktopCodeEditorPresenter.Launch error: {e}");
+                DiagnosticLog($"DesktopCodeEditorPresenter.Launch error: {e}");
 
                 // Re-throw so callers (CodeEditor) can detect failure and abort lifecycle.
                 throw;
@@ -511,11 +511,11 @@ namespace Monaco
 
         private void WebView2_NavigationStarting(WebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationStartingEventArgs args)
         {
-            Debug.WriteLine($"DesktopCodeEditorPresenter: NavigationStarting → {args.Uri}");
+            DiagnosticLog($"DesktopCodeEditorPresenter: NavigationStarting → {args.Uri}");
 
             if (args.Uri is string uri && !IsNavigationAllowed(uri, AllowedFileContentRoot))
             {
-                Debug.WriteLine($"DesktopCodeEditorPresenter: Blocked navigation to {uri}");
+                DiagnosticLog($"DesktopCodeEditorPresenter: Blocked navigation to {uri}");
                 args.Cancel = true;
                 return;
             }
@@ -535,14 +535,14 @@ namespace Monaco
 
         private void WebView2_NavigationCompleted(WebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs args)
         {
-            Debug.WriteLine($"DesktopCodeEditorPresenter: NavigationCompleted (IsSuccess={args.IsSuccess})");
+            DiagnosticLog($"DesktopCodeEditorPresenter: NavigationCompleted (IsSuccess={args.IsSuccess})");
 
             if (ShouldFallbackToFileNavigation(args.IsSuccess, _webView.Source, _fileFallbackAttempted, AllowedFileContentRoot)
                 && _desktopContentRoot is { } contentRoot)
             {
                 _fileFallbackAttempted = true;
                 var fallbackUri = BuildFileEditorUri(contentRoot);
-                Debug.WriteLine($"DesktopCodeEditorPresenter: Virtual host navigation failed, retrying with {fallbackUri}");
+                DiagnosticLog($"DesktopCodeEditorPresenter: Virtual host navigation failed, retrying with {fallbackUri}");
                 _webView.Source = fallbackUri;
                 return;
             }
@@ -661,7 +661,7 @@ namespace Monaco
 
             if (!File.Exists(Path.Combine(contentRoot, HelpersScriptFileName)))
             {
-                Debug.WriteLine(
+                DiagnosticLog(
                     $"DesktopCodeEditorPresenter: {HelpersScriptFileName} is missing from {contentRoot} — " +
                     "the editor page will load blank.");
             }
@@ -741,11 +741,11 @@ namespace Monaco
                     contentRoot,
                     Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
                 virtualHostAvailable = true;
-                Debug.WriteLine("DesktopCodeEditorPresenter: Virtual host mapping configured");
+                DiagnosticLog("DesktopCodeEditorPresenter: Virtual host mapping configured");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"DesktopCodeEditorPresenter: Virtual host mapping not available ({ex.GetType().Name}: {ex.Message})");
+                DiagnosticLog($"DesktopCodeEditorPresenter: Virtual host mapping not available ({ex.GetType().Name}: {ex.Message})");
             }
 
             // Navigate using WebView2.Source (documented as implemented on Skia).
@@ -764,7 +764,7 @@ namespace Monaco
             }
 
             _webView.Source = editorUri;
-            Debug.WriteLine($"DesktopCodeEditorPresenter: Navigating to {editorUri} (content root: {contentRoot})");
+            DiagnosticLog($"DesktopCodeEditorPresenter: Navigating to {editorUri} (content root: {contentRoot})");
         }
 
         // ============================================================
@@ -808,7 +808,7 @@ namespace Monaco
             _jsonRpc.AddLocalRpcTarget(debugLogger);
 
             _jsonRpc.StartListening();
-            Debug.WriteLine("DesktopCodeEditorPresenter: JsonRpc bridge started");
+            DiagnosticLog("DesktopCodeEditorPresenter: JsonRpc bridge started");
 
             return (parentAccessor, themeListener, keyboardListener, debugLogger);
         }
@@ -884,12 +884,20 @@ namespace Monaco
         }
 
         /// <summary>
-        /// Writes a diagnostic message to stdout when the <c>MONACO_DIAGNOSTICS</c>
-        /// environment variable is set to <c>"1"</c>. Used for Release-testable
-        /// diagnostics that do not appear in production output.
+        /// Writes a diagnostic message to the debugger, and to stdout when the
+        /// <c>MONACO_DIAGNOSTICS</c> environment variable is set to <c>"1"</c>. Nothing is
+        /// emitted in a normal Release run.
+        /// <para>The whole launch and navigation path reports through here rather than through
+        /// <c>Debug.WriteLine</c> alone: on platforms with no CDP endpoint -- WebKitGTK
+        /// and WKWebView -- stdout is the only window into why the web view did not come up,
+        /// and a Release CI run compiles the debugger sink away.</para>
         /// </summary>
         internal static void DiagnosticLog(string message)
         {
+            // Conditional("DEBUG"), so this costs nothing in Release and keeps the
+            // debugger output developers already rely on.
+            Debug.WriteLine(message);
+
             if (Environment.GetEnvironmentVariable("MONACO_DIAGNOSTICS") == "1")
             {
                 Console.WriteLine(message);
