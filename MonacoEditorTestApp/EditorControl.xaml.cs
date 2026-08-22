@@ -410,6 +410,13 @@ namespace MonacoEditorTestApp
 
         public bool IsEditorOperational => Editor is { IsEditorLoaded: true };
 
+        /// <summary>
+        /// Text installed before the hover probe so the round-trip has content to return:
+        /// the provider reports only on the word "Hit", which must therefore be at line 1,
+        /// column 1. See <see cref="CollectFeatureProbeAsync"/>.
+        /// </summary>
+        private const string HoverProbeText = "Hit the hover provider from the self-verify probe.";
+
         public async Task<string> CollectRuntimeProbeAsync(string stage)
         {
             if (Editor is null)
@@ -464,6 +471,17 @@ namespace MonacoEditorTestApp
 
             try
             {
+                // Arrange: the hover provider only reports on the word "Hit"
+                // (see Helpers/EditorHoverProvider.cs), and it reads the C# Text property, so
+                // what the editor happens to contain decides whether the probe gets content
+                // back. That varies by host and by harness mode -- the default sample starts
+                // with "public", the MONACO_DIAGNOSTICS harness overwrites it with
+                // "// test-init-text" -- and in both cases the provider correctly returns null,
+                // leaving the probe unable to tell "no hover at this position" apart from "the
+                // bridge never answered". Setting a known first line makes a non-empty response
+                // the only healthy outcome.
+                Editor.Text = HoverProbeText;
+
                 var stageLiteral = ToJsonStringLiteral(stage);
                 await Editor.InvokeScriptAsync("""
                     (() => {
@@ -541,8 +559,11 @@ namespace MonacoEditorTestApp
                         }
                     }
 
+                    // Re-issue while the result is still unset (null: promise pending) or empty
+                    // (the provider answered before the text above had been applied).
                     if (string.IsNullOrEmpty(probe)
-                        || probe.Contains("\"hoverProbeResult\":null", StringComparison.Ordinal))
+                        || probe.Contains("\"hoverProbeResult\":null", StringComparison.Ordinal)
+                        || probe.Contains("\"hoverProbeResult\":\"\"", StringComparison.Ordinal))
                     {
                         await Editor.InvokeScriptAsync("""
                             (() => {
