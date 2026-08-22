@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-08-22T10:35:10.086049Z",
+  "depends_on": [
+    "fn-16-linux-desktop-test-coverage.4"
+  ],
+  "epic": "fn-16-linux-desktop-test-coverage",
+  "id": "fn-16-linux-desktop-test-coverage.5",
+  "priority": 5,
+  "spec_path": ".flow/tasks/fn-16-linux-desktop-test-coverage.5.md",
+  "status": "todo",
+  "title": "Update docs for actual per-platform coverage",
+  "updated_at": "2026-08-22T10:35:10.086049Z"
+}
