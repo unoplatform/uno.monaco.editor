@@ -876,6 +876,32 @@ The modified (right) document is the editable one. Everything `DiffCodeEditor` i
 position, actions, and commands. `OriginalLanguage` is optional -- leave it unset and the
 original side follows `CodeLanguage`.
 
+### Locking each side
+
+The two documents lock independently, with one property each:
+
+```csharp
+Diff.ReadOnly = true;         // inherited -- locks the modified (right) side
+Diff.OriginalEditable = true; // unlocks the original (left) side, read-only by default
+```
+
+A pure comparison view is `ReadOnly="True"` with `OriginalEditable` left alone. Unlocking the
+original side does not make it write back -- edits there are never pushed to `OriginalText`,
+so read the value from Monaco if you need it.
+
+`OriginalEditable` is a pass-through for `DiffOptions.OriginalEditable` and the two stay in
+sync in both directions, the same way `ReadOnly` pairs with `Options.ReadOnly`. Assigning a
+whole new `DiffOptions` object can drop the pass-through, though: an `OriginalEditable` set on
+the incoming instance is adopted, but one that is unset leaves the old value behind with the
+discarded object.
+
+> **`ReadOnly` at runtime leaves the revert affordances visible.** Only a `ReadOnly` that is
+> already `true` when the editor bootstraps reaches Monaco's diff-widget options; later changes
+> are applied to the modified sub-editor alone. Monaco decides whether to draw the revert arrows
+> and the "Revert Block" gutter entries from the widget's flag, so those stay on screen. They
+> are inert -- reverting goes through the modified editor's `executeEdits`, which a read-only
+> editor refuses -- but if the affordance matters, set `ReadOnly` before the control loads.
+
 ### Configuring the diff
 
 Diff-specific settings live on `DiffOptions`, separate from `Options`. Monaco keeps the two in

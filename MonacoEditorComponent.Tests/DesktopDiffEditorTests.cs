@@ -173,6 +173,36 @@ public sealed class DesktopDiffEditorTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// The sample sets <c>OriginalEditable="True"</c>, so this covers the pass-through from the
+    /// dependency property through DiffOptions to Monaco.
+    /// </summary>
+    /// <remarks>
+    /// On desktop the value rides in the pushed initial state and is handed to
+    /// <c>createDiffEditor</c>, so unlike the WASM counterpart this is the construction path.
+    /// </remarks>
+    [Fact]
+    [Trait("Category", "DesktopCDP")]
+    public async Task DiffEditor_OriginalEditableUnlocksOnlyTheOriginalSide()
+    {
+        _currentTestName = nameof(DiffEditor_OriginalEditableUnlocksOnlyTheOriginalSide);
+        try
+        {
+            await _fixture.DiffPage.WaitForFunctionAsync(
+                DiffEditorCases.OriginalEditorWritableExpression,
+                null, new PageWaitForFunctionOptions { Timeout = DiffTimeoutMs });
+
+            Assert.False(
+                await _fixture.DiffPage.EvaluateAsync<bool>(DiffEditorCases.ModifiedEditorReadOnlyExpression),
+                "OriginalEditable must not leak onto the modified side, which ReadOnly governs.");
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    /// <summary>
     /// The diff widget's own stylesheet rules are the one part of the CSS payload a plain
     /// editor never exercises, so this is also the cheapest check that the diff styles reach
     /// the page at all.

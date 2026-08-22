@@ -106,6 +106,36 @@ internal static class DiffEditorCases
         "(value) => monaco.editor.getDiffEditors()[0].getModifiedEditor().getModel().setValue(value)";
 
     /// <summary>
+    /// Whether the original (left) sub-editor is read-only. Monaco derives this from the diff
+    /// widget's <c>originalEditable</c> option and overwrites it on every option change, so it
+    /// is the effective readout of <c>DiffCodeEditor.OriginalEditable</c> -- and the only diff
+    /// option whose effect is observable on a sub-editor rather than on the widget.
+    /// </summary>
+    /// <remarks>
+    /// Reads the option id from <c>monaco.editor.EditorOption</c> rather than hardcoding its
+    /// numeric value, which shifts between Monaco releases.
+    /// </remarks>
+    public const string OriginalEditorReadOnlyExpression =
+        "() => monaco.editor.getDiffEditors()[0].getOriginalEditor().getOption(monaco.editor.EditorOption.readOnly)";
+
+    /// <summary>
+    /// Waits until the original side is present and writable. Phrased as a wait rather than a
+    /// read because WASM delivers the diff options after construction, so a diff editor can
+    /// exist for a moment before <c>originalEditable</c> reaches it.
+    /// </summary>
+    public const string OriginalEditorWritableExpression =
+        "() => { const editors = monaco.editor.getDiffEditors(); if (!editors.length) return false;" +
+        " return editors[0].getOriginalEditor().getOption(monaco.editor.EditorOption.readOnly) === false; }";
+
+    /// <summary>
+    /// Whether the modified (right) sub-editor is read-only. Asserted alongside
+    /// <see cref="OriginalEditorReadOnlyExpression"/>: the two sides lock independently, so
+    /// unlocking the original must not have leaked across to the modified one.
+    /// </summary>
+    public const string ModifiedEditorReadOnlyExpression =
+        "() => monaco.editor.getDiffEditors()[0].getModifiedEditor().getOption(monaco.editor.EditorOption.readOnly)";
+
+    /// <summary>
     /// The sample the test app loads. Kept in sync with <c>DiffEditorControl</c> only loosely:
     /// assertions below check structural facts (the sides differ, hunks exist) rather than
     /// exact text, so tweaking the sample does not break the tests.

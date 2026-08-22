@@ -153,6 +153,18 @@ namespace Monaco
                 return;
             }
 
+            // The options object wins over the pass-through property, the way CodeLanguage
+            // follows Options.Language on the base: setting DiffOptions.OriginalEditable
+            // directly is a documented path and must not be reverted to the DP's value.
+            // This cannot loop -- the DP callback assigns the same value straight back, and
+            // DiffEditorOptions.SetPropertyValue raises PropertyChanged only on a real change.
+            if (e.PropertyName == nameof(DiffEditorOptions.OriginalEditable)
+                && options.OriginalEditable is { } originalEditable
+                && OriginalEditable != originalEditable)
+            {
+                OriginalEditable = originalEditable;
+            }
+
             await InvokeScriptAsync("updateDiffOptions", options);
         }
     }

@@ -244,6 +244,39 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
             throw;
         }
     }
+
+    /// <summary>
+    /// The sample sets <c>OriginalEditable="True"</c>, so this covers the pass-through from the
+    /// dependency property through DiffOptions to Monaco.
+    /// </summary>
+    /// <remarks>
+    /// WASM bootstraps with <c>createDiffEditor({})</c> and receives the diff options afterwards
+    /// through <c>updateDiffOptions</c>, so this is the post-construction delivery path; the
+    /// desktop counterpart covers the pushed initial state instead.
+    /// </remarks>
+    [Fact]
+    [Trait("Category", "WasmPlaywright")]
+    public async Task DiffEditor_OriginalEditableUnlocksOnlyTheOriginalSide()
+    {
+        _currentTestName = nameof(DiffEditor_OriginalEditableUnlocksOnlyTheOriginalSide);
+        try
+        {
+            // The option arrives after construction here, so wait for it rather than reading
+            // once: a diff editor that is merely present may not have been configured yet.
+            await _fixture.Page.WaitForFunctionAsync(
+                DiffEditorCases.OriginalEditorWritableExpression,
+                null, new PageWaitForFunctionOptions { Timeout = DiffTimeoutMs });
+
+            Assert.False(
+                await _fixture.Page.EvaluateAsync<bool>(DiffEditorCases.ModifiedEditorReadOnlyExpression),
+                "OriginalEditable must not leak onto the modified side, which ReadOnly governs.");
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
 }
 
 /// <summary>

@@ -136,6 +136,15 @@ namespace MonacoEditorTestApp
             => Diff.DiffOptions.IgnoreTrimWhitespace = IgnoreWhitespaceToggle.IsOn;
 
         /// <summary>
+        /// Unlocks the original (left) side at runtime, deliberately through the options object
+        /// rather than the <c>OriginalEditable</c> property: the two are kept in sync both ways,
+        /// and the editor already carries <c>OriginalEditable="True"</c> declaratively, so
+        /// between them the sample drives the pass-through from each end.
+        /// </summary>
+        private void OriginalEditable_Toggled(object sender, RoutedEventArgs e)
+            => Diff.DiffOptions.OriginalEditable = OriginalEditableToggle.IsOn;
+
+        /// <summary>
         /// Edits the modified side from C# to confirm the diff recomputes and DiffUpdated fires.
         /// </summary>
         private void Mutate_Click(object sender, RoutedEventArgs e)

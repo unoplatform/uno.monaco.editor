@@ -35,6 +35,10 @@
                           Header="Ignore whitespace"
                           IsOn="True"
                           Toggled="IgnoreWhitespace_Toggled" />
+            <ToggleSwitch x:Name="OriginalEditableToggle"
+                          Header="Original editable"
+                          IsOn="True"
+                          Toggled="OriginalEditable_Toggled" />
             <Button x:Name="MutateButton"
                     Content="Edit modified side"
                     Click="Mutate_Click" />
@@ -43,6 +47,7 @@
         <monaco:DiffCodeEditor x:Name="Diff"
                                Grid.Row="1"
                                CodeLanguage="csharp"
+                               OriginalEditable="True"
                                OriginalText="{x:Bind OriginalContent, Mode=TwoWay}"
                                ModifiedText="{x:Bind ModifiedContent, Mode=TwoWay}"
                                DiffUpdated="Diff_DiffUpdated" />

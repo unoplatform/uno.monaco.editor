@@ -10,8 +10,8 @@ namespace Monaco
         /// Gets or sets the original (left-hand) document -- the "before" side of the comparison.
         /// </summary>
         /// <remarks>
-        /// Read-only by default. Set <see cref="DiffOptions"/>.<see cref="DiffEditorOptions.OriginalEditable"/>
-        /// to make it editable; note that edits to it are not pushed back to this property.
+        /// Read-only by default. Set <see cref="OriginalEditable"/> to make it editable; note
+        /// that edits to it are not pushed back to this property.
         /// </remarks>
         public string OriginalText
         {
@@ -90,6 +90,47 @@ namespace Monaco
         }));
 
         /// <summary>
+        /// Gets or sets a value indicating whether the original (left-hand) document can be
+        /// edited. Defaults to <see langword="false"/>, matching Monaco.
+        /// </summary>
+        /// <remarks>
+        /// The two documents are locked independently: this property governs the original side,
+        /// and the inherited <see cref="CodeEditorBase.ReadOnly"/> governs the modified one.
+        /// A read-only comparison view is therefore <c>ReadOnly="True"</c> with this left unset.
+        /// <para>
+        /// A pass-through for <see cref="DiffOptions"/>.<see cref="DiffEditorOptions.OriginalEditable"/>,
+        /// which stays in sync in both directions -- the same relationship
+        /// <see cref="CodeEditorBase.ReadOnly"/> has with
+        /// <see cref="CodeEditorBase.Options"/>.<see cref="StandaloneEditorConstructionOptions.ReadOnly"/>.
+        /// Unlocking the original side does not make it write back: edits there are still not
+        /// pushed to <see cref="OriginalText"/>.
+        /// </para>
+        /// </remarks>
+        public bool OriginalEditable
+        {
+            get => (bool)GetValue(OriginalEditableProperty);
+            set => SetValue(OriginalEditableProperty, value);
+        }
+
+        /// <summary>Identifies the <see cref="OriginalEditable"/> dependency property.</summary>
+        public static DependencyProperty OriginalEditableProperty { get; } = DependencyProperty.Register(
+            nameof(OriginalEditable),
+            typeof(bool),
+            typeof(DiffCodeEditor),
+            new PropertyMetadata(
+                false,
+                (d, e) =>
+                {
+                    if (d is not DiffCodeEditor editor) return;
+
+                    // Writing into the options object is the entire push: its PropertyChanged
+                    // handler forwards to Monaco once the editor is up, and before that the
+                    // same instance is what BuildInitialStateMap and ApplyInitialPropertyValues
+                    // serialize. Nothing is sent from here.
+                    editor.DiffOptions?.OriginalEditable = (bool)e.NewValue;
+                }));
+
+        /// <summary>
         /// Gets or sets the diff-specific options: side-by-side versus inline rendering,
         /// whitespace handling, the diff algorithm, collapsing of unchanged regions, and so on.
         /// </summary>
@@ -102,6 +143,13 @@ namespace Monaco
         /// automatically. The nested <see cref="DiffEditorOptions.Experimental"/> and
         /// <see cref="DiffEditorOptions.HideUnchangedRegions"/> objects are plain values and do
         /// not raise change notifications -- assign a new instance to push an update.
+        /// </para>
+        /// <para>
+        /// Setting this property replaces the entire options object and may overwrite the
+        /// <see cref="OriginalEditable"/> pass-through, exactly as replacing
+        /// <see cref="CodeEditorBase.Options"/> may overwrite <see cref="CodeEditorBase.ReadOnly"/>.
+        /// An explicit value on the incoming instance is adopted into the pass-through property;
+        /// an unset one leaves the previously pushed value behind with the discarded object.
         /// </para>
         /// </remarks>
         public DiffEditorOptions DiffOptions
@@ -134,6 +182,15 @@ namespace Monaco
                     {
                         value.PropertyChanged -= editor.DiffOptions_PropertyChanged;
                         value.PropertyChanged += editor.DiffOptions_PropertyChanged;
+
+                        // Same adoption rule the base applies to Options at load: an explicit
+                        // value on the incoming instance seeds an untouched pass-through
+                        // property, and an untouched instance does not clear one that was set.
+                        if (value.OriginalEditable is { } originalEditable
+                            && editor.ReadLocalValue(OriginalEditableProperty) == DependencyProperty.UnsetValue)
+                        {
+                            editor.OriginalEditable = originalEditable;
+                        }
 
                         if (editor.IsEditorLoaded)
                         {
