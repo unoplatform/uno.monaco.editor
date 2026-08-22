@@ -99,11 +99,33 @@ namespace MonacoEditorTestApp
                 Console.WriteLine(isHealthy
                     ? "SELF_VERIFY_RESULT:PASS"
                     : "SELF_VERIFY_RESULT:FAIL");
+                MaybeExit(isHealthy);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"SELF_VERIFY_RESULT:ERROR:{ex.Message}");
+                MaybeExit(false);
             }
+        }
+
+        /// <summary>
+        /// Terminates the app with the self-verification outcome as its exit code when
+        /// <c>MONACO_SELF_VERIFY_EXIT=1</c>. Off by default so manual validation keeps the
+        /// window open for inspection; shell-driven runs (for example
+        /// <c>xvfb-run ... dotnet run</c>) opt in to get a pass/fail exit code.
+        /// <para>The <c>SELF_VERIFY_RESULT:</c> stdout line remains the authoritative signal:
+        /// exiting from the UI thread can race native window teardown, so automated harnesses
+        /// parse stdout and treat the exit code as corroborating evidence only.</para>
+        /// </summary>
+        private static void MaybeExit(bool isHealthy)
+        {
+            if (Environment.GetEnvironmentVariable("MONACO_SELF_VERIFY_EXIT") != "1")
+            {
+                return;
+            }
+
+            Console.Out.Flush();
+            Environment.Exit(isHealthy ? 0 : 1);
         }
 
         private async Task<EditorControl> WaitForEditorControlReadyAsync(int tabIndex, TimeSpan timeout)
