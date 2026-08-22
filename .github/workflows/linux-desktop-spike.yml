@@ -53,7 +53,7 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get install -yq --no-install-recommends \
-            libgtk-3-0t64 libwebkit2gtk-4.1-0 xvfb xauth libgl1-mesa-dri dbus-x11
+            libgtk-3-0t64 libwebkit2gtk-4.1-0 xvfb xauth libgl1-mesa-dri dbus-x11 openbox
 
       - name: Install npm dependencies and build Monaco bundles
         run: npm install && npm run build
@@ -66,24 +66,25 @@ jobs:
 
       # The self-verify suite launches the app itself; xvfb-run wraps the whole test process so
       # DISPLAY is inherited by the child. There is no headless mode for the native web view.
-      # dbus-run-session gives WebKitGTK a session bus, which it expects and CI does not provide.
       #
-      # Knobs to try, in order, if the stack refuses to start:
-      #   WEBKIT_DISABLE_COMPOSITING_MODE: 1
-      #   WEBKIT_DISABLE_DMABUF_RENDERER: 1
-      #   LIBGL_ALWAYS_SOFTWARE: 1
-      #   GDK_GL: gles
+      # openbox: Xvfb ships no window manager, so nothing maps or sizes top-level windows.
+      # Run 3 showed Launch() entering and EnsureCoreWebView2Async never returning, which is
+      # what an unrealized native window looks like from the managed side.
+      # dbus-run-session: WebKitGTK expects a session bus that CI does not provide.
+      # The WEBKIT_* knobs disable the accelerated paths that have no GPU to talk to here.
       - name: Run desktop self-verify tests
         env:
           MONACO_DIAGNOSTICS: '1'
+          GDK_BACKEND: x11
+          WEBKIT_DISABLE_COMPOSITING_MODE: '1'
+          WEBKIT_DISABLE_DMABUF_RENDERER: '1'
+          LIBGL_ALWAYS_SOFTWARE: '1'
         run: |
-          xvfb-run -a --server-args="-screen 0 1280x1024x24" \
-            dbus-run-session -- \
-            dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj \
-              -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}" --no-build \
-              --results-directory ${{ runner.temp }}/TestResults \
-              -- --filter-trait "Category=DesktopSelfVerify" \
-                 --report-xunit --report-xunit-filename linux-desktop-test-results.xml
+          xvfb-run -a --server-args="-screen 0 1280x1024x24" bash -c '
+            openbox &
+            sleep 2
+            dbus-run-session -- dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}" --no-build --results-directory ${{ runner.temp }}/TestResults -- --filter-trait "Category=DesktopSelfVerify" --report-xunit --report-xunit-filename linux-desktop-test-results.xml
+          '
 
       - name: Upload test artifacts
         if: always()
