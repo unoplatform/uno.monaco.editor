@@ -65,12 +65,26 @@ public partial class App : Application
     public static void InitializeLogging()
     {
 #if DEBUG
+        const bool isDebugBuild = true;
+#else
+        const bool isDebugBuild = false;
+#endif
+
         // Logging is disabled by default for release builds, as it incurs a significant
         // initialization cost from Microsoft.Extensions.Logging setup. If startup performance
         // is a concern for your application, keep this disabled. If you're running on the web or
         // desktop targets, you can use URL or command line parameters to enable it.
         //
         // For more performance documentation: https://platform.uno/docs/articles/Uno-UI-Performance.html
+        //
+        // MONACO_DIAGNOSTICS=1 turns it on in Release too: automated desktop verification runs
+        // in Release, and when the native web view fails to come up, Uno's own log is the only
+        // place that says why.
+        var isDiagnosticsRun = Environment.GetEnvironmentVariable("MONACO_DIAGNOSTICS") == "1";
+        if (!isDebugBuild && !isDiagnosticsRun)
+        {
+            return;
+        }
 
         var factory = LoggerFactory.Create(builder =>
         {
@@ -85,10 +99,13 @@ public partial class App : Application
             // Exclude logs below this level
             builder.SetMinimumLevel(LogLevel.Information);
 
-            // Default filters for Uno Platform namespaces
-            builder.AddFilter("Uno", LogLevel.Warning);
-            builder.AddFilter("Windows", LogLevel.Warning);
-            builder.AddFilter("Microsoft", LogLevel.Warning);
+            // Default filters for Uno Platform namespaces. A diagnostics run drops to
+            // Information: warnings alone have proven too coarse to explain a web view that
+            // never initializes.
+            var platformLevel = isDiagnosticsRun ? LogLevel.Information : LogLevel.Warning;
+            builder.AddFilter("Uno", platformLevel);
+            builder.AddFilter("Windows", platformLevel);
+            builder.AddFilter("Microsoft", platformLevel);
 
             // Generic Xaml events
             // builder.AddFilter("Microsoft.UI.Xaml", LogLevel.Debug );
@@ -122,7 +139,6 @@ public partial class App : Application
 
 #if HAS_UNO
         global::Uno.UI.Adapter.Microsoft.Extensions.Logging.LoggingAdapter.Initialize();
-#endif
 #endif
     }
 }
