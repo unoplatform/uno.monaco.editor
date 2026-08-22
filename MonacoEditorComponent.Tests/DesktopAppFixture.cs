@@ -42,12 +42,10 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     private const int MonacoReadyTimeoutMs = 60_000;
 
     private IPlaywright? _playwright;
-    private Process? _appProcess;
+    private TestAppProcessHost? _host;
     private IBrowser? _browser;
     private string _userDataFolder = string.Empty;
-    private string _processLogPath = string.Empty;
     private int _cdpPort;
-    private CancellationTokenSource? _logCaptureCts;
     private bool _wroteHklmBrowserArgs;
 
     // Machine-wide WebView2 policy key. Arguments published here survive an elevated host
@@ -60,9 +58,9 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     private const string WebView2AdditionalArgsKey = WebView2PolicyKey + @"\AdditionalBrowserArguments";
     private const string WebView2AppIdWildcard = "*";
 
-    // In-memory log lines for cursor-based query API.
-    private readonly List<string> _logLines = [];
-    private readonly object _logLock = new();
+    /// <summary>The process host, valid from <see cref="InitializeAsync"/> onward.</summary>
+    private TestAppProcessHost Host =>
+        _host ?? throw new InvalidOperationException("The fixture has not been initialized.");
 
     /// <summary>The Playwright page connected to the Monaco WebView2 content.</summary>
     public IPage Page { get; private set; } = null!;
@@ -83,35 +81,18 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         _userDataFolder = Path.Combine(Path.GetTempPath(), $"uno-monaco-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_userDataFolder);
 
-        // 3. Ensure test-artifacts directory exists.
-        var artifactsDir = Path.Combine(FindRepoRoot(), "test-artifacts");
-        Directory.CreateDirectory(artifactsDir);
-        _processLogPath = Path.Combine(artifactsDir, $"desktop-fixture-{DateTime.UtcNow:yyyyMMdd-HHmmss}.log");
-
-        // 4. Launch MonacoEditorTestApp desktop with CDP enabled.
-        var repoRoot = FindRepoRoot();
-        var testAppProject = Path.Combine(repoRoot, "MonacoEditorTestApp", "MonacoEditorTestApp.csproj");
-
-        // Use -c Release --no-build to run the pre-built app without triggering a Debug
-        // rebuild. CI pre-builds with -c Release (ci.yml desktop-tests job), so omitting
-        // -c Release here caused dotnet run to rebuild in Debug, eating ~30s of timeout.
-        // --no-launch-profile prevents launch profile env vars from interfering.
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "dotnet",
-            Arguments = $"run --project \"{testAppProject}\" -f net10.0-desktop -c Release --no-build --no-launch-profile",
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true,
-            Environment =
+        // 3. Prepare the process host: it owns the launch, the timestamped log under
+        //    test-artifacts/, and the cursor-based log query API this fixture re-exposes.
+        _host = new TestAppProcessHost(
+            "desktop-fixture",
+            new Dictionary<string, string>
             {
                 ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = $"--remote-debugging-port={_cdpPort}",
                 ["WEBVIEW2_USER_DATA_FOLDER"] = _userDataFolder,
                 ["MONACO_DIAGNOSTICS"] = "1",
-            },
-        };
+            });
 
+        // 4. Launch MonacoEditorTestApp desktop with CDP enabled.
         // WebView2 runtime v150 hardened elevated (High Integrity Level) hosts: switches
         // supplied through user-writable channels (WEBVIEW2_* env vars, HKCU policy) are
         // ignored -- only HKLM policy and API args are honored (WebView2Feedback #5640,
@@ -132,12 +113,7 @@ public sealed class DesktopAppFixture : IAsyncLifetime
             await PublishHklmBrowserArgumentsAsync($"--remote-debugging-port={_cdpPort}");
         }
 
-        _appProcess = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("Failed to start MonacoEditorTestApp desktop process.");
-
-        // Start background log capture with cancellation support.
-        _logCaptureCts = new CancellationTokenSource();
-        _ = CaptureProcessOutputAsync(_appProcess, _processLogPath, _logCaptureCts.Token);
+        _host.Start();
 
         // 5. Deterministic readiness: poll CDP version endpoint.
         // Use the IPv4 loopback literal, not "localhost": WebView2/Chromium's
@@ -177,26 +153,13 @@ public sealed class DesktopAppFixture : IAsyncLifetime
 
     public async ValueTask DisposeAsync()
     {
-        // Cancel log capture first so stream reads don't block process disposal.
-        if (_logCaptureCts is not null)
-        {
-            try { await _logCaptureCts.CancelAsync(); } catch { /* best-effort */ }
-            _logCaptureCts.Dispose();
-            _logCaptureCts = null;
-        }
-
-        // Kill the app process FIRST so the browser close doesn't wait for it.
-        // On Windows, Playwright browser.CloseAsync can hang indefinitely if the
+        // Stop log capture and kill the app process FIRST so the browser close doesn't wait
+        // for it. On Windows, Playwright browser.CloseAsync can hang indefinitely if the
         // underlying CDP target (WebView2) is unresponsive. Killing the process
         // before closing the browser ensures deterministic cleanup.
-        if (_appProcess is { HasExited: false })
+        if (_host is not null)
         {
-            try
-            {
-                _appProcess.Kill(entireProcessTree: true);
-                await _appProcess.WaitForExitAsync(new CancellationTokenSource(5000).Token);
-            }
-            catch { /* best-effort cleanup */ }
+            await _host.ShutdownAsync();
         }
 
         if (_browser is not null)
@@ -210,7 +173,12 @@ public sealed class DesktopAppFixture : IAsyncLifetime
             catch { /* best-effort cleanup */ }
         }
 
-        _appProcess?.Dispose();
+        if (_host is not null)
+        {
+            await _host.DisposeAsync();
+            _host = null;
+        }
+
         _playwright?.Dispose();
 
         // Clean up unique user data folder.
@@ -272,72 +240,18 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     }
 
     // ============================================================
-    // Cursor-based log query API
+    // Cursor-based log query API (delegated to the process host)
     // ============================================================
 
-    /// <summary>
-    /// Returns a cursor (index) representing the current end of the log buffer.
-    /// Lines added after this cursor are "new" from the caller's perspective.
-    /// </summary>
-    public int GetLogCursor()
-    {
-        lock (_logLock)
-        {
-            return _logLines.Count;
-        }
-    }
+    /// <inheritdoc cref="TestAppProcessHost.GetLogCursor"/>
+    public int GetLogCursor() => Host.GetLogCursor();
 
-    /// <summary>
-    /// Waits for a log line matching <paramref name="pattern"/> (regex) to appear
-    /// after the given <paramref name="cursor"/> position. Returns the matching line.
-    /// </summary>
-    /// <param name="cursor">The cursor position returned by <see cref="GetLogCursor"/>.</param>
-    /// <param name="pattern">A regex pattern to match against log lines.</param>
-    /// <param name="timeoutMs">Maximum time to wait in milliseconds.</param>
-    /// <returns>The first matching log line after the cursor.</returns>
-    /// <exception cref="TimeoutException">Thrown if no matching line appears within the timeout.</exception>
-    public async Task<string> WaitForLogLineAfterAsync(int cursor, string pattern, int timeoutMs = 10_000)
-    {
-        var regex = new Regex(pattern, RegexOptions.Compiled);
-        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+    /// <inheritdoc cref="TestAppProcessHost.WaitForLogLineAfterAsync"/>
+    public Task<string> WaitForLogLineAfterAsync(int cursor, string pattern, int timeoutMs = 10_000)
+        => Host.WaitForLogLineAfterAsync(cursor, pattern, timeoutMs);
 
-        while (DateTime.UtcNow < deadline)
-        {
-            lock (_logLock)
-            {
-                for (int i = cursor; i < _logLines.Count; i++)
-                {
-                    if (regex.IsMatch(_logLines[i]))
-                    {
-                        return _logLines[i];
-                    }
-                }
-            }
-
-            await Task.Delay(50);
-        }
-
-        // Build diagnostic message with available lines.
-        var availableLines = GetLinesAfter(cursor);
-        throw new TimeoutException(
-            $"No log line matching '{pattern}' appeared within {timeoutMs}ms after cursor {cursor}.\n" +
-            $"Lines after cursor ({availableLines.Count}):\n" +
-            string.Join("\n", availableLines.Take(50)));
-    }
-
-    /// <summary>
-    /// Returns all log lines captured after the given <paramref name="cursor"/> position.
-    /// </summary>
-    /// <param name="cursor">The cursor position returned by <see cref="GetLogCursor"/>.</param>
-    /// <returns>A list of log lines after the cursor.</returns>
-    public List<string> GetLinesAfter(int cursor)
-    {
-        lock (_logLock)
-        {
-            if (cursor >= _logLines.Count) return [];
-            return _logLines.GetRange(cursor, _logLines.Count - cursor);
-        }
-    }
+    /// <inheritdoc cref="TestAppProcessHost.GetLinesAfter"/>
+    public List<string> GetLinesAfter(int cursor) => Host.GetLinesAfter(cursor);
 
     /// <summary>
     /// Captures a failure screenshot and stops the Playwright trace, saving artifacts
@@ -345,7 +259,7 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     /// </summary>
     public async Task CaptureFailureArtifacts(string testName)
     {
-        var artifactsDir = Path.Combine(FindRepoRoot(), "test-artifacts");
+        var artifactsDir = Path.Combine(TestAppProcessHost.FindRepoRoot(), "test-artifacts");
         Directory.CreateDirectory(artifactsDir);
 
         try
@@ -374,11 +288,11 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         catch { /* best-effort */ }
 
         // Copy process log to test-specific path.
-        if (File.Exists(_processLogPath))
+        if (File.Exists(Host.LogPath))
         {
             try
             {
-                File.Copy(_processLogPath, Path.Combine(artifactsDir, $"{testName}-process.log"), overwrite: true);
+                File.Copy(Host.LogPath, Path.Combine(artifactsDir, $"{testName}-process.log"), overwrite: true);
             }
             catch { /* best-effort */ }
         }
@@ -392,9 +306,9 @@ public sealed class DesktopAppFixture : IAsyncLifetime
 
         while (DateTime.UtcNow < deadline)
         {
-            if (_appProcess is { HasExited: true })
+            if (Host.HasExited)
             {
-                var exitCode = _appProcess.ExitCode;
+                var exitCode = Host.ExitCode;
                 throw new InvalidOperationException(
                     $"MonacoEditorTestApp process exited unexpectedly with code {exitCode} before CDP was ready.\n" +
                     $"Process log:\n{CaptureLogSnapshot()}");
@@ -601,21 +515,8 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         catch (IOException) { return string.Empty; }
     }
 
-    /// <summary>
-    /// Builds an artifact path sharing the timestamped base name of the process log
-    /// (e.g. <c>desktop-fixture-{timestamp}-cdp-version.txt</c>) so a run's diagnostics group
-    /// together and don't overwrite each other across parallel fixture instances or retries.
-    /// Returns null when the log directory cannot be determined.
-    /// </summary>
-    private string? ArtifactSiblingPath(string suffix)
-    {
-        var dir = Path.GetDirectoryName(_processLogPath);
-        if (string.IsNullOrEmpty(dir))
-        {
-            return null;
-        }
-        return Path.Join(dir, $"{Path.GetFileNameWithoutExtension(_processLogPath)}-{suffix}");
-    }
+    /// <inheritdoc cref="TestAppProcessHost.ArtifactSiblingPath"/>
+    private string? ArtifactSiblingPath(string suffix) => Host.ArtifactSiblingPath(suffix);
 
     /// <summary>
     /// True when the current process runs at High (or System) Integrity Level on Windows.
@@ -689,30 +590,11 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     /// <summary>
     /// Returns the captured process stdout/stderr as a single string from the in-memory
     /// buffer. Reading the on-disk log file directly is unsafe on Windows: the background
-    /// <see cref="CaptureProcessOutputAsync"/> writer holds it open, and a concurrent
-    /// reader's implicit FileShare.Read does not grant the writer's Write access, which
-    /// surfaces as an IOException that masks the real readiness diagnostic.
+    /// writer holds it open, and a concurrent reader's implicit FileShare.Read does not
+    /// grant the writer's Write access, which surfaces as an IOException that masks the
+    /// real readiness diagnostic.
     /// </summary>
-    private string CaptureLogSnapshot()
-    {
-        // Keep only the most recent lines: the tail is the relevant diagnostic near a
-        // failure, and the full buffer can make exceptions unreadably large.
-        const int maxLines = 200;
-        var lines = GetLinesAfter(0);
-        if (lines.Count == 0)
-        {
-            return "(no log)";
-        }
-        if (lines.Count <= maxLines)
-        {
-            return string.Join(Environment.NewLine, lines);
-        }
-
-        var omitted = lines.Count - maxLines;
-        var tail = lines.GetRange(lines.Count - maxLines, maxLines);
-        return $"(... {omitted} earlier line(s) omitted; showing last {maxLines} ...)" +
-            Environment.NewLine + string.Join(Environment.NewLine, tail);
-    }
+    private string CaptureLogSnapshot() => Host.CaptureLogSnapshot();
 
     private async Task<IPage> FindMonacoPage()
     {
@@ -794,92 +676,5 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         listener.Stop();
         return port;
-    }
-
-    private static string FindRepoRoot()
-    {
-        var dir = AppContext.BaseDirectory;
-        while (dir is not null)
-        {
-            if (Directory.Exists(Path.Combine(dir, ".git")))
-            {
-                return dir;
-            }
-            dir = Path.GetDirectoryName(dir);
-        }
-
-        // Fallback: navigate up from BaseDirectory assuming standard build output layout.
-        return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
-    }
-
-    private async Task CaptureProcessOutputAsync(Process process, string logPath, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await using var logWriter = new StreamWriter(logPath, append: false);
-            // Use a SemaphoreSlim to serialize StreamWriter access from concurrent
-            // stdout/stderr readers. _logLock guards List<string> but StreamWriter
-            // is not thread-safe and needs its own synchronization.
-            using var writerSemaphore = new SemaphoreSlim(1, 1);
-
-            // ReadLineAsync returns null at end-of-stream, avoiding the CA2024
-            // diagnostic from synchronous EndOfStream checks in async methods.
-            var stdoutTask = Task.Run(async () =>
-            {
-                string? line;
-                while (!cancellationToken.IsCancellationRequested &&
-                       (line = await process.StandardOutput.ReadLineAsync(cancellationToken)) is not null)
-                {
-                    var formattedLine = $"[stdout] {line}";
-                    lock (_logLock)
-                    {
-                        _logLines.Add(formattedLine);
-                    }
-                    await writerSemaphore.WaitAsync(cancellationToken);
-                    try
-                    {
-                        await logWriter.WriteLineAsync(formattedLine.AsMemory(), cancellationToken);
-                        await logWriter.FlushAsync(cancellationToken);
-                    }
-                    finally
-                    {
-                        writerSemaphore.Release();
-                    }
-                }
-            }, cancellationToken);
-            var stderrTask = Task.Run(async () =>
-            {
-                string? line;
-                while (!cancellationToken.IsCancellationRequested &&
-                       (line = await process.StandardError.ReadLineAsync(cancellationToken)) is not null)
-                {
-                    var formattedLine = $"[stderr] {line}";
-                    lock (_logLock)
-                    {
-                        _logLines.Add(formattedLine);
-                    }
-                    await writerSemaphore.WaitAsync(cancellationToken);
-                    try
-                    {
-                        await logWriter.WriteLineAsync(formattedLine.AsMemory(), cancellationToken);
-                        await logWriter.FlushAsync(cancellationToken);
-                    }
-                    finally
-                    {
-                        writerSemaphore.Release();
-                    }
-                }
-            }, cancellationToken);
-
-            await Task.WhenAny(Task.WhenAll(stdoutTask, stderrTask), Task.Delay(TimeSpan.FromMinutes(5), cancellationToken));
-        }
-        catch (OperationCanceledException)
-        {
-            // Expected when fixture is being disposed -- log capture is no longer needed.
-        }
-        catch
-        {
-            // Best-effort log capture -- never throw from background task.
-        }
     }
 }
