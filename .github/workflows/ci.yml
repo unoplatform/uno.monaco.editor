@@ -94,7 +94,7 @@ jobs:
           playwright-version: ${{ env.PLAYWRIGHT_VERSION }}
 
       - name: Run tests
-        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}" --no-build --coverage --coverage-output-format cobertura --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=DesktopCDP" --report-xunit --report-xunit-filename test-results.xml
+        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}" --no-build --coverage --coverage-output-format cobertura --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=DesktopCDP" --filter-not-trait "Category=DesktopSelfVerify" --report-xunit --report-xunit-filename test-results.xml
 
       - name: Upload test artifacts
         if: always()
@@ -170,7 +170,7 @@ jobs:
       # drops that env var (WebView2Feedback #5640) -- it additionally publishes the switch
       # through the HKLM WebView2 policy. See DesktopAppFixture.PublishHklmBrowserArgumentsAsync.
       - name: Run tests (unit + DesktopCDP)
-        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}" --no-build --coverage --coverage-output-format cobertura --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=WasmPlaywright" --report-xunit --report-xunit-filename desktop-test-results.xml
+        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}" --no-build --coverage --coverage-output-format cobertura --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=WasmPlaywright" --filter-not-trait "Category=DesktopSelfVerify" --report-xunit --report-xunit-filename desktop-test-results.xml
 
       - name: Upload test artifacts
         if: always()
@@ -230,7 +230,16 @@ jobs:
       # WASM Playwright tests are already covered by the ubuntu job.
       # macOS ARM validates builds + unit tests; exclude DesktopCDP (headless) and WasmPlaywright (slow startup on ARM).
       - name: Run tests
-        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}" --no-build --coverage --coverage-output-format cobertura --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=DesktopCDP" --filter-not-trait "Category=WasmPlaywright" --report-xunit --report-xunit-filename test-results.xml
+        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}" --no-build --coverage --coverage-output-format cobertura --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=DesktopCDP" --filter-not-trait "Category=WasmPlaywright" --filter-not-trait "Category=DesktopSelfVerify" --report-xunit --report-xunit-filename test-results.xml
+
+      # macOS's first desktop runtime coverage. WKWebView has no CDP endpoint, so the app
+      # verifies itself and reports over stdout (see DesktopSelfVerifyFixture). Isolated in its
+      # own step, and non-blocking while it earns trust, so it cannot destabilise this job.
+      - name: Run desktop self-verify tests
+        continue-on-error: true
+        env:
+          MONACO_DIAGNOSTICS: '1'
+        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}" --no-build --results-directory ${{ runner.temp }}/TestResults -- --filter-trait "Category=DesktopSelfVerify" --report-xunit --report-xunit-filename macos-selfverify-results.xml
 
       - name: Upload test artifacts
         if: always()
@@ -239,6 +248,7 @@ jobs:
           name: test-artifacts-macos
           path: |
             ${{ runner.temp }}/TestResults/test-results.xml
+            ${{ runner.temp }}/TestResults/macos-selfverify-results.xml
             **/test-artifacts/**
           if-no-files-found: ignore
 
