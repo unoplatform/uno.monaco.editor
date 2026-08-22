@@ -1,0 +1,87 @@
+name: Linux Desktop Spike
+
+# Temporary, dispatch-only workflow for proving the desktop editor can run headless on Linux
+# (Uno Skia X11 + WebKitGTK under Xvfb). Iterating here keeps attempts off the PR pipeline.
+# Fold the working recipe into ci.yml as the `linux-desktop-tests` job, then delete this file.
+
+on:
+  workflow_dispatch:
+    inputs:
+      extra_env:
+        description: 'Extra env for the app run, one KEY=VALUE per line (e.g. WEBKIT_DISABLE_COMPOSITING_MODE=1)'
+        required: false
+        default: ''
+      wrap_dbus:
+        description: 'Wrap the test run in dbus-run-session'
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: linux-desktop-spike-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_NOLOGO: 1
+  NUGET_XMLDOC_MODE: skip
+  ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
+
+jobs:
+  linux-desktop-selfverify:
+    name: Linux Desktop Self-Verify (spike)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # WebKitGTK is the web engine Uno's WebView2 control delegates to on Linux; xvfb
+      # provides the display the X11 host requires; mesa gives GL a software rasteriser.
+      - name: Install desktop runtime dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -yq --no-install-recommends \
+            libgtk-3-0t64 libwebkit2gtk-4.1-0 xvfb xauth libgl1-mesa-dri dbus-x11
+
+      - name: Install npm dependencies and build Monaco bundles
+        run: npm install && npm run build
+
+      - name: Build test project
+        run: dotnet build MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}"
+
+      - name: Build desktop test app
+        run: dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-desktop -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}"
+
+      - name: Apply dispatch-provided env
+        if: inputs.extra_env != ''
+        run: echo "${{ inputs.extra_env }}" >> "$GITHUB_ENV"
+
+      # The self-verify suite launches the app itself; xvfb-run wraps the whole test process so
+      # DISPLAY is inherited by the child. There is no headless mode for the native web view.
+      - name: Run desktop self-verify tests
+        run: |
+          CMD="dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath=\"${{ env.ARTIFACTS_PATH }}\" --no-build --results-directory ${{ runner.temp }}/TestResults -- --filter-trait \"Category=DesktopSelfVerify\" --report-xunit --report-xunit-filename linux-desktop-test-results.xml"
+          if [ "${{ inputs.wrap_dbus }}" = "true" ]; then
+            xvfb-run -a --server-args="-screen 0 1280x1024x24" dbus-run-session -- bash -c "$CMD"
+          else
+            xvfb-run -a --server-args="-screen 0 1280x1024x24" bash -c "$CMD"
+          fi
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts-linux-spike
+          path: |
+            ${{ runner.temp }}/TestResults/linux-desktop-test-results.xml
+            **/test-artifacts/**
+          if-no-files-found: ignore
