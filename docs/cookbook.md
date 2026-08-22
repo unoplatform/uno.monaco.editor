@@ -458,7 +458,7 @@ public class FormatAction : IActionDescriptor
     public string? Precondition => null;
     public string? KeybindingContext => null;
 
-    public async void Run(CodeEditor editor, object[]? args)
+    public async void Run(CodeEditorBase editor, object[]? args)
     {
         var selected = editor.SelectedText;
         // Process the selected text...
@@ -624,7 +624,7 @@ public MainPage()
     Editor.OpenLinkRequested += Editor_OpenLinkRequested;
 }
 
-private void Editor_OpenLinkRequested(CodeEditor sender, OpenLinkRequestedEventArgs args)
+private void Editor_OpenLinkRequested(CodeEditorBase sender, OpenLinkRequestedEventArgs args)
 {
     // Block navigation entirely
     args.Handled = true;

@@ -221,7 +221,7 @@ classDiagram
         +ElementId : string
         +IsLoaded : bool
         +IsSettingValue : bool
-        +ParentCodeEditor : CodeEditor?
+        +ParentCodeEditor : CodeEditorBase?
         +DispatcherQueue : DispatcherQueue
         +Launch() Task
         +InvokeScriptAsync(script) Task~string~
