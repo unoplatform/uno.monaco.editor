@@ -4,18 +4,14 @@ name: Linux Desktop Spike
 # (Uno Skia X11 + WebKitGTK under Xvfb). Iterating here keeps attempts off the PR pipeline.
 # Fold the working recipe into ci.yml as the `linux-desktop-tests` job, then delete this file.
 
+# Push-triggered on the spike branch only: workflow_dispatch is unavailable for a workflow
+# that does not yet exist on the default branch, and ci.yml ignores non-main branches, so
+# each push here runs exactly this job and nothing else.
 on:
+  push:
+    branches:
+      - dev/xygu/20260822/linux-desktop-test-coverage
   workflow_dispatch:
-    inputs:
-      extra_env:
-        description: 'Extra env for the app run, one KEY=VALUE per line (e.g. WEBKIT_DISABLE_COMPOSITING_MODE=1)'
-        required: false
-        default: ''
-      wrap_dbus:
-        description: 'Wrap the test run in dbus-run-session'
-        type: boolean
-        required: false
-        default: false
 
 concurrency:
   group: linux-desktop-spike-${{ github.ref }}
@@ -61,20 +57,26 @@ jobs:
       - name: Build desktop test app
         run: dotnet build MonacoEditorTestApp/MonacoEditorTestApp.csproj -f net10.0-desktop -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}"
 
-      - name: Apply dispatch-provided env
-        if: inputs.extra_env != ''
-        run: echo "${{ inputs.extra_env }}" >> "$GITHUB_ENV"
-
       # The self-verify suite launches the app itself; xvfb-run wraps the whole test process so
       # DISPLAY is inherited by the child. There is no headless mode for the native web view.
+      # dbus-run-session gives WebKitGTK a session bus, which it expects and CI does not provide.
+      #
+      # Knobs to try, in order, if the stack refuses to start:
+      #   WEBKIT_DISABLE_COMPOSITING_MODE: 1
+      #   WEBKIT_DISABLE_DMABUF_RENDERER: 1
+      #   LIBGL_ALWAYS_SOFTWARE: 1
+      #   GDK_GL: gles
       - name: Run desktop self-verify tests
+        env:
+          MONACO_DIAGNOSTICS: '1'
         run: |
-          CMD="dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath=\"${{ env.ARTIFACTS_PATH }}\" --no-build --results-directory ${{ runner.temp }}/TestResults -- --filter-trait \"Category=DesktopSelfVerify\" --report-xunit --report-xunit-filename linux-desktop-test-results.xml"
-          if [ "${{ inputs.wrap_dbus }}" = "true" ]; then
-            xvfb-run -a --server-args="-screen 0 1280x1024x24" dbus-run-session -- bash -c "$CMD"
-          else
-            xvfb-run -a --server-args="-screen 0 1280x1024x24" bash -c "$CMD"
-          fi
+          xvfb-run -a --server-args="-screen 0 1280x1024x24" \
+            dbus-run-session -- \
+            dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj \
+              -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}" --no-build \
+              --results-directory ${{ runner.temp }}/TestResults \
+              -- --filter-trait "Category=DesktopSelfVerify" \
+                 --report-xunit --report-xunit-filename linux-desktop-test-results.xml
 
       - name: Upload test artifacts
         if: always()
