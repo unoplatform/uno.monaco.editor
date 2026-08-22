@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using System.Linq;
+﻿using System.Linq;
 
 using Monaco;
 
@@ -18,6 +17,15 @@ namespace MonacoEditorTestApp
         /// a settled diff rather than polling. Mirrors EditorControl's TEST_HARNESS_READY.
         /// </summary>
         private const string DiffReadyMarker = "DIFF_HARNESS_READY";
+
+        /// <summary>
+        /// Prefix for the per-computation summary marker, formatted
+        /// <c>DIFF_HUNKS:{total}:{added}:{removed}</c>. This is the only place the integration
+        /// suite can observe the C# side of the feature: the Playwright assertions all read
+        /// Monaco's JS API directly, so without this nothing exercises DiffUpdated,
+        /// GetLineChangesAsync, or the LineChange deserialization contract end to end.
+        /// </summary>
+        private const string DiffHunksMarker = "DIFF_HUNKS";
 
         private bool _diffReadyAnnounced;
 
@@ -86,7 +94,10 @@ namespace MonacoEditorTestApp
 
             if (changes is null)
             {
+                // null means the call never reached the editor (uninitialized, or the script
+                // failed) rather than "no differences", which is an empty array.
                 SummaryText.Text = "Diff unavailable.";
+                Console.WriteLine($"{DiffHunksMarker}:unavailable");
                 return;
             }
 
@@ -98,11 +109,14 @@ namespace MonacoEditorTestApp
 
             SummaryText.Text = $"{changes.Length} hunk(s): {added} added, {removed} removed, {modified} modified";
 
+            // Console.WriteLine, not Debug.WriteLine: the integration suite runs Release
+            // builds, where Debug.WriteLine is compiled out.
+            Console.WriteLine($"{DiffHunksMarker}:{changes.Length}:{added}:{removed}");
+
             if (!_diffReadyAnnounced)
             {
                 _diffReadyAnnounced = true;
                 Console.WriteLine(DiffReadyMarker);
-                Debug.WriteLine(DiffReadyMarker);
             }
         }
 

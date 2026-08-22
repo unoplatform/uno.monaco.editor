@@ -25,6 +25,172 @@ public class SerializationContractTests
 {
     #region Golden Baselines — STJ wire format verification
 
+    #region Diff editor types
+
+    /// <summary>
+    /// <c>GetLineChangesAsync</c> deserializes Monaco's <c>getLineChanges()</c> payload into
+    /// this shape, so the property names and the inherited <see cref="Change"/> members have to
+    /// match the wire exactly. The members are hand-authored with <c>[JsonInclude]</c> and
+    /// <c>internal set</c>, which the source generator only honors if they are declared that
+    /// way -- a silent mismatch would surface as a hunk whose line numbers are all zero.
+    /// </summary>
+    [Fact]
+    public void RoundTrip_LineChange_WithCharChanges()
+    {
+        const string json = """
+            {
+              "originalStartLineNumber": 5,
+              "originalEndLineNumber": 7,
+              "modifiedStartLineNumber": 5,
+              "modifiedEndLineNumber": 9,
+              "charChanges": [
+                {
+                  "originalStartLineNumber": 5,
+                  "originalEndLineNumber": 5,
+                  "modifiedStartLineNumber": 5,
+                  "modifiedEndLineNumber": 5,
+                  "originalStartColumn": 3,
+                  "originalEndColumn": 11,
+                  "modifiedStartColumn": 3,
+                  "modifiedEndColumn": 14
+                }
+              ]
+            }
+            """;
+
+        var change = JsonSerializer.Deserialize(json, MonacoJsonContext.Default.LineChange);
+
+        Assert.NotNull(change);
+        Assert.Equal(5, change!.OriginalStartLineNumber);
+        Assert.Equal(7, change.OriginalEndLineNumber);
+        Assert.Equal(5, change.ModifiedStartLineNumber);
+        Assert.Equal(9, change.ModifiedEndLineNumber);
+
+        Assert.NotNull(change.CharChanges);
+        var charChange = Assert.Single(change.CharChanges!);
+        Assert.Equal(3, charChange.OriginalStartColumn);
+        Assert.Equal(11, charChange.OriginalEndColumn);
+        Assert.Equal(3, charChange.ModifiedStartColumn);
+        Assert.Equal(14, charChange.ModifiedEndColumn);
+    }
+
+    /// <summary>
+    /// Monaco omits <c>charChanges</c> for pure insertions and deletions, and encodes the side
+    /// with no lines as 0 for both of its line numbers. Both have to survive deserialization,
+    /// because that zero is what callers test to classify a hunk.
+    /// </summary>
+    [Fact]
+    public void RoundTrip_LineChange_PureInsertionOmitsCharChanges()
+    {
+        const string json = """
+            {
+              "originalStartLineNumber": 0,
+              "originalEndLineNumber": 0,
+              "modifiedStartLineNumber": 12,
+              "modifiedEndLineNumber": 15
+            }
+            """;
+
+        var change = JsonSerializer.Deserialize(json, MonacoJsonContext.Default.LineChange);
+
+        Assert.NotNull(change);
+        Assert.Equal(0, change!.OriginalStartLineNumber);
+        Assert.Equal(0, change.OriginalEndLineNumber);
+        Assert.Equal(12, change.ModifiedStartLineNumber);
+        Assert.Equal(15, change.ModifiedEndLineNumber);
+        Assert.Null(change.CharChanges);
+    }
+
+    /// <summary>
+    /// The array form is what actually crosses the bridge. It needs its own
+    /// <c>[JsonSerializable]</c> registration; with reflection disabled, a missing one throws
+    /// at runtime rather than failing the build.
+    /// </summary>
+    [Fact]
+    public void RoundTrip_LineChangeArray()
+    {
+        const string json = """
+            [
+              { "originalStartLineNumber": 1, "originalEndLineNumber": 1,
+                "modifiedStartLineNumber": 1, "modifiedEndLineNumber": 1 },
+              { "originalStartLineNumber": 0, "originalEndLineNumber": 0,
+                "modifiedStartLineNumber": 4, "modifiedEndLineNumber": 6 }
+            ]
+            """;
+
+        var changes = JsonSerializer.Deserialize(json, MonacoJsonContext.Default.LineChangeArray);
+
+        Assert.NotNull(changes);
+        Assert.Equal(2, changes!.Length);
+        Assert.Equal(1, changes[0].ModifiedEndLineNumber);
+        Assert.Equal(0, changes[1].OriginalEndLineNumber);
+    }
+
+    /// <summary>
+    /// Diff options reach Monaco as <c>diffEditor.updateOptions</c> arguments, so the wire names
+    /// must be the camelCase keys Monaco reads. Unset properties must be omitted rather than
+    /// written as null, or they would override Monaco's defaults.
+    /// </summary>
+    [Fact]
+    public void Golden_DiffEditorOptions_OmitsUnsetProperties()
+    {
+        var options = new DiffEditorOptions
+        {
+            RenderSideBySide = false,
+            IgnoreTrimWhitespace = true,
+            DiffAlgorithm = DiffAlgorithm.Advanced,
+            DiffWordWrap = DiffWordWrap.Inherit,
+            MaxComputationTime = 2500,
+            SplitViewDefaultRatio = 0.4,
+        };
+
+        var json = JsonSerializer.Serialize(options, MonacoJsonContext.Default.DiffEditorOptions);
+        var root = JsonDocument.Parse(json).RootElement;
+
+        Assert.False(root.GetProperty("renderSideBySide").GetBoolean());
+        Assert.True(root.GetProperty("ignoreTrimWhitespace").GetBoolean());
+        Assert.Equal("advanced", root.GetProperty("diffAlgorithm").GetString());
+        Assert.Equal("inherit", root.GetProperty("diffWordWrap").GetString());
+        Assert.Equal(2500u, root.GetProperty("maxComputationTime").GetUInt32());
+        Assert.Equal(0.4, root.GetProperty("splitViewDefaultRatio").GetDouble());
+
+        // Everything not set stays absent, so Monaco keeps its own defaults.
+        Assert.False(root.TryGetProperty("originalEditable", out _));
+        Assert.False(root.TryGetProperty("renderIndicators", out _));
+        Assert.False(root.TryGetProperty("experimental", out _));
+        Assert.False(root.TryGetProperty("hideUnchangedRegions", out _));
+    }
+
+    /// <summary>
+    /// The two nested option bags stand in for upstream inline object literals, and are the one
+    /// place a diff option is more than a scalar.
+    /// </summary>
+    [Fact]
+    public void Golden_DiffEditorOptions_NestedValueObjects()
+    {
+        var options = new DiffEditorOptions
+        {
+            Experimental = new DiffEditorExperimentalOptions { ShowMoves = true, UseTrueInlineView = false },
+            HideUnchangedRegions = new DiffEditorHideUnchangedRegionsOptions { Enabled = true, ContextLineCount = 3 },
+        };
+
+        var json = JsonSerializer.Serialize(options, MonacoJsonContext.Default.DiffEditorOptions);
+        var root = JsonDocument.Parse(json).RootElement;
+
+        var experimental = root.GetProperty("experimental");
+        Assert.True(experimental.GetProperty("showMoves").GetBoolean());
+        Assert.False(experimental.GetProperty("useTrueInlineView").GetBoolean());
+        Assert.False(experimental.TryGetProperty("showEmptyDecorations", out _));
+
+        var hidden = root.GetProperty("hideUnchangedRegions");
+        Assert.True(hidden.GetProperty("enabled").GetBoolean());
+        Assert.Equal(3u, hidden.GetProperty("contextLineCount").GetUInt32());
+        Assert.False(hidden.TryGetProperty("revealLineCount", out _));
+    }
+
+    #endregion
+
+
     [Fact]
     public void Golden_Position()
     {

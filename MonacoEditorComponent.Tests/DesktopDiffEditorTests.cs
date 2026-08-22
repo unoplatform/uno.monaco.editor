@@ -126,6 +126,53 @@ public sealed class DesktopDiffEditorTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// Exercises the C# side of the feature, which every other assertion here misses: they all
+    /// read Monaco's JS API directly. The sample only emits this marker after
+    /// <c>DiffUpdated</c> fired and <c>GetLineChangesAsync()</c> returned hunks, so one
+    /// assertion covers the bridge callback, the script round trip, and the hand-authored
+    /// LineChange deserialization contract.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "DesktopCDP")]
+    public async Task DiffEditor_ReportsHunksThroughTheManagedApi()
+    {
+        _currentTestName = nameof(DiffEditor_ReportsHunksThroughTheManagedApi);
+        try
+        {
+            const string marker = "DIFF_HUNKS:";
+            var line = await _fixture.WaitForLogLineAfterAsync(0, marker, DiffTimeoutMs);
+
+            Assert.DoesNotContain("DIFF_HUNKS:unavailable", line);
+
+            // DIFF_HUNKS:{total}:{added}:{removed}
+            var fields = line[(line.IndexOf(marker, StringComparison.Ordinal) + marker.Length)..]
+                .Trim()
+                .Split(':');
+
+            Assert.Equal(3, fields.Length);
+
+            var total = int.Parse(fields[0]);
+            var added = int.Parse(fields[1]);
+            var removed = int.Parse(fields[2]);
+
+            Assert.True(total > 0, $"Expected the managed API to report at least one hunk, got '{line}'.");
+
+            // The sample's modified document only edits and adds, so no hunk is a pure
+            // deletion. Deliberately not asserting a pure *addition*: Monaco groups adjacent
+            // changes, and here it merges the new method into the edit above it, so the added
+            // count is legitimately zero. The line-number encoding itself is pinned directly by
+            // SerializationContractTests.RoundTrip_LineChange_PureInsertionOmitsCharChanges.
+            Assert.Equal(0, removed);
+            Assert.True(added + removed <= total, $"Classified more hunks than exist, got '{line}'.");
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    /// <summary>
     /// The diff widget's own stylesheet rules are the one part of the CSS payload a plain
     /// editor never exercises, so this is also the cheapest check that the diff styles reach
     /// the page at all.
