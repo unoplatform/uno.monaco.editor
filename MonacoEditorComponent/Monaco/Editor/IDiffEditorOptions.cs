@@ -6,42 +6,19 @@ using System.Text.Json.Serialization;
 namespace Monaco.Editor
 {
     /// <summary>
-    /// Configuration options for the diff editor.
+    /// Configuration options for the diff editor: the editor-level options of the
+    /// underlying editors, plus the diff-specific options.
     /// </summary>
     /// <remarks>
     /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor.IDiffEditorOptions.html">Monaco API</see> for more details.
+    /// <para>
+    /// Nothing implements this union directly. <c>DiffCodeEditor</c> splits it in two: the
+    /// editor-level half is carried by <see cref="CodeEditorBase.Options"/> and applied to
+    /// the modified sub-editor, and the diff-specific half by
+    /// <c>DiffCodeEditor.DiffOptions</c>, typed as <see cref="DiffEditorOptions"/>.
+    /// </para>
     /// </remarks>
-    public partial interface IDiffEditorOptions : IEditorOptions
+    public partial interface IDiffEditorOptions : IEditorOptions, IDiffEditorBaseOptions
     {
-        /// <summary>
-        /// Allow the user to resize the diff editor split view.
-        /// Defaults to true.
-        /// </summary>
-        bool? EnableSplitViewResizing { get; set; }
-        /// <summary>
-        /// Compute the diff by ignoring leading/trailing whitespace
-        /// Defaults to true.
-        /// </summary>
-        bool? IgnoreTrimWhitespace { get; set; }
-        /// <summary>
-        /// Timeout in milliseconds after which diff computation is cancelled.
-        /// Defaults to 5000.
-        /// </summary>
-        uint? MaxComputationTime { get; set; }
-        /// <summary>
-        /// Original model should be editable?
-        /// Defaults to false.
-        /// </summary>
-        bool? OriginalEditable { get; set; }
-        /// <summary>
-        /// Render +/- indicators for added/deleted changes.
-        /// Defaults to true.
-        /// </summary>
-        bool? RenderIndicators { get; set; }
-        /// <summary>
-        /// Render the differences in two side-by-side editors.
-        /// Defaults to true.
-        /// </summary>
-        bool? RenderSideBySide { get; set; }
     }
 }

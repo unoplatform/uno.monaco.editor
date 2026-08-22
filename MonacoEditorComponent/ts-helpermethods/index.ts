@@ -14,6 +14,7 @@ import * as monaco from 'monaco-editor';
 // Helper modules
 import {
     createMonacoEditor,
+    createMonacoDiffEditor,
     disposeEditor,
     InvokeJS,
     languageIdFromExtension,
@@ -33,6 +34,13 @@ import {
     updateContext,
     updateContent,
     updateDecorations,
+    layoutEditor,
+    updateOriginalContent,
+    updateOriginalLanguage,
+    updateDiffOptions,
+    goToDiff,
+    revealFirstDiff,
+    getLineChanges,
     updateStyle,
     getOptions,
     updateOptions,
@@ -140,6 +148,7 @@ if (isDesktop) {
 
 // Core editor functions (referenced by [JSImport("globalThis.*")])
 globalThis.createMonacoEditor = createMonacoEditor;
+(globalThis as any).createMonacoDiffEditor = createMonacoDiffEditor;
 globalThis.InvokeJS = InvokeJS;
 globalThis.languageIdFromExtension = languageIdFromExtension;
 
@@ -159,6 +168,15 @@ globalThis.languageIdFromExtension = languageIdFromExtension;
 (globalThis as any).changeTheme = changeTheme;
 (globalThis as any).keyDown = keyDown;
 (globalThis as any).updateSelectedContent = updateSelectedContent;
+(globalThis as any).layoutEditor = layoutEditor;
+
+// Diff editor surface (DiffCodeEditor)
+(globalThis as any).updateOriginalContent = updateOriginalContent;
+(globalThis as any).updateOriginalLanguage = updateOriginalLanguage;
+(globalThis as any).updateDiffOptions = updateDiffOptions;
+(globalThis as any).goToDiff = goToDiff;
+(globalThis as any).revealFirstDiff = revealFirstDiff;
+(globalThis as any).getLineChanges = getLineChanges;
 
 // Provider registrations
 (globalThis as any).registerCodeActionProvider = registerCodeActionProvider;

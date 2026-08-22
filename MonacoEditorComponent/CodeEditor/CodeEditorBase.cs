@@ -198,7 +198,7 @@ namespace Monaco
                 return;
             }
 
-            await SendScriptAsync("EditorContext.getEditorForElement(element).editor.layout();");
+            await SendScriptAsync("layoutEditor(element);");
         }
 
         private void RestoreDesktopBridgeAfterHardTeardown()

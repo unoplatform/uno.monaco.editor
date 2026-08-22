@@ -146,7 +146,19 @@ function cleanupEditorRuntimeState(editorContext: EditorContext): void {
         (editorContext as any)._rpcHandlerDisposables = undefined;
     }
 
-    if (editorContext.editor) {
+    // Dispose the diff widget, not editorContext.editor: on a diff context that field is
+    // the *modified sub-editor*, and disposing it would leave the widget leaked. The two
+    // models below were created explicitly by initializeMonacoDiffEditor and are not owned
+    // by the widget, so they have to go too. monaco.editor.create() does own the model it
+    // builds from `value`, so the plain path must not dispose it here.
+    const diffEditor = editorContext.diffEditor;
+    if (diffEditor) {
+        diffEditor.dispose();
+        editorContext.originalModel?.dispose();
+        editorContext.model?.dispose();
+        editorContext.diffEditor = undefined;
+        editorContext.originalModel = undefined;
+    } else if (editorContext.editor) {
         editorContext.editor.dispose();
     }
 }
@@ -162,55 +174,44 @@ interface InitialState {
     text: string;
     language: string;
     readOnly: boolean;
+    /** Diff editor only: the original (left-hand) document. */
+    originalText?: string;
+    /** Diff editor only: language of the original document; falls back to `language`. */
+    originalLanguage?: string;
+    /** Diff editor only: IDiffEditorOptions to apply at construction. */
+    diffOptions?: any;
 }
 
 /**
- * Initialize the Monaco editor instance.
- * On desktop with initialState provided, theme/text/language are applied synchronously
- * from the pushed values -- no async RPC round-trips needed.
- * On WASM (or desktop without initialState), property reads use the existing paths.
+ * Build the construction options for monaco.editor.create() from the pushed initial state.
+ * Returns an empty object on WASM, where no payload is pushed and properties instead
+ * arrive afterwards via ApplyInitialPropertyValues.
  */
-export const initializeMonacoEditor = async (managedOwner: any, element: any, initialState?: InitialState) => {
-    // Re-init guard: when createMonacoEditor is invoked repeatedly for the same element,
-    // tear down previous editor/runtime hooks first to avoid duplicated handlers and
-    // leaked editor instances during async lifecycle races.
-    const existingContext = EditorContext.tryGetEditorForElement(element);
-    if (existingContext?.editor) {
-        cleanupEditorRuntimeState(existingContext);
-    }
-
-    // When initial state is provided, pass theme + language + readOnly to monaco.editor.create()
-    // so the editor renders correctly from the first frame.
-    var opt: any = {};
-    let initialThemeName: string | null = null;
-    let initialIsHighContrast = false;
-
+const resolveInitialOptions = (initialState?: InitialState): any => {
     if (initialState) {
-        console.log(`[initializeMonacoEditor] Using pushed initial state: theme=${initialState.themeName}, lang=${initialState.language}`);
-
-        // Determine Monaco theme ID from initial state
-        initialIsHighContrast = initialState.isHighContrast;
-        initialThemeName = initialState.themeName;
+        console.log(`[resolveInitialOptions] Using pushed initial state: theme=${initialState.themeName}, lang=${initialState.language}`);
 
         let monacoTheme = 'vs';
-        if (initialIsHighContrast) {
+        if (initialState.isHighContrast) {
             monacoTheme = 'hc-black';
-        } else if (initialThemeName === 'Dark') {
+        } else if (initialState.themeName === 'Dark') {
             monacoTheme = 'vs-dark';
         }
 
-        opt = {
+        return {
             theme: monacoTheme,
             language: initialState.language || 'plaintext',
             readOnly: initialState.readOnly || false,
             value: initialState.text || '',
         };
-    } else if (_isDesktop) {
-        // Desktop fallback when initial state payload is missing/invalid:
+    }
+
+    if (_isDesktop) {
+        // Desktop fallback when the initial state payload is missing/invalid:
         // avoid async bridge round-trips during init and choose a best-effort theme.
         const prefersDark = typeof window.matchMedia === 'function'
             && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        opt = {
+        return {
             theme: prefersDark ? 'vs-dark' : 'vs',
             language: 'plaintext',
             readOnly: false,
@@ -218,23 +219,63 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any, in
         };
     }
 
-    const editor = monaco.editor.create(element, opt);
-    var editorContext = EditorContext.registerEditorForElement(element, editor);
+    return {};
+};
+
+/**
+ * Same, for createDiffEditor(). `value` and `language` are dropped because they belong to
+ * IStandaloneEditorConstructionOptions -- a diff editor takes its content from the two
+ * models instead -- and the caller's IDiffEditorOptions are layered on top.
+ */
+const resolveInitialDiffOptions = (initialState?: InitialState): any => {
+    const base = resolveInitialOptions(initialState);
+    const opt: any = {};
+
+    if (base.theme !== undefined) {
+        opt.theme = base.theme;
+    }
+    if (base.readOnly !== undefined) {
+        opt.readOnly = base.readOnly;
+    }
+    if (initialState && initialState.diffOptions && typeof initialState.diffOptions === 'object') {
+        Object.assign(opt, initialState.diffOptions);
+    }
+
+    return opt;
+};
+
+/**
+ * Wire everything that is identical for both editor flavors: the bridge helpers, the
+ * content and selection listeners, theme initialization, the resize observer, the desktop
+ * RPC handlers, and the closing "Loaded" handshake.
+ *
+ * @param layoutTarget the object whose layout() is called on resize -- the diff widget for
+ *   a diff editor, the editor itself otherwise.
+ * @param textPropertyName the C# dependency property the content listener writes back to:
+ *   "Text" on CodeEditor, "ModifiedText" on DiffCodeEditor. Both bridge implementations
+ *   resolve the property by name via reflection, so this parameter is the whole mechanism
+ *   that lets the two controls avoid sharing one overloaded Text property.
+ */
+const attachEditorRuntime = async (
+    managedOwner: any,
+    element: any,
+    editorContext: EditorContext,
+    layoutTarget: { layout(): void },
+    textPropertyName: string,
+    initialState?: InitialState) => {
 
     (<any>editorContext).Debug = new DebugLoggerImpl(managedOwner);
     (<any>editorContext).Keyboard = new KeyboardListenerImpl(managedOwner);
     (<any>editorContext).Accessor = new ParentAccessor(managedOwner);
     (<any>editorContext).Theme = new ThemeListener(managedOwner);
 
-    editorContext.model = editor.getModel()!;
-
     // Listen for Content Changes
     editorContext.model.onDidChangeContent((event) => {
-        editorContext.Accessor.setValue("Text", stringifyForMarshalling(editorContext.model.getValue()));
+        editorContext.Accessor.setValue(textPropertyName, stringifyForMarshalling(editorContext.model.getValue()));
     });
 
     // Listen for Selection Changes
-    editor.onDidChangeCursorSelection((event) => {
+    editorContext.editor.onDidChangeCursorSelection((event) => {
         if (!editorContext.modifingSelection) {
             editorContext.Accessor.setValue("SelectedText", stringifyForMarshalling(editorContext.model.getValueInRange(event.selection)));
             editorContext.Accessor.setValueWithType("SelectedRange", stringifyForMarshalling(JSON.stringify(event.selection)), "Selection");
@@ -242,12 +283,12 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any, in
     });
 
     // Apply theme:
-    // - Desktop with initial state: theme already applied in monaco.editor.create options.
+    // - Desktop with initial state: theme already applied in the construction options.
     // - Desktop without initial state: use local fallback theme (already applied in options).
     // - WASM without initial state: use existing async property path.
     if (!initialState) {
         if (_isDesktop) {
-            console.warn('[initializeMonacoEditor] Missing pushed initial state on desktop; using local fallback theme');
+            console.warn('[attachEditorRuntime] Missing pushed initial state on desktop; using local fallback theme');
         }
         else {
         // Set theme -- async on desktop (JSON-RPC with timeout), sync on WASM (JSExport)
@@ -259,7 +300,7 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any, in
             let theme: any = await editorContext.Accessor.getJsonValueAsync("RequestedTheme");
             const t1 = performance.now();
             if (_isDesktop) {
-                console.log(`[initializeMonacoEditor] getJsonValueAsync("RequestedTheme"): ${(t1 - t0).toFixed(1)}ms, result=${theme}`);
+                console.log(`[attachEditorRuntime] getJsonValueAsync("RequestedTheme"): ${(t1 - t0).toFixed(1)}ms, result=${theme}`);
             }
 
             theme = {
@@ -273,7 +314,7 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any, in
                 theme = await (editorContext as any).Theme.getCurrentThemeNameAsync();
                 const t3 = performance.now();
                 if (_isDesktop) {
-                    console.log(`[initializeMonacoEditor] getCurrentThemeNameAsync: ${(t3 - t2).toFixed(1)}ms, result=${theme}`);
+                    console.log(`[attachEditorRuntime] getCurrentThemeNameAsync: ${(t3 - t2).toFixed(1)}ms, result=${theme}`);
                 }
             }
 
@@ -281,7 +322,7 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any, in
             const isHighContrast = await (editorContext as any).Theme.getIsHighContrastAsync();
             const t5 = performance.now();
             if (_isDesktop) {
-                console.log(`[initializeMonacoEditor] getIsHighContrastAsync: ${(t5 - t4).toFixed(1)}ms, result=${isHighContrast}`);
+                console.log(`[attachEditorRuntime] getIsHighContrastAsync: ${(t5 - t4).toFixed(1)}ms, result=${isHighContrast}`);
             }
 
             changeTheme(element, theme, isHighContrast as any);
@@ -289,22 +330,22 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any, in
             const themeInitEnd = performance.now();
             const cumulativeMs = themeInitEnd - themeInitStart;
             if (_isDesktop) {
-                console.log(`[initializeMonacoEditor] Theme init cumulative: ${cumulativeMs.toFixed(1)}ms` +
+                console.log(`[attachEditorRuntime] Theme init cumulative: ${cumulativeMs.toFixed(1)}ms` +
                     (cumulativeMs > 16 ? ' (EXCEEDS 16ms frame budget)' : ''));
             }
         } catch (err) {
-            console.warn('[initializeMonacoEditor] Theme initialization failed, using defaults:', err);
+            console.warn('[attachEditorRuntime] Theme initialization failed, using defaults:', err);
             changeTheme(element, 'Light', 'false');
         }
         }
     } else {
-        console.log(`[initializeMonacoEditor] Skipped async theme init -- using pushed initial state`);
+        console.log(`[attachEditorRuntime] Skipped async theme init -- using pushed initial state`);
     }
 
     // Track parent element size changes via ResizeObserver for deterministic cleanup.
     // This replaces the old window "resize" listener that fired on every window resize
     // even when the editor's container didn't change size.
-    const resizeObserver = new ResizeObserver(() => { editor.layout(); });
+    const resizeObserver = new ResizeObserver(() => { layoutTarget.layout(); });
     resizeObserver.observe(element);
     (editorContext as any)._resizeObserver = resizeObserver;
 
@@ -324,6 +365,65 @@ export const initializeMonacoEditor = async (managedOwner: any, element: any, in
 
     // Callback to Parent that we're loaded
     editorContext.Accessor.callAction("Loaded");
+};
+
+/**
+ * Initialize a plain Monaco editor instance.
+ * On desktop with initialState provided, theme/text/language are applied synchronously
+ * from the pushed values -- no async RPC round-trips needed.
+ * On WASM (or desktop without initialState), property reads use the existing paths.
+ */
+export const initializeMonacoEditor = async (managedOwner: any, element: any, initialState?: InitialState) => {
+    // Re-init guard: when createMonacoEditor is invoked repeatedly for the same element,
+    // tear down previous editor/runtime hooks first to avoid duplicated handlers and
+    // leaked editor instances during async lifecycle races.
+    const existingContext = EditorContext.tryGetEditorForElement(element);
+    if (existingContext?.editor) {
+        cleanupEditorRuntimeState(existingContext);
+    }
+
+    const editor = monaco.editor.create(element, resolveInitialOptions(initialState));
+    var editorContext = EditorContext.registerEditorForElement(element, editor);
+    editorContext.model = editor.getModel()!;
+
+    await attachEditorRuntime(managedOwner, element, editorContext, editor, "Text", initialState);
+};
+
+/**
+ * Initialize a Monaco diff editor instance, over the same element and the same lifecycle
+ * handshake the plain editor uses.
+ */
+export const initializeMonacoDiffEditor = async (managedOwner: any, element: any, initialState?: InitialState) => {
+    const existingContext = EditorContext.tryGetEditorForElement(element);
+    if (existingContext?.editor) {
+        cleanupEditorRuntimeState(existingContext);
+    }
+
+    const diffEditor = monaco.editor.createDiffEditor(element, resolveInitialDiffOptions(initialState));
+
+    // createDiffEditor does not build models for you the way create() does, so both sides
+    // are created here -- and disposed in cleanupEditorRuntimeState, since the widget does
+    // not own them.
+    const language = (initialState && initialState.language) || 'plaintext';
+    const originalLanguage = (initialState && initialState.originalLanguage) || language;
+    const originalModel = monaco.editor.createModel((initialState && initialState.originalText) || '', originalLanguage);
+    const modifiedModel = monaco.editor.createModel((initialState && initialState.text) || '', language);
+    diffEditor.setModel({ original: originalModel, modified: modifiedModel });
+
+    var editorContext = EditorContext.registerDiffEditorForElement(element, diffEditor);
+    editorContext.model = modifiedModel;
+    editorContext.originalModel = originalModel;
+
+    // Registered before attachEditorRuntime so the first computation is not missed.
+    // Accessor is assigned synchronously at the top of that call and Monaco computes the
+    // diff asynchronously, so the guard below is belt-and-braces.
+    diffEditor.onDidUpdateDiff(() => {
+        if (editorContext.Accessor) {
+            editorContext.Accessor.callAction("DiffUpdated");
+        }
+    });
+
+    await attachEditorRuntime(managedOwner, element, editorContext, diffEditor, "ModifiedText", initialState);
 };
 
 /**
@@ -417,7 +517,21 @@ export const callParentActionWithParameters = (element: any, name: string, param
         parameters != null && parameters.length > 0 ? stringifyForMarshalling(parameters[0]) : null as any,
         parameters != null && parameters.length > 1 ? stringifyForMarshalling(parameters[1]) : null as any);
 
-export const createMonacoEditor = async (managedOwner: any, elementId: string, basePath: string, initialStatePayload?: InitialState | string) => {
+/**
+ * Shared bootstrap for both editor flavors. Prepares the dynamic style element,
+ * normalizes the pushed initial state, sets up the bridge helpers, runs the supplied
+ * initializer, and reports readiness.
+ *
+ * Sharing this is what gives the diff editor every recovery signal the C# host probes
+ * for -- __unoMonacoInitError, __unoMonacoInitComplete, and the editor/ready
+ * notification -- without adding a second set of lifecycle paths.
+ */
+const bootstrapMonaco = async (
+    managedOwner: any,
+    elementId: string,
+    initialStatePayload: InitialState | string | undefined,
+    label: string,
+    initializer: (managedOwner: any, element: any, initialState?: InitialState) => Promise<void>) => {
     (globalThis as any).__unoMonacoInitError = null;
     (globalThis as any).__unoMonacoInitComplete = false;
 
@@ -436,14 +550,14 @@ export const createMonacoEditor = async (managedOwner: any, elementId: string, b
         if (initialStatePayload.length > 0) {
             try {
                 initialState = JSON.parse(initialStatePayload) as InitialState;
-                console.log(`[createMonacoEditor] Parsed initial state (string): theme=${initialState.themeName}`);
+                console.log(`[${label}] Parsed initial state (string): theme=${initialState.themeName}`);
             } catch (err) {
-                console.warn('[createMonacoEditor] Failed to parse initial state JSON string:', err);
+                console.warn(`[${label}] Failed to parse initial state JSON string:`, err);
             }
         }
     } else if (initialStatePayload && typeof initialStatePayload === 'object') {
         initialState = initialStatePayload as InitialState;
-        console.log(`[createMonacoEditor] Parsed initial state (object): theme=${initialState.themeName}`);
+        console.log(`[${label}] Parsed initial state (object): theme=${initialState.themeName}`);
     }
 
     await DebugLoggerImpl.setup();
@@ -452,11 +566,11 @@ export const createMonacoEditor = async (managedOwner: any, elementId: string, b
     await ThemeListener.setup();
 
     try {
-        await initializeMonacoEditor(managedOwner, document.getElementById(elementId), initialState);
+        await initializer(managedOwner, document.getElementById(elementId), initialState);
         (globalThis as any).__unoMonacoInitComplete = true;
     } catch (err) {
         (globalThis as any).__unoMonacoInitError = String(err);
-        console.error('[createMonacoEditor] initializeMonacoEditor failed:', err);
+        console.error(`[${label}] initialization failed:`, err);
     }
 
     // Emit editor/ready notification on desktop after Monaco init completes.
@@ -465,6 +579,14 @@ export const createMonacoEditor = async (managedOwner: any, elementId: string, b
         getConnection().sendNotification('editor/ready', { protocolVersion: 1 });
     }
 }
+
+/** Bootstrap entry point for CodeEditor. Invoked from C# by name. */
+export const createMonacoEditor = async (managedOwner: any, elementId: string, basePath: string, initialStatePayload?: InitialState | string) =>
+    await bootstrapMonaco(managedOwner, elementId, initialStatePayload, 'createMonacoEditor', initializeMonacoEditor);
+
+/** Bootstrap entry point for DiffCodeEditor. Invoked from C# by name. */
+export const createMonacoDiffEditor = async (managedOwner: any, elementId: string, basePath: string, initialStatePayload?: InitialState | string) =>
+    await bootstrapMonaco(managedOwner, elementId, initialStatePayload, 'createMonacoDiffEditor', initializeMonacoDiffEditor);
 
 export const InvokeJS = (elementId: string, command: string): string => {
     var r = eval(`var element = globalThis.document.getElementById("${elementId}"); ${command}`) || "";

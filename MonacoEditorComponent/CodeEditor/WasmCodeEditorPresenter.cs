@@ -129,7 +129,19 @@ namespace Monaco
                 }
 
                 Debug.WriteLine($"InitializeMonaco({this.GetHashCode():X8})");
-                await NativeMethods.InitializeMonaco(this, _element.ElementId, $"{UNO_BOOTSTRAP_WEBAPP_BASE_PATH}{UNO_BOOTSTRAP_APP_BASE}");
+
+                // [JSImport] needs a compile-time-constant function name, so the two
+                // bootstrap entry points are separate imports selected here rather than
+                // one import with a parameterized name.
+                var basePath = $"{UNO_BOOTSTRAP_WEBAPP_BASE_PATH}{UNO_BOOTSTRAP_APP_BASE}";
+                if (ParentCodeEditor.IsDiffEditor)
+                {
+                    await NativeMethods.InitializeMonacoDiff(this, _element.ElementId, basePath);
+                }
+                else
+                {
+                    await NativeMethods.InitializeMonaco(this, _element.ElementId, basePath);
+                }
             }
             catch (Exception e)
             {
@@ -180,6 +192,9 @@ namespace Monaco
 
             [JSImport("globalThis.createMonacoEditor")]
             public static partial Task InitializeMonaco([JSMarshalAs<JSType.Any>] object managedOwner, string elementId, string baseUri);
+
+            [JSImport("globalThis.createMonacoDiffEditor")]
+            public static partial Task InitializeMonacoDiff([JSMarshalAs<JSType.Any>] object managedOwner, string elementId, string baseUri);
         }
     }
 }

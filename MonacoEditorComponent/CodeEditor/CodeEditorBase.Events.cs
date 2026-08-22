@@ -230,32 +230,39 @@ namespace Monaco
         /// </summary>
         protected virtual string BuildInitialStateJson()
         {
-            var themeName = RequestedTheme == ElementTheme.Default
-                ? _themeListener?.CurrentThemeName ?? "Light"
-                : RequestedTheme.ToString();
-            var isHighContrast = _themeListener?.IsHighContrast ?? false;
-            var requestedTheme = (int)RequestedTheme;
-
-            // Build a JSON object with all the state JS needs at init time.
-            // Using raw JSON construction to avoid needing another STJ context.
-            var text = PrimaryText ?? string.Empty;
-            var language = CodeLanguage ?? "plaintext";
-            var readOnly = ReadOnly;
-
-            // Use FallbackOptions (reflection-based) since anonymous types are not registered
-            // in MonacoJsonContext. Safe on desktop (native code, not AOT-WASM).
-            var json = JsonSerializer.Serialize(new
-            {
-                requestedTheme,
-                themeName,
-                isHighContrast,
-                text,
-                language,
-                readOnly
-            }, MonacoJsonContext.FallbackOptions);
+            // Use FallbackOptions (reflection-based) since the map holds loose object values
+            // rather than a registered type. Safe on desktop (native code, not AOT-WASM).
+            var json = JsonSerializer.Serialize(BuildInitialStateMap(), MonacoJsonContext.FallbackOptions);
 
             DesktopCodeEditorPresenter.DiagnosticLog($"BuildInitialStateJson: {json}");
             return json;
+        }
+
+        /// <summary>
+        /// Builds the initial-state values that <see cref="BuildInitialStateJson"/> serializes.
+        /// Derived controls override this to contribute their own keys rather than rebuilding
+        /// the theme resolution.
+        /// </summary>
+        /// <returns>
+        /// The state map. Keys are camelCase because they are consumed verbatim by the
+        /// <c>InitialState</c> interface in <c>asyncCallbackHelpers.ts</c> -- the serializer's
+        /// camelCase policy applies to properties, not to dictionary keys.
+        /// </returns>
+        protected virtual Dictionary<string, object?> BuildInitialStateMap()
+        {
+            var themeName = RequestedTheme == ElementTheme.Default
+                ? _themeListener?.CurrentThemeName ?? "Light"
+                : RequestedTheme.ToString();
+
+            return new Dictionary<string, object?>
+            {
+                ["requestedTheme"] = (int)RequestedTheme,
+                ["themeName"] = themeName,
+                ["isHighContrast"] = _themeListener?.IsHighContrast ?? false,
+                ["text"] = PrimaryText ?? string.Empty,
+                ["language"] = CodeLanguage ?? "plaintext",
+                ["readOnly"] = ReadOnly,
+            };
         }
 
         /// <summary>
@@ -751,7 +758,7 @@ namespace Monaco
                 Debug.WriteLine("INIT_COMPLETE");
 
                 // Layout first to ensure the editor dimensions are correct.
-                await SendScriptAsync("EditorContext.getEditorForElement(element).editor.layout();");
+                await SendScriptAsync("layoutEditor(element);");
 
                 // Apply all current property values in the correct order
                 // This ensures properties set before IsEditorLoaded=true take effect

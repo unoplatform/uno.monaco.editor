@@ -9,9 +9,23 @@ namespace Monaco.Editor
     /// </summary>
     /// <remarks>
     /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor.IDiffEditorConstructionOptions.html">Monaco API</see> for more details.
+    /// <para>
+    /// Upstream also declares <c>overflowWidgetsDomNode</c>. It is omitted here because it
+    /// is an <c>HTMLElement</c>, which has no meaningful representation across the bridge.
+    /// </para>
     /// </remarks>
     public partial interface IDiffEditorConstructionOptions : IDiffEditorOptions
     {
+        /// <summary>
+        /// Aria label for the modified editor.
+        /// </summary>
+        string? ModifiedAriaLabel { get; set; }
+
+        /// <summary>
+        /// Aria label for the original editor.
+        /// </summary>
+        string? OriginalAriaLabel { get; set; }
+
         /// <summary>
         /// Initial theme to be used for rendering.
         /// The current out-of-the-box available themes are: 'vs' (default), 'vs-dark', 'hc-black'.
