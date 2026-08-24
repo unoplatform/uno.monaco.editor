@@ -1,12 +1,10 @@
 import * as monaco from 'monaco-editor';
-import { EditorContext } from './otherScriptsToBeOrganized';
-import { callParentEventAsync } from './asyncCallbackHelpers';
+import { callProviderEventAsync, registerSingleProvider } from './providerRegistrations';
 
 export const registerCodeLensProvider = function (unused: any, languageId: string) {
-    return monaco.languages.registerCodeLensProvider(languageId, {
+    return registerSingleProvider('codeLens', languageId, () => monaco.languages.registerCodeLensProvider(languageId, {
         provideCodeLenses: function (model, token) {
-            var element = EditorContext.getElementFromModel(model);
-            return callParentEventAsync(element, "ProvideCodeLenses" + languageId, []).then(result => {
+            return callProviderEventAsync(model, "ProvideCodeLenses" + languageId, []).then(result => {
                 if (result) {
                     const list: monaco.languages.CodeLensList = JSON.parse(result);
 
@@ -19,13 +17,12 @@ export const registerCodeLensProvider = function (unused: any, languageId: strin
             });
         },
         resolveCodeLens: function (model, codeLens, token) {
-            var element = EditorContext.getElementFromModel(model);
-            return callParentEventAsync(element, "ResolveCodeLens" + languageId, [JSON.stringify(codeLens)]).then(result => {
+            return callProviderEventAsync(model, "ResolveCodeLens" + languageId, [JSON.stringify(codeLens)]).then(result => {
                 if (result) {
                     return JSON.parse(result);
                 }
                 return null;
             });
         }
-    });
+    }));
 }

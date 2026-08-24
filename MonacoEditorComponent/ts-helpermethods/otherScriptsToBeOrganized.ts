@@ -1,6 +1,7 @@
 import * as monaco from 'monaco-editor';
 import { ParentAccessor } from './Monaco.Helpers.ParentAccessor';
 import { callParentEventAsync } from './asyncCallbackHelpers';
+import { callProviderEventAsync, registerSingleProvider } from './providerRegistrations';
 
 export class EditorContext {
     static _editors: Map<any, EditorContext> = new Map<any, EditorContext>();
@@ -64,20 +65,11 @@ export class EditorContext {
     public modifingSelection: boolean;
 }
 
-const hoverProviderRegistrations = new Map<string, monaco.IDisposable>();
-
 export const registerHoverProvider = function (unused: any, languageId: string) {
-    const existing = hoverProviderRegistrations.get(languageId);
-    if (existing) {
-        existing.dispose();
-        hoverProviderRegistrations.delete(languageId);
-    }
-
-    const disposable = monaco.languages.registerHoverProvider(languageId, {
+    return registerSingleProvider('hover', languageId, () => monaco.languages.registerHoverProvider(languageId, {
         provideHover: async function (model, position) {
-            var element = EditorContext.getElementFromModel(model);
             try {
-                const result = await callParentEventAsync(element, "HoverProvider" + languageId, [JSON.stringify(position)]);
+                const result = await callProviderEventAsync(model, "HoverProvider" + languageId, [JSON.stringify(position)]);
                 if (result) {
                     return JSON.parse(result);
                 }
@@ -86,17 +78,7 @@ export const registerHoverProvider = function (unused: any, languageId: string) 
             }
             return undefined;
         }
-    });
-
-    hoverProviderRegistrations.set(languageId, disposable);
-    return {
-        dispose: () => {
-            disposable.dispose();
-            if (hoverProviderRegistrations.get(languageId) === disposable) {
-                hoverProviderRegistrations.delete(languageId);
-            }
-        }
-    };
+    }));
 };
 
 export const addAction = function (element: any, action: monaco.editor.IActionDescriptor) {

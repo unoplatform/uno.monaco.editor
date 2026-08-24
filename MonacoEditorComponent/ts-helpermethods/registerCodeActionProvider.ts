@@ -1,16 +1,14 @@
 import * as monaco from 'monaco-editor';
-import { EditorContext } from './otherScriptsToBeOrganized';
-import { callParentEventAsync } from './asyncCallbackHelpers';
+import { callProviderEventAsync, registerSingleProvider } from './providerRegistrations';
 
 function isTextEdit(edit: monaco.languages.IWorkspaceTextEdit | monaco.languages.IWorkspaceFileEdit): edit is monaco.languages.IWorkspaceTextEdit {
     return (edit as monaco.languages.IWorkspaceTextEdit).textEdit !== undefined;
 }
 
 export const registerCodeActionProvider = function (unused: any, languageId: string) {
-    return monaco.languages.registerCodeActionProvider(languageId, {
+    return registerSingleProvider('codeAction', languageId, () => monaco.languages.registerCodeActionProvider(languageId, {
         provideCodeActions: function (model, range, context, token) {
-            var element = EditorContext.getElementFromModel(model);
-            return callParentEventAsync(element, "ProvideCodeActions" + languageId, [JSON.stringify(range), JSON.stringify(context)]).then(result => {
+            return callProviderEventAsync(model, "ProvideCodeActions" + languageId, [JSON.stringify(range), JSON.stringify(context)]).then(result => {
                 if (result) {
                     const list: monaco.languages.CodeActionList = JSON.parse(result);
 
@@ -37,5 +35,5 @@ export const registerCodeActionProvider = function (unused: any, languageId: str
                 }
             });
         },
-    });
+    }));
 }

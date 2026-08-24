@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 
 using Monaco.Serialization;
@@ -41,7 +42,9 @@ public sealed class ModelHelper(CodeEditor editor) : IModel
     {
         if (_editor.TryGetTarget(out var editor))
         {
-            return await editor.InvokeScriptAsync<IEnumerable<FindMatch>>("EditorContext.getEditorForElement(element).model.findMatches", [searchString, searchOnlyEditableRange, isRegex, matchCase, wordSeparators, captureMatches, limitResultCount]).AsAsyncOperation();
+            var script = BuildFindMatchesScript(searchString, searchOnlyEditableRange, isRegex, matchCase, wordSeparators, captureMatches, limitResultCount);
+
+            return await editor.SendScriptAsync<IEnumerable<FindMatch>>(script) ?? [];
         }
 
         return [];
@@ -51,7 +54,9 @@ public sealed class ModelHelper(CodeEditor editor) : IModel
     {
         if (_editor.TryGetTarget(out var editor))
         {
-            return await editor.InvokeScriptAsync<IEnumerable<FindMatch>>("EditorContext.getEditorForElement(element).model.findMatches", [searchString, searchScope, isRegex, matchCase, wordSeparators, captureMatches, limitResultCount]).AsAsyncOperation();
+            var script = BuildFindMatchesScript(searchString, searchScope, isRegex, matchCase, wordSeparators, captureMatches, limitResultCount);
+
+            return await editor.SendScriptAsync<IEnumerable<FindMatch>>(script) ?? [];
         }
 
         return [];
@@ -61,7 +66,9 @@ public sealed class ModelHelper(CodeEditor editor) : IModel
     {
         if (_editor.TryGetTarget(out var editor))
         {
-            return await editor.InvokeScriptAsync<FindMatch>("EditorContext.getEditorForElement(element).model.findNextMatch", [searchString, searchStart, isRegex, matchCase, wordSeparators, captureMatches]).AsAsyncOperation();
+            var script = BuildFindMatchScript("findNextMatch", searchString, searchStart, isRegex, matchCase, wordSeparators, captureMatches);
+
+            return await editor.SendScriptAsync<FindMatch>(script);
         }
 
         return null;
@@ -71,7 +78,9 @@ public sealed class ModelHelper(CodeEditor editor) : IModel
     {
         if (_editor.TryGetTarget(out var editor))
         {
-            return await editor.InvokeScriptAsync<FindMatch>("EditorContext.getEditorForElement(element).model.findPreviousMatch", [searchString, searchStart, isRegex, matchCase, wordSeparators, captureMatches]).AsAsyncOperation();
+            var script = BuildFindMatchScript("findPreviousMatch", searchString, searchStart, isRegex, matchCase, wordSeparators, captureMatches);
+
+            return await editor.SendScriptAsync<FindMatch>(script);
         }
 
         return null;
@@ -383,4 +392,56 @@ public sealed class ModelHelper(CodeEditor editor) : IModel
 
         return null;
     }
+
+    /// <summary>
+    /// Builds a <c>model.findMatches(...)</c> call.
+    /// </summary>
+    /// <remarks>
+    /// These scripts are sent with <c>SendScriptAsync</c>, not <c>InvokeScriptAsync</c>: the latter
+    /// emits <c>method(element, ...args)</c> so the host can resolve the editor element, which shifts
+    /// every argument by one when the target is a Monaco API rather than one of our helper functions.
+    /// Monaco then read the DOM element as the search pattern (<c>[object HTMLDivElement]</c>, a
+    /// character class that matches an isolated space) and <c>true</c> as the result limit, so every
+    /// search reported one bogus match instead of none.
+    /// </remarks>
+    internal static string BuildFindMatchesScript(string searchString, bool searchOnlyEditableRange, bool isRegex, bool matchCase, string? wordSeparators, bool captureMatches, double limitResultCount)
+        => BuildFindMatchesScript(searchString, JsArg(searchOnlyEditableRange), isRegex, matchCase, wordSeparators, captureMatches, limitResultCount);
+
+    /// <inheritdoc cref="BuildFindMatchesScript(string, bool, bool, bool, string?, bool, double)"/>
+    internal static string BuildFindMatchesScript(string searchString, IRange searchScope, bool isRegex, bool matchCase, string? wordSeparators, bool captureMatches, double limitResultCount)
+        => BuildFindMatchesScript(searchString, JsArg(searchScope), isRegex, matchCase, wordSeparators, captureMatches, limitResultCount);
+
+    private static string BuildFindMatchesScript(string searchString, string searchScope, bool isRegex, bool matchCase, string? wordSeparators, bool captureMatches, double limitResultCount)
+        => "EditorContext.getEditorForElement(element).model.findMatches("
+            + JsArg(searchString) + ", "
+            + searchScope + ", "
+            + JsArg(isRegex) + ", "
+            + JsArg(matchCase) + ", "
+            + JsArg(wordSeparators) + ", "
+            + JsArg(captureMatches) + ", "
+            + JsArg(limitResultCount) + ");";
+
+    /// <summary>
+    /// Builds a <c>model.findNextMatch(...)</c> / <c>model.findPreviousMatch(...)</c> call.
+    /// </summary>
+    /// <remarks>See <see cref="BuildFindMatchesScript(string, bool, bool, bool, string?, bool, double)"/> for why these are not invoked as methods.</remarks>
+    internal static string BuildFindMatchScript(string method, string searchString, IPosition searchStart, bool isRegex, bool matchCase, string? wordSeparators, bool captureMatches)
+        => "EditorContext.getEditorForElement(element).model." + method + "("
+            + JsArg(searchString) + ", "
+            + JsArg(searchStart) + ", "
+            + JsArg(isRegex) + ", "
+            + JsArg(matchCase) + ", "
+            + JsArg(wordSeparators) + ", "
+            + JsArg(captureMatches) + ");";
+
+    private static string JsArg(string? value)
+        => value is null ? "null" : JsonSerializer.Serialize(value, MonacoJsonContext.Relaxed.Options);
+
+    private static string JsArg(bool value) => value ? "true" : "false";
+
+    private static string JsArg(double value) => value.ToString(CultureInfo.InvariantCulture);
+
+    private static string JsArg(IRange range) => JsonSerializer.Serialize(Range.Lift(range), MonacoJsonContext.Relaxed.Range);
+
+    private static string JsArg(IPosition position) => JsonSerializer.Serialize(Position.Lift(position), MonacoJsonContext.Relaxed.Position);
 }
