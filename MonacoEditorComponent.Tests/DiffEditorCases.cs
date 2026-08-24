@@ -136,6 +136,29 @@ internal static class DiffEditorCases
         "() => monaco.editor.getDiffEditors()[0].getModifiedEditor().getOption(monaco.editor.EditorOption.readOnly)";
 
     /// <summary>
+    /// Whether Monaco's own stylesheet reached the page, rather than only the theme rules
+    /// Monaco injects at runtime. Three independent signals, because the runtime-injected
+    /// rules also match <c>.monaco-editor</c> and would satisfy a looser check on their own:
+    /// the exact <c>.monaco-editor</c> selector, which only the bundled sheet declares; the
+    /// <c>position: relative</c> it sets, which nothing else supplies; and the codicon font
+    /// family from its <c>@font-face</c>, whose absence turns every Monaco icon into tofu.
+    /// </summary>
+    /// <remarks>
+    /// This is a delivery check, not a styling check. On WASM the stylesheet only reaches the
+    /// document when it is embedded under a <c>WasmCSS</c> logical name: Uno.Wasm.Bootstrap
+    /// extracts <c>WasmScripts</c> resources as scripts and drops a <c>.css</c> file among them
+    /// without a diagnostic, which is how the sheet went missing while every other WASM test
+    /// still passed.
+    /// </remarks>
+    public const string MonacoStylesheetAppliedExpression =
+        "() => { const rules = [];" +
+        " for (const sheet of document.styleSheets) { try { rules.push(...sheet.cssRules); } catch (e) { /* cross-origin */ } }" +
+        " if (!rules.some(r => (r.selectorText || '').trim() === '.monaco-editor')) return false;" +
+        " const editor = document.querySelector('.monaco-editor');" +
+        " if (!editor || getComputedStyle(editor).position !== 'relative') return false;" +
+        " return [...document.fonts].some(f => f.family === 'codicon'); }";
+
+    /// <summary>
     /// The sample the test app loads. Kept in sync with <c>DiffEditorControl</c> only loosely:
     /// assertions below check structural facts (the sides differ, hunks exist) rather than
     /// exact text, so tweaking the sample does not break the tests.

@@ -279,6 +279,33 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
             throw;
         }
     }
+
+    /// <summary>
+    /// Monaco's bundled stylesheet has to be delivered to the page, not merely embedded in the
+    /// assembly. It carries the layout rules and the codicon <c>@font-face</c>; without it the
+    /// editor still runs, because Monaco sets much of its geometry inline, so no other test in
+    /// this suite notices. What breaks is visual: icons render as tofu, action-bar lists keep
+    /// their default bullets, and the line-number margin loses its positioning.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "WasmPlaywright")]
+    public async Task MonacoStylesheet_IsDeliveredToThePage()
+    {
+        _currentTestName = nameof(MonacoStylesheet_IsDeliveredToThePage);
+        try
+        {
+            Assert.True(
+                await _fixture.Page.EvaluateAsync<bool>(DiffEditorCases.MonacoStylesheetAppliedExpression),
+                "Monaco's stylesheet did not reach the document: no exact '.monaco-editor' rule, "
+                + "no 'position: relative' on the editor, or no codicon font face. On WASM this "
+                + "means the embedded resource is not under a WasmCSS logical name.");
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
 }
 
 /// <summary>
