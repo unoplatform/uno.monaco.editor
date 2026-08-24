@@ -99,12 +99,14 @@
 		at all. Monaco's inline layout styles hide most of it, but the codicon @font-face is in
 		this file, so every Monaco icon rendered as tofu, action-bar lists kept their bullets,
 		and the line-number margin lost its styling. Desktop was never affected: editor.html
-		links the copy in DesktopContent.
+		links the copy in DesktopContent. Only the ".WasmCSS." infix is load-bearing; the
+		prefix is $(RootNamespace), the same one MSBuild would derive for the sibling .js
+		resource, so a rename keeps the two consistent.
 	-->
 	<ItemGroup>
 		<EmbeddedResource Include="Properties\MonacoEditorComponent.rd.xml" />
 		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.js" />
-		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.css" LogicalName="MonacoEditorComponent.WasmCSS.uno-monaco-helpers.css" Condition="Exists('WasmScripts\uno-monaco-helpers.css')" />
+		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.css" LogicalName="$(RootNamespace).WasmCSS.uno-monaco-helpers.css" Condition="Exists('WasmScripts\uno-monaco-helpers.css')" />
 	</ItemGroup>
 
 	<!-- Desktop: Content files copied to output directory -->
