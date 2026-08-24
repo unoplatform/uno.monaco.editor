@@ -89,19 +89,22 @@
 		it gets its worker copies from the Content items below, next to editor.html, where a real
 		"workers/" subdirectory does exist.
 
-		OPEN QUESTION, do not treat the CSS entry below as verified: the shell task keys CSS off a
-		separate "WasmCSS" folder prefix, so a .css under WasmScripts appears to be dropped. It is
-		absent from config.uno_dependencies, absent from wwwroot/package_<hash>/, and never
-		requested in the dev-server log, which suggests it is dead payload in the same way the
-		workers were. It was NOT removed here because, unlike the workers, no browser check has
-		confirmed the visual consequence: Monaco also injects theme CSS at runtime via
-		createStyleSheet, so the editor may render correctly without it. Resolve by checking
-		whether the file must move to a WasmCSS folder or can simply be dropped for WASM.
+		The CSS entry needs the WasmCSS logical name, not the WasmScripts one its file path
+		implies. Uno.Wasm.Bootstrap deploys and <link>s embedded resources whose manifest name
+		contains ".WasmCSS." (that is how Uno's own uno.css and the app's Fonts.css arrive), and
+		extracts ".WasmScripts." ones as scripts, where a .css file is silently dropped. Under
+		the WasmScripts name the stylesheet was embedded in the assembly and never reached the
+		page: verified in Chromium against the built app, document.styleSheets held only Uno's
+		four sheets plus Monaco's runtime-injected theme rules, with no rule for ".monaco-editor"
+		at all. Monaco's inline layout styles hide most of it, but the codicon @font-face is in
+		this file, so every Monaco icon rendered as tofu, action-bar lists kept their bullets,
+		and the line-number margin lost its styling. Desktop was never affected: editor.html
+		links the copy in DesktopContent.
 	-->
 	<ItemGroup>
 		<EmbeddedResource Include="Properties\MonacoEditorComponent.rd.xml" />
 		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.js" />
-		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.css" Condition="Exists('WasmScripts\uno-monaco-helpers.css')" />
+		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.css" LogicalName="MonacoEditorComponent.WasmCSS.uno-monaco-helpers.css" Condition="Exists('WasmScripts\uno-monaco-helpers.css')" />
 	</ItemGroup>
 
 	<!-- Desktop: Content files copied to output directory -->
