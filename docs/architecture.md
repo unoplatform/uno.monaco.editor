@@ -278,7 +278,7 @@ classDiagram
     class DiffCodeEditor {
         +OriginalText : string
         +ModifiedText : string
-        +OriginalLanguage : string
+        +OriginalLanguage : string?
         +DiffOptions : DiffEditorOptions
         +DiffUpdated : event
         +GoToDiffAsync(direction) Task

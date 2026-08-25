@@ -73,9 +73,9 @@ namespace Monaco
         /// Only worth setting when the two sides are genuinely different languages -- comparing
         /// a config file against its rendered output, for instance.
         /// </remarks>
-        public string OriginalLanguage
+        public string? OriginalLanguage
         {
-            get => (string)GetValue(OriginalLanguageProperty);
+            get => (string?)GetValue(OriginalLanguageProperty);
             set => SetValue(OriginalLanguageProperty, value);
         }
 
