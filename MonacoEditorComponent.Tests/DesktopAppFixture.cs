@@ -764,10 +764,12 @@ public sealed class DesktopAppFixture : IAsyncLifetime
                             return page;
                         }
                     }
-                    catch
+                    catch (PlaywrightException)
                     {
                         // The page can be mid-navigation or not yet executing scripts; the
-                        // next sweep retries it.
+                        // next sweep retries it. PlaywrightException is the base of every
+                        // failure this call can raise -- evaluation errors, destroyed
+                        // execution contexts and TargetClosedException all derive from it.
                     }
                 }
             }
