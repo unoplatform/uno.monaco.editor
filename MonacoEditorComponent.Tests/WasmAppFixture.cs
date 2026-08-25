@@ -24,17 +24,39 @@ public sealed class WasmAppFixture : IAsyncLifetime
 {
     private const int MonacoReadyTimeoutMs = 30_000;
 
+    /// <summary>
+    /// Emitted by <c>EditorControl</c> once both of its <c>async void</c> init handlers have
+    /// finished and the last write it issued has been observed landing in Monaco.
+    /// </summary>
+    private const string AppInitSettledMarker = "APP_INIT_SETTLED";
+
+    /// <summary>Content every test starts from -- see <see cref="ResetEditorStateAsync"/>.</summary>
+    private const string ResetText = "// test-init-text";
+
     private IPlaywright? _playwright;
     private Process? _serverProcess;
     private IBrowser? _browser;
     private string _processLogPath = string.Empty;
     private int _serverPort;
 
+    private readonly List<string> _consoleLines = [];
+    private readonly object _consoleLock = new();
+
+    private readonly TaskCompletionSource<string> _appInitComplete =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     /// <summary>The Playwright page connected to the WASM app.</summary>
     public IPage Page { get; private set; } = null!;
 
     /// <summary>The Playwright browser context for tracing support.</summary>
     public IBrowserContext Context { get; private set; } = null!;
+
+    /// <summary>
+    /// The editor text the app settled on during its own initialisation, captured once before any
+    /// test ran. Tests asserting on first-load content must use this rather than reading the live
+    /// model, which every preceding test in the collection is free to overwrite.
+    /// </summary>
+    public string InitialEditorText { get; private set; } = string.Empty;
 
     public async ValueTask InitializeAsync()
     {
@@ -80,21 +102,127 @@ public sealed class WasmAppFixture : IAsyncLifetime
 
         Page = await Context.NewPageAsync();
 
-        // 8. Navigate to the WASM app.
+        // 8. Start capturing console output BEFORE navigating. C# Console.WriteLine surfaces
+        // here under WASM, and the readiness marker is emitted during boot -- subscribing after
+        // GotoAsync would race it.
+        Page.Console += OnPageConsole;
+
+        // 9. Navigate to the WASM app.
         await Page.GotoAsync($"http://localhost:{_serverPort}/", new()
         {
             WaitUntil = WaitUntilState.NetworkIdle,
             Timeout = MonacoReadyTimeoutMs,
         });
 
-        // 9. Wait for Monaco to be ready.
+        // 10. Wait for a Monaco instance to exist.
         await Page.WaitForFunctionAsync(
             "() => typeof monaco !== 'undefined' && monaco.editor.getEditors().length > 0",
             null, new PageWaitForFunctionOptions { Timeout = MonacoReadyTimeoutMs });
+
+        // 11. Wait for the app to finish its own initialisation.
+        //
+        // The step above is NOT sufficient on its own: it goes green the moment the editor is
+        // constructed, while EditorControl.Editor_Loading is still fetching Content.txt and
+        // pushing it into the model. Tests that start in that window get their writes clobbered
+        // by the late push -- observed on CI run 32854772712, where setValue landed at t+9.13s
+        // and the following getValue at t+9.29s returned Content.txt instead.
+        await WaitForAppInitCompleteAsync();
+
+        // 12. Snapshot the settled content for tests that assert on first-load state.
+        InitialEditorText = await Page.EvaluateAsync<string>(
+            "() => monaco.editor.getEditors()[0].getValue()");
+    }
+
+    private void OnPageConsole(object? sender, IConsoleMessage message)
+    {
+        var text = message.Text ?? string.Empty;
+
+        lock (_consoleLock)
+        {
+            _consoleLines.Add($"[{message.Type}] {text}");
+        }
+
+        if (text.Contains(AppInitSettledMarker, StringComparison.Ordinal))
+        {
+            _appInitComplete.TrySetResult(text);
+        }
+    }
+
+    /// <summary>
+    /// Blocks until the app emits its init-complete marker, failing with the captured console
+    /// output rather than a bare timeout when it never arrives.
+    /// </summary>
+    private async Task WaitForAppInitCompleteAsync()
+    {
+        using var timeoutCts = new CancellationTokenSource();
+
+        var completed = await Task.WhenAny(
+            _appInitComplete.Task,
+            Task.Delay(MonacoReadyTimeoutMs, timeoutCts.Token));
+
+        // Release the timer as soon as the marker wins, rather than leaving it armed for the
+        // rest of the timeout on every run.
+        await timeoutCts.CancelAsync();
+
+        if (completed != _appInitComplete.Task)
+        {
+            throw new TimeoutException(
+                $"The app did not emit '{AppInitSettledMarker}' within {MonacoReadyTimeoutMs}ms. " +
+                "Tests cannot start before it without racing the app's initial text push.\n" +
+                "Console output so far:\n  " + string.Join("\n  ", GetConsoleLines()));
+        }
+
+        var marker = await _appInitComplete.Task;
+
+        if (marker.Contains($"{AppInitSettledMarker}:error=", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"The app reported a failure while initialising: {marker}");
+        }
+    }
+
+    /// <summary>Console output captured from the page since navigation.</summary>
+    public IReadOnlyList<string> GetConsoleLines()
+    {
+        lock (_consoleLock)
+        {
+            return [.. _consoleLines];
+        }
+    }
+
+    /// <summary>
+    /// Returns the editor to a known state so tests in the shared collection do not inherit each
+    /// other's mutations. Mirrors <c>DesktopAppFixture.ResetEditorStateAsync</c>.
+    /// </summary>
+    public async Task ResetEditorStateAsync()
+    {
+        await Page.EvaluateAsync($$"""
+            () => {
+                const editor = monaco.editor.getEditors()[0];
+                editor.setValue('{{ResetText}}');
+                const model = editor.getModel();
+                if (model) {
+                    monaco.editor.setModelLanguage(model, 'javascript');
+                    monaco.editor.setModelMarkers(model, 'test', []);
+                    monaco.editor.setModelMarkers(model, 'CodeEditor', []);
+                    editor.deltaDecorations(
+                        model.getAllDecorations().map(d => d.id),
+                        []
+                    );
+                }
+                monaco.editor.setTheme('vs');
+                editor.updateOptions({ readOnly: false });
+            }
+            """);
     }
 
     public async ValueTask DisposeAsync()
     {
+        if (Page is not null)
+        {
+            Page.Console -= OnPageConsole;
+        }
+
         if (_browser is not null)
         {
             try { await _browser.CloseAsync(); } catch { /* best-effort */ }
@@ -156,6 +284,16 @@ public sealed class WasmAppFixture : IAsyncLifetime
             }
             catch { /* best-effort */ }
         }
+
+        try
+        {
+            // The page console carries the app's own markers, so a failure here can be read
+            // against what the app had actually done by that point.
+            await File.WriteAllLinesAsync(
+                Path.Combine(artifactsDir, $"{testName}-console.log"),
+                GetConsoleLines());
+        }
+        catch { /* best-effort */ }
     }
 
     private static string ResolveWasmBuildOutput(string repoRoot)

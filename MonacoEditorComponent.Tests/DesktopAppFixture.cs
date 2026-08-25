@@ -70,6 +70,13 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     /// <summary>The Playwright browser context for tracing support.</summary>
     public IBrowserContext Context { get; private set; } = null!;
 
+    /// <summary>
+    /// The editor text the app settled on during its own initialisation, captured once before any
+    /// test ran. Tests asserting on first-load content must use this rather than reading the live
+    /// model, which every preceding test in the collection is free to overwrite.
+    /// </summary>
+    public string InitialEditorText { get; private set; } = string.Empty;
+
     public async ValueTask InitializeAsync()
     {
         // 0. Create Playwright instance (owned by this fixture).
@@ -173,6 +180,20 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         // registration, language registration, markers, decorations, theme switching).
         // The harness emits TEST_HARNESS_READY as its final stdout marker.
         await WaitForLogLineAfterAsync(0, @"TEST_HARNESS_READY", MonacoReadyTimeoutMs);
+
+        // 11. Wait for the app to finish initialising altogether.
+        //
+        // TEST_HARNESS_READY only covers Editor_Loaded. Editor_Loading runs as a second,
+        // independent async void chain that fetches Content.txt and pushes it into the model,
+        // and nothing orders the two -- so the harness can report ready while a Content.txt
+        // write is still in flight, ready to overwrite whatever the first test writes.
+        // APP_INIT_SETTLED is emitted only once both chains are done and the app has read the
+        // model back, which cannot happen before their writes have landed.
+        await WaitForLogLineAfterAsync(0, @"APP_INIT_SETTLED", MonacoReadyTimeoutMs);
+
+        // 12. Snapshot the settled content for tests that assert on first-load state.
+        InitialEditorText = await Page.EvaluateAsync<string>(
+            "() => monaco.editor.getEditors()[0].getValue()");
     }
 
     public async ValueTask DisposeAsync()

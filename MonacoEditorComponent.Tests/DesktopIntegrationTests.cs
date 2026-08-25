@@ -34,10 +34,14 @@ public sealed class DesktopIntegrationTests : IAsyncLifetime
         _fixture = fixture;
     }
 
-    public ValueTask InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _testFailed = false;
-        return ValueTask.CompletedTask;
+
+        // The collection shares one app process and page, and xUnit does not fix the order tests
+        // run in, so every test starts from a state some other test left behind unless it is
+        // reset here. DesktopBridgeIntegrationTests already resets per test; this class did not.
+        await _fixture.ResetEditorStateAsync();
     }
 
     public async ValueTask DisposeAsync()
@@ -539,22 +543,32 @@ public sealed class DesktopIntegrationTests : IAsyncLifetime
 
             Assert.Equal("second editor", secondText);
             Assert.NotEqual(firstText, secondText);
-
-            // Cleanup: dispose the second editor and remove its container.
-            await _fixture.Page.EvaluateAsync("""
-                () => {
-                    const editors = monaco.editor.getEditors();
-                    const last = editors[editors.length - 1];
-                    last.dispose();
-                    const el = document.getElementById('test-editor-2');
-                    if (el) el.remove();
-                }
-                """);
         }
         catch
         {
             _testFailed = true;
             throw;
+        }
+        finally
+        {
+            // Must run even when an assertion above failed: PresenterLifecycle_SingleEditorInstance
+            // asserts the editor count is exactly 1, so a leaked second instance turns one failure
+            // here into a cascade across the rest of the collection.
+            try
+            {
+                await _fixture.Page.EvaluateAsync("""
+                    () => {
+                        const el = document.getElementById('test-editor-2');
+                        for (const editor of monaco.editor.getEditors()) {
+                            if (el && el.contains(editor.getContainerDomNode())) {
+                                editor.dispose();
+                            }
+                        }
+                        if (el) el.remove();
+                    }
+                    """);
+            }
+            catch { /* best-effort cleanup */ }
         }
     }
 
