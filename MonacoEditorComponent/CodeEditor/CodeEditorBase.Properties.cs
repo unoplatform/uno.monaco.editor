@@ -9,7 +9,7 @@ using Windows.Foundation.Collections;
 
 namespace Monaco
 {
-    abstract partial class CodeEditorBase : IParentAccessorAcceptor
+    public abstract partial class CodeEditorBase : IParentAccessorAcceptor
     {
         /// <summary>
         /// Gets the helper for accessing <c>monaco.languages.*</c> registration APIs such as
@@ -180,7 +180,7 @@ namespace Monaco
         }
 
         /// <summary>Identifies the <see cref="Decorations"/> dependency property.</summary>
-        public static DependencyProperty DecorationsProperty { get; } = DependencyProperty.Register(nameof(Decorations), typeof(IModelDeltaDecoration), typeof(CodeEditorBase), new PropertyMetadata(null, async (d, e) =>
+        public static DependencyProperty DecorationsProperty { get; } = DependencyProperty.Register(nameof(Decorations), typeof(IObservableVector<IModelDeltaDecoration>), typeof(CodeEditorBase), new PropertyMetadata(null, async (d, e) =>
         {
             if (d is CodeEditorBase editor)
             {
@@ -234,7 +234,7 @@ namespace Monaco
         }
 
         /// <summary>Identifies the <see cref="Markers"/> dependency property.</summary>
-        public static DependencyProperty MarkersProperty { get; } = DependencyProperty.Register(nameof(Markers), typeof(IMarkerData), typeof(CodeEditorBase), new PropertyMetadata(null, async (d, e) =>
+        public static DependencyProperty MarkersProperty { get; } = DependencyProperty.Register(nameof(Markers), typeof(IObservableVector<IMarkerData>), typeof(CodeEditorBase), new PropertyMetadata(null, async (d, e) =>
         {
             if (d is CodeEditorBase editor)
             {
