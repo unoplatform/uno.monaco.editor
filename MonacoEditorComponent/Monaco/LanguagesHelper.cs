@@ -156,8 +156,6 @@ namespace Monaco
             if (_editor.TryGetTarget(out var editor)
                 && editor._parentAccessor is not null)
             {
-                Console.WriteLine($"Register color provider: {languageId}/{editor.GetHashCode():X8}");
-
                 // link:registerColorProvider.ts:ProvideColorPresentations
                 editor._parentAccessor.RegisterEvent("ProvideColorPresentations" + languageId, async (args) =>
                 {

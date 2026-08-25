@@ -1,5 +1,7 @@
 using Microsoft.Playwright;
 
+using Monaco.Editor;
+
 using Xunit;
 
 namespace MonacoEditorComponent.Tests;
@@ -170,6 +172,105 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
                 DiffLanguageTokenizationCases.Sample);
 
             Assert.Equal(DiffLanguageTokenizationCases.ExpectedTokens, tokenTypes);
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// The sample app registers a document-color provider that searches the model for 8-digit hex
+    /// literals. <c>Content.txt</c> has none, so the search must come back empty. It did not: the
+    /// script was invoked as <c>findMatches(element, ...)</c>, which shifted every argument by one
+    /// and left Monaco compiling the stringified DOM element into a regex. Running the real script
+    /// against the real model is the only way to catch that -- the C# side happily deserializes the
+    /// bogus match either way.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "WasmPlaywright")]
+    public async Task FindMatches_ScriptSentByModelHelperMatchesNothingWhenThePatternIsAbsent()
+    {
+        _currentTestName = nameof(FindMatches_ScriptSentByModelHelperMatchesNothingWhenThePatternIsAbsent);
+        try
+        {
+            var script = ModelHelper.BuildFindMatchesScript(
+                searchString: "#[A-Fa-f0-9]{8}",
+                searchOnlyEditableRange: true,
+                isRegex: true,
+                matchCase: true,
+                wordSeparators: null,
+                captureMatches: true,
+                limitResultCount: 999);
+
+            // Mirrors the WASM host, which evals the script with `element` bound to the editor's div.
+            var matches = await _fixture.Page.EvaluateAsync<string>(
+                """
+                (s) => {
+                    const element = [...EditorContext._editors.keys()][0];
+                    return JSON.stringify(eval(s));
+                }
+                """,
+                script);
+
+            Assert.Equal("[]", matches);
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Provider registrations live on the page-global <c>monaco.languages</c> registry, which every
+    /// editor on a WASM page shares. Each new editor used to add its own document-color provider and
+    /// Monaco concatenated all of their results, so the same color produced one stacked colorpicker
+    /// decoration per open editor. Registering repeatedly must leave exactly one live provider.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "WasmPlaywright")]
+    public async Task ColorProvider_RepeatedRegistrationKeepsASingleProvider()
+    {
+        _currentTestName = nameof(ColorProvider_RepeatedRegistrationKeepsASingleProvider);
+        try
+        {
+            var roundTrips = await _fixture.Page.EvaluateAsync<int>(
+                """
+                async () => {
+                    const element = [...EditorContext._editors.keys()][0];
+                    const context = EditorContext.getEditorForElement(element);
+                    const accessor = context.Accessor;
+                    const original = accessor.callEvent.bind(accessor);
+                    let calls = 0;
+                    accessor.callEvent = (name, p1, p2) => {
+                        if (String(name).startsWith('ProvideDocumentColors')) { calls++; }
+                        return original(name, p1, p2);
+                    };
+
+                    try {
+                        // Stand in for three more editors loading and registering the same provider.
+                        globalThis.registerColorProvider(element, 'csharp');
+                        globalThis.registerColorProvider(element, 'csharp');
+                        globalThis.registerColorProvider(element, 'csharp');
+                        await new Promise(r => setTimeout(r, 2000));
+
+                        // Force exactly one color computation and count the managed round-trips.
+                        calls = 0;
+                        const model = context.model;
+                        const value = model.getValue();
+                        model.setValue(value + String.fromCharCode(10));
+                        await new Promise(r => setTimeout(r, 2000));
+                        model.setValue(value);
+                        return calls;
+                    } finally {
+                        accessor.callEvent = original;
+                    }
+                }
+                """);
+
+            Assert.Equal(1, roundTrips);
         }
         catch
         {
