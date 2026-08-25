@@ -75,6 +75,13 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     /// <summary>The Playwright browser context for tracing support.</summary>
     public IBrowserContext Context { get; private set; } = null!;
 
+    /// <summary>
+    /// The editor text the app settled on during its own initialisation, captured once before any
+    /// test ran. Tests asserting on first-load content must use this rather than reading the live
+    /// model, which every preceding test in the collection is free to overwrite.
+    /// </summary>
+    public string InitialEditorText { get; private set; } = string.Empty;
+
     public async ValueTask InitializeAsync()
     {
         // 0. Create Playwright instance (owned by this fixture).
@@ -175,14 +182,27 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         // order in which monaco.editor.createDiffEditor registers the widget versus its two
         // sub-editors. Waiting settles that question rather than betting on it.
         //
-        // EditorControl emits TEST_HARNESS_READY once its async setup is done (command/action
-        // registration, language registration, markers, decorations, theme switching).
-        // DiffEditorControl emits DIFF_HARNESS_READY once the first diff has been computed and
-        // GetLineChangesAsync has returned hunks. Both use Console.WriteLine, not
-        // Debug.WriteLine, which is compiled out of the Release builds this fixture runs.
-        // A stronger content-settled marker for the plain editor is in flight on PR #50
-        // (APP_INIT_SETTLED); it belongs in this block, for the same reason.
+        // The three markers, in the order they can be reasoned about:
+        //
+        // TEST_HARNESS_READY  -- EditorControl finished its async setup (command/action
+        //   registration, language registration, markers, decorations, theme switching).
+        // APP_INIT_SETTLED    -- EditorControl joined BOTH of its async void init chains and
+        //   read the value back through the editor. TEST_HARNESS_READY covers only
+        //   Editor_Loaded; Editor_Loading independently fetches Content.txt and pushes it into
+        //   the model, and nothing orders the two, so the harness can report ready with a
+        //   write still in flight that will clobber whatever the first test wrote.
+        // DIFF_HARNESS_READY  -- DiffEditorControl computed its first diff and
+        //   GetLineChangesAsync returned hunks.
+        //
+        // APP_INIT_SETTLED does NOT subsume TEST_HARNESS_READY even though it is emitted later:
+        // it is signalled from a finally, so it also fires when harness registration threw. Both
+        // waits are kept so a half-registered harness fails here, naming the missing marker,
+        // rather than inside whichever test first depends on the registration.
+        //
+        // All three are Console.WriteLine, not Debug.WriteLine, which is compiled out of the
+        // Release builds this fixture runs.
         await WaitForLogLineAfterAsync(0, @"TEST_HARNESS_READY", MonacoReadyTimeoutMs);
+        await WaitForLogLineAfterAsync(0, @"APP_INIT_SETTLED", MonacoReadyTimeoutMs);
         await WaitForLogLineAfterAsync(0, @"DIFF_HARNESS_READY", MonacoReadyTimeoutMs);
 
         // 8. Find the Monaco pages. Two WebView2 hosts are live (the plain editor sample and
@@ -206,6 +226,13 @@ public sealed class DesktopAppFixture : IAsyncLifetime
             Screenshots = true,
             Snapshots = true,
         });
+
+        // 10. Snapshot the settled content for tests that assert on first-load state. Read
+        // through the standalone-editor filter rather than getEditors()[0]: the plain page has
+        // no diff widget so the two agree today, but the filter is what the rest of the suite
+        // uses to mean "the sample editor", and it stays correct if the page ever gains one.
+        InitialEditorText = await Page.EvaluateAsync<string>(
+            $"() => {DiffEditorCases.StandaloneEditorsExpressionBody}[0].getValue()");
     }
 
     public async ValueTask DisposeAsync()

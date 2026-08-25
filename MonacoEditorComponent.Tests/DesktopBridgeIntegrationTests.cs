@@ -926,17 +926,11 @@ public sealed class DesktopBridgeIntegrationTests : IAsyncLifetime
         _currentTestName = nameof(TextContent_NonEmptyOnFirstLoad);
         try
         {
-            // The editor should have non-empty text from the initial state push.
-            // Wait for Monaco to have text content.
-            await _fixture.Page.WaitForFunctionAsync(
-                "() => monaco.editor.getEditors()[0].getValue().length > 0",
-                null, new PageWaitForFunctionOptions { Timeout = 10_000 });
-
-            var text = await _fixture.Page.EvaluateAsync<string>(
-                "() => monaco.editor.getEditors()[0].getValue()");
-
-            Assert.NotNull(text);
-            Assert.NotEmpty(text);
+            // Asserted against the fixture's snapshot, not the live model: "first load" is a
+            // property of app startup, and by the time this test runs any other test in the
+            // collection may already have replaced the content.
+            Assert.NotNull(_fixture.InitialEditorText);
+            Assert.NotEmpty(_fixture.InitialEditorText);
         }
         catch
         {

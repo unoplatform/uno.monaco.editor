@@ -31,10 +31,13 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
         _fixture = fixture;
     }
 
-    public ValueTask InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _testFailed = false;
-        return ValueTask.CompletedTask;
+
+        // The collection shares one page, and xUnit does not fix the order tests run in, so
+        // every test starts from a state some other test left behind unless it is reset here.
+        await _fixture.ResetEditorStateAsync();
     }
 
     public async ValueTask DisposeAsync()
@@ -42,6 +45,31 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
         if (_testFailed)
         {
             await _fixture.CaptureFailureArtifacts(_currentTestName);
+        }
+    }
+
+    /// <summary>
+    /// Regression guard for the fixture's readiness contract. Before the app emitted
+    /// <c>APP_INIT_SETTLED</c>, the fixture released tests as soon as a Monaco instance existed,
+    /// while <c>EditorControl.Editor_Loading</c> was still fetching Content.txt and pushing it
+    /// into the model. A test writing in that window had its write overwritten -- CI run
+    /// 32854772712 failed exactly that way. If the gate regresses, the app's text has not landed
+    /// by the time this runs and the snapshot is empty or wrong.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "WasmPlaywright")]
+    public void AppInitialisation_TextHasLandedBeforeTestsRun()
+    {
+        _currentTestName = nameof(AppInitialisation_TextHasLandedBeforeTestsRun);
+        try
+        {
+            // Contains rather than StartsWith: Content.txt carries a UTF-8 BOM.
+            Assert.Contains("public class Program", _fixture.InitialEditorText);
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
         }
     }
 
