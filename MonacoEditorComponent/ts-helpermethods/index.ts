@@ -79,6 +79,27 @@ import { createBridgeConnection, isDesktopHost, getConnection } from './bridge/j
 const isDesktop = isDesktopHost();
 
 /**
+ * Reduce a URL to its containing directory, with a trailing slash:
+ * ".../uno-monaco-helpers.js" -> ".../", and ".../editor.html" -> ".../".
+ *
+ * Both callers below concatenate a relative worker path onto the result, so the
+ * trailing slash is load-bearing -- without it "editor.html" + "workers/x.js" becomes
+ * "editor.htmlworkers/x.js" and every worker 404s. new URL() also drops any query or
+ * fragment, which a plain lastIndexOf('/') would leave behind; the substring is kept
+ * as a fallback for a scheme the URL constructor rejects.
+ */
+function _directoryOf(url: string): string {
+    if (!url) {
+        return '';
+    }
+    try {
+        return new URL('.', url).href;
+    } catch {
+        return url.substring(0, url.lastIndexOf('/') + 1);
+    }
+}
+
+/**
  * Resolve a worker URL relative to the main bundle script's location.
  *
  * Using the script's own URL as base (via document.currentScript.src) ensures
@@ -86,15 +107,17 @@ const isDesktop = isDesktopHost();
  * - Desktop: file:// or https://uno-monaco.example/ (relative to editor.html)
  * - WASM: subpath deployments where WasmScripts/ may be at a non-root path
  *
- * Falls back to document.baseURI if currentScript is unavailable (deferred scripts).
+ * Falls back to document.baseURI if currentScript is unavailable (module scripts,
+ * or execution from a callback rather than top-level). That is the *document* URL and
+ * normally carries a filename, so it goes through the same directory reduction --
+ * returning it whole is what produced ".../editor.htmlworkers/editor.worker.js".
  */
 const _scriptBase: string = (() => {
     const cs = (document as any).currentScript;
     if (cs && cs.src) {
-        // Strip filename to get the directory: ".../uno-monaco-helpers.js" -> ".../"
-        return cs.src.substring(0, cs.src.lastIndexOf('/') + 1);
+        return _directoryOf(cs.src);
     }
-    return document.baseURI || '';
+    return _directoryOf(document.baseURI || '');
 })();
 
 /**
