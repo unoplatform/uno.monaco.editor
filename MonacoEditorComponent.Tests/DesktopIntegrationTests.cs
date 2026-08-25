@@ -656,8 +656,12 @@ public sealed class DesktopIntegrationTests : IAsyncLifetime
         _currentTestName = nameof(PresenterLifecycle_InitCompleteOnce);
         try
         {
+            // Matched at the end of the line, not anywhere in it: "INIT_COMPLETE" is a substring
+            // of INIT_COMPLETE_PROBE, the marker CodeEditor.Events emits when it gives up waiting
+            // for the callback -- a Contains match counts that too.
             var lines = _fixture.GetLinesAfter(0);
-            var initCompleteCount = lines.Count(l => l.Contains("INIT_COMPLETE"));
+            var initCompleteCount = lines.Count(
+                l => l.TrimEnd().EndsWith("INIT_COMPLETE", StringComparison.Ordinal));
 
             Assert.Equal(1, initCompleteCount);
         }

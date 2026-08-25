@@ -52,6 +52,12 @@ namespace Monaco
 
         private IThemeListener? _themeListener;
         private EditorLifecycleState _lifecycleState = EditorLifecycleState.Unloaded;
+
+        /// <summary>
+        /// Set while <see cref="CodeEditorLoaded"/> is running, so a second invocation cannot
+        /// re-run initialisation before the first has published its state.
+        /// </summary>
+        private bool _codeEditorLoadedInFlight;
         private int _desktopInitTimeoutRetryCount;
 
         /// <summary>
@@ -735,6 +741,21 @@ namespace Monaco
                 return;
             }
 
+            // Re-entrancy guard. The guard above is not enough on its own: this method is
+            // async void, and the state it tests (_lifecycleState, _desktopBootstrapInFlight)
+            // is only updated after the awaits below. The desktop init probe polls exactly that
+            // state, so while a first call is mid-await the probe still reads "Loading with
+            // bootstrap in flight", concludes the callback never arrived, and synthesizes a
+            // second CodeEditorLoaded -- running the whole init sequence twice. Both callers
+            // are on the UI thread, so a plain flag is sufficient.
+            if (_codeEditorLoadedInFlight)
+            {
+                Debug.WriteLine("CodeEditorLoaded: ignoring (already in flight)");
+                return;
+            }
+
+            _codeEditorLoadedInFlight = true;
+
             try
             {
                 _view = _view ?? throw new InvalidOperationException("The view not set");
@@ -745,7 +766,12 @@ namespace Monaco
                 _initialized = true;
 
                 // Emit canonical init-complete marker for diagnostics (always visible).
-                Debug.WriteLine("INIT_COMPLETE");
+                // Debug.WriteLine is [Conditional("DEBUG")], so under -c Release -- which is how
+                // CI and the integration fixtures run the app -- this marker was compiled away
+                // entirely, leaving PresenterLifecycle_InitCompleteOnce counting the unrelated
+                // INIT_COMPLETE_PROBE line instead. DiagnosticLog honours the same
+                // MONACO_DIAGNOSTICS gate as every other marker the tests read, in every config.
+                DesktopCodeEditorPresenter.DiagnosticLog("INIT_COMPLETE");
 
                 // Layout first to ensure the editor dimensions are correct.
                 await SendScriptAsync("EditorContext.getEditorForElement(element).editor.layout();");
@@ -788,6 +814,10 @@ namespace Monaco
                 _desktopBootstrapInFlight = false;
                 Debug.WriteLine($"CodeEditorLoaded failed: {ex}");
                 InternalException?.Invoke(this, ex);
+            }
+            finally
+            {
+                _codeEditorLoadedInFlight = false;
             }
         }
 
