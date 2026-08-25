@@ -165,6 +165,17 @@ namespace Monaco
                 OriginalEditable = originalEditable;
             }
 
+            // The pass-through above is a managed mirror and has to run whether or not the
+            // editor is up -- OriginalEditable must read back correctly before load, and the
+            // same options instance is what BuildInitialStateMap serializes. Only the push to
+            // Monaco is gated, matching the DiffOptions DP callback and the base's
+            // Options_PropertyChanged: before load InvokeScriptAsync is a no-op that logs a
+            // warning, and the value arrives anyway through initial-state serialization.
+            if (!IsEditorLoaded)
+            {
+                return;
+            }
+
             await InvokeScriptAsync("updateDiffOptions", options);
         }
     }

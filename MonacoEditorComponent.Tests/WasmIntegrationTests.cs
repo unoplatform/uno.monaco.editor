@@ -189,9 +189,11 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
     /// recomputes when the modified document changes.
     /// </summary>
     /// <remarks>
-    /// On WASM there is no editor web worker in the payload, so Monaco computes the diff on
-    /// the main thread through its built-in fallback. This is therefore also the check that
-    /// that fallback path actually produces hunks. See <see cref="DiffEditorCases"/>.
+    /// The diff itself is computed by Monaco's editor web worker, which is embedded and served
+    /// on WASM precisely because of this control -- without a reachable worker the computation
+    /// never resolves and no hunk is ever produced. This test is therefore also the end-to-end
+    /// check that the worker is actually delivered and reachable under the Uno.Wasm.Bootstrap
+    /// package layout. See <see cref="DiffEditorCases"/>.
     /// </remarks>
     [Fact]
     [Trait("Category", "WasmPlaywright")]

@@ -422,7 +422,11 @@ namespace Monaco
                 ReadOnly = Options.ReadOnly.Value;
             }
 
-            DesktopCodeEditorPresenter.DiagnosticLog($"CodeEditor_Loaded [{_model}] [{_view}] ({GetHashCode():x8})");
+            // Identify the collaborators by type and hash rather than ToString(): neither
+            // ModelHelper nor the presenters override it, so the default output carries no
+            // more information than the type name and is noisier to read in a log.
+            DesktopCodeEditorPresenter.DiagnosticLog(
+                $"CodeEditor_Loaded [{Describe(_model)}] [{Describe(_view)}] ({GetHashCode():x8})");
 
             // Do this the 2nd time around.
             if (_model == null && _view != null)
@@ -718,15 +722,9 @@ namespace Monaco
             }
 
             // Create the correct presenter at runtime via OperatingSystem.IsBrowser()
-            ICodeEditorPresenter presenter;
-            if (OperatingSystem.IsBrowser())
-            {
-                presenter = new WasmCodeEditorPresenter();
-            }
-            else
-            {
-                presenter = new DesktopCodeEditorPresenter();
-            }
+            ICodeEditorPresenter presenter = OperatingSystem.IsBrowser()
+                ? new WasmCodeEditorPresenter()
+                : new DesktopCodeEditorPresenter();
 
             viewHost.Content = presenter;
             _view = presenter;
@@ -771,6 +769,13 @@ namespace Monaco
                 }
                 catch (Exception e)
                 {
+                    // Deliberately unfiltered. This is the only path by which a script failure
+                    // reaches the app: the callers are property callbacks and event handlers
+                    // that are fire-and-forget, so anything escaping here is an unobserved
+                    // task exception, not a diagnosable error. The exception type is whatever
+                    // the WebView2 / JSImport bridge chose to throw, which differs per platform
+                    // and per Monaco version, so an allowlist would silently start crashing on
+                    // the first type it did not anticipate. InternalException is the report.
                     InternalException?.Invoke(this, e);
                 }
             }
@@ -831,6 +836,10 @@ namespace Monaco
                 }
                 catch (Exception e)
                 {
+                    // Deliberately unfiltered, for the same reason as SendScriptAsync above:
+                    // this is the sole error-surfacing path of a fire-and-forget interop
+                    // bridge whose exception types are platform-defined. InternalException
+                    // is the report.
                     InternalException?.Invoke(this, e);
                 }
             }
@@ -852,6 +861,14 @@ namespace Monaco
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+
+        /// <summary>
+        /// Renders a collaborator as a stable, greppable identity for diagnostics:
+        /// <c>TypeName@hash</c>, or <c>null</c>. Used instead of <c>ToString()</c>, which none
+        /// of these types override.
+        /// </summary>
+        private static string Describe(object? value) =>
+            value is null ? "null" : $"{value.GetType().Name}@{value.GetHashCode():x8}";
 
         /// <summary>
         /// Emits subscription count diagnostics to stdout when <c>MONACO_DIAGNOSTICS=1</c>.

@@ -32,8 +32,12 @@ namespace MonacoEditorTestApp
             //tabItem.Header = "Original item";
             //tabItem.Content = new EditorControl();
             //editors.TabItems.Add(tabItem);
-            // Tab 0 must stay a plain CodeEditor: both integration fixtures gate readiness on
-            // monaco.editor.getEditors(), which does not enumerate diff editors.
+            // Tab 0 must stay a plain CodeEditor. monaco.editor.getEditors() does enumerate a
+            // diff editor's two sub-editors, so it is not a discriminator on its own: the desktop
+            // fixture finds the plain page with "getEditors().length > 0 &&
+            // getDiffEditors().length === 0", which needs a page carrying a standalone editor and
+            // no diff widget, and the WASM tests reach the plain editor by subtracting the
+            // sub-editors out of getEditors(), which needs at least one left over.
             AddEditorTab();
 
             // The diff sample goes in an always-realized panel rather than a tab whenever a

@@ -866,7 +866,7 @@ Use `DiffCodeEditor` to compare two documents side by side or inline.
 ```xml
 <monaco:DiffCodeEditor x:Name="Diff"
                        CodeLanguage="csharp"
-                       OriginalText="{x:Bind Before, Mode=TwoWay}"
+                       OriginalText="{x:Bind Before, Mode=OneWay}"
                        ModifiedText="{x:Bind After, Mode=TwoWay}"
                        DiffUpdated="Diff_DiffUpdated" />
 ```
@@ -875,6 +875,10 @@ The modified (right) document is the editable one. Everything `DiffCodeEditor` i
 `CodeEditorBase` acts on it: `SelectedText`, `Decorations`, `Markers`, `Options`, cursor
 position, actions, and commands. `OriginalLanguage` is optional -- leave it unset and the
 original side follows `CodeLanguage`.
+
+The two bindings deliberately differ in mode: `ModifiedText` is `TwoWay` because edits on the
+right side are pushed back into it, while `OriginalText` is `OneWay` because the left side
+never writes back -- not even when `OriginalEditable` is set.
 
 ### Locking each side
 

@@ -51,7 +51,7 @@
         <monaco:DiffCodeEditor x:Name="Diff"
                                Grid.Row="1"
                                CodeLanguage="csharp"
-                               OriginalText="{x:Bind OriginalContent, Mode=TwoWay}"
+                               OriginalText="{x:Bind OriginalContent, Mode=OneWay}"
                                ModifiedText="{x:Bind ModifiedContent, Mode=TwoWay}"
                                DiffUpdated="Diff_DiffUpdated" />
 
