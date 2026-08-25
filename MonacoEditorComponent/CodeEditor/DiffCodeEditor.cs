@@ -169,8 +169,12 @@ namespace Monaco
             // editor is up -- OriginalEditable must read back correctly before load, and the
             // same options instance is what BuildInitialStateMap serializes. Only the push to
             // Monaco is gated, matching the DiffOptions DP callback and the base's
-            // Options_PropertyChanged: before load InvokeScriptAsync is a no-op that logs a
-            // warning, and the value arrives anyway through initial-state serialization.
+            // Options_PropertyChanged.
+            //
+            // Nothing is lost by skipping: every window in which IsEditorLoaded is false ends
+            // in ApplyInitialPropertyValues, which pushes this whole options object. That
+            // covers both the initial bootstrap and a rebootstrap, where the previous page is
+            // gone and a push would land nowhere anyway.
             if (!IsEditorLoaded)
             {
                 return;
