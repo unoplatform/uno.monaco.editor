@@ -31,6 +31,16 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
+      # Copilot code review overrides the checkout above with `fetch-depth: 2`, which
+      # leaves Nerdbank.GitVersioning unable to walk back to the version-height-resetting
+      # commit. NB.GV is a GlobalPackageReference, so a shallow clone breaks `nbgv cloud`
+      # below *and* every subsequent build. No-op for the coding agent, which gets depth 0.
+      - name: Deepen shallow checkout
+        run: |
+          if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+            git fetch --unshallow --tags
+          fi
+
       - uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
