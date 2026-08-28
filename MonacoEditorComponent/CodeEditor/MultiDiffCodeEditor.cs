@@ -203,8 +203,15 @@ namespace Monaco
         {
             using (await _mutexFiles.LockAsync())
             {
+                // The (string, object?) cast is load-bearing. DiffFileEntry[] is assignable to
+                // object[], so without it the compiler picks InvokeScriptAsync(string, object[]),
+                // which treats every file as a *separate* JS argument -- the helper then receives
+                // only the first one and throws while iterating it, and InvokeScriptAsync swallows
+                // that into InternalException. Desktop hid the bug because its file list also
+                // arrives in the pushed initial state; WASM, which has no pushed state, simply
+                // rendered "No Changed Files" forever.
                 // link:multiDiffEditor.ts:updateMultiDiffFiles
-                await InvokeScriptAsync("updateMultiDiffFiles", SnapshotFiles());
+                await InvokeScriptAsync("updateMultiDiffFiles", (object)SnapshotFiles());
             }
         }
 

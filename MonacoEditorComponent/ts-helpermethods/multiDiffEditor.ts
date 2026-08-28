@@ -424,9 +424,14 @@ export const setAllMultiDiffCollapsed = function (element: any, collapsed: boole
 /**
  * Scroll a file into view.
  *
- * `MultiDiffEditorWidget.reveal` was tree-shaken away, so the offset is recomputed the way
- * `MultiDiffEditorWidgetImpl.render` accumulates it: each item occupies
- * min(contentHeight, viewportHeight) of scroll space, not its full content height.
+ * `MultiDiffEditorWidget.reveal` was tree-shaken away, so the offset is recomputed here.
+ * `MultiDiffEditorWidgetImpl.render` tracks two parallel accumulators -- one over
+ * min(contentHeight, viewportHeight), one over the full contentHeight -- and it is the *second*
+ * that the scroll position is measured against: `contentViewPort` is built from `scrollTop`, and
+ * every visibility decision compares it to `itemContentRange`. `setScrollDimensions` agrees,
+ * reporting `scrollHeight` as the sum of full content heights. So scroll offsets live in content
+ * space; clamping each item to the viewport height here lands short by the overflow of every
+ * preceding item.
  */
 export const revealMultiDiffFile = function (element: any, path: string) {
     const state = tryGetState(element);
@@ -440,10 +445,9 @@ export const revealMultiDiffFile = function (element: any, path: string) {
     }
 
     const items = state.impl._viewItems.get();
-    const viewportHeight = state.impl._sizeObserver.height.get();
     let scrollTop = 0;
     for (let i = 0; i < index && i < items.length; i++) {
-        scrollTop += Math.min(items[i].contentHeight.get(), viewportHeight);
+        scrollTop += items[i].contentHeight.get();
     }
 
     state.impl._scrollableElement.setScrollPosition({ scrollTop });

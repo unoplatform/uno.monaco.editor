@@ -16,6 +16,11 @@
                  editor in a tab is never realized until a human clicks it, and the CDP
                  harness drives WebView contents rather than the XAML tree. -->
             <RowDefinition x:Name="DiffPanelRow" Height="0" />
+            <!-- Same reasoning as DiffPanelRow, for MultiDiffCodeEditor. Gated on
+                 MONACO_MULTIDIFF_TAB=1 on desktop, always shown on WASM so the Playwright suite
+                 can reach it; DiffEditorCases scopes its expressions structurally rather than by
+                 editor count precisely because this panel adds more of them to the same page. -->
+            <RowDefinition x:Name="MultiDiffPanelRow" Height="0" />
         </Grid.RowDefinitions>
 
         <muxc:TabView x:Name="editors"
@@ -25,6 +30,12 @@
 
         <ContentControl x:Name="DiffPanelHost"
                         Grid.Row="1"
+                        Visibility="Collapsed"
+                        HorizontalContentAlignment="Stretch"
+                        VerticalContentAlignment="Stretch" />
+
+        <ContentControl x:Name="MultiDiffPanelHost"
+                        Grid.Row="2"
                         Visibility="Collapsed"
                         HorizontalContentAlignment="Stretch"
                         VerticalContentAlignment="Stretch" />
