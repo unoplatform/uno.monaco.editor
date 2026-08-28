@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-08-28T07:31:56.966930Z",
+  "depends_on": [],
+  "epic": "fn-16-multi-file-diff-view-multidiffcodeeditor",
+  "id": "fn-16-multi-file-diff-view-multidiffcodeeditor.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-16-multi-file-diff-view-multidiffcodeeditor.5.md",
+  "status": "todo",
+  "title": "MultiDiffCodeEditor control and host plumbing",
+  "updated_at": "2026-08-28T07:31:56.966930Z"
+}

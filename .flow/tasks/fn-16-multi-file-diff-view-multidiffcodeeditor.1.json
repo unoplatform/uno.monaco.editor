@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-08-28T07:31:55.252552Z",
+  "depends_on": [],
+  "epic": "fn-16-multi-file-diff-view-multidiffcodeeditor",
+  "id": "fn-16-multi-file-diff-view-multidiffcodeeditor.1",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-16-multi-file-diff-view-multidiffcodeeditor.1.md",
+  "status": "todo",
+  "title": "Spike: prove Monaco's multi-diff widget is drivable",
+  "updated_at": "2026-08-28T07:31:55.252552Z"
+}
