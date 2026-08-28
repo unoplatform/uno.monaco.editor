@@ -1,4 +1,5 @@
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml;
 
 namespace Monaco
 {
@@ -34,5 +35,16 @@ namespace Monaco
 
         /// <inheritdoc />
         protected override string? PrimaryText => Text;
+
+        private async void OnTextChanged(DependencyPropertyChangedEventArgs e)
+        {
+            if (IsEditorLoaded && !IsSettingValue)
+            {
+                // link:otherScriptsToBeOrganized.ts:updateContent
+                await InvokeScriptAsync("updateContent", e.NewValue?.ToString() ?? string.Empty);
+            }
+
+            NotifyPropertyChanged(nameof(Text));
+        }
     }
 }

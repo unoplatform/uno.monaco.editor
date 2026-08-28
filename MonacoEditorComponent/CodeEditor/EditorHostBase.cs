@@ -12,6 +12,10 @@ using Monaco.Editor;
 using Monaco.Extensions;
 using Monaco.Helpers;
 
+using Nito.AsyncEx;
+
+using Windows.Foundation.Collections;
+
 namespace Monaco
 {
     /// <summary>
@@ -77,33 +81,117 @@ namespace Monaco
         /// <inheritdoc />
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        /// <summary>
-        /// Gets a value indicating whether the Monaco editor has completed its initialization
-        /// lifecycle and is ready to receive commands.
-        /// </summary>
-        /// <remarks>
-        /// This property transitions to <see langword="true"/> after the editor fires
-        /// <see cref="EditorHostBase.EditorLoaded"/>. It can be used in XAML templates to control
-        /// visibility and prevent displaying an empty WebView during loading.
-        /// </remarks>
-        public bool IsEditorLoaded
+        private readonly AsyncLock _mutexLineDecorations = new();
+        private readonly AsyncLock _mutexMarkers = new();
+
+        private void OnIsEditorLoadedChanged(DependencyPropertyChangedEventArgs e) => UpdatePresenterVisibility();
+
+        private void OnSelectedTextChanged(DependencyPropertyChangedEventArgs e)
         {
-            get => (bool)GetValue(IsEditorLoadedProperty);
-            private set => SetValue(IsEditorLoadedProperty, value);
+            if (IsEditorLoaded && !IsSettingValue)
+            {
+                // link:updateSelectedContent.ts:updateSelectedContent
+                _ = InvokeScriptAsync("updateSelectedContent", e.NewValue?.ToString() ?? string.Empty);
+            }
+
+            NotifyPropertyChanged(nameof(SelectedText));
         }
 
-        /// <summary>Identifies the <see cref="IsEditorLoaded"/> dependency property.</summary>
-        public static DependencyProperty IsEditorLoadedProperty { get; } = DependencyProperty.Register(
-            nameof(IsEditorLoaded),
-            typeof(bool),
-            typeof(EditorHostBase),
-            new PropertyMetadata(false, OnIsEditorLoadedChanged));
+        private void OnCodeLanguageChanged(DependencyPropertyChangedEventArgs e)
+            => Options?.Language = e.NewValue?.ToString();
 
-        private static void OnIsEditorLoadedChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        private void OnReadOnlyChanged(DependencyPropertyChangedEventArgs e)
+            => Options?.ReadOnly = bool.Parse(e.NewValue?.ToString() ?? "false");
+
+        private void OnHasGlyphMarginChanged(DependencyPropertyChangedEventArgs e)
+            => Options?.GlyphMargin = e.NewValue as bool?;
+
+        private void OnOptionsChanged(DependencyPropertyChangedEventArgs e)
         {
-            if (d is EditorHostBase editor)
+            if (e.OldValue is StandaloneEditorConstructionOptions oldValue)
             {
-                editor.UpdatePresenterVisibility();
+                oldValue.PropertyChanged -= Options_PropertyChanged;
+            }
+
+            if (e.NewValue is StandaloneEditorConstructionOptions value)
+            {
+                value.PropertyChanged -= Options_PropertyChanged;
+                value.PropertyChanged += Options_PropertyChanged;
+            }
+        }
+
+        private async void OnDecorationsChanged(DependencyPropertyChangedEventArgs e)
+        {
+            // We only want to do this one at a time per editor.
+            using (await _mutexLineDecorations.LockAsync())
+            {
+                var old = e.OldValue as IObservableVector<IModelDeltaDecoration>;
+                // Clear out the old line decorations if we're replacing them or setting back to null
+                if ((old != null && old.Count > 0) || e.NewValue == null)
+                {
+                    await DeltaDecorationsHelperAsync([]);
+                }
+
+                if (e.NewValue is IObservableVector<IModelDeltaDecoration> value)
+                {
+                    if (value.Count > 0)
+                    {
+                        await DeltaDecorationsHelperAsync([.. value]);
+                    }
+
+                    value.VectorChanged -= Decorations_VectorChanged;
+                    value.VectorChanged += Decorations_VectorChanged;
+                }
+            }
+        }
+
+        private async void Decorations_VectorChanged(IObservableVector<IModelDeltaDecoration> sender, IVectorChangedEventArgs @event)
+        {
+            if (sender != null)
+            {
+                // Need to recall mutex as this is called from outside of this initial callback setting it up.
+                using (await _mutexLineDecorations.LockAsync())
+                {
+                    await DeltaDecorationsHelperAsync([.. sender]);
+                }
+            }
+        }
+
+        private async void OnMarkersChanged(DependencyPropertyChangedEventArgs e)
+        {
+            // We only want to do this one at a time per editor.
+            using (await _mutexMarkers.LockAsync())
+            {
+                var old = e.OldValue as IObservableVector<IMarkerData>;
+                // Clear out the old markers if we're replacing them or setting back to null
+                if ((old != null && old.Count > 0) || e.NewValue == null)
+                {
+                    // TODO: Can I simplify this in this case?
+                    await SetModelMarkersAsync("CodeEditor", []);
+                }
+
+                if (e.NewValue is IObservableVector<IMarkerData> value)
+                {
+                    if (value.Count > 0)
+                    {
+                        await SetModelMarkersAsync("CodeEditor", [.. value]);
+                    }
+
+                    value.VectorChanged -= Markers_VectorChanged;
+                    value.VectorChanged += Markers_VectorChanged;
+                }
+            }
+        }
+
+        private async void Markers_VectorChanged(IObservableVector<IMarkerData> sender, IVectorChangedEventArgs @event)
+        {
+            if (sender != null)
+            {
+                // Need to recall mutex as this is called from outside of this initial callback setting it up.
+                using (await _mutexMarkers.LockAsync())
+                {
+                    await SetModelMarkersAsync("CodeEditor", [.. sender]);
+                }
             }
         }
 
@@ -226,22 +314,6 @@ namespace Monaco
 
             RebootstrapMonacoAsync();
         }
-
-        /// <summary>
-        /// Gets the rendering backend used by the editor (Wasm or Desktop).
-        /// </summary>
-        public RenderingBackend RenderingBackend
-        {
-            get => (RenderingBackend)GetValue(RenderingBackendProperty);
-            private set => SetValue(RenderingBackendProperty, value);
-        }
-
-        /// <summary>Identifies the <see cref="RenderingBackend"/> dependency property.</summary>
-        public static DependencyProperty RenderingBackendProperty { get; } = DependencyProperty.Register(
-            nameof(RenderingBackend),
-            typeof(RenderingBackend),
-            typeof(EditorHostBase),
-            new PropertyMetadata(OperatingSystem.IsBrowser() ? RenderingBackend.Wasm : RenderingBackend.Desktop));
 
         /// <summary>
         /// Gets the name of the global JavaScript function that bootstraps this control's
