@@ -134,16 +134,11 @@ public sealed class DesktopMultiDiffEditorTests : IAsyncLifetime
     /// leaves that label empty.
     /// </summary>
     /// <remarks>
-    /// Reveals strictly forward through the list, never back to a file already passed. Scrolling
-    /// backwards grows the widget's template pool, and a file-list push while the pool is larger
-    /// than the viewport needs blanks the widget permanently -- see the "pool growth" note in
-    /// docs/architecture.md. That is a control defect rather than a test one, but until it is
-    /// fixed a backward reveal here takes the rest of the shared app down with it.
-    /// <para>
-    /// The empty-label assertions therefore only reach templates recycled forward, off other
-    /// non-renamed files. Catching a stale label left by the *rename* needs a list whose rename
-    /// is not last, which the sample's is.
-    /// </para>
+    /// Item templates are pooled and recycled across files, and the widget rebinds both labels on
+    /// every reuse, so a label that returned early on an absent URI would leave the previous
+    /// occupant's path showing. The forward pass catches that between non-renamed files; the
+    /// trailing reveal of the first file catches it after the rename, whose template is the only
+    /// one that ever carries a secondary label.
     /// </remarks>
     [Fact]
     [Trait("Category", "DesktopCDP")]
@@ -178,6 +173,66 @@ public sealed class DesktopMultiDiffEditorTests : IAsyncLifetime
                     Assert.Equal(string.Empty, secondary);
                 }
             }
+
+            // Back to a file that is not a rename, now that the renamed one has been rendered:
+            // its template is in the pool, and a label that returned early on an absent URI would
+            // leave the old path showing beside a file that never had one.
+            var first = MultiDiffEditorCases.SampleFilePaths[0];
+            var reused = await RevealAsync(first);
+
+            Assert.Equal(
+                string.Empty,
+                await reused.EvaluateAsync<string>(
+                    MultiDiffEditorCases.SecondaryLabelForPathExpression, first));
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Revealing a file *above* the one on screen, then pushing a file list, leaves the widget
+    /// rendering.
+    /// </summary>
+    /// <remarks>
+    /// The backward reveal is the whole point. Jumping the scroll position in one step used to
+    /// churn the widget's derived-observable graph inside a single transaction and leak three
+    /// unmatched <c>beginUpdate</c> calls onto its "render all" autorun; an autorun with a
+    /// non-zero update count never runs again. Nothing looked wrong until the next push released
+    /// every pooled template -- with no render pass left to re-acquire one, the list went blank
+    /// permanently, and neither a resize nor another scroll brought it back. In user terms:
+    /// scroll up, update <c>Files</c>, lose the list.
+    /// <para>
+    /// <c>revealMultiDiffFile</c> now scrolls smoothly, spreading the change across animation
+    /// frames the way a mouse wheel does -- wheel scrolling never reproduced this. The assertion
+    /// that matters is the one *after* the push: the reveal itself succeeds either way, and so
+    /// does everything up to the push.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    [Trait("Category", "DesktopCDP")]
+    public async Task MultiDiffEditor_KeepsRenderingAfterAPushThatFollowsABackwardReveal()
+    {
+        _currentTestName = nameof(MultiDiffEditor_KeepsRenderingAfterAPushThatFollowsABackwardReveal);
+        try
+        {
+            await WaitForSettledAsync();
+
+            // Forward to the end, so the pool has recycled and the viewport is off the top.
+            foreach (var path in MultiDiffEditorCases.SampleFilePaths)
+            {
+                await RevealAsync(path);
+            }
+
+            // ...then back to the first file, which is what used to wedge the render autorun.
+            await RevealAsync(MultiDiffEditorCases.SampleFilePaths[0]);
+
+            // The same gate every other test opens with. Expanding before the push is what makes
+            // the damage visible: the push releases every pooled template, and a wedged autorun
+            // never re-acquires one.
+            await WaitForSettledAsync();
         }
         catch
         {

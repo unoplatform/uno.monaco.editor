@@ -388,31 +388,32 @@ And it drops the badge from Monaco's `font-weight: 600` to normal. Monaco's mult
 rule carries the specificity of the entire widget selector chain: the override repeats the chain
 and doubles the final class so it wins on specificity rather than on emission order.
 
-#### Known defect: a push after the template pool grows blanks the widget
+#### Why `revealMultiDiffFile` scrolls smoothly
 
-Scrolling *backwards* -- revealing a file above the one already on screen -- makes the
-`ObjectPool` allocate additional `.multiDiffEntry` templates rather than recycle the existing
-ones. Once the pool holds more templates than the viewport needs, the next `updateMultiDiffFiles`
-push leaves **every** template parked at `visibility: hidden` and the widget never renders again.
-It does not recover: neither a fresh `Dimension` through the resize path nor a
-`revealMultiDiffFile` scroll brings it back.
+It passes `reuseAnimation: true`, which is the only switch that routes
+`SmoothScrollableElement.setScrollPosition` to `setScrollPositionSmooth` instead of
+`setScrollPositionNow`. The flag's name describes what it does to an animation already in flight;
+here it is being used for the branch it selects.
 
-Reproduced on desktop with the sample's four files, viewport showing two:
+An instant jump wedges the widget. Moving the scroll position in one step makes items acquire and
+release templates together, `contentHeight` swap the observable it reads, and observers get added
+to a derived mid-update -- all inside one transaction. Monaco 0.52's observable library then leaks
+unmatched `beginUpdate` calls onto the widget's "render all" autorun (measured: `updateCount: 3`),
+and an autorun whose update count never returns to zero never runs again.
 
-| step | `.multiDiffEntry` count | visible |
-|---|---|---|
-| settled | 2 | 2 |
-| revealed all four, forward | 2 | 2 |
-| revealed the first file again (backward) | 4 | 2 |
-| pushed the same file list | 4 | **0** |
+Nothing looks wrong at that point, because the templates already on screen stay bound. The damage
+surfaces at the next `updateMultiDiffFiles`: the push releases every pooled template, no render
+pass is left to re-acquire one, and the list goes blank **permanently** -- not recoverable by a
+fresh `Dimension` through the resize path, by another scroll, or by waiting. In user terms: scroll
+up, update `Files`, lose the list.
 
-In user terms: scroll up, then update `Files`, and the list goes blank. Forward-only scrolling is
-unaffected, which is why the integration suite did not surface it until a test scrolled back.
-`MultiDiffEditor_SplitsHeaderLabelIntoNameAndDirectory` reveals strictly forward for this reason.
+Animating spreads the same scroll across animation frames, which is why mouse-wheel scrolling
+never reproduced it and every reveal did. Measured across repeated reveal-and-push cycles: three
+stuck autoruns before, none after.
 
-Not yet diagnosed. The suspects are the identity reconciliation in `updateMultiDiffFiles` (the
-`documents` array is new on every push even when every item object is reused) and the interaction
-between `deferDispose` and the view model's `RefCounted` acquire/release ordering.
+The cost is that the scroll finishes a frame or two after `RevealFileAsync` returns.
+`MultiDiffEditor_KeepsRenderingAfterAPushThatFollowsABackwardReveal` covers the regression; its
+load-bearing assertion is the one after the push, since everything before it passes either way.
 
 #### Four things that fail silently
 

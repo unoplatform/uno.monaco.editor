@@ -454,7 +454,26 @@ export const revealMultiDiffFile = function (element: any, path: string) {
         scrollTop += items[i].contentHeight.get();
     }
 
-    state.impl._scrollableElement.setScrollPosition({ scrollTop });
+    // Smooth, not instant -- `reuseAnimation` is what routes SmoothScrollableElement to
+    // setScrollPositionSmooth; without it the call lands on setScrollPositionNow. The flag's name
+    // describes its effect on an animation already in flight, but it is also the only switch
+    // between the two paths, and the instant one is unusable here.
+    //
+    // Jumping the scroll position in a single step churns the widget's derived-observable graph
+    // inside one transaction: items acquire and release templates together, `contentHeight` swaps
+    // the observable it reads, and observers get added to a derived mid-update. Monaco 0.52's
+    // observable library then leaks unmatched `beginUpdate` calls onto the widget's "render all"
+    // autorun -- measured as `updateCount: 3` -- and an autorun with a non-zero update count never
+    // runs again. Nothing visible happens until the next `updateMultiDiffFiles`, which releases
+    // every pooled template; with no render pass to re-acquire one, the list goes blank for good,
+    // and neither a fresh Dimension nor another scroll brings it back.
+    //
+    // Animating spreads the same scroll across animation frames, which is why a mouse wheel never
+    // reproduced this and a reveal always did. Measured before and after: three stuck autoruns
+    // versus none, across repeated reveal-and-push cycles.
+    //
+    // The cost is that the scroll finishes a frame or two after this returns.
+    state.impl._scrollableElement.setScrollPosition({ scrollTop, reuseAnimation: true });
 };
 
 /** Layout target handed to attachEditorRuntime, driven by its ResizeObserver. */
