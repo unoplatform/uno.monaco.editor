@@ -31,6 +31,10 @@ import { Dimension } from 'monaco-editor/esm/vs/base/browser/dom';
 
 import { EditorContext } from './otherScriptsToBeOrganized';
 
+// Header styling for this widget. esbuild folds it into uno-monaco-helpers.css alongside
+// Monaco's own stylesheets; the file explains why the badge override is written as it is.
+import './multiDiffEditor.css';
+
 /** One file's two sides, as pushed from C#'s DiffFileEntry. */
 export interface MultiDiffFile {
     /** Identity and primary header label. Must be unique within the control. */
@@ -552,15 +556,64 @@ export const createMultiDiffWidget = function (element: any, initialOptions: any
 };
 
 /**
+ * Split a path into the file name and the directory that contains it.
+ *
+ * Both separators, because `DiffFileEntry.Path` is whatever the caller wrote and this is a
+ * Windows repo: `a\b\c.cs` would otherwise render as one undifferentiated file name.
+ */
+function splitPath(path: string): { name: string; directory: string } {
+    const cut = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+    return cut < 0
+        ? { name: path, directory: '' }
+        : { name: path.substring(cut + 1), directory: path.substring(0, cut) };
+}
+
+/**
  * Our IWorkbenchUIElementFactory. Supplying one is the whole reason this module constructs
  * MultiDiffEditorWidgetImpl instead of calling createMultiFileDiffEditor, which hardcodes `{}`
  * and therefore leaves every filename header blank.
+ *
+ * The label renders as VS Code's does: the file name at full strength, followed by its
+ * directory dimmed and smaller, and nothing at all when the path has no directory. Styling
+ * lives in multiDiffEditor.css; the full path stays on the element as `title` (a tooltip for
+ * a path too long to fit) and as `data-uno-path`, which is the stable way to address a file
+ * from the outside now that the visible text is only its name.
  */
 function createResourceLabel(container: HTMLElement) {
+    container.classList.add('uno-resource-label');
+
+    const name = document.createElement('span');
+    name.className = 'uno-resource-label-name';
+
+    const description = document.createElement('span');
+    description.className = 'uno-resource-label-description';
+
+    container.replaceChildren(name, description);
+
     return {
         setUri(uri: monaco.Uri | undefined, options?: { strikethrough?: boolean }) {
-            container.textContent = uri ? String(uri.path).replace(/^\//, '') : '';
+            const full = uri ? String(uri.path).replace(/^\//, '') : '';
+            const parts = splitPath(full);
+
+            // Both spans are rewritten on every call, with no early return: the item templates
+            // are pooled and recycled across files, and setUri(undefined) is what a non-renamed
+            // file's secondary label gets. Leaving either span alone shows the previous
+            // occupant's directory beside the current file's name.
+            name.textContent = parts.name;
+            description.textContent = parts.directory;
+
+            // On the container rather than the name span, so it covers the directory too: this
+            // marks a deleted file's path and a rename's old path, both of which are struck
+            // through whole.
             container.style.textDecoration = options?.strikethrough ? 'line-through' : '';
+
+            if (full) {
+                container.title = full;
+                container.dataset.unoPath = full;
+            } else {
+                container.removeAttribute('title');
+                container.removeAttribute('data-uno-path');
+            }
         },
         dispose() { /* the container is owned by the item template */ },
     };

@@ -316,6 +316,16 @@ already an `IStandaloneCodeEditor`, the field's declared type -- so every existi
 handler) operates unchanged on the editable side of the diff. No JSON-RPC method was added for
 the diff editor; `DiffUpdated` rides the existing `parentAccessor/callAction`.
 
+Both diff controls share one stylesheet, `ts-helpermethods/diffEditor.css`, imported from
+`index.ts` rather than from either control's module because neither owns it. Today it holds one
+rule: the `+`/`-` marker Monaco draws in the line-decorations margin ahead of a changed line is
+dimmed past Monaco's own `opacity: 0.7`, since it only restates what the row's background colour
+already says. Monaco's declaration is `!important`, so the override carries `!important` too and
+runs one selector step longer -- among important declarations the cascade still decides on
+specificity. The high-contrast themes are excluded: Monaco resets these markers to full opacity
+under `.hc-black` / `.hc-light` so they stay legible where colour cannot carry the meaning, and
+that is an accessibility decision rather than a styling one.
+
 ### Multi-file diff
 
 `MultiDiffCodeEditor` renders N file diffs in one scrollable, virtualized, collapsible list,
@@ -342,12 +352,67 @@ constructor, so filename headers could never be populated through it.
 `MultiDiffEditorWidgetImpl` -- the class that actually renders -- survived intact, so
 `ts-helpermethods/multiDiffEditor.ts` constructs that directly. Same widget, same DOM, same CSS:
 the `monaco-editor` barrel already pulls both in whether we use them or not, which is why the
-feature cost about 11 KB of JS and no CSS at all. Only `MultiDiffEditorViewModel` was
+feature cost about 11 KB of JS and no Monaco CSS at all -- the only stylesheet it adds is
+the few hundred bytes of header styling described below. Only `MultiDiffEditorViewModel` was
 tree-shaken out and is reached by a deep import.
 
 **If a Monaco bump breaks this, it breaks silently** -- the factory is typed `any` and esbuild
 strips types without checking them. `assertMonacoInternals()` and a post-construction DOM check
 turn that into a thrown error instead. Both point back here.
+
+#### The file header
+
+Monaco builds the header row itself -- collapse chevron, primary label, `A`/`D`/`R` badge,
+secondary label, action bar -- and derives all of it from the two model URIs: the badge is `R`
+when the paths differ, `D` with no modified URI, `A` with no original one. The only opening it
+leaves is `IWorkbenchUIElementFactory.createResourceLabel`, which is handed a container element
+per label and told what URI to put in it. That factory is the component's, and it renders the
+label the way VS Code's resource label does: the file name at full strength, then the containing
+directory dimmed and smaller, and nothing at all when the path has no directory. The whole path
+stays on the element as a `title` tooltip and as `data-uno-path`, which is how the test suite
+addresses a file now that no single node holds its path.
+
+Two things about that factory are load-bearing. Both labels are rewritten on *every* bind with no
+early return, because the item templates are pooled and `setUri(undefined)` is what a
+non-renamed file's secondary label receives -- returning early there leaves the previous
+occupant's directory beside the current file's name. And the strikethrough goes on the container
+rather than the name span, so it covers the directory too, on both the deleted file and the old
+half of a rename.
+
+`ts-helpermethods/multiDiffEditor.css` carries the styling, bundled into `uno-monaco-helpers.css`
+next to Monaco's own stylesheets. It does two more things. It gives the widget root the UI font,
+because Monaco declares one only on `.monaco-editor` and this widget's root is
+`.monaco-component.multiDiffEditor` -- so the header, badge and placeholder otherwise inherit the
+document default and render in Times New Roman, while the per-file editors inside look correct.
+And it drops the badge from Monaco's `font-weight: 600` to normal. Monaco's multi-diff stylesheet uses native CSS nesting, which esbuild preserves, so that
+rule carries the specificity of the entire widget selector chain: the override repeats the chain
+and doubles the final class so it wins on specificity rather than on emission order.
+
+#### Known defect: a push after the template pool grows blanks the widget
+
+Scrolling *backwards* -- revealing a file above the one already on screen -- makes the
+`ObjectPool` allocate additional `.multiDiffEntry` templates rather than recycle the existing
+ones. Once the pool holds more templates than the viewport needs, the next `updateMultiDiffFiles`
+push leaves **every** template parked at `visibility: hidden` and the widget never renders again.
+It does not recover: neither a fresh `Dimension` through the resize path nor a
+`revealMultiDiffFile` scroll brings it back.
+
+Reproduced on desktop with the sample's four files, viewport showing two:
+
+| step | `.multiDiffEntry` count | visible |
+|---|---|---|
+| settled | 2 | 2 |
+| revealed all four, forward | 2 | 2 |
+| revealed the first file again (backward) | 4 | 2 |
+| pushed the same file list | 4 | **0** |
+
+In user terms: scroll up, then update `Files`, and the list goes blank. Forward-only scrolling is
+unaffected, which is why the integration suite did not surface it until a test scrolled back.
+`MultiDiffEditor_SplitsHeaderLabelIntoNameAndDirectory` reveals strictly forward for this reason.
+
+Not yet diagnosed. The suspects are the identity reconciliation in `updateMultiDiffFiles` (the
+`documents` array is new on every push even when every item object is reused) and the interaction
+between `deferDispose` and the view model's `RefCounted` acquire/release ordering.
 
 #### Four things that fail silently
 

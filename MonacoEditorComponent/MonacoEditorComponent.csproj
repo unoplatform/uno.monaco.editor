@@ -64,6 +64,7 @@
 	<!-- Exclude TypeScript source from compile (esbuild handles it) -->
 	<ItemGroup>
 		<None Remove="ts-helpermethods\**\*.ts" />
+		<None Remove="ts-helpermethods\**\*.css" />
 		<None Remove="tsconfig.json" />
 	</ItemGroup>
 
@@ -140,6 +141,7 @@
 	<!-- Rebuild Monaco JS bundles when TypeScript sources change -->
 	<ItemGroup>
 		<MonacoBundleInput Include="ts-helpermethods\**\*.ts" />
+		<MonacoBundleInput Include="ts-helpermethods\**\*.css" />
 		<MonacoBundleInput Include="ts-helpermethods\esbuild.config.mjs" />
 		<MonacoBundleInput Include="..\package.json" />
 		<MonacoBundleInput Include="..\package-lock.json" />

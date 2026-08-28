@@ -76,6 +76,10 @@ import {
 // Languages Monaco does not ship, bundled with the component
 import { registerDiffLanguage } from './languages/diff';
 
+// Styling that applies to every diff editor the component renders, standalone and per-file
+// alike. esbuild folds it into uno-monaco-helpers.css.
+import './diffEditor.css';
+
 // Bridge module
 import { createBridgeConnection, isDesktopHost, getConnection } from './bridge/jsonRpcBridge';
 

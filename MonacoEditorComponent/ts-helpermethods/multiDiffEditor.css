@@ -1,0 +1,86 @@
+/*
+ * Styling for the multi-file diff header, bundled into uno-monaco-helpers.css alongside
+ * Monaco's own stylesheets.
+ *
+ * Two kinds of rule live here:
+ *   - the classes our createResourceLabel puts inside Monaco's `.title` container, which
+ *     Monaco knows nothing about;
+ *   - two rules that reach Monaco's own elements: the UI font on the widget root, which
+ *     Monaco never sets there, and the weight of the A/D/R badge.
+ *
+ * Monaco's multi-diff stylesheet uses native CSS nesting, which esbuild preserves, so its
+ * `.status` rule carries the specificity of the whole `.monaco-component.multiDiffEditor
+ * .multiDiffEntry .header .header-content .file-path .status` chain. The override below
+ * repeats that chain and doubles the final class, so it wins on specificity rather than on
+ * emission order -- which depends on esbuild's traversal of the import graph and is not
+ * something to bet a silent style regression on.
+ */
+
+/*
+ * The widget's UI font. Monaco declares its own only on `.monaco-editor`, and this widget's root
+ * is `.monaco-component.multiDiffEditor` -- so without this the header, the badge and the
+ * "No Changed Files" placeholder inherit the document default, which on a bare host page is
+ * Times New Roman. The per-file editors inside are unaffected either way: they carry
+ * `.monaco-editor` and get the stack below from Monaco's own stylesheet.
+ *
+ * The stack is copied from that rule rather than referenced. Monaco 0.52 hardcodes it there, and
+ * the `--vscode-font-family` variable the workbench would use is a setting, not a colour, so
+ * StandaloneThemeService never emits it.
+ *
+ * 13px is the size VS Code uses for this chrome. Measured, the only things that inherit it are
+ * the badge and the empty-state placeholder: `.title` sets 14px of its own and the collapse
+ * chevron is a 16px codicon, so the header row keeps its height either way.
+ */
+.monaco-component.multiDiffEditor {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", HelveticaNeue-Light, system-ui, Ubuntu, "Droid Sans", sans-serif;
+	font-size: 13px;
+}
+
+/* The A/D/R badge. Monaco sets font-weight: 600; the rest of its rule is kept. */
+.monaco-component.multiDiffEditor .multiDiffEntry .header .header-content .file-path .status.status {
+	font-weight: normal;
+}
+
+/*
+ * The file label: name first, then the containing directory, dimmed -- the shape VS Code's
+ * resource label uses. Both parts live inside Monaco's `.title` element, which is a flex item
+ * of `.file-path`.
+ */
+.uno-resource-label {
+	display: flex;
+	align-items: baseline;
+	min-width: 0;
+	overflow: hidden;
+}
+
+/* The file name never shrinks: the directory is what gives way when space runs out. */
+.uno-resource-label-name {
+	flex: 0 0 auto;
+	white-space: nowrap;
+}
+
+.uno-resource-label-description {
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	font-size: 0.9em;
+	/*
+	 * descriptionForeground is in the standalone colour registry, so StandaloneThemeService
+	 * emits it into <style class="monaco-colors"> like every other registered colour. The
+	 * currentColor fallback keeps the label readable rather than invisible if a future Monaco
+	 * drops it, and the opacity guarantees the "dimmed" part cannot silently no-op.
+	 */
+	color: var(--vscode-descriptionForeground, currentColor);
+	opacity: 0.9;
+}
+
+/* Directory-less paths render as a bare file name, with no stray gap before nothing. */
+.uno-resource-label-description:empty {
+	display: none;
+}
+
+.uno-resource-label-description:not(:empty) {
+	margin-left: 8px;
+}

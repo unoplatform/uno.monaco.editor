@@ -370,6 +370,19 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
                 var badge = await _fixture.Page.EvaluateAsync<string>(
                     MultiDiffEditorCases.BadgeForPathExpression, path);
                 Assert.Equal(MultiDiffEditorCases.SampleStatusBadges[i], badge);
+
+                // The header renders the file name and its directory as two spans, and the badge
+                // drops Monaco's 600 weight. Both are pure styling on desktop, but on WASM they
+                // also depend on the stylesheet reaching the page at all.
+                var parts = await _fixture.Page.EvaluateAsync<string[]>(
+                    MultiDiffEditorCases.LabelPartsForPathExpression, path);
+                var cut = path.LastIndexOf('/');
+                Assert.Equal(path[(cut + 1)..], parts[0]);
+                Assert.Equal(path[..cut], parts[1]);
+
+                var weight = await _fixture.Page.EvaluateAsync<string>(
+                    MultiDiffEditorCases.BadgeFontWeightForPathExpression, path);
+                Assert.Equal("400", weight);
             }
 
             var hunks = await _fixture.Page.EvaluateAsync<int[]>(

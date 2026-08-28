@@ -97,6 +97,21 @@ internal static class DiffEditorCases
         ".some(e => !e.closest('.multiDiffEditor'))";
 
     /// <summary>
+    /// The computed opacity of the <c>+</c>/<c>-</c> marker Monaco draws in the line-decorations
+    /// margin ahead of an inserted or deleted line, or <c>null</c> when no marker is on the page.
+    /// </summary>
+    /// <remarks>
+    /// Monaco declares <c>opacity: 0.7 !important</c> on these; the component dims them further,
+    /// which means its own rule has to carry <c>!important</c> too and outrank Monaco's on
+    /// specificity. Only the computed value distinguishes a rule that landed from one that lost
+    /// the cascade -- the marker is an empty codicon element, so nothing else about it is
+    /// observable. It exists only once a hunk has been computed.
+    /// </remarks>
+    public const string ChangeSignOpacityExpression =
+        "() => { const sign = document.querySelector('.insert-sign, .delete-sign');" +
+        " return sign === null ? null : getComputedStyle(sign).opacity; }";
+
+    /// <summary>
     /// Waits until Monaco has computed a diff with at least one hunk. Diff computation is
     /// asynchronous (and on WASM runs on the main thread via Monaco's worker fallback), so
     /// tests must wait rather than read immediately after load.

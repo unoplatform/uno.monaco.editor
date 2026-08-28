@@ -40,6 +40,12 @@ public sealed class DiffFileEntry : INotifyPropertyChanged
     /// <remarks>
     /// Must be unique within a <see cref="MultiDiffCodeEditor"/>; duplicates are skipped. Keeping
     /// it stable across updates is what preserves the file's scroll position and collapsed state.
+    /// <para>
+    /// The header shows the file name, with the directory containing it dimmed beside it, and
+    /// nothing beside it when the path has no directory. Either separator delimits them, so a
+    /// Windows-style path reads the same as a forward-slashed one. The whole path is on the
+    /// element as a tooltip.
+    /// </para>
     /// </remarks>
     public string Path
     {

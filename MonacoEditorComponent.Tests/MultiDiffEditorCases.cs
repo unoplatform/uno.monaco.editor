@@ -59,13 +59,14 @@ internal static class MultiDiffEditorCases
         "() => " + VisibleEntriesExpressionBody + ".length > 0";
 
     /// <summary>
-    /// The primary (modified-side) header label of each rendered file, in display order.
+    /// The file name shown in each rendered file's header, in display order. The label is split
+    /// in two -- the name, then the directory beside it dimmed -- so this is the name half only.
     /// Populated by the control's own <c>createResourceLabel</c>; empty labels mean the
     /// <c>IWorkbenchUIElementFactory</c> never reached the item template.
     /// </summary>
     public const string HeaderLabelsExpression =
         "() => " + VisibleEntriesExpressionBody +
-        ".map(e => e.querySelector('.title.modified')?.textContent ?? '')";
+        ".map(e => e.querySelector('.title.modified .uno-resource-label-name')?.textContent ?? '')";
 
     /// <summary>
     /// The status badge of each rendered file, in display order: <c>A</c> added, <c>D</c> deleted,
@@ -166,20 +167,85 @@ internal static class MultiDiffEditorCases
         "() => monaco.editor.getModels().length";
 
     /// <summary>
+    /// The rendered section for the path in scope. Only valid inside an arrow function whose
+    /// parameter is named <c>path</c>.
+    /// </summary>
+    /// <remarks>
+    /// Matched on <c>data-uno-path</c> rather than on the label's text: the header renders the
+    /// file name and its directory as two separate spans, so the visible text is neither the
+    /// path nor a single node. The attribute is written by the control's own
+    /// <c>createResourceLabel</c>, so a miss here still means what an empty label used to -- the
+    /// <c>IWorkbenchUIElementFactory</c> never reached the item template.
+    /// </remarks>
+    public const string EntryForPathExpressionBody =
+        VisibleEntriesExpressionBody +
+        ".find(x => x.querySelector('.title.modified')?.dataset.unoPath === path)";
+
+    /// <summary>
     /// Whether a file with the given path is currently rendered. Takes the path as its argument.
     /// </summary>
     public const string IsPathRenderedExpression =
-        "(path) => " + VisibleEntriesExpressionBody +
-        ".some(e => (e.querySelector('.title.modified')?.textContent ?? '') === path)";
+        "(path) => " + EntryForPathExpressionBody + " !== undefined";
 
     /// <summary>
     /// The status badge of the file with the given path, or <c>null</c> when it is not rendered.
     /// Takes the path as its argument.
     /// </summary>
     public const string BadgeForPathExpression =
-        "(path) => { const e = " + VisibleEntriesExpressionBody +
-        ".find(x => (x.querySelector('.title.modified')?.textContent ?? '') === path);" +
+        "(path) => { const e = " + EntryForPathExpressionBody + ";" +
         " return e === undefined ? null : (e.querySelector('.status')?.textContent ?? '').trim(); }";
+
+    /// <summary>
+    /// The two halves of a file's header label as <c>[name, directory]</c>, or <c>null</c> when
+    /// the file is not rendered. Takes the path as its argument.
+    /// </summary>
+    public const string LabelPartsForPathExpression =
+        "(path) => { const e = " + EntryForPathExpressionBody + ";" +
+        " if (e === undefined) return null;" +
+        " const t = e.querySelector('.title.modified');" +
+        " return [t.querySelector('.uno-resource-label-name')?.textContent ?? ''," +
+        " t.querySelector('.uno-resource-label-description')?.textContent ?? '']; }";
+
+    /// <summary>
+    /// The original-side header label of a file, which carries the old path of a rename and
+    /// nothing at all for every other file. Takes the path as its argument.
+    /// </summary>
+    /// <remarks>
+    /// The readout that catches a stale label. Item templates are pooled and recycled, and the
+    /// widget rebinds both labels on every reuse -- so text here on a file that is not a rename
+    /// is the previous occupant's, left behind by a label that returned early on an absent URI.
+    /// Name and directory concatenate with no separator, so assert on containment, not equality.
+    /// </remarks>
+    public const string SecondaryLabelForPathExpression =
+        "(path) => { const e = " + EntryForPathExpressionBody + ";" +
+        " return e === undefined ? null : (e.querySelector('.title.original')?.textContent ?? ''); }";
+
+    /// <summary>
+    /// The computed opacity of a <c>+</c>/<c>-</c> change marker inside one of the per-file
+    /// editors, or <c>null</c> when none is rendered.
+    /// </summary>
+    /// <remarks>
+    /// The same override that dims them in <c>DiffCodeEditor</c> has to reach here too: the
+    /// per-file editors are ordinary diff editors, but they live behind a different root, so a
+    /// rule scoped to the standalone control would miss them silently.
+    /// </remarks>
+    public const string ChangeSignOpacityExpression =
+        "() => { const sign = document.querySelector('.multiDiffEntry .insert-sign, .multiDiffEntry .delete-sign');" +
+        " return sign === null ? null : getComputedStyle(sign).opacity; }";
+
+    /// <summary>
+    /// The computed font weight of a file's status badge. Takes the path as its argument.
+    /// </summary>
+    /// <remarks>
+    /// Monaco's own stylesheet asks for 600 through a nested rule whose specificity is the whole
+    /// widget selector chain. Only the computed value proves the component's override outranks
+    /// it; the override's presence in the bundle does not.
+    /// </remarks>
+    public const string BadgeFontWeightForPathExpression =
+        "(path) => { const e = " + EntryForPathExpressionBody + ";" +
+        " if (e === undefined) return null;" +
+        " const s = e.querySelector('.status');" +
+        " return s === null ? null : getComputedStyle(s).fontWeight; }";
 
     /// <summary>Scrolls the file with the given path into view. Takes the path as its argument.</summary>
     public const string RevealPathExpression =
@@ -224,8 +290,7 @@ internal static class MultiDiffEditorCases
 
     /// <summary>Whether the file with the given path is collapsed. Takes the path as its argument.</summary>
     public const string IsPathCollapsedExpression =
-        "(path) => { const e = " + VisibleEntriesExpressionBody +
-        ".find(x => (x.querySelector('.title.modified')?.textContent ?? '') === path);" +
+        "(path) => { const e = " + EntryForPathExpressionBody + ";" +
         " return e === undefined ? null : e.querySelector('.collapse-button .codicon-chevron-right') !== null; }";
 
     /// <summary>Collapses or expands one file. Takes <c>[path, collapsed]</c> as its argument.</summary>

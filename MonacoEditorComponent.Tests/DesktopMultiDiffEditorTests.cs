@@ -129,6 +129,64 @@ public sealed class DesktopMultiDiffEditorTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// The header label is the file name, with the containing directory as a separate span
+    /// beside it. The rename carries its old path in the original-side label; every other file
+    /// leaves that label empty.
+    /// </summary>
+    /// <remarks>
+    /// Reveals strictly forward through the list, never back to a file already passed. Scrolling
+    /// backwards grows the widget's template pool, and a file-list push while the pool is larger
+    /// than the viewport needs blanks the widget permanently -- see the "pool growth" note in
+    /// docs/architecture.md. That is a control defect rather than a test one, but until it is
+    /// fixed a backward reveal here takes the rest of the shared app down with it.
+    /// <para>
+    /// The empty-label assertions therefore only reach templates recycled forward, off other
+    /// non-renamed files. Catching a stale label left by the *rename* needs a list whose rename
+    /// is not last, which the sample's is.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    [Trait("Category", "DesktopCDP")]
+    public async Task MultiDiffEditor_SplitsHeaderLabelIntoNameAndDirectory()
+    {
+        _currentTestName = nameof(MultiDiffEditor_SplitsHeaderLabelIntoNameAndDirectory);
+        try
+        {
+            await WaitForSettledAsync();
+
+            const string renamed = "docs/arithmetic.md";
+
+            foreach (var path in MultiDiffEditorCases.SampleFilePaths)
+            {
+                var page = await RevealAsync(path);
+                var parts = await page.EvaluateAsync<string[]>(
+                    MultiDiffEditorCases.LabelPartsForPathExpression, path);
+                var cut = path.LastIndexOf('/');
+
+                Assert.Equal(path[(cut + 1)..], parts[0]);
+                Assert.Equal(path[..cut], parts[1]);
+
+                var secondary = await page.EvaluateAsync<string>(
+                    MultiDiffEditorCases.SecondaryLabelForPathExpression, path);
+
+                if (path == renamed)
+                {
+                    Assert.Contains("math.md", secondary);
+                }
+                else
+                {
+                    Assert.Equal(string.Empty, secondary);
+                }
+            }
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Added, deleted and renamed files carry their badges, and a plainly-modified file carries
     /// none. The last part is the real assertion: a badge there would mean the two sides' model
     /// URIs disagree on their path, which makes Monaco read every modified file as a rename.
@@ -149,6 +207,14 @@ public sealed class DesktopMultiDiffEditorTests : IAsyncLifetime
                 var badge = await page.EvaluateAsync<string>(MultiDiffEditorCases.BadgeForPathExpression, path);
 
                 Assert.Equal(MultiDiffEditorCases.SampleStatusBadges[i], badge);
+
+                // Monaco's stylesheet asks for font-weight 600 through a rule carrying the whole
+                // widget selector chain; the component overrides it back to normal. Nothing else
+                // observes that override, and it fails by simply losing the cascade.
+                var weight = await page.EvaluateAsync<string>(
+                    MultiDiffEditorCases.BadgeFontWeightForPathExpression, path);
+
+                Assert.Equal("400", weight);
             }
         }
         catch
@@ -229,6 +295,12 @@ public sealed class DesktopMultiDiffEditorTests : IAsyncLifetime
             Assert.True(
                 await _fixture.MultiDiffPage.EvaluateAsync<bool>(MultiDiffEditorCases.ChevronGlyphRenderedExpression),
                 "The collapse chevron must resolve to a codicon glyph.");
+
+            // The per-file editors are ordinary diff editors behind a different root, so the
+            // change-marker override has to reach them too.
+            Assert.Equal(
+                "0.4",
+                await _fixture.MultiDiffPage.EvaluateAsync<string>(MultiDiffEditorCases.ChangeSignOpacityExpression));
         }
         catch
         {
