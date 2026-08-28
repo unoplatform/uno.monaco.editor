@@ -148,6 +148,11 @@ function cleanupEditorRuntimeState(editorContext: EditorContext): void {
         (editorContext as any)._resizeObserver = undefined;
     }
 
+    // Every flavor sets this, so every flavor has to clear it. Contexts are cached per element
+    // and reused across a re-bootstrap, so a handle left behind here would let a later
+    // layoutEditor() call layout() on an already-disposed widget.
+    (editorContext as any)._layoutTarget = undefined;
+
     const disposables = (editorContext as any)._rpcHandlerDisposables as Disposable[] | undefined;
     if (disposables) {
         for (const d of disposables) {
@@ -165,7 +170,6 @@ function cleanupEditorRuntimeState(editorContext: EditorContext): void {
     if (multiDiff) {
         disposeMultiDiffState(multiDiff);
         editorContext.multiDiff = undefined;
-        (editorContext as any)._layoutTarget = undefined;
         return;
     }
 
@@ -189,9 +193,12 @@ interface InitialState {
     requestedTheme: number;
     themeName: string;
     isHighContrast: boolean;
-    text: string;
-    language: string;
-    readOnly: boolean;
+    /** Absent when the control has no primary document, i.e. the multi-file diff. */
+    text?: string;
+    /** Absent when the control has no primary document, i.e. the multi-file diff. */
+    language?: string;
+    /** Absent when the control has no primary document, i.e. the multi-file diff. */
+    readOnly?: boolean;
     /** Diff editor only: the original (left-hand) document. */
     originalText?: string;
     /** Diff editor only: language of the original document; falls back to `language`. */
