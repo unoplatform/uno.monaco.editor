@@ -33,6 +33,7 @@ Key layers from top to bottom:
 | **EditorHostBase** | Abstract templated `Control`; owns lifecycle, property sync, bridge helper wiring |
 | **CodeEditor** | Thin single-document subclass of `EditorHostBase`; adds the `Text` property |
 | **DiffCodeEditor** | Side-by-side diff subclass of `EditorHostBase`; adds the `OriginalText`/`ModifiedText` properties |
+| **MultiDiffCodeEditor** | Multi-file diff subclass of `EditorHostBase`; adds the `Files` collection of `DiffFileEntry` |
 | **ICodeEditorPresenter** | Abstraction over the web host; two implementations selected by platform |
 | **WasmCodeEditorPresenter** | WASM: wraps `BrowserHtmlElement` (iframe-like DOM element) |
 | **DesktopCodeEditorPresenter** | Desktop (Skia): wraps `WebView2` with CoreWebView2 |
@@ -264,7 +265,8 @@ classDiagram
         -_debugLogger : IDebugLogger?
         +RenderingBackend : RenderingBackend
         #BootstrapFunctionName : string
-        #IsDiffEditor : bool
+        #Flavor : EditorFlavor
+        #HasPrimaryDocument : bool
         #PrimaryText : string?
         #BuildInitialStateMap() Dictionary
         #ApplyInitialPropertyValues() Task
@@ -285,10 +287,20 @@ classDiagram
         +GetLineChangesAsync() Task~LineChange[]~
     }
 
+    class MultiDiffCodeEditor {
+        +Files : IObservableVector~DiffFileEntry~
+        +DiffOptions : DiffEditorOptions
+        +ActiveFilePath : string?
+        +DiffUpdated : event
+        +CollapseAllAsync() Task
+        +RevealFileAsync(path) Task
+    }
+
     ICodeEditorPresenter <|.. WasmCodeEditorPresenter
     ICodeEditorPresenter <|.. DesktopCodeEditorPresenter
     EditorHostBase <|-- CodeEditor
     EditorHostBase <|-- DiffCodeEditor
+    EditorHostBase <|-- MultiDiffCodeEditor
     EditorHostBase o-- ICodeEditorPresenter : _view
 ```
 
@@ -303,6 +315,73 @@ already an `IStandaloneCodeEditor`, the field's declared type -- so every existi
 (`updateContent`, `updateLanguage`, decorations, selection tracking, the `editor/getValue` RPC
 handler) operates unchanged on the editable side of the diff. No JSON-RPC method was added for
 the diff editor; `DiffUpdated` rides the existing `parentAccessor/callAction`.
+
+### Multi-file diff
+
+`MultiDiffCodeEditor` renders N file diffs in one scrollable, virtualized, collapsible list,
+inside a single WebView. One control rather than N `DiffCodeEditor`s: on desktop each control
+owns its own WebView2, so a list of them would mean N WebView2s and N independent scrollbars.
+
+It has no primary document, so it overrides `HasPrimaryDocument` to `false`. That flag gates the
+single-document half of `BuildInitialStateMap` and `ApplyInitialPropertyValues`: everything past
+the theme push targets `EditorContext.editor`, which this element does not have. For the same
+reason the members it inherits for a single document -- `SelectedText`, `Decorations`, `Markers`,
+`Options`, `CodeLanguage`, `ReadOnly`, cursor position, actions, commands -- are inert and
+documented as such. Monaco pools and recycles the per-file editors through an `ObjectPool`, so
+there is no stable single editor to alias the way `DiffCodeEditor` aliases its modified side.
+
+#### Why it does not call `createMultiFileDiffEditor`
+
+Monaco ships the widget and `monaco.editor.createMultiFileDiffEditor` is declared in
+`monaco.d.ts` -- returning `any` -- but the factory is unusable. Monaco's build tree-shakes at
+`ShakeLevel.ClassMembers`, and `MultiDiffEditorWidget` keeps only its constructor: `setViewModel`,
+`createViewModel`, `layout` and `reveal` are absent from both the ESM output and the min bundle.
+It also hardcodes `{}` as the `IWorkbenchUIElementFactory` and builds its impl eagerly in that
+constructor, so filename headers could never be populated through it.
+
+`MultiDiffEditorWidgetImpl` -- the class that actually renders -- survived intact, so
+`ts-helpermethods/multiDiffEditor.ts` constructs that directly. Same widget, same DOM, same CSS:
+the `monaco-editor` barrel already pulls both in whether we use them or not, which is why the
+feature cost about 11 KB of JS and no CSS at all. Only `MultiDiffEditorViewModel` was
+tree-shaken out and is reached by a deep import.
+
+**If a Monaco bump breaks this, it breaks silently** -- the factory is typed `any` and esbuild
+strips types without checking them. `assertMonacoInternals()` and a post-construction DOM check
+turn that into a thrown error instead. Both point back here.
+
+#### Four things that fail silently
+
+1. **The theme container must be registered.** `StandaloneThemeService` only injects its
+   `<style class="monaco-colors">` -- which carries both the `--vscode-*` variables *and* the
+   runtime-generated codicon glyph rules -- when an editor container is registered. Only
+   `createStandaloneEditor`, `createStandaloneDiffEditor` and `colorize*` do that; `setTheme`
+   does not. Without it the widget renders with serif headers, no syntax colours, no diff
+   highlighting and an invisible collapse chevron. Note it is `StandaloneServices.get(...)`, not
+   the `InstantiationService` that `initialize()` returns -- that one has no `get`.
+2. **The side discriminator belongs in the model URI's authority, never its path.** The item
+   template flags a rename whenever `originalUri.path !== modifiedUri.path`, so
+   `multidiff://ctx/original/<path>` badges every modified file as `R`. The scheme used is
+   `multidiff://<contextId>-original/<path>`.
+3. **Removed documents are disposed a frame after the list swap**, not during it, or Monaco
+   throws `TextModel got disposed before DiffEditorWidget model got reset`.
+4. **The widget does not self-size.** It builds `ObservableElementSizeObserver(element, undefined)`
+   and never calls `setAutomaticLayout(true)`, so the `ResizeObserver` behind `startObserving()`
+   never runs. A fresh `Dimension` is pushed from the existing `attachEditorRuntime`
+   `ResizeObserver`; re-setting an equal value does not retrigger the autorun.
+
+Scroll offsets are in *content* space: `render` compares the viewport against an accumulator over
+full content heights, and `setScrollDimensions` reports `scrollHeight` the same way. Reveal sums
+full content heights, not viewport-clamped ones.
+
+The TypeScript layer owns every `ITextModel`; C# only ever sends text. URIs are stable and
+derived from `DiffFileEntry.Path`, which is what preserves each file's scroll offset and
+collapsed state across a re-push -- `updateMultiDiffFiles` reconciles by path and keeps the same
+document object for an unchanged file, because `mapObservableArrayCached` caches by identity.
+`createModel` throws on a duplicate URI, so every create goes through `getModel` first.
+
+A `null` original or modified text omits that side's model entirely, which is what produces the
+`A`/`D` badge; `""` is a real but empty file. As with the diff editor, no JSON-RPC method was
+added -- the collapse and focus callbacks ride `parentAccessor/callActionWithParameters`.
 
 ### Bridge Helpers
 

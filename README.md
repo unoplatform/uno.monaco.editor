@@ -19,6 +19,8 @@ A cross-platform [Uno Platform](https://platform.uno/) wrapper around the [Monac
 - **Editor options** -- full `StandaloneEditorConstructionOptions` support through `CodeEditor.Options`
 - **Diff editor** -- `DiffCodeEditor` renders a side-by-side or inline comparison of two documents,
   with hunk navigation, a `DiffUpdated` event, and `GetLineChangesAsync()` for the computed hunks
+- **Multi-file diff** -- `MultiDiffCodeEditor` renders a whole changeset as one scrollable,
+  virtualized list of collapsible per-file diffs, with added/deleted/renamed badges
 - **Two-way text binding** -- bind editor content to C# properties with change notifications
 - **Dual-platform support** -- single codebase runs on both `net10.0-browserwasm` and `net10.0-desktop`
 
@@ -32,6 +34,7 @@ A cross-platform [Uno Platform](https://platform.uno/) wrapper around the [Monac
 | Language providers (Completion, Hover, etc.) | Supported | Supported |
 | `AddActionAsync` / `AddCommandAsync` | Supported | Supported |
 | `DiffCodeEditor` (side-by-side / inline diff) | Supported | Supported |
+| `MultiDiffCodeEditor` (multi-file diff, read-only) | Supported | Supported |
 | `PostWebMessage` | Not supported | Supported |
 | Interop mechanism | JSImport / JSExport | JSON-RPC over WebView2 |
 

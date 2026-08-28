@@ -42,6 +42,7 @@ using Monaco.Helpers;
 14. [Register a Color Provider](#14-register-a-color-provider)
 15. [Work with the Text Model](#15-work-with-the-text-model)
 16. [Show a Diff Between Two Documents](#16-show-a-diff-between-two-documents)
+17. [Show Diffs Across Multiple Files](#17-show-diffs-across-multiple-files)
 
 ---
 
@@ -959,6 +960,93 @@ editor at all.
 **Platform support:** WASM and Desktop.
 
 ---
+
+---
+
+## 17. Show Diffs Across Multiple Files
+
+Use `MultiDiffCodeEditor` for a changeset: one scrollable list of per-file diffs with collapsible
+headers, the equivalent of VS Code's multi-file diff editor. It is a **read-only viewer** -- for
+an editable comparison of a single document, use `DiffCodeEditor` (recipe 16).
+
+```xml
+<monaco:MultiDiffCodeEditor x:Name="Changes"
+                            DiffUpdated="Changes_DiffUpdated" />
+```
+
+```csharp
+Changes.Files.Add(new DiffFileEntry
+{
+    Path = "src/Calculator.cs",
+    OriginalText = before,
+    ModifiedText = after,
+});
+```
+
+`Files` is an observable collection, and so is each entry: adding, removing or reordering files
+re-pushes the list, and so does changing `ModifiedText` on an entry already in it. Reconciliation
+is by `Path`, so a file that keeps its path keeps its scroll offset and collapsed state across
+the push. Paths must be unique.
+
+### `null` is not an empty string
+
+This is the one thing worth getting right up front. `OriginalText` and `ModifiedText` are
+nullable, and `null` means something different from `""`:
+
+| | `OriginalText` | `ModifiedText` | Renders as |
+|---|---|---|---|
+| Modified | text | text | no badge |
+| Added | **`null`** | text | `A` badge, hatched left side |
+| Deleted | text | **`null`** | `D` badge, hatched right side |
+| Emptied | text | `""` | no badge -- a diff against a real, empty file |
+
+`null` omits that side of the comparison entirely; `""` is a file that exists and happens to be
+empty. Passing `""` where you meant `null` produces a diff that deletes every line instead of a
+file marked as deleted.
+
+A rename is a fifth case, driven by `OriginalPath`:
+
+```csharp
+Changes.Files.Add(new DiffFileEntry
+{
+    Path = "docs/arithmetic.md",
+    OriginalPath = "docs/math.md",   // differs from Path => "R" badge, old name struck through
+    OriginalText = before,
+    ModifiedText = after,
+    Language = "markdown",           // null infers from the extension of Path
+});
+```
+
+### Navigating
+
+```csharp
+await Changes.CollapseAllAsync();
+await Changes.ExpandAllAsync();
+await Changes.SetCollapsedAsync("src/Calculator.cs", collapsed: true);
+await Changes.RevealFileAsync("docs/arithmetic.md");
+```
+
+`ActiveFilePath` follows focus, and `DiffUpdated` fires whenever any file's diff is recomputed.
+`DiffFileEntry.Collapsed` is two-way: set it to collapse a section, and a user clicking the
+chevron writes back to it.
+
+The list is **virtualized** -- only files near the viewport have live editors -- so
+`RevealFileAsync` is how you reach one that is not currently rendered.
+
+### What does not apply here
+
+Because this control has no single document, the members it inherits from `EditorHostBase` for
+one are inert: `SelectedText`, `SelectedRange`, `CodeLanguage`, `ReadOnly`, `Options`,
+`HasGlyphMargin`, `Decorations`, `Markers`, the cursor position accessors, and the action and
+command APIs. Monaco pools and recycles the per-file editors, so there is no stable editor for
+them to act on. Set the language per file with `DiffFileEntry.Language`, and configure the
+comparison through `DiffOptions`.
+
+`DiffOptions` applies to every file, with two caveats: `HideUnchangedRegions` is forced on by
+Monaco for a multi-file view and cannot be disabled, and `OriginalEditable` is ignored because
+the control is read-only.
+
+**Platform support:** WASM and Desktop.
 
 ## Further Reading
 
