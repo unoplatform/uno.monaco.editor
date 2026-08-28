@@ -57,6 +57,12 @@ interface DocEntry {
     hasModified: boolean;
     original?: monaco.editor.ITextModel;
     modified?: monaco.editor.ITextModel;
+    /**
+     * What this entry's dispose() will actually destroy. Mutable and separate from
+     * `original`/`modified`: when an entry is rebuilt, the replacement adopts the models whose
+     * URIs did not change, and the outgoing entry has to be told to let go of them.
+     */
+    owned: { original?: monaco.editor.ITextModel; modified?: monaco.editor.ITextModel };
     /** The IDocumentDiffItem handed to Monaco. Identity matters: the view model caches on it. */
     item: any;
     ref: any;
@@ -246,6 +252,7 @@ function createEntry(state: MultiDiffState, file: MultiDiffFile): DocEntry {
         ? ensureModel(modelUri(state.contextId, 'modified', file.path), file.modifiedText!, language)
         : undefined;
 
+    const owned = { original, modified };
     const entry: DocEntry = {
         path: file.path,
         originalPath,
@@ -253,6 +260,7 @@ function createEntry(state: MultiDiffState, file: MultiDiffFile): DocEntry {
         hasModified,
         original,
         modified,
+        owned,
         item: undefined,
         ref: undefined,
     };
@@ -265,8 +273,8 @@ function createEntry(state: MultiDiffState, file: MultiDiffFile): DocEntry {
         get options() { return state.itemOptions; },
         onOptionsDidChange: state.onOptionsDidChange,
         dispose() {
-            original?.dispose();
-            modified?.dispose();
+            owned.original?.dispose();
+            owned.modified?.dispose();
         },
     };
     entry.ref = (RefCounted as any).create(entry.item, 'uno-multi-diff');
@@ -344,10 +352,23 @@ export const updateMultiDiffFiles = function (element: any, files: MultiDiffFile
                 }
             }
         } else {
+            const replacement = createEntry(state, file);
             if (entry) {
+                // ensureModel returns the *existing* model for an unchanged URI, and the
+                // modified URI depends only on file.path -- so a shape change (a side
+                // appearing or disappearing, or a rename) hands the replacement the very
+                // models the outgoing entry is about to dispose two frames from now.
+                // Whatever they share is now the replacement's to destroy, not this one's.
+                if (entry.owned.original === replacement.original) {
+                    entry.owned.original = undefined;
+                }
+                if (entry.owned.modified === replacement.modified) {
+                    entry.owned.modified = undefined;
+                }
+
                 removed.push(entry.ref);
             }
-            entry = createEntry(state, file);
+            entry = replacement;
             state.docs.set(file.path, entry);
         }
 

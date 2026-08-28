@@ -607,4 +607,61 @@ public sealed class DesktopMultiDiffEditorTests : IAsyncLifetime
             throw;
         }
     }
+
+    /// <summary>
+    /// A file whose shape changes -- here an added file gaining an original side -- forces the
+    /// entry to be rebuilt rather than updated in place. The rebuilt entry adopts the models
+    /// whose URIs did not change (the modified URI is derived from the path alone), while the
+    /// outgoing entry is disposed two frames later. Nothing else in this suite drives a shape
+    /// change, so without this the rebuilt entry could be left holding a disposed model.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "DesktopCDP")]
+    public async Task MultiDiffEditor_KeepsModelsAliveWhenAFileChangesShape()
+    {
+        _currentTestName = nameof(MultiDiffEditor_KeepsModelsAliveWhenAFileChangesShape);
+        try
+        {
+            await WaitForSettledAsync();
+
+            var page = _fixture.MultiDiffPage;
+            const string path = "probe/shape.cs";
+
+            try
+            {
+                await page.EvaluateAsync(MultiDiffEditorCases.PushShapeChangeAddedExpression);
+                await WaitForDiffsComputedAsync();
+                Assert.Equal(1, await page.EvaluateAsync<int>(
+                    MultiDiffEditorCases.LiveModelsForPathExpression, path));
+
+                // Same path, now with an original side: a rebuild, not an in-place update.
+                await page.EvaluateAsync(MultiDiffEditorCases.PushShapeChangeModifiedExpression);
+                await WaitForDiffsComputedAsync();
+
+                // Past the double-requestAnimationFrame the deferred disposal waits on, plus
+                // margin -- the point is to observe the state the disposal leaves behind.
+                await Task.Delay(500);
+
+                Assert.Equal(2, await page.EvaluateAsync<int>(
+                    MultiDiffEditorCases.LiveModelsForPathExpression, path));
+
+                // A disposed model still renders its last frame, so assert the widget can
+                // actually read through to it rather than trusting the count alone.
+                await page.EvaluateAsync(MultiDiffEditorCases.RevealPathExpression, path);
+                await page.WaitForFunctionAsync(
+                    MultiDiffEditorCases.IsPathRenderedExpression, path,
+                    new PageWaitForFunctionOptions { Timeout = MultiDiffTimeoutMs });
+            }
+            finally
+            {
+                await page.EvaluateAsync(MultiDiffEditorCases.ClearFilesExpression);
+                await Task.Delay(200);
+            }
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
 }

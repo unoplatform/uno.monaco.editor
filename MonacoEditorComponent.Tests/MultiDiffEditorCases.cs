@@ -374,4 +374,32 @@ internal static class MultiDiffEditorCases
     /// <summary>Pushes <see cref="SampleFilesLiteral"/> back onto the widget.</summary>
     public const string RestoreSampleFilesExpression =
         "() => globalThis.updateMultiDiffFiles(" + HostExpressionBody + ", " + SampleFilesLiteral + ")";
+
+    /// <summary>One file with no original side, so the entry is built in its "added" shape.</summary>
+    public const string ShapeChangeAddedFilesLiteral =
+        "[{path:'probe/shape.cs',originalText:null,modifiedText:'class Shape { }'}]";
+
+    /// <summary>Pushes <see cref="ShapeChangeAddedFilesLiteral"/>.</summary>
+    public const string PushShapeChangeAddedExpression =
+        "() => globalThis.updateMultiDiffFiles(" + HostExpressionBody + ", " + ShapeChangeAddedFilesLiteral + ")";
+
+    /// <summary>
+    /// The same path with an original side, which changes the entry's shape and forces a rebuild
+    /// rather than an in-place update.
+    /// </summary>
+    public const string ShapeChangeModifiedFilesLiteral =
+        "[{path:'probe/shape.cs',originalText:'class Shape { }',modifiedText:'class Shape { int X; }'}]";
+
+    /// <summary>Pushes <see cref="ShapeChangeModifiedFilesLiteral"/>.</summary>
+    public const string PushShapeChangeModifiedExpression =
+        "() => globalThis.updateMultiDiffFiles(" + HostExpressionBody + ", " + ShapeChangeModifiedFilesLiteral + ")";
+
+    /// <summary>
+    /// How many live models the widget holds for a path. Monaco drops a model from
+    /// <c>getModels()</c> the moment it is disposed, so this is how a disposal is observed --
+    /// both sides share the URI path and differ only in the authority.
+    /// </summary>
+    public const string LiveModelsForPathExpression =
+        "(path) => monaco.editor.getModels()" +
+        ".filter(m => m.uri.scheme === 'multidiff' && m.uri.path === '/' + path).length";
 }
