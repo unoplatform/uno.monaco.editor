@@ -39,3 +39,20 @@ MonacoEditorComponent/Monaco/CancellationTokenSource.cs
 
 # Disposable conflicts with System.IDisposable patterns
 MonacoEditorComponent/Monaco/Disposable.cs
+
+# Diff editor types, hand-authored because the emitter cannot express their shape:
+# DiffEditorOptions has INotifyPropertyChanged + dictionary backing (like
+# StandaloneEditorConstructionOptions) and implements only IDiffEditorBaseOptions;
+# the *Options value objects stand in for upstream inline object literals; and the
+# Change hierarchy uses class inheritance plus an explicit interface implementation
+# where the emitter would emit three flat, unrelated classes.
+MonacoEditorComponent/Monaco/Editor/DiffEditorOptions.cs
+MonacoEditorComponent/Monaco/Editor/DiffEditorExperimentalOptions.cs
+MonacoEditorComponent/Monaco/Editor/DiffEditorHideUnchangedRegionsOptions.cs
+MonacoEditorComponent/Monaco/Editor/Change.cs
+MonacoEditorComponent/Monaco/Editor/CharChange.cs
+MonacoEditorComponent/Monaco/Editor/LineChange.cs
+
+# IDiffEditorConstructionOptions deliberately omits upstream's overflowWidgetsDomNode
+# (an HTMLElement, meaningless across the bridge).
+MonacoEditorComponent/Monaco/Editor/IDiffEditorConstructionOptions.cs

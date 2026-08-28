@@ -35,7 +35,6 @@ public sealed class DesktopAppFixture : IAsyncLifetime
 {
     private const int CdpPollIntervalMs = 500;
     private const int CdpReadyTimeoutMs = 30_000;
-    private const int MonacoPageTimeoutMs = 10_000;
     // CI cold-start (Windows runner) can take significantly longer than local dev:
     // dotnet run launches the pre-built app, WebView2 initializes, then Monaco loads.
     // 15s was insufficient on CI run 21957402273; 60s provides adequate headroom.
@@ -67,13 +66,26 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     /// <summary>The Playwright page connected to the Monaco WebView2 content.</summary>
     public IPage Page { get; private set; } = null!;
 
+    /// <summary>
+    /// The page hosting the <c>DiffCodeEditor</c> sample. On desktop every editor control owns
+    /// its own WebView2, so this is a different page from <see cref="Page"/>.
+    /// </summary>
+    public IPage DiffPage { get; private set; } = null!;
+
     /// <summary>The Playwright browser context for tracing support.</summary>
     public IBrowserContext Context { get; private set; } = null!;
+
+    /// <summary>
+    /// The editor text the app settled on during its own initialisation, captured once before any
+    /// test ran. Tests asserting on first-load content must use this rather than reading the live
+    /// model, which every preceding test in the collection is free to overwrite.
+    /// </summary>
+    public string InitialEditorText { get; private set; } = string.Empty;
 
     public async ValueTask InitializeAsync()
     {
         // 0. Create Playwright instance (owned by this fixture).
-        EnsurePlaywrightDriverSearchPath();
+        PlaywrightDriverPath.Ensure();
         _playwright = await Playwright.CreateAsync();
 
         // 1. Pick a random available port for CDP.
@@ -109,6 +121,11 @@ public sealed class DesktopAppFixture : IAsyncLifetime
                 ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = $"--remote-debugging-port={_cdpPort}",
                 ["WEBVIEW2_USER_DATA_FOLDER"] = _userDataFolder,
                 ["MONACO_DIAGNOSTICS"] = "1",
+                // Realizes the DiffCodeEditor sample in an always-visible panel. A diff editor
+                // parked in a TabView tab is never constructed until a human selects the tab,
+                // and CDP drives WebView contents rather than the XAML tree, so there would be
+                // no way to reach it from a test.
+                ["MONACO_DIFF_TAB"] = "1",
             },
         };
 
@@ -153,26 +170,69 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         // 6. Connect Playwright via CDP.
         _browser = await _playwright!.Chromium.ConnectOverCDPAsync(cdpEndpoint);
 
-        // 7. Find the Monaco page.
-        Page = await FindMonacoPage();
+        // 7. Wait for both samples to report settled state, BEFORE going looking for their
+        // pages. Both markers are plain stdout lines served from the captured log buffer, so
+        // neither needs an IPage and both can gate page discovery rather than trail it.
+        //
+        // Ordering them first buys two things. Discovery below sweeps the live WebView2 page
+        // list, and a sweep that runs while hosts are still attaching races the driver (see
+        // SnapshotPages). More importantly, the plain-editor probe identifies its page by the
+        // ABSENCE of a diff editor, which only carries information once the diff editor
+        // exists: run it too early and whether the diff page can satisfy it comes down to the
+        // order in which monaco.editor.createDiffEditor registers the widget versus its two
+        // sub-editors. Waiting settles that question rather than betting on it.
+        //
+        // The three markers, in the order they can be reasoned about:
+        //
+        // TEST_HARNESS_READY  -- EditorControl finished its async setup (command/action
+        //   registration, language registration, markers, decorations, theme switching).
+        // APP_INIT_SETTLED    -- EditorControl joined BOTH of its async void init chains and
+        //   read the value back through the editor. TEST_HARNESS_READY covers only
+        //   Editor_Loaded; Editor_Loading independently fetches Content.txt and pushes it into
+        //   the model, and nothing orders the two, so the harness can report ready with a
+        //   write still in flight that will clobber whatever the first test wrote.
+        // DIFF_HARNESS_READY  -- DiffEditorControl computed its first diff and
+        //   GetLineChangesAsync returned hunks.
+        //
+        // APP_INIT_SETTLED does NOT subsume TEST_HARNESS_READY even though it is emitted later:
+        // it is signalled from a finally, so it also fires when harness registration threw. Both
+        // waits are kept so a half-registered harness fails here, naming the missing marker,
+        // rather than inside whichever test first depends on the registration.
+        //
+        // All three are Console.WriteLine, not Debug.WriteLine, which is compiled out of the
+        // Release builds this fixture runs.
+        await WaitForLogLineAfterAsync(0, @"TEST_HARNESS_READY", MonacoReadyTimeoutMs);
+        await WaitForLogLineAfterAsync(0, @"APP_INIT_SETTLED", MonacoReadyTimeoutMs);
+        await WaitForLogLineAfterAsync(0, @"DIFF_HARNESS_READY", MonacoReadyTimeoutMs);
+
+        // 8. Find the Monaco pages. Two WebView2 hosts are live (the plain editor sample and
+        // the diff sample) and they share a URL, so they are told apart by content.
+        // Excluding diff editors is not redundant: monaco.editor.getEditors() lists every code
+        // editor the service knows about, and a diff widget's two sub-editors are standalone
+        // code editors, so the diff page can satisfy a bare getEditors() probe too.
+        //
+        // No separate "wait for Monaco in the page" step follows: the probe that selected this
+        // page already required monaco to be defined with a live editor on it.
+        Page = await FindEditorPageAsync(
+            "monaco.editor.getEditors().length > 0 && monaco.editor.getDiffEditors().length === 0",
+            "plain editor");
+        DiffPage = await FindEditorPageAsync(
+            "monaco.editor.getDiffEditors().length > 0", "diff editor");
         Context = Page.Context;
 
-        // 8. Start tracing for failure artifact collection.
+        // 9. Start tracing for failure artifact collection.
         await Context.Tracing.StartAsync(new()
         {
             Screenshots = true,
             Snapshots = true,
         });
 
-        // 9. Wait for Monaco to be ready in the page.
-        await Page.WaitForFunctionAsync(
-            "() => typeof monaco !== 'undefined' && monaco.editor.getEditors().length > 0",
-            null, new PageWaitForFunctionOptions { Timeout = MonacoReadyTimeoutMs });
-
-        // 10. Wait for the test harness to complete all async setup (command/action
-        // registration, language registration, markers, decorations, theme switching).
-        // The harness emits TEST_HARNESS_READY as its final stdout marker.
-        await WaitForLogLineAfterAsync(0, @"TEST_HARNESS_READY", MonacoReadyTimeoutMs);
+        // 10. Snapshot the settled content for tests that assert on first-load state. Read
+        // through the standalone-editor filter rather than getEditors()[0]: the plain page has
+        // no diff widget so the two agree today, but the filter is what the rest of the suite
+        // uses to mean "the sample editor", and it stays correct if the page ever gains one.
+        InitialEditorText = await Page.EvaluateAsync<string>(
+            $"() => {DiffEditorCases.StandaloneEditorsExpressionBody}[0].getValue()");
     }
 
     public async ValueTask DisposeAsync()
@@ -714,78 +774,74 @@ public sealed class DesktopAppFixture : IAsyncLifetime
             Environment.NewLine + string.Join(Environment.NewLine, tail);
     }
 
-    private async Task<IPage> FindMonacoPage()
+    /// <summary>
+    /// Finds the WebView2 page whose Monaco instance satisfies <paramref name="readyExpression"/>.
+    /// </summary>
+    /// <remarks>
+    /// Probes page content rather than matching URLs: the app hosts more than one WebView2 and
+    /// they all navigate to the same editor.html, so a URL heuristic picks one at random. The
+    /// probe also doubles as a readiness wait, since a page that has not finished loading
+    /// Monaco simply fails to match.
+    /// </remarks>
+    private async Task<IPage> FindEditorPageAsync(string readyExpression, string description)
     {
-        var deadline = DateTime.UtcNow.AddMilliseconds(MonacoPageTimeoutMs);
+        var deadline = DateTime.UtcNow.AddMilliseconds(MonacoReadyTimeoutMs);
+        var probe = $"() => typeof monaco !== 'undefined' && {readyExpression}";
 
         while (DateTime.UtcNow < deadline)
         {
-            if (_browser?.Contexts.Count > 0)
+            foreach (var page in SnapshotPages())
             {
-                foreach (var context in _browser.Contexts)
+                try
                 {
-                    foreach (var page in context.Pages)
+                    if (page.Url.StartsWith("about:", StringComparison.OrdinalIgnoreCase))
                     {
-                        // The Monaco editor page will have a URL containing the virtual host
-                        // or a file:// URL pointing to the editor HTML.
-                        var url = page.Url;
-                        if (url.Contains("uno-monaco", StringComparison.OrdinalIgnoreCase) ||
-                            url.Contains("monaco", StringComparison.OrdinalIgnoreCase) ||
-                            url.Contains("index.html", StringComparison.OrdinalIgnoreCase))
-                        {
-                            return page;
-                        }
+                        continue;
                     }
 
-                    // If no URL match, return first non-blank page.
-                    foreach (var page in context.Pages)
+                    if (await page.EvaluateAsync<bool>(probe))
                     {
-                        if (!page.Url.StartsWith("about:", StringComparison.OrdinalIgnoreCase))
-                        {
-                            return page;
-                        }
+                        return page;
                     }
+                }
+                catch (PlaywrightException)
+                {
+                    // The page can be mid-navigation, not yet executing scripts, or already
+                    // gone since the snapshot was taken; the next sweep retries it.
+                    // PlaywrightException is the base of every failure this body can raise --
+                    // evaluation errors, destroyed execution contexts and TargetClosedException
+                    // all derive from it.
                 }
             }
 
-            await Task.Delay(500);
+            await Task.Delay(CdpPollIntervalMs);
         }
 
-        // Last resort: return whatever page exists.
-        if (_browser?.Contexts.Count > 0 && _browser.Contexts[0].Pages.Count > 0)
-        {
-            return _browser.Contexts[0].Pages[0];
-        }
-
+        var seen = string.Join(", ", SnapshotPages().Select(p => p.Url));
         throw new TimeoutException(
-            $"Could not find Monaco editor page within {MonacoPageTimeoutMs}ms. " +
-            "Check that the desktop app started correctly and WebView2 loaded the editor.");
+            $"Could not find the {description} page within {MonacoReadyTimeoutMs}ms. " +
+            $"Pages last seen: [{seen}]. Check that the desktop app started and WebView2 loaded the editor.");
     }
 
     /// <summary>
-    /// Points Playwright at the driver bundled in the Microsoft.Playwright NuGet package
-    /// (the .playwright/ folder) when <c>PLAYWRIGHT_DRIVER_SEARCH_PATH</c> is not already set.
-    /// The project excludes Playwright's build assets (see the .csproj), so the driver is not
-    /// copied next to the test DLL; CI sets this env var explicitly, and this makes local runs
-    /// work without manual setup. No-op when the env var is already set (e.g. on CI).
+    /// Takes a point-in-time copy of every page across the browser's contexts.
     /// </summary>
-    private static void EnsurePlaywrightDriverSearchPath()
-    {
-        const string envVar = "PLAYWRIGHT_DRIVER_SEARCH_PATH";
-        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(envVar)))
-        {
-            return;
-        }
+    /// <remarks>
+    /// <see cref="IBrowser.Contexts"/> and <see cref="IBrowserContext.Pages"/> hand back the
+    /// driver's own backing lists, and the driver appends to them from its dispatch loop as the
+    /// app's WebView2 hosts attach. Enumerating them directly across an await therefore throws
+    /// "Collection was modified", which is what took this fixture down in CI once the diff
+    /// sample added a second host that attaches while the first sweep is in flight. Copying
+    /// trades that for a possibly stale page reference, which callers already tolerate: every
+    /// call they make on a page is inside a <see cref="PlaywrightException"/> catch, and
+    /// TargetClosedException derives from it. The copy itself takes no enumerator over a live
+    /// list -- ToArray on a List-backed IReadOnlyList is a span/CopyTo bulk copy.
+    /// </remarks>
+    private IReadOnlyList<IPage> SnapshotPages() =>
+        (_browser?.Contexts ?? []).ToArray()
+            .SelectMany(context => context.Pages.ToArray())
+            .ToArray();
 
-        var packagePath = typeof(DesktopAppFixture).Assembly
-            .GetCustomAttributes<AssemblyMetadataAttribute>()
-            .FirstOrDefault(a => a.Key == "PlaywrightPackagePath")?.Value;
-
-        if (!string.IsNullOrEmpty(packagePath) && Directory.Exists(packagePath))
-        {
-            Environment.SetEnvironmentVariable(envVar, packagePath);
-        }
-    }
 
     private static int GetAvailablePort()
     {

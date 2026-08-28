@@ -11,6 +11,22 @@ export class EditorContext {
         return value;
     }
 
+    /**
+     * Register a diff editor for an element.
+     *
+     * The modified (right-hand) sub-editor is aliased onto `editor`, which
+     * monaco types as IStandaloneCodeEditor -- exactly what the field already
+     * declares. Every existing helper (updateContent, updateLanguage, addAction,
+     * decorations, selection tracking, the editor/getValue RPC handler) therefore
+     * keeps working unchanged, operating on the editable side of the diff.
+     */
+    public static registerDiffEditorForElement(element: any, diffEditor: monaco.editor.IStandaloneDiffEditor): EditorContext {
+        var value = EditorContext.getEditorForElement(element);
+        value.diffEditor = diffEditor;
+        value.editor = diffEditor.getModifiedEditor();
+        return value;
+    }
+
     public static getEditorForElement(element: any): EditorContext {
         var context = EditorContext._editors.get(element);
 
@@ -30,9 +46,18 @@ export class EditorContext {
         return EditorContext._editors.get(element);
     }
 
+    /**
+     * Reverse lookup used by every language-provider bridge to find the element a
+     * provider callback fired for.
+     *
+     * A diff editor owns two models, and providers registered for a language fire for
+     * both sides. Matching only `model` would return null for the original side, and
+     * the callers pass that null straight into the *creating* getEditorForElement,
+     * fabricating a junk context. Match both models.
+     */
     public static getElementFromModel(model: monaco.editor.ITextModel): any {
         for (let [key, value] of EditorContext._editors) {
-            if (value.model === model) {
+            if (value.model === model || value.originalModel === model) {
                 return key;
             }
         }
@@ -57,8 +82,14 @@ export class EditorContext {
     public Keyboard: any;
     public Theme: any;
 
+    /** The modified (right-hand) sub-editor when this context hosts a diff editor. */
     public editor: monaco.editor.IStandaloneCodeEditor;
+    /** The modified (right-hand) model when this context hosts a diff editor. */
     public model: monaco.editor.ITextModel;
+    /** Set only for a diff editor. Its absence is what marks a context as a plain editor. */
+    public diffEditor?: monaco.editor.IStandaloneDiffEditor;
+    /** The original (left-hand) model. Set only for a diff editor. */
+    public originalModel?: monaco.editor.ITextModel;
     public contexts: { [index: string]: monaco.editor.IContextKey<any> };
     public decorations: string[];
     public modifingSelection: boolean;
@@ -290,4 +321,96 @@ export const getThemeCurrentThemeName = (element: any): string =>
  */
 export const getThemeCurrentThemeNameAsync = async (element: any): Promise<string> => {
     return await EditorContext.getEditorForElement(element).Theme.getCurrentThemeNameAsync();
+};
+
+// ---------------------------------------------------------------------------
+// Diff editor helpers
+//
+// All of these are no-ops on a plain editor context, so a C# caller that reaches
+// for them against the wrong control degrades quietly instead of throwing across
+// the bridge.
+// ---------------------------------------------------------------------------
+
+/**
+ * Lay out the editor. Resolves to the diff widget when present -- laying out only
+ * the modified sub-editor leaves the original side and the split view stale.
+ */
+export const layoutEditor = function (element: any) {
+    var editorContext = EditorContext.tryGetEditorForElement(element);
+    if (!editorContext) {
+        return;
+    }
+
+    const target = editorContext.diffEditor ?? editorContext.editor;
+    if (target) {
+        target.layout();
+    }
+};
+
+/** Replace the original (left-hand) document. */
+export const updateOriginalContent = function (element: any, content: string) {
+    var editorContext = EditorContext.tryGetEditorForElement(element);
+    const model = editorContext?.originalModel;
+
+    if (model && content !== model.getValue()) {
+        model.setValue(content);
+    }
+};
+
+/** Set the syntax language of the original (left-hand) document. */
+export const updateOriginalLanguage = function (element: any, language: string) {
+    var editorContext = EditorContext.tryGetEditorForElement(element);
+
+    if (editorContext?.originalModel) {
+        monaco.editor.setModelLanguage(editorContext.originalModel, language);
+    }
+};
+
+/**
+ * Push diff-specific options (renderSideBySide, ignoreTrimWhitespace, diffAlgorithm,
+ * hideUnchangedRegions, ...). Deliberately separate from updateOptions, which targets
+ * the modified sub-editor -- the two option sets have different sinks and silently
+ * swallow each other's keys.
+ */
+export const updateDiffOptions = function (element: any, opt: any) {
+    var editorContext = EditorContext.tryGetEditorForElement(element);
+
+    if (editorContext?.diffEditor && opt !== null && typeof opt === "object") {
+        editorContext.diffEditor.updateOptions(opt);
+    }
+};
+
+/** Jump to the next or previous diff hunk. */
+export const goToDiff = function (element: any, target: string) {
+    var editorContext = EditorContext.tryGetEditorForElement(element);
+
+    editorContext?.diffEditor?.goToDiff(target === 'previous' ? 'previous' : 'next');
+};
+
+/** Scroll to the first diff hunk, waiting for the diff computation to finish. */
+export const revealFirstDiff = function (element: any) {
+    var editorContext = EditorContext.tryGetEditorForElement(element);
+
+    editorContext?.diffEditor?.revealFirstDiff();
+};
+
+/**
+ * The computed diff hunks. Pairs with the DiffUpdated callback, which fires whenever
+ * this value changes.
+ *
+ * Monaco returns null until the first computation completes, but null must not cross
+ * the bridge here: the WASM path coerces a falsy result to "" before serializing
+ * (`eval(...) || ""` in InvokeJS), and `""` then fails to deserialize as an array on
+ * the C# side and raises a spurious InternalException. Normalized to an empty array,
+ * which survives both transports -- callers distinguish "not computed yet" by not
+ * having seen DiffUpdated rather than by the return value.
+ */
+export const getLineChanges = function (element: any) {
+    var editorContext = EditorContext.tryGetEditorForElement(element);
+
+    if (!editorContext?.diffEditor) {
+        return [];
+    }
+
+    return editorContext.diffEditor.getLineChanges() ?? [];
 };

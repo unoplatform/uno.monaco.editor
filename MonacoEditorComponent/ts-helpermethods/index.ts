@@ -14,6 +14,7 @@ import * as monaco from 'monaco-editor';
 // Helper modules
 import {
     createMonacoEditor,
+    createMonacoDiffEditor,
     disposeEditor,
     InvokeJS,
     languageIdFromExtension,
@@ -33,6 +34,13 @@ import {
     updateContext,
     updateContent,
     updateDecorations,
+    layoutEditor,
+    updateOriginalContent,
+    updateOriginalLanguage,
+    updateDiffOptions,
+    goToDiff,
+    revealFirstDiff,
+    getLineChanges,
     updateStyle,
     getOptions,
     updateOptions,
@@ -71,6 +79,27 @@ import { createBridgeConnection, isDesktopHost, getConnection } from './bridge/j
 const isDesktop = isDesktopHost();
 
 /**
+ * Reduce a URL to its containing directory, with a trailing slash:
+ * ".../uno-monaco-helpers.js" -> ".../", and ".../editor.html" -> ".../".
+ *
+ * Both callers below concatenate a relative worker path onto the result, so the
+ * trailing slash is load-bearing -- without it "editor.html" + "workers/x.js" becomes
+ * "editor.htmlworkers/x.js" and every worker 404s. new URL() also drops any query or
+ * fragment, which a plain lastIndexOf('/') would leave behind; the substring is kept
+ * as a fallback for a scheme the URL constructor rejects.
+ */
+function _directoryOf(url: string): string {
+    if (!url) {
+        return '';
+    }
+    try {
+        return new URL('.', url).href;
+    } catch {
+        return url.substring(0, url.lastIndexOf('/') + 1);
+    }
+}
+
+/**
  * Resolve a worker URL relative to the main bundle script's location.
  *
  * Using the script's own URL as base (via document.currentScript.src) ensures
@@ -78,38 +107,55 @@ const isDesktop = isDesktopHost();
  * - Desktop: file:// or https://uno-monaco.example/ (relative to editor.html)
  * - WASM: subpath deployments where WasmScripts/ may be at a non-root path
  *
- * Falls back to document.baseURI if currentScript is unavailable (deferred scripts).
+ * Falls back to document.baseURI if currentScript is unavailable (module scripts,
+ * or execution from a callback rather than top-level). That is the *document* URL and
+ * normally carries a filename, so it goes through the same directory reduction --
+ * returning it whole is what produced ".../editor.htmlworkers/editor.worker.js".
  */
 const _scriptBase: string = (() => {
     const cs = (document as any).currentScript;
     if (cs && cs.src) {
-        // Strip filename to get the directory: ".../uno-monaco-helpers.js" -> ".../"
-        return cs.src.substring(0, cs.src.lastIndexOf('/') + 1);
+        return _directoryOf(cs.src);
     }
-    return document.baseURI || '';
+    return _directoryOf(document.baseURI || '');
 })();
 
+/**
+ * Desktop copies the worker bundles into a real "workers/" directory next to editor.html.
+ * On WASM they are embedded resources, and Uno.Wasm.Bootstrap's shell task flattens the
+ * path to a dot-joined name ("workers.editor.worker.js") in package_<hash>/ -- there is no
+ * "workers/" directory in the deployed output, so asking for one 404s.
+ */
 function resolveWorkerUrl(filename: string): string {
-    return _scriptBase + `workers/${filename}`;
+    return isDesktop
+        ? _scriptBase + `workers/${filename}`
+        : _scriptBase + `workers.${filename}`;
+}
+
+/** Map a Monaco language label to the worker bundle that serves it. */
+function workerFileName(label: string): string {
+    if (label === 'json') {
+        return 'json.worker.js';
+    }
+    if (label === 'css' || label === 'scss' || label === 'less') {
+        return 'css.worker.js';
+    }
+    if (label === 'html' || label === 'handlebars' || label === 'razor') {
+        return 'html.worker.js';
+    }
+    if (label === 'typescript' || label === 'javascript') {
+        return 'ts.worker.js';
+    }
+    // The default editor worker, which backs core services including diff computation.
+    return 'editor.worker.js';
 }
 
 (self as any).MonacoEnvironment = {
-    getWorkerUrl: function (_moduleId: string, label: string) {
-        // Map language labels to worker file names
-        if (label === 'json') {
-            return resolveWorkerUrl('json.worker.js');
-        }
-        if (label === 'css' || label === 'scss' || label === 'less') {
-            return resolveWorkerUrl('css.worker.js');
-        }
-        if (label === 'html' || label === 'handlebars' || label === 'razor') {
-            return resolveWorkerUrl('html.worker.js');
-        }
-        if (label === 'typescript' || label === 'javascript') {
-            return resolveWorkerUrl('ts.worker.js');
-        }
-        // Default editor worker
-        return resolveWorkerUrl('editor.worker.js');
+    // getWorker rather than getWorkerUrl: Monaco 0.52's ESM build constructs a getWorkerUrl
+    // result with { type: 'module' }, but these bundles are built as IIFE, so they are
+    // instantiated here as classic workers instead.
+    getWorker: function (_moduleId: string, label: string) {
+        return new Worker(resolveWorkerUrl(workerFileName(label)));
     }
 };
 
@@ -140,6 +186,7 @@ if (isDesktop) {
 
 // Core editor functions (referenced by [JSImport("globalThis.*")])
 globalThis.createMonacoEditor = createMonacoEditor;
+(globalThis as any).createMonacoDiffEditor = createMonacoDiffEditor;
 globalThis.InvokeJS = InvokeJS;
 globalThis.languageIdFromExtension = languageIdFromExtension;
 
@@ -159,6 +206,15 @@ globalThis.languageIdFromExtension = languageIdFromExtension;
 (globalThis as any).changeTheme = changeTheme;
 (globalThis as any).keyDown = keyDown;
 (globalThis as any).updateSelectedContent = updateSelectedContent;
+(globalThis as any).layoutEditor = layoutEditor;
+
+// Diff editor surface (DiffCodeEditor)
+(globalThis as any).updateOriginalContent = updateOriginalContent;
+(globalThis as any).updateOriginalLanguage = updateOriginalLanguage;
+(globalThis as any).updateDiffOptions = updateDiffOptions;
+(globalThis as any).goToDiff = goToDiff;
+(globalThis as any).revealFirstDiff = revealFirstDiff;
+(globalThis as any).getLineChanges = getLineChanges;
 
 // Provider registrations
 (globalThis as any).registerCodeActionProvider = registerCodeActionProvider;

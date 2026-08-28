@@ -36,6 +36,40 @@ namespace MonacoEditorTestApp
 
         private ContextKey? _myCondition;
 
+        #region App readiness signalling
+        /// <summary>
+        /// Completed when <see cref="Editor_Loading"/> has run to the end, successfully or not.
+        /// </summary>
+        private readonly TaskCompletionSource _loadingHandlerCompleted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        /// <summary>
+        /// Completed when <see cref="Editor_Loaded"/> has run to the end, successfully or not.
+        /// </summary>
+        private readonly TaskCompletionSource _loadedHandlerCompleted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        /// <summary>Guards <see cref="SignalAppReadyWhenInitCompletesAsync"/> against a second start.</summary>
+        private int _appReadySignalStarted;
+
+        /// <summary>
+        /// Final marker written to stdout (the browser console under WASM) once every async
+        /// initialisation path this control owns has finished AND the last write it issued has
+        /// been observed landing in Monaco.
+        /// </summary>
+        /// <remarks>
+        /// Integration fixtures gate on this. <c>TEST_HARNESS_READY</c> cannot serve that purpose:
+        /// it is emitted from <see cref="Editor_Loaded"/> only when <c>MONACO_DIAGNOSTICS=1</c>
+        /// (so never under WASM), and it proves the harness assigned <c>Editor.Text</c> -- not that
+        /// the assignment reached the model, nor that the independent <see cref="Editor_Loading"/>
+        /// chain, which pushes Content.txt, has finished. Both handlers are <c>async void</c>, so
+        /// neither the control nor the component awaits them and their completion order is
+        /// undefined. Tests that start before this marker race a late text push and read back the
+        /// wrong content.
+        /// </remarks>
+        public const string AppInitSettledMarker = "APP_INIT_SETTLED";
+        #endregion
+
         #region CSS Style Objects
         private readonly CssLineStyle CssLineDarkRed = new()
         {
@@ -81,6 +115,71 @@ namespace MonacoEditorTestApp
 
             Editor.InternalException += Editor_InternalException;
             Editor.PropertyChanged += Editor_PropertyChanged;
+
+            SignalAppReadyWhenInitCompletes();
+        }
+
+        /// <summary>
+        /// Starts the one-shot task that emits <see cref="AppInitSettledMarker"/>. Safe to call
+        /// more than once; only the first call starts anything.
+        /// </summary>
+        private void SignalAppReadyWhenInitCompletes()
+        {
+            if (Interlocked.Exchange(ref _appReadySignalStarted, 1) == 0)
+            {
+                _ = SignalAppReadyWhenInitCompletesAsync();
+            }
+        }
+
+        private async Task SignalAppReadyWhenInitCompletesAsync()
+        {
+            try
+            {
+                // Both handlers are async void, so this is the only place their completion is
+                // joined. Either may finish first.
+                await Task.WhenAll(_loadingHandlerCompleted.Task, _loadedHandlerCompleted.Task);
+
+                // Every text write above was issued but not necessarily observed landing. Reading
+                // the value back is a round-trip on the same ordered channel those writes used, so
+                // it cannot complete before they have been applied -- the marker then means the
+                // model has stopped changing on the app's account, not merely that the app stopped
+                // asking it to change.
+                //
+                // Deliberately not Editor.GetModel(): that returns the cached ModelHelper, which is
+                // only assigned on a later Loaded pass and was still null here on desktop, so it
+                // reported no length and drained nothing.
+                // Resolved through this control's own element, with a diff-aware fallback:
+                // under WASM both samples share one page and one monaco instance, so
+                // getEditors()[0] can be a sub-editor of the diff widget rather than this
+                // control's editor, and the length reported below would describe the wrong
+                // document. The ordering guarantee does not depend on which editor is read --
+                // any read on this channel flushes the writes ahead of it -- but the number in
+                // the marker is read by humans diagnosing a stuck fixture.
+                var settled = Editor is null
+                    ? null
+                    : await Editor.InvokeScriptAsync(
+                        """
+                        (() => {
+                            const context = typeof EditorContext !== 'undefined' && EditorContext.getEditorForElement
+                                ? EditorContext.getEditorForElement(element)
+                                : null;
+                            const subs = new Set(monaco.editor.getDiffEditors()
+                                .flatMap(d => [d.getOriginalEditor(), d.getModifiedEditor()]));
+                            const editor = context && context.editor
+                                ? context.editor
+                                : (monaco.editor.getEditors().find(e => !subs.has(e)) ?? null);
+                            return editor ? editor.getValue().length : -1;
+                        })()
+                        """);
+
+                Console.WriteLine($"{AppInitSettledMarker}:length={settled ?? "unavailable"}");
+            }
+            catch (Exception ex)
+            {
+                // Emit the marker regardless: a fixture blocked on it would otherwise sit until its
+                // own timeout with nothing explaining why.
+                Console.WriteLine($"{AppInitSettledMarker}:error={ex.GetType().Name}:{ex.Message}");
+            }
         }
 
         private void Editor_Unloaded(object sender, RoutedEventArgs e)
@@ -93,7 +192,7 @@ namespace MonacoEditorTestApp
             Debug.WriteLine("Property changed - " + e.PropertyName);
         }
 
-        private void Editor_InternalException(CodeEditor sender, Exception args)
+        private void Editor_InternalException(CodeEditorBase sender, Exception args)
         {
             // This shouldn't happen, if it does, then it's a bug.
         }
@@ -103,6 +202,7 @@ namespace MonacoEditorTestApp
         {
             if (Editor is null)
             {
+                _loadingHandlerCompleted.TrySetResult();
                 return;
             }
 
@@ -231,9 +331,27 @@ namespace MonacoEditorTestApp
             {
                 Debug.WriteLine($"Editor_Loading failed: {ex}");
             }
+            finally
+            {
+                _loadingHandlerCompleted.TrySetResult();
+            }
         }
 
         private async void Editor_Loaded(object sender, RoutedEventArgs e)
+        {
+            // Body split out so the readiness signal fires on every exit path, including the
+            // MONACO_DIAGNOSTICS early return that the WASM run always takes.
+            try
+            {
+                await Editor_LoadedCoreAsync();
+            }
+            finally
+            {
+                _loadedHandlerCompleted.TrySetResult();
+            }
+        }
+
+        private async Task Editor_LoadedCoreAsync()
         {
             // Populated here rather than in Editor_Loading: script calls are gated on the
             // editor being initialized, which only happens once loading completes. Not
@@ -587,7 +705,7 @@ namespace MonacoEditorTestApp
                 .Replace("\r", "\\r", StringComparison.Ordinal)
                 .Replace("\n", "\\n", StringComparison.Ordinal)}\"";
 
-        private void Editor_OpenLinkRequest(CodeEditor sender, OpenLinkRequestedEventArgs args)
+        private void Editor_OpenLinkRequest(CodeEditorBase sender, OpenLinkRequestedEventArgs args)
         {
             if (this.AllowWeb.IsChecked == false)
             {
@@ -663,7 +781,7 @@ namespace MonacoEditorTestApp
         }
 
         // Note: Can't make this method async as otherwise handled won't be read for intercepts.
-        private void Editor_KeyDown(CodeEditor sender, WebKeyEventArgs e)
+        private void Editor_KeyDown(CodeEditorBase sender, WebKeyEventArgs e)
         {
             Debug.WriteLine("KeyDown: " + e.KeyCode + " " + e.CtrlKey);
 

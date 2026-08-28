@@ -30,7 +30,9 @@ Key layers from top to bottom:
 | Layer | Responsibility |
 |-------|---------------|
 | **C# Application** | Consumes `CodeEditor` control, sets properties, subscribes to events |
-| **CodeEditor** | Templated `Control`; owns lifecycle, property sync, bridge helper wiring |
+| **CodeEditorBase** | Abstract templated `Control`; owns lifecycle, property sync, bridge helper wiring |
+| **CodeEditor** | Thin single-document subclass of `CodeEditorBase`; adds the `Text` property |
+| **DiffCodeEditor** | Side-by-side diff subclass of `CodeEditorBase`; adds the `OriginalText`/`ModifiedText` properties |
 | **ICodeEditorPresenter** | Abstraction over the web host; two implementations selected by platform |
 | **WasmCodeEditorPresenter** | WASM: wraps `BrowserHtmlElement` (iframe-like DOM element) |
 | **DesktopCodeEditorPresenter** | Desktop (Skia): wraps `WebView2` with CoreWebView2 |
@@ -145,7 +147,7 @@ sequenceDiagram
 
 ### Platform API Parity
 
-All public `CodeEditor` APIs work identically on WASM and desktop. The unified `InvokeMethodAsync` on `ICodeEditorPresenter` handles element resolution per-platform, ensuring scripts reference the correct editor element on both transport paths.
+All public `CodeEditorBase` APIs work identically on WASM and desktop. The unified `InvokeMethodAsync` on `ICodeEditorPresenter` handles element resolution per-platform, ensuring scripts reference the correct editor element on both transport paths.
 
 | API | WASM | Desktop | Notes |
 |-----|------|---------|-------|
@@ -211,7 +213,9 @@ See [bridge-protocol.md](../MonacoEditorComponent/DesktopContent/bridge-protocol
 
 ## Presenter Pattern
 
-The presenter pattern decouples the `CodeEditor` control from platform-specific web host implementations.
+The presenter pattern decouples the editor control from platform-specific web host implementations.
+`CodeEditorBase` holds the presenter and every bridge helper, so the presenter contract is shared by
+every derived control -- `CodeEditor` for a single document, `DiffCodeEditor` for a side-by-side diff.
 
 ```mermaid
 classDiagram
@@ -221,7 +225,7 @@ classDiagram
         +ElementId : string
         +IsLoaded : bool
         +IsSettingValue : bool
-        +ParentCodeEditor : CodeEditor?
+        +ParentCodeEditor : CodeEditorBase?
         +DispatcherQueue : DispatcherQueue
         +Launch() Task
         +InvokeScriptAsync(script) Task~string~
@@ -251,19 +255,54 @@ classDiagram
         +Rpc : JsonRpc? (internal)
     }
 
-    class CodeEditor {
+    class CodeEditorBase {
+        <<abstract>>
         -_view : ICodeEditorPresenter?
         -_parentAccessor : IParentAccessor?
         -_themeListener : IThemeListener?
         -_keyboardListener : IKeyboardListener?
         -_debugLogger : IDebugLogger?
         +RenderingBackend : RenderingBackend
+        #BootstrapFunctionName : string
+        #IsDiffEditor : bool
+        #PrimaryText : string?
+        #BuildInitialStateMap() Dictionary
+        #ApplyInitialPropertyValues() Task
+        #RegisterBridgeCallbacks(accessor) void
+    }
+
+    class CodeEditor {
+        +Text : string
+    }
+
+    class DiffCodeEditor {
+        +OriginalText : string
+        +ModifiedText : string
+        +OriginalLanguage : string?
+        +DiffOptions : DiffEditorOptions
+        +DiffUpdated : event
+        +GoToDiffAsync(direction) Task
+        +GetLineChangesAsync() Task~LineChange[]~
     }
 
     ICodeEditorPresenter <|.. WasmCodeEditorPresenter
     ICodeEditorPresenter <|.. DesktopCodeEditorPresenter
-    CodeEditor o-- ICodeEditorPresenter : _view
+    CodeEditorBase <|-- CodeEditor
+    CodeEditorBase <|-- DiffCodeEditor
+    CodeEditorBase o-- ICodeEditorPresenter : _view
 ```
+
+`CodeEditorBase` owns everything identical across editor flavors: presenter creation and reuse,
+the initialization handshake and its recovery paths, the bridge helpers, theming, decorations,
+markers, and script invocation. A derived control supplies only its bootstrap entry point and
+its own text properties, so adding one costs no new lifecycle code.
+
+`DiffCodeEditor` bootstraps through `createMonacoDiffEditor` instead of `createMonacoEditor`. On
+the JS side the diff widget's modified sub-editor is aliased onto `EditorContext.editor` -- it is
+already an `IStandaloneCodeEditor`, the field's declared type -- so every existing helper
+(`updateContent`, `updateLanguage`, decorations, selection tracking, the `editor/getValue` RPC
+handler) operates unchanged on the editable side of the diff. No JSON-RPC method was added for
+the diff editor; `DiffUpdated` rides the existing `parentAccessor/callAction`.
 
 ### Bridge Helpers
 
@@ -416,8 +455,8 @@ The JavaScript side is built as a single IIFE bundle (`uno-monaco-helpers.js`) f
 
 | Module | Responsibility |
 |--------|---------------|
-| `index.ts` | Entry point; imports Monaco ESM, configures workers, assigns ~40 functions to `globalThis`, auto-inits bridge on desktop |
-| `asyncCallbackHelpers.ts` | `createMonacoEditor`, `InvokeJS`, sanitize/desanitize, parent accessor call helpers |
+| `index.ts` | Entry point; imports Monaco ESM, configures workers via `MonacoEnvironment.getWorker`, assigns ~50 functions to `globalThis`, auto-inits bridge on desktop |
+| `asyncCallbackHelpers.ts` | `createMonacoEditor` / `createMonacoDiffEditor` over a shared bootstrap and a shared `attachEditorRuntime`, `InvokeJS`, sanitize/desanitize, parent accessor call helpers |
 | `otherScriptsToBeOrganized.ts` | `EditorContext`, editor manipulation functions (updateContent, updateOptions, etc.), theme accessor helpers |
 | `registerCompletionItemProvider.ts` | Completion provider bridge |
 | `registerCodeActionProvider.ts` | Code action provider bridge |

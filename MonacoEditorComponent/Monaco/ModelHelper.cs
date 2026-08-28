@@ -5,13 +5,13 @@ using Monaco.Serialization;
 namespace Monaco.Editor;
 
 /// <summary>
-/// Helper to access IModel interface methods off of CodeEditor object.
+/// Helper to access IModel interface methods off of CodeEditorBase object.
 /// <see href="https://microsoft.github.io/monaco-editor/typedoc/types/editor_editor_api.editor.IModel.html">monaco.editor.IModel</see>,
 /// <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor_editor_api.editor.ITextModel.html">monaco.editor.ITextModel</see>
 /// </summary>
-public sealed class ModelHelper(CodeEditor editor) : IModel
+public sealed class ModelHelper(CodeEditorBase editor) : IModel
 {
-    private readonly WeakReference<CodeEditor> _editor = new(editor);
+    private readonly WeakReference<CodeEditorBase> _editor = new(editor);
 
     public string Id => throw new NotImplementedException();
 

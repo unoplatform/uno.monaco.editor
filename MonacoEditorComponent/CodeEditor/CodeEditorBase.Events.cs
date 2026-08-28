@@ -14,9 +14,9 @@ using Windows.Foundation;
 
 namespace Monaco
 {
-    public partial class CodeEditor
+    public abstract partial class CodeEditorBase
     {
-        // Override default Loaded/Loading event so we can make sure we've initialized our WebView contents with the CodeEditor.
+        // Override default Loaded/Loading event so we can make sure we've initialized our WebView contents with the CodeEditorBase.
 
         /// <summary>
         /// Occurs when the editor begins initialization. The Monaco instance is not yet
@@ -35,13 +35,13 @@ namespace Monaco
         /// <see cref="OpenLinkRequestedEventArgs.Handled"/> to <see langword="true"/> to
         /// prevent the default navigation behavior.
         /// </summary>
-        public event TypedEventHandler<CodeEditor, OpenLinkRequestedEventArgs>? OpenLinkRequested;
+        public event TypedEventHandler<CodeEditorBase, OpenLinkRequestedEventArgs>? OpenLinkRequested;
 
         /// <summary>
         /// Occurs when an internal exception is encountered while executing a script command.
         /// Subscribe to this event for diagnostics and error reporting.
         /// </summary>
-        public event TypedEventHandler<CodeEditor, Exception>? InternalException;
+        public event TypedEventHandler<CodeEditorBase, Exception>? InternalException;
 
         /// <summary>
         /// Occurs when a key is pressed inside the Monaco editor.
@@ -51,6 +51,7 @@ namespace Monaco
         public new event WebKeyEventHandler? KeyDown;
 
         private IThemeListener? _themeListener;
+        private bool _codeEditorLoadedInFlight;
         private EditorLifecycleState _lifecycleState = EditorLifecycleState.Unloaded;
         private int _desktopInitTimeoutRetryCount;
 
@@ -228,34 +229,41 @@ namespace Monaco
         /// This eliminates async RPC round-trips during init -- JS uses the provided
         /// values directly instead of calling back to C# for each property.
         /// </summary>
-        private string BuildInitialStateJson()
+        protected virtual string BuildInitialStateJson()
+        {
+            // Use FallbackOptions (reflection-based) since the map holds loose object values
+            // rather than a registered type. Safe on desktop (native code, not AOT-WASM).
+            var json = JsonSerializer.Serialize(BuildInitialStateMap(), MonacoJsonContext.FallbackOptions);
+
+            DesktopCodeEditorPresenter.DiagnosticLog($"BuildInitialStateJson: {json}");
+            return json;
+        }
+
+        /// <summary>
+        /// Builds the initial-state values that <see cref="BuildInitialStateJson"/> serializes.
+        /// Derived controls override this to contribute their own keys rather than rebuilding
+        /// the theme resolution.
+        /// </summary>
+        /// <returns>
+        /// The state map. Keys are camelCase because they are consumed verbatim by the
+        /// <c>InitialState</c> interface in <c>asyncCallbackHelpers.ts</c> -- the serializer's
+        /// camelCase policy applies to properties, not to dictionary keys.
+        /// </returns>
+        protected virtual Dictionary<string, object?> BuildInitialStateMap()
         {
             var themeName = RequestedTheme == ElementTheme.Default
                 ? _themeListener?.CurrentThemeName ?? "Light"
                 : RequestedTheme.ToString();
-            var isHighContrast = _themeListener?.IsHighContrast ?? false;
-            var requestedTheme = (int)RequestedTheme;
 
-            // Build a JSON object with all the state JS needs at init time.
-            // Using raw JSON construction to avoid needing another STJ context.
-            var text = Text ?? string.Empty;
-            var language = CodeLanguage ?? "plaintext";
-            var readOnly = ReadOnly;
-
-            // Use FallbackOptions (reflection-based) since anonymous types are not registered
-            // in MonacoJsonContext. Safe on desktop (native code, not AOT-WASM).
-            var json = JsonSerializer.Serialize(new
+            return new Dictionary<string, object?>
             {
-                requestedTheme,
-                themeName,
-                isHighContrast,
-                text,
-                language,
-                readOnly
-            }, MonacoJsonContext.FallbackOptions);
-
-            DesktopCodeEditorPresenter.DiagnosticLog($"BuildInitialStateJson: {json}");
-            return json;
+                ["requestedTheme"] = (int)RequestedTheme,
+                ["themeName"] = themeName,
+                ["isHighContrast"] = _themeListener?.IsHighContrast ?? false,
+                ["text"] = PrimaryText ?? string.Empty,
+                ["language"] = CodeLanguage ?? "plaintext",
+                ["readOnly"] = ReadOnly,
+            };
         }
 
         /// <summary>
@@ -303,7 +311,7 @@ namespace Monaco
         {
             try
             {
-                await presenter.InvokeScriptAsync(BuildCreateMonacoEditorScript(escapedState));
+                await presenter.InvokeScriptAsync(BuildCreateMonacoEditorScript(BootstrapFunctionName, escapedState));
                 DesktopCodeEditorPresenter.DiagnosticLog($"{source}: createMonacoEditor invoked on desktop");
             }
             catch (Exception ex)
@@ -315,7 +323,10 @@ namespace Monaco
         }
 
         internal static string BuildCreateMonacoEditorScript(string escapedState)
-            => $"void createMonacoEditor(null, 'editor-container', '', {escapedState})";
+            => BuildCreateMonacoEditorScript("createMonacoEditor", escapedState);
+
+        internal static string BuildCreateMonacoEditorScript(string bootstrapFunctionName, string escapedState)
+            => $"void {bootstrapFunctionName}(null, 'editor-container', '', {escapedState})";
 
         /// <summary>
         /// Timeout fallback: if CodeEditorLoaded never fires within 30 seconds
@@ -698,7 +709,7 @@ namespace Monaco
                         $"Unsupported presenter type: {_view.GetType().Name}");
                 }
 
-                _parentAccessor?.RegisterAction("Loaded", CodeEditorLoaded);
+                RegisterBridgeCallbacks(_parentAccessor);
 
                 _themeListener.ThemeChanged += ThemeListener_ThemeChanged;
                 _themeToken = RegisterPropertyChangedCallback(RequestedThemeProperty, RequestedTheme_PropertyChanged);
@@ -735,6 +746,19 @@ namespace Monaco
                 return;
             }
 
+            // Re-entrancy guard. Both the "Loaded" bridge callback and
+            // MonitorDesktopInitCompletionAsync's probe can arrive for the same bootstrap, and
+            // the state this method transitions on is only updated after two awaits -- so a
+            // probe landing inside that window still passes the guard above and runs the whole
+            // body a second time, re-applying every initial property and potentially raising
+            // EditorLoaded twice for one initialization cycle.
+            if (_codeEditorLoadedInFlight)
+            {
+                Debug.WriteLine("CodeEditorLoaded: ignoring (already in flight for this bootstrap)");
+                return;
+            }
+
+            _codeEditorLoadedInFlight = true;
             try
             {
                 _view = _view ?? throw new InvalidOperationException("The view not set");
@@ -744,11 +768,18 @@ namespace Monaco
                 // applying initial properties.
                 _initialized = true;
 
-                // Emit canonical init-complete marker for diagnostics (always visible).
-                Debug.WriteLine("INIT_COMPLETE");
+                // Emit canonical init-complete marker for diagnostics.
+                //
+                // Through DiagnosticLog, not Debug.WriteLine: Debug.WriteLine is
+                // [Conditional("DEBUG")] and so compiles out of the Release builds the desktop
+                // integration suite runs against, where this marker is the evidence that
+                // CodeEditorLoaded ran. Qualified by control type so a host with more than one
+                // editor can tell which one initialized, and so the marker cannot be confused
+                // with INIT_COMPLETE_PROBE on a substring match.
+                DesktopCodeEditorPresenter.DiagnosticLog($"INIT_COMPLETE:{GetType().Name}");
 
                 // Layout first to ensure the editor dimensions are correct.
-                await SendScriptAsync("EditorContext.getEditorForElement(element).editor.layout();");
+                await SendScriptAsync("layoutEditor(element);");
 
                 // Apply all current property values in the correct order
                 // This ensures properties set before IsEditorLoaded=true take effect
@@ -772,7 +803,7 @@ namespace Monaco
                 _pendingDesktopBootstrapAfterLoad = false;
 
                 // Defer focus until after init is fully complete to avoid focus ping-pong.
-                // Only focus if this CodeEditor is the currently focused element.
+                // Only focus if this CodeEditorBase is the currently focused element.
 #pragma warning disable CS0618 // Type or member is obsolete
                 if (FocusManager.GetFocusedElement() == this)
                 {
@@ -789,6 +820,10 @@ namespace Monaco
                 Debug.WriteLine($"CodeEditorLoaded failed: {ex}");
                 InternalException?.Invoke(this, ex);
             }
+            finally
+            {
+                _codeEditorLoadedInFlight = false;
+            }
         }
 
         /// <summary>
@@ -796,7 +831,7 @@ namespace Monaco
         /// Called during initialization to ensure properties set before IsEditorLoaded=true take effect.
         /// Order matters: language/options must be set before content for proper syntax highlighting.
         /// </summary>
-        private async Task ApplyInitialPropertyValues()
+        protected virtual async Task ApplyInitialPropertyValues()
         {
             // 1. Apply language and options first (includes ReadOnly, GlyphMargin)
             if (!string.IsNullOrEmpty(CodeLanguage))
@@ -821,7 +856,7 @@ namespace Monaco
             // 3. Apply content after language is configured.
             // Always send values (including empty string) so Monaco state is
             // synchronized on reload -- skipping empty would leave stale content.
-            await InvokeScriptAsync("updateContent", Text ?? string.Empty);
+            await InvokeScriptAsync("updateContent", PrimaryText ?? string.Empty);
             await InvokeScriptAsync("updateSelectedContent", SelectedText ?? string.Empty);
 
             // 4. Apply decorations and markers last
@@ -855,7 +890,7 @@ namespace Monaco
 
         private async void RequestedTheme_PropertyChanged(DependencyObject? obj, DependencyProperty property)
         {
-            if (obj is CodeEditor editor
+            if (obj is CodeEditorBase editor
                 && _themeListener is { } listener)
             {
                 var theme = editor.RequestedTheme;

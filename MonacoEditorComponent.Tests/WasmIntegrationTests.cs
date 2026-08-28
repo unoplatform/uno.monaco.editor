@@ -20,6 +20,8 @@ namespace MonacoEditorComponent.Tests;
 [Collection("WasmPlaywright")]
 public sealed class WasmIntegrationTests : IAsyncLifetime
 {
+    private const int DiffTimeoutMs = 30_000;
+
     private readonly WasmAppFixture _fixture;
     private string _currentTestName = "unknown";
     private bool _testFailed;
@@ -29,10 +31,13 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
         _fixture = fixture;
     }
 
-    public ValueTask InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _testFailed = false;
-        return ValueTask.CompletedTask;
+
+        // The collection shares one page, and xUnit does not fix the order tests run in, so
+        // every test starts from a state some other test left behind unless it is reset here.
+        await _fixture.ResetEditorStateAsync();
     }
 
     public async ValueTask DisposeAsync()
@@ -40,6 +45,31 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
         if (_testFailed)
         {
             await _fixture.CaptureFailureArtifacts(_currentTestName);
+        }
+    }
+
+    /// <summary>
+    /// Regression guard for the fixture's readiness contract. Before the app emitted
+    /// <c>APP_INIT_SETTLED</c>, the fixture released tests as soon as a Monaco instance existed,
+    /// while <c>EditorControl.Editor_Loading</c> was still fetching Content.txt and pushing it
+    /// into the model. A test writing in that window had its write overwritten -- CI run
+    /// 32854772712 failed exactly that way. If the gate regresses, the app's text has not landed
+    /// by the time this runs and the snapshot is empty or wrong.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "WasmPlaywright")]
+    public void AppInitialisation_TextHasLandedBeforeTestsRun()
+    {
+        _currentTestName = nameof(AppInitialisation_TextHasLandedBeforeTestsRun);
+        try
+        {
+            // Contains rather than StartsWith: Content.txt carries a UTF-8 BOM.
+            Assert.Contains("public class Program", _fixture.InitialEditorText);
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
         }
     }
 
@@ -52,9 +82,9 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
         {
             // The fixture already waits for Monaco ready.
             var editorCount = await _fixture.Page.EvaluateAsync<int>(
-                "() => monaco.editor.getEditors().length");
+                DiffEditorCases.StandaloneEditorCountExpression);
 
-            Assert.True(editorCount > 0, "Expected at least one Monaco editor instance.");
+            Assert.True(editorCount > 0, "Expected at least one standalone Monaco editor instance.");
         }
         catch
         {
@@ -72,13 +102,14 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
         {
             var testText = $"WASM Playwright test {Guid.NewGuid():N}";
 
-            // Set text via Monaco JS API.
+            // Target the plain editor explicitly: getEditors() also lists the diff widget's two
+            // sub-editors, so indexing into it would depend on construction order.
             await _fixture.Page.EvaluateAsync(
-                $"() => monaco.editor.getEditors()[0].setValue('{testText}')");
+                $"() => {DiffEditorCases.StandaloneEditorsExpressionBody}[0].setValue('{testText}')");
 
             // Read back via Monaco JS API.
             var readBack = await _fixture.Page.EvaluateAsync<string>(
-                "() => monaco.editor.getEditors()[0].getValue()");
+                $"() => {DiffEditorCases.StandaloneEditorsExpressionBody}[0].getValue()");
 
             Assert.Equal(testText, readBack);
         }
@@ -96,15 +127,17 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
         _currentTestName = nameof(LifecycleEvents_EditorLoadedExactlyOnce);
         try
         {
-            // Verify exactly one editor instance exists (lifecycle fired once, not duplicated).
+            // Verify exactly one plain editor instance exists (lifecycle fired once, not
+            // duplicated). Counted excluding diff sub-editors -- see
+            // DiffEditorCases.StandaloneEditorsExpressionBody.
             var editorCount = await _fixture.Page.EvaluateAsync<int>(
-                "() => monaco.editor.getEditors().length");
+                DiffEditorCases.StandaloneEditorCountExpression);
 
             Assert.Equal(1, editorCount);
 
             // Verify the editor has a model (fully loaded, not partial init).
             var hasModel = await _fixture.Page.EvaluateAsync<bool>(
-                "() => monaco.editor.getEditors()[0].getModel() !== null");
+                DiffEditorCases.StandaloneEditorHasModelExpression);
 
             Assert.True(hasModel, "Editor should have a model after lifecycle completes.");
         }
@@ -170,6 +203,132 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
                 DiffLanguageTokenizationCases.Sample);
 
             Assert.Equal(DiffLanguageTokenizationCases.ExpectedTokens, tokenTypes);
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Covers <c>DiffCodeEditor</c> end to end on WASM: both documents load independently,
+    /// the original side follows CodeLanguage, the widget renders, and the diff genuinely
+    /// recomputes when the modified document changes.
+    /// </summary>
+    /// <remarks>
+    /// The diff itself is computed by Monaco's editor web worker, which is embedded and served
+    /// on WASM precisely because of this control -- without a reachable worker the computation
+    /// never resolves and no hunk is ever produced. This test is therefore also the end-to-end
+    /// check that the worker is actually delivered and reachable under the Uno.Wasm.Bootstrap
+    /// package layout. See <see cref="DiffEditorCases"/>.
+    /// </remarks>
+    [Fact]
+    [Trait("Category", "WasmPlaywright")]
+    public async Task DiffEditor_LoadsBothSidesAndRecomputesOnEdit()
+    {
+        _currentTestName = nameof(DiffEditor_LoadsBothSidesAndRecomputesOnEdit);
+        try
+        {
+            await _fixture.Page.WaitForFunctionAsync(
+                DiffEditorCases.HasComputedDiffExpression,
+                null, new PageWaitForFunctionOptions { Timeout = DiffTimeoutMs });
+
+            Assert.True(
+                await _fixture.Page.EvaluateAsync<bool>(DiffEditorCases.ModelsAreDistinctExpression),
+                "The original and modified sides must be backed by distinct models.");
+
+            Assert.True(
+                await _fixture.Page.EvaluateAsync<bool>(DiffEditorCases.DiffEditorRootExpression),
+                "Expected Monaco's .monaco-diff-editor root element on the page.");
+
+            var original = await _fixture.Page.EvaluateAsync<string>(DiffEditorCases.OriginalValueExpression);
+            var modified = await _fixture.Page.EvaluateAsync<string>(DiffEditorCases.ModifiedValueExpression);
+
+            Assert.NotEqual(original, modified);
+            Assert.StartsWith(DiffEditorCases.SharedFirstLine, original);
+            Assert.StartsWith(DiffEditorCases.SharedFirstLine, modified);
+
+            // OriginalLanguage is unset on the sample, so the original side must follow
+            // CodeLanguage. Nothing on the base forwards language to the original model, so
+            // this is what keeps DiffCodeEditor's own forwarding honest.
+            Assert.Equal("csharp", await _fixture.Page.EvaluateAsync<string>(DiffEditorCases.OriginalLanguageExpression));
+            Assert.Equal("csharp", await _fixture.Page.EvaluateAsync<string>(DiffEditorCases.ModifiedLanguageExpression));
+
+            // Make the sides identical: the hunk count must fall to zero, proving the diff is
+            // recomputed rather than captured once at construction.
+            await _fixture.Page.EvaluateAsync(DiffEditorCases.SetModifiedValueExpression, original);
+            await _fixture.Page.WaitForFunctionAsync(
+                DiffEditorCases.NoRemainingHunksExpression,
+                null, new PageWaitForFunctionOptions { Timeout = DiffTimeoutMs });
+
+            // Restore, so the shared page is left as other tests in this collection expect.
+            await _fixture.Page.EvaluateAsync(DiffEditorCases.SetModifiedValueExpression, modified);
+            await _fixture.Page.WaitForFunctionAsync(
+                DiffEditorCases.HasComputedDiffExpression,
+                null, new PageWaitForFunctionOptions { Timeout = DiffTimeoutMs });
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// The two documents lock independently -- <c>OriginalEditable</c> governs the original side
+    /// and the inherited <c>ReadOnly</c> the modified one -- and the sample leaves both at their
+    /// defaults, so the original must come up read-only and the modified writable.
+    /// </summary>
+    /// <remarks>
+    /// Nothing here drives <c>OriginalEditable</c> itself: the sample's toggle is a XAML control,
+    /// which CDP cannot reach on desktop, so the two sides' default arrangement is what the
+    /// integration suite can pin. The pass-through in both directions is covered by the sample
+    /// manually instead.
+    /// </remarks>
+    [Fact]
+    [Trait("Category", "WasmPlaywright")]
+    public async Task DiffEditor_LocksTheOriginalSideOnly()
+    {
+        _currentTestName = nameof(DiffEditor_LocksTheOriginalSideOnly);
+        try
+        {
+            // The diff options arrive after construction on WASM, so wait rather than read
+            // once: a diff editor that is merely present may not have been configured yet.
+            await _fixture.Page.WaitForFunctionAsync(
+                DiffEditorCases.OriginalEditorLockedExpression,
+                null, new PageWaitForFunctionOptions { Timeout = DiffTimeoutMs });
+
+            Assert.False(
+                await _fixture.Page.EvaluateAsync<bool>(DiffEditorCases.ModifiedEditorReadOnlyExpression),
+                "The original side's lock must not leak onto the modified side, which ReadOnly governs.");
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Monaco's bundled stylesheet has to be delivered to the page, not merely embedded in the
+    /// assembly. It carries the layout rules and the codicon <c>@font-face</c>; without it the
+    /// editor still runs, because Monaco sets much of its geometry inline, so no other test in
+    /// this suite notices. What breaks is visual: icons render as tofu, action-bar lists keep
+    /// their default bullets, and the line-number margin loses its positioning.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "WasmPlaywright")]
+    public async Task MonacoStylesheet_IsDeliveredToThePage()
+    {
+        _currentTestName = nameof(MonacoStylesheet_IsDeliveredToThePage);
+        try
+        {
+            Assert.True(
+                await _fixture.Page.EvaluateAsync<bool>(DiffEditorCases.MonacoStylesheetAppliedExpression),
+                "Monaco's stylesheet did not reach the document: no exact '.monaco-editor' rule, "
+                + "no 'position: relative' on the editor, or no codicon font face. On WASM this "
+                + "means the embedded resource is not under a WasmCSS logical name.");
         }
         catch
         {

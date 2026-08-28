@@ -68,26 +68,28 @@
 	</ItemGroup>
 
 	<!--
-		WASM: EmbeddedResource for main bundle + CSS.
+		WASM: EmbeddedResource for the main bundle, the CSS, and the editor worker.
 
-		The five worker bundles are deliberately NOT embedded. Uno.Wasm.Bootstrap's shell task
-		flattens WasmScripts\workers\ts.worker.js to the dot-joined name "workers.ts.worker.js"
-		in wwwroot/package_<hash>/, but MonacoEnvironment.getWorkerUrl (ts-helpermethods/index.ts)
-		resolves workers as "<scriptBase>workers/<name>.js" with a slash. No "workers/" directory
-		exists in the deployed output, so every worker request 404s and Monaco falls back to
-		main-thread language services. Verified in a browser: all five URLs returned 404 while
-		the flattened name returned 200, forcing a JSON model produced no markers, and Monaco
-		logged "Could not create web worker(s)".
+		The editor worker is required, not an optimization. The diff editor computes its diff
+		through EditorWorkerService, and without a reachable worker that computation never
+		completes: Monaco's documented "fall back to the main thread" path only triggers when
+		the Worker constructor throws, and a 404 URL fails asynchronously instead, so the
+		internal $ping never settles. Observed directly: the diff editor rendered both documents
+		correctly but produced no hunks and getLineChanges() stayed null, while the dev server
+		logged a 404 for package_<hash>/workers/editor.worker.js.
 
-		Embedding them therefore cost ~8.5 MB of download, main-thread parse time and resident
-		WASM linear memory for files that can never run as workers, and executing each bundle on
-		the main thread clobbered window.onmessage five times during boot.
+		The four language workers (json/css/html/ts) stay unembedded. They are ~8.2 MB of
+		download, main-thread parse time, and resident WASM linear memory, and nothing in the
+		component's supported surface requires them; their absence only degrades the built-in
+		language services for those four languages, which is the pre-existing behavior.
 
-		Re-add these entries together with the fix to the URL/name mismatch (and prefer a
-		getWorker override over getWorkerUrl, so the worker is constructed as a classic script
-		rather than the type:'module' Monaco 0.52 requests by default). Desktop is unaffected:
-		it gets its worker copies from the Content items below, next to editor.html, where a real
-		"workers/" subdirectory does exist.
+		Name mismatch, now handled in ts-helpermethods/index.ts: Uno.Wasm.Bootstrap's shell task
+		flattens the worker path to the dot-joined name "workers.editor.worker.js" in
+		wwwroot/package_&lt;hash&gt;/, with no "workers/" directory in the deployed output.
+		resolveWorkerUrl therefore requests the flattened name on WASM and the real subdirectory
+		on desktop, where the Content items below place the workers next to editor.html. index.ts
+		also overrides getWorker rather than getWorkerUrl, because Monaco 0.52's ESM build
+		constructs getWorkerUrl results with { type: 'module' } while these bundles are IIFE.
 
 		The CSS entry needs the WasmCSS logical name, not the WasmScripts one its file path
 		implies. Uno.Wasm.Bootstrap deploys and <link>s embedded resources whose manifest name
@@ -107,6 +109,7 @@
 		<EmbeddedResource Include="Properties\MonacoEditorComponent.rd.xml" />
 		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.js" />
 		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.css" LogicalName="$(RootNamespace).WasmCSS.uno-monaco-helpers.css" Condition="Exists('WasmScripts\uno-monaco-helpers.css')" />
+		<EmbeddedResource Include="WasmScripts\workers\editor.worker.js" />
 	</ItemGroup>
 
 	<!-- Desktop: Content files copied to output directory -->

@@ -69,6 +69,6 @@ namespace Monaco.Editor
         /// </summary>
         string? Precondition { get; }
 
-        void Run(CodeEditor editor, object[]? args);
+        void Run(CodeEditorBase editor, object[]? args);
     }
 }

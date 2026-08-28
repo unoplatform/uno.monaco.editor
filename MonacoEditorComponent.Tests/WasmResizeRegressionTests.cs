@@ -88,7 +88,8 @@ public sealed class WasmResizeRegressionTests
 
     /// <summary>
     /// Verifies that the <c>NativeMethods</c> nested type only contains the
-    /// expected methods (GetSrc, SetSrc, InitializeMonaco) and no others,
+    /// expected methods (GetSrc, SetSrc, InitializeMonaco, InitializeMonacoDiff) and no
+    /// others,
     /// preventing accidental re-introduction of removed interop methods.
     /// </summary>
     [Fact]
@@ -108,7 +109,7 @@ public sealed class WasmResizeRegressionTests
             .OrderBy(n => n)
             .ToArray();
 
-        var expectedMethods = new[] { "GetSrc", "InitializeMonaco", "SetSrc" };
+        var expectedMethods = new[] { "GetSrc", "InitializeMonaco", "InitializeMonacoDiff", "SetSrc" };
 
         Assert.Equal(expectedMethods, declaredMethods);
     }
