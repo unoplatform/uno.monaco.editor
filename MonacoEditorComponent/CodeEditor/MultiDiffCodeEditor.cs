@@ -220,11 +220,18 @@ namespace Monaco
             if (e.OldValue is IObservableVector<DiffFileEntry> oldValue)
             {
                 oldValue.VectorChanged -= Files_VectorChanged;
-                foreach (var entry in oldValue)
-                {
-                    entry.PropertyChanged -= File_PropertyChanged;
-                }
             }
+
+            // Unsubscribe through the same bookkeeping that subscribed, not by walking the old
+            // vector: an entry present in both collections would otherwise be detached here and
+            // then skipped by SyncFileSubscriptions, because _subscribedFiles still claims it.
+            // Editing that entry would silently stop reaching Monaco.
+            foreach (var entry in _subscribedFiles)
+            {
+                entry.PropertyChanged -= File_PropertyChanged;
+            }
+
+            _subscribedFiles.Clear();
 
             if (e.NewValue is IObservableVector<DiffFileEntry> value)
             {

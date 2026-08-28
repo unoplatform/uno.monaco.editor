@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Text.Json.Serialization;
 
 namespace Monaco;
 
@@ -103,12 +102,6 @@ public sealed class DiffFileEntry : INotifyPropertyChanged
         get => _collapsed;
         set => Set(ref _collapsed, value);
     }
-
-    /// <summary>
-    /// Whether both sides carry the same text -- a file listed with no changes.
-    /// </summary>
-    [JsonIgnore]
-    public bool IsUnchanged => OriginalText == ModifiedText;
 
     private void Set<T>(ref T field, T value, [CallerMemberName] string propertyName = "")
     {

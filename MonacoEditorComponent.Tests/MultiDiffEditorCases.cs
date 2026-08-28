@@ -81,12 +81,25 @@ internal static class MultiDiffEditorCases
         ".map(e => (e.querySelector('.status')?.textContent ?? '').trim())";
 
     /// <summary>
-    /// The number of computed hunks for each per-file diff editor inside the widget, or -1 for
-    /// one that has not finished computing.
+    /// The per-file diff editors of the sections currently on screen, as a JS array.
+    /// </summary>
+    /// <remarks>
+    /// Scoped to *visible* sections, not merely to editors inside the widget. The ObjectPool
+    /// parks recycled templates in the DOM with their diff model detached, so a parked editor is
+    /// still registered with the code editor service and still reports <c>getLineChanges() ===
+    /// null</c> forever -- which would make any "every editor has computed" wait unsatisfiable
+    /// after a push that shrank the list.
+    /// </remarks>
+    public const string LiveFileEditorsExpressionBody =
+        "monaco.editor.getDiffEditors().filter(d => { const entry = d.getContainerDomNode().closest('.multiDiffEntry');" +
+        " return entry !== null && getComputedStyle(entry).visibility !== 'hidden'; })";
+
+    /// <summary>
+    /// The number of computed hunks for each rendered file, or -1 for one that has not finished
+    /// computing.
     /// </summary>
     public const string PerFileHunkCountsExpression =
-        "() => monaco.editor.getDiffEditors()" +
-        ".filter(d => d.getContainerDomNode().closest('.multiDiffEditor'))" +
+        "() => " + LiveFileEditorsExpressionBody +
         ".map(d => { const c = d.getLineChanges(); return c === null ? -1 : c.length; })";
 
     /// <summary>
@@ -101,8 +114,7 @@ internal static class MultiDiffEditorCases
     /// view, not a general readiness check. Use <see cref="AnyEntryRenderedExpression"/> for that.
     /// </remarks>
     public const string AllDiffsComputedExpression =
-        "() => { const eds = monaco.editor.getDiffEditors()" +
-        ".filter(d => d.getContainerDomNode().closest('.multiDiffEditor'));" +
+        "() => { const eds = " + LiveFileEditorsExpressionBody + ";" +
         " return eds.length > 0 && eds.every(d => d.getLineChanges() !== null); }";
 
     /// <summary>
@@ -110,8 +122,7 @@ internal static class MultiDiffEditorCases
     /// viewer, and the two sides lock through different options, so both are checked.
     /// </summary>
     public const string AllFilesReadOnlyExpression =
-        "() => { const eds = monaco.editor.getDiffEditors()" +
-        ".filter(d => d.getContainerDomNode().closest('.multiDiffEditor'));" +
+        "() => { const eds = " + LiveFileEditorsExpressionBody + ";" +
         " return eds.length > 0 && eds.every(d =>" +
         " d.getModifiedEditor().getOption(monaco.editor.EditorOption.readOnly) === true" +
         " && d.getOriginalEditor().getOption(monaco.editor.EditorOption.readOnly) === true); }";
@@ -173,6 +184,53 @@ internal static class MultiDiffEditorCases
     /// <summary>Scrolls the file with the given path into view. Takes the path as its argument.</summary>
     public const string RevealPathExpression =
         "(path) => globalThis.revealMultiDiffFile(" + HostExpressionBody + ", path)";
+
+    /// <summary>
+    /// Three files tall enough to overflow any test viewport, so scrolling is real. Built with
+    /// <c>String.fromCharCode(10)</c> rather than an escaped newline to keep this readable as a
+    /// C# string literal.
+    /// </summary>
+    public const string TallProbeFilesLiteral =
+        "(() => { const NL = String.fromCharCode(10);" +
+        " const L = (n, tail) => Array.from({length: 40}, (_, i) => '// ' + n + ' line ' + i).join(NL) + (tail ? NL + tail : '');" +
+        " return [{path:'probe/one.cs',originalText:L('one'),modifiedText:L('one','// tail one')}," +
+        "{path:'probe/two.cs',originalText:L('two'),modifiedText:L('two','// tail two')}," +
+        "{path:'probe/three.cs',originalText:L('three'),modifiedText:L('three','// tail three')}]; })()";
+
+    /// <summary>
+    /// Pushes <see cref="TallProbeFilesLiteral"/>, optionally appending <paramref name="mutation"/>
+    /// to the first file's modified text -- a change to one file, with every path unchanged.
+    /// </summary>
+    public static string PushTallProbesExpression(string? mutation = null)
+    {
+        var body = mutation is null
+            ? TallProbeFilesLiteral
+            : $"(() => {{ const f = {TallProbeFilesLiteral}; f[0].modifiedText += '{mutation}'; return f; }})()";
+
+        return "() => globalThis.updateMultiDiffFiles(" + HostExpressionBody + ", " + body + ")";
+    }
+
+    /// <summary>
+    /// Two files that differ only in how their absent side is expressed: one <c>null</c>, one an
+    /// empty string. Pushed together so the badges can be compared directly.
+    /// </summary>
+    public const string NullVersusEmptyFilesLiteral =
+        "[{path:'probe/added.cs',originalText:null,modifiedText:'class Added { }'}," +
+        "{path:'probe/emptied.cs',originalText:'',modifiedText:'class Emptied { }'}]";
+
+    /// <summary>Pushes <see cref="NullVersusEmptyFilesLiteral"/>.</summary>
+    public const string PushNullVersusEmptyExpression =
+        "() => globalThis.updateMultiDiffFiles(" + HostExpressionBody + ", " + NullVersusEmptyFilesLiteral + ")";
+
+    /// <summary>Whether the file with the given path is collapsed. Takes the path as its argument.</summary>
+    public const string IsPathCollapsedExpression =
+        "(path) => { const e = " + VisibleEntriesExpressionBody +
+        ".find(x => (x.querySelector('.title.modified')?.textContent ?? '') === path);" +
+        " return e === undefined ? null : e.querySelector('.collapse-button .codicon-chevron-right') !== null; }";
+
+    /// <summary>Collapses or expands one file. Takes <c>[path, collapsed]</c> as its argument.</summary>
+    public const string SetCollapsedExpression =
+        "(a) => globalThis.setMultiDiffCollapsed(" + HostExpressionBody + ", a[0], a[1])";
 
     /// <summary>Collapses or expands every file. Takes the collapsed flag as its argument.</summary>
     public const string SetAllCollapsedExpression =

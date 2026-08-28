@@ -47,14 +47,32 @@ public sealed class DesktopMultiDiffEditorTests : IAsyncLifetime
         }
     }
 
+    /// <summary>
+    /// Brings the widget to a known state: present, showing the sample's four files, every diff
+    /// computed.
+    /// </summary>
+    /// <remarks>
+    /// The sample list is re-pushed rather than assumed, because the app is shared across the
+    /// whole DesktopCDP collection and several tests here drive their own file lists. Restoring
+    /// at the *start* of each test rather than in the previous one's finally means a test that
+    /// fails part-way cannot cascade into the rest -- which it otherwise does, since the readiness
+    /// gate is itself a wait on the widget's contents.
+    /// </remarks>
     private async Task WaitForSettledAsync()
     {
         await _fixture.MultiDiffPage.WaitForFunctionAsync(
             MultiDiffEditorCases.IsPresentExpression,
             null, new PageWaitForFunctionOptions { Timeout = MultiDiffTimeoutMs });
+
+        // Expand first: a collapsed file has its diff model detached, so the computed-diffs wait
+        // below could never be satisfied after a test that left the list collapsed.
+        await _fixture.MultiDiffPage.EvaluateAsync(MultiDiffEditorCases.SetAllCollapsedExpression, false);
+        await _fixture.MultiDiffPage.EvaluateAsync(MultiDiffEditorCases.RestoreSampleFilesExpression);
+
         await _fixture.MultiDiffPage.WaitForFunctionAsync(
             MultiDiffEditorCases.AnyEntryRenderedExpression,
             null, new PageWaitForFunctionOptions { Timeout = MultiDiffTimeoutMs });
+        await WaitForDiffsComputedAsync();
     }
 
     /// <summary>Waits for every expanded file to have finished computing its diff.</summary>
@@ -153,7 +171,6 @@ public sealed class DesktopMultiDiffEditorTests : IAsyncLifetime
         try
         {
             await WaitForSettledAsync();
-            await WaitForDiffsComputedAsync();
 
             var hunks = await _fixture.MultiDiffPage.EvaluateAsync<int[]>(
                 MultiDiffEditorCases.PerFileHunkCountsExpression);
@@ -180,7 +197,6 @@ public sealed class DesktopMultiDiffEditorTests : IAsyncLifetime
         try
         {
             await WaitForSettledAsync();
-            await WaitForDiffsComputedAsync();
 
             Assert.True(
                 await _fixture.MultiDiffPage.EvaluateAsync<bool>(MultiDiffEditorCases.AllFilesReadOnlyExpression),
@@ -305,16 +321,122 @@ public sealed class DesktopMultiDiffEditorTests : IAsyncLifetime
             finally
             {
                 page.PageError -= OnPageError;
-
-                // The app is shared across the collection and C# does not re-push on its own, so
-                // an equivalent list has to be put back for whichever test runs next.
-                await page.EvaluateAsync(MultiDiffEditorCases.RestoreSampleFilesExpression);
-                await WaitForDiffsComputedAsync();
             }
 
             // The sample's own list is what the baseline was measured against; the probe list is
             // deliberately smaller, so the two are not compared.
             _ = baseline;
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// A file's scroll position and collapsed state must survive a text change to a *different*
+    /// file.
+    /// </summary>
+    /// <remarks>
+    /// This is the only assertion that the push is genuinely incremental. Every change -- one
+    /// entry's text, an add, a remove -- re-sends the whole list, which is only acceptable
+    /// because <c>updateMultiDiffFiles</c> reconciles by path and hands Monaco the *same*
+    /// IDocumentDiffItem object for an unchanged file, so <c>mapObservableArrayCached</c> keeps
+    /// its view model. A regression to rebuilding everything renders identically and passes every
+    /// other test here, while silently resetting scroll and collapse on each keystroke.
+    /// </remarks>
+    [Fact]
+    [Trait("Category", "DesktopCDP")]
+    public async Task MultiDiffEditor_PreservesScrollAndCollapseAcrossAnUnrelatedEdit()
+    {
+        _currentTestName = nameof(MultiDiffEditor_PreservesScrollAndCollapseAcrossAnUnrelatedEdit);
+        try
+        {
+            await WaitForSettledAsync();
+            var page = _fixture.MultiDiffPage;
+
+            try
+            {
+                // Tall files, so there is real scrolling to preserve.
+                await page.EvaluateAsync(MultiDiffEditorCases.PushTallProbesExpression());
+                await WaitForDiffsComputedAsync();
+
+                const string target = "probe/three.cs";
+                await page.EvaluateAsync(MultiDiffEditorCases.RevealPathExpression, target);
+                await page.WaitForFunctionAsync(
+                    MultiDiffEditorCases.IsPathRenderedExpression, target,
+                    new PageWaitForFunctionOptions { Timeout = MultiDiffTimeoutMs });
+
+                await page.EvaluateAsync(MultiDiffEditorCases.SetCollapsedExpression, new object[] { target, true });
+                await page.WaitForFunctionAsync(
+                    MultiDiffEditorCases.IsPathCollapsedExpression, target,
+                    new PageWaitForFunctionOptions { Timeout = MultiDiffTimeoutMs });
+
+                // Change the FIRST file's text. Nothing about the third file changed, so neither
+                // its position in the scroll nor its collapsed state may move.
+                await page.EvaluateAsync(MultiDiffEditorCases.PushTallProbesExpression("// edited"));
+                await Task.Delay(1500);
+
+                Assert.True(
+                    await page.EvaluateAsync<bool>(MultiDiffEditorCases.IsPathRenderedExpression, target),
+                    "Editing another file scrolled the view away from the revealed file, so the push rebuilt the list instead of reconciling it.");
+                Assert.True(
+                    await page.EvaluateAsync<bool?>(MultiDiffEditorCases.IsPathCollapsedExpression, target),
+                    "Editing another file expanded a collapsed one, so its view model was recreated.");
+            }
+            finally
+            {
+                // WaitForSettledAsync restores the sample list for whichever test runs next, so
+                // there is nothing to undo here beyond letting this one's pushes drain.
+                await Task.Delay(200);
+            }
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// An absent side and an empty side must render differently: <c>null</c> earns the <c>A</c>
+    /// badge, <c>""</c> is an ordinary diff against an empty file.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "DesktopCDP")]
+    public async Task MultiDiffEditor_DistinguishesAnAbsentSideFromAnEmptyOne()
+    {
+        _currentTestName = nameof(MultiDiffEditor_DistinguishesAnAbsentSideFromAnEmptyOne);
+        try
+        {
+            await WaitForSettledAsync();
+            var page = _fixture.MultiDiffPage;
+
+            try
+            {
+                await page.EvaluateAsync(MultiDiffEditorCases.PushNullVersusEmptyExpression);
+                await WaitForDiffsComputedAsync();
+
+                foreach (var (path, badge) in new[] { ("probe/added.cs", "A"), ("probe/emptied.cs", string.Empty) })
+                {
+                    // Revealed first: the panel is short enough that the second file has no DOM
+                    // until it is scrolled to.
+                    await page.EvaluateAsync(MultiDiffEditorCases.RevealPathExpression, path);
+                    await page.WaitForFunctionAsync(
+                        MultiDiffEditorCases.IsPathRenderedExpression, path,
+                        new PageWaitForFunctionOptions { Timeout = MultiDiffTimeoutMs });
+
+                    Assert.Equal(badge, await page.EvaluateAsync<string>(
+                        MultiDiffEditorCases.BadgeForPathExpression, path));
+                }
+            }
+            finally
+            {
+                // WaitForSettledAsync restores the sample list for whichever test runs next, so
+                // there is nothing to undo here beyond letting this one's pushes drain.
+                await Task.Delay(200);
+            }
         }
         catch
         {
