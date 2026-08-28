@@ -15,7 +15,7 @@ using Monaco.Helpers;
 namespace Monaco
 {
     /// <summary>
-    /// Indicates the rendering backend used by the CodeEditorBase.
+    /// Indicates the rendering backend used by the EditorHostBase.
     /// </summary>
     public enum RenderingBackend
     {
@@ -45,7 +45,7 @@ namespace Monaco
     /// </para>
     /// </remarks>
     [TemplatePart(Name = "RootBorder", Type = typeof(Border))]
-    public abstract partial class CodeEditorBase : Control, INotifyPropertyChanged, IDisposable
+    public abstract partial class EditorHostBase : Control, INotifyPropertyChanged, IDisposable
     {
         private bool _initialized;
         private bool _desktopBootstrapInFlight;
@@ -83,7 +83,7 @@ namespace Monaco
         /// </summary>
         /// <remarks>
         /// This property transitions to <see langword="true"/> after the editor fires
-        /// <see cref="CodeEditorBase.EditorLoaded"/>. It can be used in XAML templates to control
+        /// <see cref="EditorHostBase.EditorLoaded"/>. It can be used in XAML templates to control
         /// visibility and prevent displaying an empty WebView during loading.
         /// </remarks>
         public bool IsEditorLoaded
@@ -96,12 +96,12 @@ namespace Monaco
         public static DependencyProperty IsEditorLoadedProperty { get; } = DependencyProperty.Register(
             nameof(IsEditorLoaded),
             typeof(bool),
-            typeof(CodeEditorBase),
+            typeof(EditorHostBase),
             new PropertyMetadata(false, OnIsEditorLoadedChanged));
 
         private static void OnIsEditorLoadedChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            if (d is CodeEditorBase editor)
+            if (d is EditorHostBase editor)
             {
                 editor.UpdatePresenterVisibility();
             }
@@ -240,7 +240,7 @@ namespace Monaco
         public static DependencyProperty RenderingBackendProperty { get; } = DependencyProperty.Register(
             nameof(RenderingBackend),
             typeof(RenderingBackend),
-            typeof(CodeEditorBase),
+            typeof(EditorHostBase),
             new PropertyMetadata(OperatingSystem.IsBrowser() ? RenderingBackend.Wasm : RenderingBackend.Desktop));
 
         /// <summary>
@@ -253,7 +253,25 @@ namespace Monaco
         /// Gets a value indicating whether this control hosts a Monaco diff editor.
         /// The presenters read this to select the matching bootstrap entry point.
         /// </summary>
-        protected internal virtual bool IsDiffEditor => false;
+        internal virtual EditorFlavor Flavor => EditorFlavor.Code;
+
+        /// <summary>
+        /// Gets a value indicating whether this control hosts a diff widget of any kind.
+        /// </summary>
+        protected internal bool IsDiffEditor => Flavor is EditorFlavor.Diff or EditorFlavor.MultiDiff;
+
+        /// <summary>
+        /// Gets a value indicating whether this control has a single primary document that the
+        /// inherited single-document surface acts on.
+        /// </summary>
+        /// <remarks>
+        /// <see langword="false"/> for <c>MultiDiffCodeEditor</c>, which has N documents and
+        /// no stable single editor to target -- Monaco pools and recycles the per-file editors. When
+        /// this is <see langword="false"/>, <see cref="BuildInitialStateMap"/> omits the
+        /// <c>text</c>/<c>language</c>/<c>readOnly</c> keys and <see cref="ApplyInitialPropertyValues"/>
+        /// skips every push that targets <c>EditorContext.editor</c>, because that element has none.
+        /// </remarks>
+        protected virtual bool HasPrimaryDocument => true;
 
         /// <summary>
         /// Gets the text of the primary (editable) document. This is the value pushed to
@@ -272,18 +290,18 @@ namespace Monaco
             => accessor?.RegisterAction("Loaded", CodeEditorLoaded);
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="CodeEditorBase"/> class on the current UI thread.
+        /// Initializes a new instance of the <see cref="EditorHostBase"/> class on the current UI thread.
         /// </summary>
-        protected CodeEditorBase() : this(null) { }
+        protected EditorHostBase() : this(null) { }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="CodeEditorBase"/> class with an explicit dispatcher.
+        /// Initializes a new instance of the <see cref="EditorHostBase"/> class with an explicit dispatcher.
         /// </summary>
         /// <param name="queue">
         /// The <see cref="DispatcherQueue"/> for the UI thread. When <see langword="null"/>, the
         /// current thread's dispatcher is used.
         /// </param>
-        protected CodeEditorBase(DispatcherQueue? queue)
+        protected EditorHostBase(DispatcherQueue? queue)
         {
             _queue = queue ?? DispatcherQueue.GetForCurrentThread();
 

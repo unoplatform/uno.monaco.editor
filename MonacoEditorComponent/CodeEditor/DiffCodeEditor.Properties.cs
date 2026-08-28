@@ -67,7 +67,7 @@ namespace Monaco
 
         /// <summary>
         /// Gets or sets the syntax language of the original document. When unset, the original
-        /// side follows <see cref="CodeEditorBase.CodeLanguage"/>.
+        /// side follows <see cref="EditorHostBase.CodeLanguage"/>.
         /// </summary>
         /// <remarks>
         /// Only worth setting when the two sides are genuinely different languages -- comparing
@@ -95,13 +95,13 @@ namespace Monaco
         /// </summary>
         /// <remarks>
         /// The two documents are locked independently: this property governs the original side,
-        /// and the inherited <see cref="CodeEditorBase.ReadOnly"/> governs the modified one.
+        /// and the inherited <see cref="EditorHostBase.ReadOnly"/> governs the modified one.
         /// A read-only comparison view is therefore <c>ReadOnly="True"</c> with this left unset.
         /// <para>
         /// A pass-through for <see cref="DiffOptions"/>.<see cref="DiffEditorOptions.OriginalEditable"/>,
         /// which stays in sync in both directions -- the same relationship
-        /// <see cref="CodeEditorBase.ReadOnly"/> has with
-        /// <see cref="CodeEditorBase.Options"/>.<see cref="StandaloneEditorConstructionOptions.ReadOnly"/>.
+        /// <see cref="EditorHostBase.ReadOnly"/> has with
+        /// <see cref="EditorHostBase.Options"/>.<see cref="StandaloneEditorConstructionOptions.ReadOnly"/>.
         /// Unlocking the original side does not make it write back: edits there are still not
         /// pushed to <see cref="OriginalText"/>.
         /// </para>
@@ -135,7 +135,7 @@ namespace Monaco
         /// whitespace handling, the diff algorithm, collapsing of unchanged regions, and so on.
         /// </summary>
         /// <remarks>
-        /// Distinct from <see cref="CodeEditorBase.Options"/>, which configures the underlying
+        /// Distinct from <see cref="EditorHostBase.Options"/>, which configures the underlying
         /// editor and is applied to the modified side. Monaco keeps the two in separate sinks
         /// and each ignores the other's keys, so they are not interchangeable.
         /// <para>
@@ -147,7 +147,7 @@ namespace Monaco
         /// <para>
         /// Setting this property replaces the entire options object and may overwrite the
         /// <see cref="OriginalEditable"/> pass-through, exactly as replacing
-        /// <see cref="CodeEditorBase.Options"/> may overwrite <see cref="CodeEditorBase.ReadOnly"/>.
+        /// <see cref="EditorHostBase.Options"/> may overwrite <see cref="EditorHostBase.ReadOnly"/>.
         /// An explicit value on the incoming instance is adopted into the pass-through property;
         /// an unset one leaves the previously pushed value behind with the discarded object.
         /// </para>

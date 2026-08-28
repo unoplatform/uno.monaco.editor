@@ -11,7 +11,7 @@ using Windows.Foundation;
 namespace Monaco
 {
     /// <summary>
-    /// Action delegate for <see cref="CodeEditorBase.AddCommandAsync(int, CommandHandler)"/> and <see cref="CodeEditorBase.AddCommandAsync(int, CommandHandler, string)"/>.
+    /// Action delegate for <see cref="EditorHostBase.AddCommandAsync(int, CommandHandler)"/> and <see cref="EditorHostBase.AddCommandAsync(int, CommandHandler, string)"/>.
     /// </summary>
     public delegate void CommandHandler(object?[] parameters);
 
@@ -22,7 +22,7 @@ namespace Monaco
     /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor_editor_api.editor.ICodeEditor.html">ICodeEditor</see>
     /// for the upstream Monaco API surface.
     /// </remarks>
-    public abstract partial class CodeEditorBase
+    public abstract partial class EditorHostBase
     {
         #region Reveal Methods
         /// <summary>
@@ -172,7 +172,7 @@ namespace Monaco
                     "The editor bridge is not initialized. Call AddActionAsync after EditorLoaded fires.");
             }
 
-            var wref = new WeakReference<CodeEditorBase>(this);
+            var wref = new WeakReference<EditorHostBase>(this);
             _parentAccessor.RegisterActionWithParameters("Action" + action.Id, (parameters) =>
             {
                 if (!wref.TryGetTarget(out var editor))

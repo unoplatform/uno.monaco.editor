@@ -13,7 +13,7 @@ namespace Monaco.Editor
     /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor.IDiffEditorOptions.html">Monaco API</see> for more details.
     /// <para>
     /// Nothing implements this union directly. <c>DiffCodeEditor</c> splits it in two: the
-    /// editor-level half is carried by <see cref="CodeEditorBase.Options"/> and applied to
+    /// editor-level half is carried by <see cref="EditorHostBase.Options"/> and applied to
     /// the modified sub-editor, and the diff-specific half by
     /// <c>DiffCodeEditor.DiffOptions</c>, typed as <see cref="DiffEditorOptions"/>.
     /// </para>

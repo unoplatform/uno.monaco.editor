@@ -32,7 +32,7 @@ internal sealed class MockCodeEditorPresenter : ICodeEditorPresenter
     public event EventHandler<WebViewMessageEventArgs>? MessageReceived;
     public event RoutedEventHandler? Loaded;
 
-    public CodeEditorBase? ParentCodeEditor { get; set; }
+    public EditorHostBase? ParentCodeEditor { get; set; }
     public global::System.Uri Source { get; set; } = new global::System.Uri("about:blank");
     public DispatcherQueue DispatcherQueue => DispatcherQueue.GetForCurrentThread()!;
     public string ElementId => "mock-presenter";

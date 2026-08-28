@@ -14,9 +14,9 @@ using Windows.Foundation;
 
 namespace Monaco
 {
-    public abstract partial class CodeEditorBase
+    public abstract partial class EditorHostBase
     {
-        // Override default Loaded/Loading event so we can make sure we've initialized our WebView contents with the CodeEditorBase.
+        // Override default Loaded/Loading event so we can make sure we've initialized our WebView contents with the EditorHostBase.
 
         /// <summary>
         /// Occurs when the editor begins initialization. The Monaco instance is not yet
@@ -35,13 +35,13 @@ namespace Monaco
         /// <see cref="OpenLinkRequestedEventArgs.Handled"/> to <see langword="true"/> to
         /// prevent the default navigation behavior.
         /// </summary>
-        public event TypedEventHandler<CodeEditorBase, OpenLinkRequestedEventArgs>? OpenLinkRequested;
+        public event TypedEventHandler<EditorHostBase, OpenLinkRequestedEventArgs>? OpenLinkRequested;
 
         /// <summary>
         /// Occurs when an internal exception is encountered while executing a script command.
         /// Subscribe to this event for diagnostics and error reporting.
         /// </summary>
-        public event TypedEventHandler<CodeEditorBase, Exception>? InternalException;
+        public event TypedEventHandler<EditorHostBase, Exception>? InternalException;
 
         /// <summary>
         /// Occurs when a key is pressed inside the Monaco editor.
@@ -255,15 +255,23 @@ namespace Monaco
                 ? _themeListener?.CurrentThemeName ?? "Light"
                 : RequestedTheme.ToString();
 
-            return new Dictionary<string, object?>
+            var state = new Dictionary<string, object?>
             {
                 ["requestedTheme"] = (int)RequestedTheme,
                 ["themeName"] = themeName,
                 ["isHighContrast"] = _themeListener?.IsHighContrast ?? false,
-                ["text"] = PrimaryText ?? string.Empty,
-                ["language"] = CodeLanguage ?? "plaintext",
-                ["readOnly"] = ReadOnly,
             };
+
+            // A control with no primary document (MultiDiffCodeEditor) has nothing to put here,
+            // and the TS side would only push these onto an EditorContext.editor it does not have.
+            if (HasPrimaryDocument)
+            {
+                state["text"] = PrimaryText ?? string.Empty;
+                state["language"] = CodeLanguage ?? "plaintext";
+                state["readOnly"] = ReadOnly;
+            }
+
+            return state;
         }
 
         /// <summary>
@@ -803,7 +811,7 @@ namespace Monaco
                 _pendingDesktopBootstrapAfterLoad = false;
 
                 // Defer focus until after init is fully complete to avoid focus ping-pong.
-                // Only focus if this CodeEditorBase is the currently focused element.
+                // Only focus if this EditorHostBase is the currently focused element.
 #pragma warning disable CS0618 // Type or member is obsolete
                 if (FocusManager.GetFocusedElement() == this)
                 {
@@ -834,17 +842,20 @@ namespace Monaco
         protected virtual async Task ApplyInitialPropertyValues()
         {
             // 1. Apply language and options first (includes ReadOnly, GlyphMargin)
-            if (!string.IsNullOrEmpty(CodeLanguage))
+            if (HasPrimaryDocument)
             {
-                await InvokeScriptAsync("updateLanguage", CodeLanguage);
+                if (!string.IsNullOrEmpty(CodeLanguage))
+                {
+                    await InvokeScriptAsync("updateLanguage", CodeLanguage);
+                }
+
+                // Ensure Options reflect current DP values before sending.
+                Options.Language = CodeLanguage;
+                Options.ReadOnly = ReadOnly;
+                Options.GlyphMargin = HasGlyphMargin;
+
+                await InvokeScriptAsync("updateOptions", Options);
             }
-
-            // Ensure Options reflect current DP values before sending.
-            Options.Language = CodeLanguage;
-            Options.ReadOnly = ReadOnly;
-            Options.GlyphMargin = HasGlyphMargin;
-
-            await InvokeScriptAsync("updateOptions", Options);
 
             // 2. Apply theme
             var themeName = RequestedTheme == ElementTheme.Default
@@ -852,6 +863,14 @@ namespace Monaco
                 : RequestedTheme.ToString();
             var isHighContrast = _themeListener?.IsHighContrast ?? false;
             await InvokeScriptAsync("changeTheme", [themeName, isHighContrast.ToString()]);
+
+            // Everything below targets EditorContext.editor. A multi-file diff element has no such
+            // editor -- its per-file editors are pooled and recycled -- so the whole single-document
+            // tail is skipped and the derived control pushes its own file list instead.
+            if (!HasPrimaryDocument)
+            {
+                return;
+            }
 
             // 3. Apply content after language is configured.
             // Always send values (including empty string) so Monaco state is
@@ -890,7 +909,7 @@ namespace Monaco
 
         private async void RequestedTheme_PropertyChanged(DependencyObject? obj, DependencyProperty property)
         {
-            if (obj is CodeEditorBase editor
+            if (obj is EditorHostBase editor
                 && _themeListener is { } listener)
             {
                 var theme = editor.RequestedTheme;

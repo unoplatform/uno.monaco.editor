@@ -11,7 +11,7 @@ namespace Monaco
         /// Setting this property after the editor is loaded invokes the Monaco
         /// <c>editor.setValue</c> API via <c>updateContent</c>. Changes originating
         /// from JavaScript are pushed back through the bridge and suppress re-entrant
-        /// notifications via <see cref="CodeEditorBase.IsSettingValue"/>.
+        /// notifications via <see cref="EditorHostBase.IsSettingValue"/>.
         /// </remarks>
         public string Text
         {

@@ -30,9 +30,9 @@ Key layers from top to bottom:
 | Layer | Responsibility |
 |-------|---------------|
 | **C# Application** | Consumes `CodeEditor` control, sets properties, subscribes to events |
-| **CodeEditorBase** | Abstract templated `Control`; owns lifecycle, property sync, bridge helper wiring |
-| **CodeEditor** | Thin single-document subclass of `CodeEditorBase`; adds the `Text` property |
-| **DiffCodeEditor** | Side-by-side diff subclass of `CodeEditorBase`; adds the `OriginalText`/`ModifiedText` properties |
+| **EditorHostBase** | Abstract templated `Control`; owns lifecycle, property sync, bridge helper wiring |
+| **CodeEditor** | Thin single-document subclass of `EditorHostBase`; adds the `Text` property |
+| **DiffCodeEditor** | Side-by-side diff subclass of `EditorHostBase`; adds the `OriginalText`/`ModifiedText` properties |
 | **ICodeEditorPresenter** | Abstraction over the web host; two implementations selected by platform |
 | **WasmCodeEditorPresenter** | WASM: wraps `BrowserHtmlElement` (iframe-like DOM element) |
 | **DesktopCodeEditorPresenter** | Desktop (Skia): wraps `WebView2` with CoreWebView2 |
@@ -147,7 +147,7 @@ sequenceDiagram
 
 ### Platform API Parity
 
-All public `CodeEditorBase` APIs work identically on WASM and desktop. The unified `InvokeMethodAsync` on `ICodeEditorPresenter` handles element resolution per-platform, ensuring scripts reference the correct editor element on both transport paths.
+All public `EditorHostBase` APIs work identically on WASM and desktop. The unified `InvokeMethodAsync` on `ICodeEditorPresenter` handles element resolution per-platform, ensuring scripts reference the correct editor element on both transport paths.
 
 | API | WASM | Desktop | Notes |
 |-----|------|---------|-------|
@@ -214,7 +214,7 @@ See [bridge-protocol.md](../MonacoEditorComponent/DesktopContent/bridge-protocol
 ## Presenter Pattern
 
 The presenter pattern decouples the editor control from platform-specific web host implementations.
-`CodeEditorBase` holds the presenter and every bridge helper, so the presenter contract is shared by
+`EditorHostBase` holds the presenter and every bridge helper, so the presenter contract is shared by
 every derived control -- `CodeEditor` for a single document, `DiffCodeEditor` for a side-by-side diff.
 
 ```mermaid
@@ -225,7 +225,7 @@ classDiagram
         +ElementId : string
         +IsLoaded : bool
         +IsSettingValue : bool
-        +ParentCodeEditor : CodeEditorBase?
+        +ParentCodeEditor : EditorHostBase?
         +DispatcherQueue : DispatcherQueue
         +Launch() Task
         +InvokeScriptAsync(script) Task~string~
@@ -255,7 +255,7 @@ classDiagram
         +Rpc : JsonRpc? (internal)
     }
 
-    class CodeEditorBase {
+    class EditorHostBase {
         <<abstract>>
         -_view : ICodeEditorPresenter?
         -_parentAccessor : IParentAccessor?
@@ -287,12 +287,12 @@ classDiagram
 
     ICodeEditorPresenter <|.. WasmCodeEditorPresenter
     ICodeEditorPresenter <|.. DesktopCodeEditorPresenter
-    CodeEditorBase <|-- CodeEditor
-    CodeEditorBase <|-- DiffCodeEditor
-    CodeEditorBase o-- ICodeEditorPresenter : _view
+    EditorHostBase <|-- CodeEditor
+    EditorHostBase <|-- DiffCodeEditor
+    EditorHostBase o-- ICodeEditorPresenter : _view
 ```
 
-`CodeEditorBase` owns everything identical across editor flavors: presenter creation and reuse,
+`EditorHostBase` owns everything identical across editor flavors: presenter creation and reuse,
 the initialization handshake and its recovery paths, the bridge helpers, theming, decorations,
 markers, and script invocation. A derived control supplies only its bootstrap entry point and
 its own text properties, so adding one costs no new lifecycle code.

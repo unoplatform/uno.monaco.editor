@@ -18,18 +18,18 @@ namespace Monaco
     /// </summary>
     /// <remarks>
     /// Shares the host, lifecycle, and bridge with <see cref="CodeEditor"/> through
-    /// <see cref="CodeEditorBase"/>; only the bootstrap entry point and the text properties
+    /// <see cref="EditorHostBase"/>; only the bootstrap entry point and the text properties
     /// differ.
     /// <para>
     /// The modified (right-hand) document is the editable one, and it is what the inherited
-    /// members act on: <see cref="CodeEditorBase.SelectedText"/>,
-    /// <see cref="CodeEditorBase.Decorations"/>, <see cref="CodeEditorBase.Markers"/>,
-    /// <see cref="CodeEditorBase.Options"/>, cursor position, and actions and commands all
+    /// members act on: <see cref="EditorHostBase.SelectedText"/>,
+    /// <see cref="EditorHostBase.Decorations"/>, <see cref="EditorHostBase.Markers"/>,
+    /// <see cref="EditorHostBase.Options"/>, cursor position, and actions and commands all
     /// target it. Diff-specific configuration lives on <see cref="DiffOptions"/> instead,
     /// because Monaco keeps the two option sets in separate sinks.
     /// </para>
     /// </remarks>
-    public sealed partial class DiffCodeEditor : CodeEditorBase
+    public sealed partial class DiffCodeEditor : EditorHostBase
     {
         /// <summary>
         /// Occurs when Monaco finishes recomputing the diff, whether because either
@@ -88,7 +88,7 @@ namespace Monaco
         protected override string BootstrapFunctionName => "createMonacoDiffEditor";
 
         /// <inheritdoc />
-        protected internal override bool IsDiffEditor => true;
+        internal override EditorFlavor Flavor => EditorFlavor.Diff;
 
         /// <inheritdoc />
         protected override string? PrimaryText => ModifiedText;

@@ -11,9 +11,9 @@ namespace Monaco
     /// <remarks>
     /// Hosts a single editable document exposed through <see cref="Text"/>. For a
     /// two-sided comparison view, use <c>DiffCodeEditor</c> instead. All host, lifecycle,
-    /// and bridge behavior lives on <see cref="CodeEditorBase"/>.
+    /// and bridge behavior lives on <see cref="EditorHostBase"/>.
     /// </remarks>
-    public sealed partial class CodeEditor : CodeEditorBase
+    public sealed partial class CodeEditor : EditorHostBase
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="CodeEditor"/> class on the current UI thread.

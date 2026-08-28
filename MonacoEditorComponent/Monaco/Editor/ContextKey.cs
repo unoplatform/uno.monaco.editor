@@ -9,7 +9,7 @@ namespace Monaco.Editor
     public sealed class ContextKey : IContextKey
     {
         [JsonIgnore]
-        private readonly WeakReference<CodeEditorBase> _editor;
+        private readonly WeakReference<EditorHostBase> _editor;
 
         /// <summary>
         /// Gets the unique key identifier for this context key.
@@ -29,9 +29,9 @@ namespace Monaco.Editor
         [JsonInclude]
         public bool Value { get; internal set; }
 
-        internal ContextKey(CodeEditorBase editor, string key, bool defaultValue)
+        internal ContextKey(EditorHostBase editor, string key, bool defaultValue)
         {
-            _editor = new WeakReference<CodeEditorBase>(editor);
+            _editor = new WeakReference<EditorHostBase>(editor);
 
             Key = key;
             DefaultValue = defaultValue;

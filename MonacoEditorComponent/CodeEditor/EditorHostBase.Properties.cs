@@ -9,7 +9,7 @@ using Windows.Foundation.Collections;
 
 namespace Monaco
 {
-    public abstract partial class CodeEditorBase : IParentAccessorAcceptor
+    public abstract partial class EditorHostBase : IParentAccessorAcceptor
     {
         /// <summary>
         /// Gets the helper for accessing <c>monaco.languages.*</c> registration APIs such as
@@ -36,9 +36,9 @@ namespace Monaco
         }
 
         /// <summary>Identifies the <see cref="SelectedText"/> dependency property.</summary>
-        public static DependencyProperty SelectedTextProperty { get; } = DependencyProperty.Register(nameof(SelectedText), typeof(string), typeof(CodeEditorBase), new PropertyMetadata(string.Empty, (d, e) =>
+        public static DependencyProperty SelectedTextProperty { get; } = DependencyProperty.Register(nameof(SelectedText), typeof(string), typeof(EditorHostBase), new PropertyMetadata(string.Empty, (d, e) =>
         {
-            if (d is CodeEditorBase codeEditor)
+            if (d is EditorHostBase codeEditor)
             {
                 if (codeEditor.IsEditorLoaded && !codeEditor.IsSettingValue)
                 {
@@ -60,7 +60,7 @@ namespace Monaco
         }
 
         /// <summary>Identifies the <see cref="SelectedRange"/> dependency property.</summary>
-        public static DependencyProperty SelectedRangeProperty { get; } = DependencyProperty.Register(nameof(SelectedRange), typeof(Selection), typeof(CodeEditorBase), new PropertyMetadata(null));
+        public static DependencyProperty SelectedRangeProperty { get; } = DependencyProperty.Register(nameof(SelectedRange), typeof(Selection), typeof(EditorHostBase), new PropertyMetadata(null));
 
         /// <summary>
         /// Gets or sets the syntax language identifier for the editor (e.g., <c>"csharp"</c>,
@@ -77,9 +77,9 @@ namespace Monaco
         }
 
         /// <summary>Identifies the <see cref="CodeLanguage"/> dependency property.</summary>
-        public static DependencyProperty CodeLanguageProperty { get; } = DependencyProperty.Register(nameof(CodeLanguage), typeof(string), typeof(CodeEditorBase), new PropertyMetadata("xml", (d, e) =>
+        public static DependencyProperty CodeLanguageProperty { get; } = DependencyProperty.Register(nameof(CodeLanguage), typeof(string), typeof(EditorHostBase), new PropertyMetadata("xml", (d, e) =>
         {
-            if (d is not CodeEditorBase editor) return;
+            if (d is not EditorHostBase editor) return;
             editor.Options?.Language = e.NewValue.ToString();
         }));
 
@@ -93,9 +93,9 @@ namespace Monaco
         }
 
         /// <summary>Identifies the <see cref="ReadOnly"/> dependency property.</summary>
-        public static DependencyProperty ReadOnlyProperty { get; } = DependencyProperty.Register(nameof(ReadOnly), typeof(bool), typeof(CodeEditorBase), new PropertyMetadata(false, (d, e) =>
+        public static DependencyProperty ReadOnlyProperty { get; } = DependencyProperty.Register(nameof(ReadOnly), typeof(bool), typeof(EditorHostBase), new PropertyMetadata(false, (d, e) =>
         {
-            if (d is not CodeEditorBase editor) return;
+            if (d is not EditorHostBase editor) return;
             editor.Options?.ReadOnly = bool.Parse(e.NewValue?.ToString() ?? "false");
         }));
 
@@ -118,12 +118,12 @@ namespace Monaco
         public static DependencyProperty OptionsProperty { get; } = DependencyProperty.Register(
             nameof(Options),
             typeof(StandaloneEditorConstructionOptions),
-            typeof(CodeEditorBase),
+            typeof(EditorHostBase),
             new PropertyMetadata(
                 null,
                 (d, e) =>
                 {
-                    if (d is CodeEditorBase editor)
+                    if (d is EditorHostBase editor)
                     {
                         if (e.OldValue is StandaloneEditorConstructionOptions oldValue)
                             oldValue.PropertyChanged -= editor.Options_PropertyChanged;
@@ -150,9 +150,9 @@ namespace Monaco
         }
 
         /// <summary>Identifies the <see cref="HasGlyphMargin"/> dependency property.</summary>
-        public static DependencyProperty HasGlyphMarginProperty { get; } = DependencyProperty.Register(nameof(HasGlyphMargin), typeof(bool), typeof(CodeEditorBase), new PropertyMetadata(false, (d, e) =>
+        public static DependencyProperty HasGlyphMarginProperty { get; } = DependencyProperty.Register(nameof(HasGlyphMargin), typeof(bool), typeof(EditorHostBase), new PropertyMetadata(false, (d, e) =>
         {
-            if (d is not CodeEditorBase editor) return;
+            if (d is not EditorHostBase editor) return;
             editor.Options?.GlyphMargin = e.NewValue as bool?;
         }));
 
@@ -180,9 +180,9 @@ namespace Monaco
         }
 
         /// <summary>Identifies the <see cref="Decorations"/> dependency property.</summary>
-        public static DependencyProperty DecorationsProperty { get; } = DependencyProperty.Register(nameof(Decorations), typeof(IObservableVector<IModelDeltaDecoration>), typeof(CodeEditorBase), new PropertyMetadata(null, async (d, e) =>
+        public static DependencyProperty DecorationsProperty { get; } = DependencyProperty.Register(nameof(Decorations), typeof(IObservableVector<IModelDeltaDecoration>), typeof(EditorHostBase), new PropertyMetadata(null, async (d, e) =>
         {
-            if (d is CodeEditorBase editor)
+            if (d is EditorHostBase editor)
             {
                 // We only want to do this one at a time per editor.
                 using (await editor._mutexLineDecorations.LockAsync())
@@ -234,9 +234,9 @@ namespace Monaco
         }
 
         /// <summary>Identifies the <see cref="Markers"/> dependency property.</summary>
-        public static DependencyProperty MarkersProperty { get; } = DependencyProperty.Register(nameof(Markers), typeof(IObservableVector<IMarkerData>), typeof(CodeEditorBase), new PropertyMetadata(null, async (d, e) =>
+        public static DependencyProperty MarkersProperty { get; } = DependencyProperty.Register(nameof(Markers), typeof(IObservableVector<IMarkerData>), typeof(EditorHostBase), new PropertyMetadata(null, async (d, e) =>
         {
-            if (d is CodeEditorBase editor)
+            if (d is EditorHostBase editor)
             {
                 // We only want to do this one at a time per editor.
                 using (await editor._mutexMarkers.LockAsync())

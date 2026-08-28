@@ -14,7 +14,7 @@ namespace Monaco.Editor
     /// <remarks>
     /// Implements <see cref="IDiffEditorBaseOptions"/> rather than the full
     /// <see cref="IDiffEditorOptions"/> union: editor-level options are carried separately by
-    /// <see cref="CodeEditorBase.Options"/> and applied to the modified sub-editor, because
+    /// <see cref="EditorHostBase.Options"/> and applied to the modified sub-editor, because
     /// Monaco itself has two sinks for them (<c>diffEditor.updateOptions</c> versus
     /// <c>modifiedEditor.updateOptions</c>) and each silently ignores the other's keys.
     /// <para>
