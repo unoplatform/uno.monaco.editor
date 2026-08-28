@@ -9,7 +9,6 @@ import {
     disposeMultiDiffState,
     layoutMultiDiffEditor,
     updateMultiDiffFiles,
-    updateMultiDiffOptions,
     MultiDiffFile
 } from './multiDiffEditor';
 

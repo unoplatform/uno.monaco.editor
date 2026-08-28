@@ -961,8 +961,6 @@ editor at all.
 
 ---
 
----
-
 ## 17. Show Diffs Across Multiple Files
 
 Use `MultiDiffCodeEditor` for a changeset: one scrollable list of per-file diffs with collapsible
