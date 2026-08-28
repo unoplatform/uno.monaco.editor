@@ -748,40 +748,57 @@ public sealed class DesktopAppFixture : IAsyncLifetime
 
         while (DateTime.UtcNow < deadline)
         {
-            foreach (var context in _browser?.Contexts ?? (IReadOnlyList<IBrowserContext>)[])
+            foreach (var page in SnapshotPages())
             {
-                foreach (var page in context.Pages)
+                try
                 {
                     if (page.Url.StartsWith("about:", StringComparison.OrdinalIgnoreCase))
                     {
                         continue;
                     }
 
-                    try
+                    if (await page.EvaluateAsync<bool>(probe))
                     {
-                        if (await page.EvaluateAsync<bool>(probe))
-                        {
-                            return page;
-                        }
+                        return page;
                     }
-                    catch (PlaywrightException)
-                    {
-                        // The page can be mid-navigation or not yet executing scripts; the
-                        // next sweep retries it. PlaywrightException is the base of every
-                        // failure this call can raise -- evaluation errors, destroyed
-                        // execution contexts and TargetClosedException all derive from it.
-                    }
+                }
+                catch (PlaywrightException)
+                {
+                    // The page can be mid-navigation, not yet executing scripts, or already
+                    // gone since the snapshot was taken; the next sweep retries it.
+                    // PlaywrightException is the base of every failure this body can raise --
+                    // evaluation errors, destroyed execution contexts and TargetClosedException
+                    // all derive from it.
                 }
             }
 
             await Task.Delay(CdpPollIntervalMs);
         }
 
-        var seen = string.Join(", ", (_browser?.Contexts ?? []).SelectMany(c => c.Pages).Select(p => p.Url));
+        var seen = string.Join(", ", SnapshotPages().Select(p => p.Url));
         throw new TimeoutException(
             $"Could not find the {description} page within {MonacoReadyTimeoutMs}ms. " +
-            $"Pages seen: [{seen}]. Check that the desktop app started and WebView2 loaded the editor.");
+            $"Pages last seen: [{seen}]. Check that the desktop app started and WebView2 loaded the editor.");
     }
+
+    /// <summary>
+    /// Takes a point-in-time copy of every page across the browser's contexts.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="IBrowser.Contexts"/> and <see cref="IBrowserContext.Pages"/> hand back the
+    /// driver's own backing lists, and the driver appends to them from its dispatch loop as the
+    /// app's WebView2 hosts attach. Enumerating them directly across an await therefore throws
+    /// "Collection was modified", which is what took this fixture down in CI once the diff
+    /// sample added a second host that attaches while the first sweep is in flight. Copying
+    /// trades that for a possibly stale page reference, which callers already tolerate: every
+    /// call they make on a page is inside a <see cref="PlaywrightException"/> catch, and
+    /// TargetClosedException derives from it. The copy itself takes no enumerator over a live
+    /// list -- ToArray on a List-backed IReadOnlyList is a span/CopyTo bulk copy.
+    /// </remarks>
+    private IReadOnlyList<IPage> SnapshotPages() =>
+        (_browser?.Contexts ?? []).ToArray()
+            .SelectMany(context => context.Pages.ToArray())
+            .ToArray();
 
 
     private static int GetAvailablePort()
