@@ -160,13 +160,14 @@ export const addAction = function (element: any, action: monaco.editor.IActionDe
         editorContext.Accessor.callActionWithParameters2("Action" + action.id, objs);
     };
 
-    editorContext.editor.addAction(action);
+    // Optional: a multi-file diff context has no single editor to add the action to.
+    editorContext.editor?.addAction(action);
 };
 
 export const addCommand = function (element: any, keybindingStr: string, handlerName: string, context: string) {
     var editorContext = EditorContext.getEditorForElement(element);
 
-    return editorContext.editor.addCommand(parseInt(keybindingStr), function () {
+    return editorContext.editor?.addCommand(parseInt(keybindingStr), function () {
         const objs: string[] = [];
         if (arguments) {
             for (let i = 1; i < arguments.length; i++) {
@@ -180,7 +181,7 @@ export const addCommand = function (element: any, keybindingStr: string, handler
 export const createContext = function (element: any, context: any) {
     var editorContext = EditorContext.getEditorForElement(element);
 
-    if (context) {
+    if (context && editorContext.editor) {
         editorContext.contexts[context.key] = editorContext.editor.createContextKey(context.key, context.defaultValue);
     }
 };
@@ -201,6 +202,10 @@ export const updateContent = function (element: any, content: string) {
 
 export const updateDecorations = function (element: any, newHighlights: any) {
     var editorContext = EditorContext.getEditorForElement(element);
+
+    if (!editorContext.editor) {
+        return;
+    }
 
     if (newHighlights) {
         editorContext.decorations = editorContext.editor.deltaDecorations(editorContext.decorations, newHighlights);
@@ -241,7 +246,7 @@ export const updateOptions = function (element: any, opt: monaco.editor.IEditorO
     var editorContext = EditorContext.getEditorForElement(element);
 
     if (opt !== null && typeof opt === "object") {
-        editorContext.editor.updateOptions(opt);
+        editorContext.editor?.updateOptions(opt);
     }
 };
 

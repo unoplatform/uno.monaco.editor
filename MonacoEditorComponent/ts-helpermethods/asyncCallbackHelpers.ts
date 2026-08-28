@@ -183,6 +183,13 @@ function cleanupEditorRuntimeState(editorContext: EditorContext): void {
     } else if (editorContext.editor) {
         editorContext.editor.dispose();
     }
+
+    // Drop the handles, not just dispose them. Contexts are cached per element and reused
+    // across a re-bootstrap, and layoutEditor() falls through to .editor -- a disposed editor
+    // left sitting here would be laid out. The plain path must not dispose .model, since
+    // monaco.editor.create() owns the model it builds from `value`, but it must still let go.
+    editorContext.editor = undefined;
+    editorContext.model = undefined;
 }
 
 /**
