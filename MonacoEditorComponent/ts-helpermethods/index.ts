@@ -15,6 +15,7 @@ import * as monaco from 'monaco-editor';
 import {
     createMonacoEditor,
     createMonacoDiffEditor,
+    createMonacoMultiDiffEditor,
     disposeEditor,
     InvokeJS,
     languageIdFromExtension,
@@ -63,6 +64,14 @@ import { registerColorProvider } from './registerColorProvider';
 import { registerCompletionItemProvider } from './registerCompletionItemProvider';
 import { registerLanguage } from './registerLanguage';
 import { updateSelectedContent } from './updateSelectedContent';
+
+import {
+    updateMultiDiffFiles,
+    updateMultiDiffOptions,
+    setMultiDiffCollapsed,
+    setAllMultiDiffCollapsed,
+    revealMultiDiffFile
+} from './multiDiffEditor';
 
 // Languages Monaco does not ship, bundled with the component
 import { registerDiffLanguage } from './languages/diff';
@@ -187,6 +196,7 @@ if (isDesktop) {
 // Core editor functions (referenced by [JSImport("globalThis.*")])
 globalThis.createMonacoEditor = createMonacoEditor;
 (globalThis as any).createMonacoDiffEditor = createMonacoDiffEditor;
+(globalThis as any).createMonacoMultiDiffEditor = createMonacoMultiDiffEditor;
 globalThis.InvokeJS = InvokeJS;
 globalThis.languageIdFromExtension = languageIdFromExtension;
 
@@ -215,6 +225,13 @@ globalThis.languageIdFromExtension = languageIdFromExtension;
 (globalThis as any).goToDiff = goToDiff;
 (globalThis as any).revealFirstDiff = revealFirstDiff;
 (globalThis as any).getLineChanges = getLineChanges;
+
+// Multi-file diff surface (MultiDiffCodeEditor)
+(globalThis as any).updateMultiDiffFiles = updateMultiDiffFiles;
+(globalThis as any).updateMultiDiffOptions = updateMultiDiffOptions;
+(globalThis as any).setMultiDiffCollapsed = setMultiDiffCollapsed;
+(globalThis as any).setAllMultiDiffCollapsed = setAllMultiDiffCollapsed;
+(globalThis as any).revealMultiDiffFile = revealMultiDiffFile;
 
 // Provider registrations
 (globalThis as any).registerCodeActionProvider = registerCodeActionProvider;

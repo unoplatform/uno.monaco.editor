@@ -45,4 +45,25 @@
         </Setter>
     </Style>
 
+    <Style TargetType="monaco:MultiDiffCodeEditor" >
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="monaco:MultiDiffCodeEditor">
+                    <Border
+                        x:Name="RootBorder"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Stretch">
+                        <ContentPresenter
+                            x:Name="View"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

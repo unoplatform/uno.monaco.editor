@@ -90,6 +90,13 @@ export class EditorContext {
     public diffEditor?: monaco.editor.IStandaloneDiffEditor;
     /** The original (left-hand) model. Set only for a diff editor. */
     public originalModel?: monaco.editor.ITextModel;
+    /**
+     * Set only for a multi-file diff. This context shape cannot express N documents -- there is
+     * one `model` and one `originalModel`, and the write-back channel is a single flat property
+     * name -- so the multi-file state hangs off here instead, and `editor`/`model` stay unset.
+     * Typed loosely to keep this module free of the multiDiffEditor import.
+     */
+    public multiDiff?: any;
     public contexts: { [index: string]: monaco.editor.IContextKey<any> };
     public decorations: string[];
     public modifingSelection: boolean;
@@ -341,7 +348,10 @@ export const layoutEditor = function (element: any) {
         return;
     }
 
-    const target = editorContext.diffEditor ?? editorContext.editor;
+    // _layoutTarget is what attachEditorRuntime drives from its ResizeObserver, and it is the
+    // only handle a multi-file diff has: that widget does not self-size and is not laid out
+    // through an editor instance.
+    const target = (editorContext as any)._layoutTarget ?? editorContext.diffEditor ?? editorContext.editor;
     if (target) {
         target.layout();
     }
