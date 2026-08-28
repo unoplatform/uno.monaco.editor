@@ -163,11 +163,36 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         // 6. Connect Playwright via CDP.
         _browser = await _playwright!.Chromium.ConnectOverCDPAsync(cdpEndpoint);
 
-        // 7. Find the Monaco pages. Two WebView2 hosts are live (the plain editor sample and
+        // 7. Wait for both samples to report settled state, BEFORE going looking for their
+        // pages. Both markers are plain stdout lines served from the captured log buffer, so
+        // neither needs an IPage and both can gate page discovery rather than trail it.
+        //
+        // Ordering them first buys two things. Discovery below sweeps the live WebView2 page
+        // list, and a sweep that runs while hosts are still attaching races the driver (see
+        // SnapshotPages). More importantly, the plain-editor probe identifies its page by the
+        // ABSENCE of a diff editor, which only carries information once the diff editor
+        // exists: run it too early and whether the diff page can satisfy it comes down to the
+        // order in which monaco.editor.createDiffEditor registers the widget versus its two
+        // sub-editors. Waiting settles that question rather than betting on it.
+        //
+        // EditorControl emits TEST_HARNESS_READY once its async setup is done (command/action
+        // registration, language registration, markers, decorations, theme switching).
+        // DiffEditorControl emits DIFF_HARNESS_READY once the first diff has been computed and
+        // GetLineChangesAsync has returned hunks. Both use Console.WriteLine, not
+        // Debug.WriteLine, which is compiled out of the Release builds this fixture runs.
+        // A stronger content-settled marker for the plain editor is in flight on PR #50
+        // (APP_INIT_SETTLED); it belongs in this block, for the same reason.
+        await WaitForLogLineAfterAsync(0, @"TEST_HARNESS_READY", MonacoReadyTimeoutMs);
+        await WaitForLogLineAfterAsync(0, @"DIFF_HARNESS_READY", MonacoReadyTimeoutMs);
+
+        // 8. Find the Monaco pages. Two WebView2 hosts are live (the plain editor sample and
         // the diff sample) and they share a URL, so they are told apart by content.
         // Excluding diff editors is not redundant: monaco.editor.getEditors() lists every code
         // editor the service knows about, and a diff widget's two sub-editors are standalone
         // code editors, so the diff page can satisfy a bare getEditors() probe too.
+        //
+        // No separate "wait for Monaco in the page" step follows: the probe that selected this
+        // page already required monaco to be defined with a live editor on it.
         Page = await FindEditorPageAsync(
             "monaco.editor.getEditors().length > 0 && monaco.editor.getDiffEditors().length === 0",
             "plain editor");
@@ -175,22 +200,12 @@ public sealed class DesktopAppFixture : IAsyncLifetime
             "monaco.editor.getDiffEditors().length > 0", "diff editor");
         Context = Page.Context;
 
-        // 8. Start tracing for failure artifact collection.
+        // 9. Start tracing for failure artifact collection.
         await Context.Tracing.StartAsync(new()
         {
             Screenshots = true,
             Snapshots = true,
         });
-
-        // 9. Wait for Monaco to be ready in the page.
-        await Page.WaitForFunctionAsync(
-            "() => typeof monaco !== 'undefined' && monaco.editor.getEditors().length > 0",
-            null, new PageWaitForFunctionOptions { Timeout = MonacoReadyTimeoutMs });
-
-        // 10. Wait for the test harness to complete all async setup (command/action
-        // registration, language registration, markers, decorations, theme switching).
-        // The harness emits TEST_HARNESS_READY as its final stdout marker.
-        await WaitForLogLineAfterAsync(0, @"TEST_HARNESS_READY", MonacoReadyTimeoutMs);
     }
 
     public async ValueTask DisposeAsync()
