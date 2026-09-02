@@ -1037,8 +1037,9 @@ Because this control has no single document, the members it inherits from `Edito
 one are inert: `SelectedText`, `SelectedRange`, `CodeLanguage`, `ReadOnly`, `Options`,
 `HasGlyphMargin`, `Decorations`, `Markers`, the cursor position accessors, and the action and
 command APIs. Monaco pools and recycles the per-file editors, so there is no stable editor for
-them to act on. Set the language per file with `DiffFileEntry.Language`, and configure the
-comparison through `DiffOptions`.
+them to act on. `AddActionAsync` completes without registering anything and `AddCommandAsync`
+returns `null`, rather than leaving a callback that can never fire. Set the language per file
+with `DiffFileEntry.Language`, and configure the comparison through `DiffOptions`.
 
 `DiffOptions` applies to every file, with two caveats: `HideUnchangedRegions` is forced on by
 Monaco for a multi-file view and cannot be disabled, and `OriginalEditable` is ignored because
