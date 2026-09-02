@@ -19,7 +19,12 @@ namespace MonacoEditorComponent.Tests;
 /// esbuild had run. These tests assert the shipped layout rather than any behaviour, because that
 /// is the level the mistake is made at.</para>
 /// <para>They are plain unit tests: no browser, no app, so they run in every CI job rather than
-/// only the one that can drive Playwright.</para>
+/// only the one that can drive Playwright. What they cannot do is stand in for the evaluation-order
+/// trap specifically, on CI: the workflow runs <c>npm run build</c> before any <c>dotnet build</c>,
+/// so the generated files are always on disk by the time a project is evaluated and a
+/// re-introduced condition would be true there. What they catch anywhere is the item or the
+/// logical name going missing for any other reason -- and on a genuinely clean local build, that
+/// trap too.</para>
 /// </remarks>
 public sealed class GeneratedAssetPackagingTests
 {
