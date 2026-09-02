@@ -167,7 +167,16 @@ export const addAction = function (element: any, action: monaco.editor.IActionDe
 export const addCommand = function (element: any, keybindingStr: string, handlerName: string, context: string) {
     var editorContext = EditorContext.getEditorForElement(element);
 
-    return editorContext.editor?.addCommand(parseInt(keybindingStr), function () {
+    if (!editorContext.editor) {
+        // A multi-file diff context has no single editor to bind to. Return null, not undefined:
+        // Monaco's own addCommand returns string | null, and undefined only survives the bridge
+        // by accident -- WASM coerces it through `eval(...) || ""` in InvokeJS, and WebView2
+        // stringifies it to "null". Both are read as "no command" on the C# side, but being
+        // explicit means the contract stops resting on either coercion.
+        return null;
+    }
+
+    return editorContext.editor.addCommand(parseInt(keybindingStr), function () {
         const objs: string[] = [];
         if (arguments) {
             for (let i = 1; i < arguments.length; i++) {

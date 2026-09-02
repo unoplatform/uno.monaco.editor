@@ -340,8 +340,10 @@ namespace Monaco
         /// <see langword="false"/> for <c>MultiDiffCodeEditor</c>, which has N documents and
         /// no stable single editor to target -- Monaco pools and recycles the per-file editors. When
         /// this is <see langword="false"/>, <see cref="BuildInitialStateMap"/> omits the
-        /// <c>text</c>/<c>language</c>/<c>readOnly</c> keys and <see cref="ApplyInitialPropertyValues"/>
-        /// skips every push that targets <c>EditorContext.editor</c>, because that element has none.
+        /// <c>text</c>/<c>language</c>/<c>readOnly</c> keys, <see cref="ApplyInitialPropertyValues"/>
+        /// skips every push that targets <c>EditorContext.editor</c>, because that element has none,
+        /// and <see cref="AddActionAsync"/>/<see cref="AddCommandAsync(int, CommandHandler, string)"/>
+        /// register nothing rather than leaving a callback that can never be invoked.
         /// </remarks>
         protected virtual bool HasPrimaryDocument => true;
 
