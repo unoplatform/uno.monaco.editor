@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Linq;
 using System.Text.Json;
 
 using Collections.Generic;
@@ -145,22 +146,7 @@ namespace Monaco
         private bool _isApplyingJsFileState;
 
         private DiffFileEntry? FindFile(string path)
-        {
-            if (Files is null)
-            {
-                return null;
-            }
-
-            foreach (var entry in Files)
-            {
-                if (string.Equals(entry.Path, path, StringComparison.Ordinal))
-                {
-                    return entry;
-                }
-            }
-
-            return null;
-        }
+            => Files?.FirstOrDefault(entry => string.Equals(entry.Path, path, StringComparison.Ordinal));
 
         /// <inheritdoc />
         protected override Dictionary<string, object?> BuildInitialStateMap()
@@ -203,8 +189,9 @@ namespace Monaco
         {
             using (await _mutexFiles.LockAsync())
             {
-                // The (string, object?) cast is load-bearing. DiffFileEntry[] is assignable to
-                // object[], so without it the compiler picks InvokeScriptAsync(string, object[]),
+                // The (object) cast is load-bearing: it forces the InvokeScriptAsync(string, object?)
+                // overload. DiffFileEntry[] is assignable to object[], so without it the compiler
+                // picks InvokeScriptAsync(string, object[]),
                 // which treats every file as a *separate* JS argument -- the helper then receives
                 // only the first one and throws while iterating it, and InvokeScriptAsync swallows
                 // that into InternalException. Desktop hid the bug because its file list also
@@ -279,12 +266,9 @@ namespace Monaco
         {
             var current = new HashSet<DiffFileEntry>(files);
 
-            foreach (var entry in _subscribedFiles)
+            foreach (var entry in _subscribedFiles.Where(entry => !current.Contains(entry)))
             {
-                if (!current.Contains(entry))
-                {
-                    entry.PropertyChanged -= File_PropertyChanged;
-                }
+                entry.PropertyChanged -= File_PropertyChanged;
             }
 
             foreach (var entry in current)
