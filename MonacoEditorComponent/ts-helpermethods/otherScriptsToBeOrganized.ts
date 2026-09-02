@@ -189,7 +189,9 @@ export const createContext = function (element: any, context: any) {
 export const updateContext = function (element: any, key: string, value: any) {
     var editorContext = EditorContext.getEditorForElement(element);
 
-    editorContext.contexts[key].set(value);
+    // Optional: createContext skips a context with no single editor -- a multi-file diff --
+    // so the key legitimately has nothing behind it here.
+    editorContext.contexts[key]?.set(value);
 }
 
 export const updateContent = function (element: any, content: string) {
