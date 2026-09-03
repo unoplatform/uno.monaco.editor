@@ -30,6 +30,9 @@ public sealed class WasmAppFixture : IAsyncLifetime
     /// </summary>
     private const string AppInitSettledMarker = "APP_INIT_SETTLED";
 
+    /// <summary>How long a rejected candidate's output capture gets to finish before it is quoted.</summary>
+    private const int CaptureDrainTimeoutMs = 2_000;
+
     /// <summary>Content every test starts from -- see <see cref="ResetEditorStateAsync"/>.</summary>
     private const string ResetText = "// test-init-text";
 
@@ -377,7 +380,7 @@ public sealed class WasmAppFixture : IAsyncLifetime
             var port = GetAvailablePort();
             var logPath = Path.Combine(
                 logDirectory,
-                $"wasm-fixture-{DateTime.UtcNow:yyyyMMdd-HHmmss-fff}-{candidate.FileName}.log");
+                $"wasm-fixture-{DateTime.UtcNow:yyyyMMdd-HHmmss-fff}-{Path.GetFileName(candidate.FileName)}.log");
 
             Process process;
             try
@@ -407,8 +410,9 @@ public sealed class WasmAppFixture : IAsyncLifetime
             }
 
             // Capture output for every candidate, not just the winner: a rejected candidate's
-            // stderr is the only thing that says why it was rejected.
-            _ = CaptureProcessOutputAsync(process, logPath);
+            // stderr is the only thing that says why it was rejected. The winner's capture runs
+            // for as long as it serves; a rejected one is drained below.
+            var capture = CaptureProcessOutputAsync(process, logPath);
 
             var rejection = await ProbeUntilReadyAsync(
                 $"http://localhost:{port}/", process, perCandidateTimeoutMs);
@@ -418,8 +422,21 @@ public sealed class WasmAppFixture : IAsyncLifetime
                 return new StaticServerHandle(process, port, logPath);
             }
 
-            attempted.Add($"{candidate.FileName} ({await DescribeRejectionAsync(process, logPath, rejection)})");
+            // Read the liveness before killing it: "still running" versus "exited with code N" is
+            // the difference between a server that never answered and a command that is not
+            // installed, and the kill would erase it.
+            var state = process.HasExited
+                ? $"exited with code {process.ExitCode}"
+                : "still running";
+
             await TerminateServerAsync(process);
+
+            // The capture ends when the dead process's streams hit EOF, so waiting on it both
+            // completes the log before it is quoted and keeps anything from reading the Process
+            // as it is disposed.
+            await Task.WhenAny(capture, Task.Delay(CaptureDrainTimeoutMs));
+
+            attempted.Add($"{candidate.FileName} ({DescribeRejection(state, rejection, ReadLogTail(logPath))})");
             process.Dispose();
         }
 
@@ -429,8 +446,8 @@ public sealed class WasmAppFixture : IAsyncLifetime
     }
 
     /// <summary>
-    /// Polls <paramref name="url"/> until it answers, giving up as soon as the server process dies
-    /// or the budget runs out. Process death is the deterministic "this command is unusable"
+    /// Polls <paramref name="url"/> until it answers with a success status, giving up as soon as
+    /// the server process dies or the budget runs out. Process death is the deterministic "this command is unusable"
     /// signal, so it is checked every pass rather than once after a fixed sleep.
     /// </summary>
     /// <returns>
@@ -470,19 +487,8 @@ public sealed class WasmAppFixture : IAsyncLifetime
     }
 
     /// <summary>Explains why a candidate was rejected, quoting whatever it managed to print.</summary>
-    private static async Task<string> DescribeRejectionAsync(Process process, string logPath, string rejection)
-    {
-        var state = process.HasExited
-            ? $"exited with code {process.ExitCode}; {rejection}"
-            : $"still running; {rejection}";
-
-        // The output capture writes from its own task, so give the last lines a moment to land
-        // before quoting them -- this runs only on the failure path.
-        await Task.Delay(200);
-
-        var log = ReadLogTail(logPath);
-        return log.Length == 0 ? state : $"{state}; output: {log}";
-    }
+    private static string DescribeRejection(string state, string rejection, string log) =>
+        log.Length == 0 ? $"{state}; {rejection}" : $"{state}; {rejection}; output: {log}";
 
     /// <summary>
     /// Reads the tail of a process log that is still open for writing, hence the explicit
@@ -522,7 +528,9 @@ public sealed class WasmAppFixture : IAsyncLifetime
             // entireProcessTree: the dotnet muxer and the py launcher both run the real server as
             // a child, which would outlive a kill aimed at the parent alone.
             process.Kill(entireProcessTree: true);
-            await process.WaitForExitAsync(new CancellationTokenSource(5000).Token);
+
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await process.WaitForExitAsync(timeout.Token);
         }
         catch { /* best-effort */ }
     }
@@ -556,29 +564,31 @@ public sealed class WasmAppFixture : IAsyncLifetime
         try
         {
             await using var logWriter = new StreamWriter(logPath, append: false);
-            // ReadLineAsync returns null at end-of-stream, avoiding the CA2024
-            // diagnostic from synchronous EndOfStream checks in async methods.
-            var stdoutTask = Task.Run(async () =>
-            {
-                string? line;
-                while ((line = await process.StandardOutput.ReadLineAsync()) is not null)
-                {
-                    await logWriter.WriteLineAsync($"[stdout] {line}");
-                    await logWriter.FlushAsync();
-                }
-            });
-            var stderrTask = Task.Run(async () =>
-            {
-                string? line;
-                while ((line = await process.StandardError.ReadLineAsync()) is not null)
-                {
-                    await logWriter.WriteLineAsync($"[stderr] {line}");
-                    await logWriter.FlushAsync();
-                }
-            });
 
-            await Task.WhenAny(Task.WhenAll(stdoutTask, stderrTask), Task.Delay(TimeSpan.FromMinutes(5)));
+            // Both pumps write to the one file and StreamWriter is not thread-safe, so lines from
+            // stdout and stderr could otherwise interleave mid-line and corrupt the log.
+            var writer = TextWriter.Synchronized(logWriter);
+
+            // Runs until both streams reach end-of-stream, which the process exiting guarantees.
+            // An earlier version gave up after 5 minutes and disposed the writer underneath the
+            // pumps, so a long session's log went silent partway through.
+            await Task.WhenAll(
+                PumpAsync(process.StandardOutput, writer, "stdout"),
+                PumpAsync(process.StandardError, writer, "stderr"));
         }
         catch { /* best-effort */ }
+    }
+
+    /// <summary>Copies one process stream into the shared log, tagged with its channel.</summary>
+    private static async Task PumpAsync(StreamReader reader, TextWriter writer, string channel)
+    {
+        // ReadLineAsync returns null at end-of-stream, avoiding the CA2024 diagnostic from
+        // synchronous EndOfStream checks in async methods.
+        string? line;
+        while ((line = await reader.ReadLineAsync()) is not null)
+        {
+            await writer.WriteLineAsync($"[{channel}] {line}");
+            await writer.FlushAsync();
+        }
     }
 }
