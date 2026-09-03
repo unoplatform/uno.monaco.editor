@@ -15,10 +15,16 @@ namespace MonacoEditorComponent.Tests;
 /// exit 1, the doomed process was returned as the winner and every WASM integration test failed
 /// without python ever being tried.</para>
 ///
-/// <para>Budgets here are generous on purpose. A cold python takes over 5s to answer on the
-/// Windows runner and over 10s on the macOS ARM one -- the same slowness that keeps the WASM
-/// suite off those jobs -- so a candidate is only ever rejected for dying, never for being
-/// slower than a number picked on a fast dev box.</para>
+/// <para>Budgets here are generous on purpose: a cold python takes over 5s to answer on the
+/// Windows runner, so a candidate is only ever rejected for dying, never for being slower than a
+/// number picked on a fast dev box.</para>
+///
+/// <para>The two tests that need a real server carry <c>Category=StaticServer</c>, which the
+/// macOS ARM job excludes. A python http.server there accepts the connection and then never
+/// answers -- it prints nothing even unbuffered, and probes time out rather than being refused,
+/// so it hangs somewhere before it serves. That is the same behaviour behind this repo keeping
+/// the WASM suite off that runner, and worth its own investigation rather than a bigger
+/// number here.</para>
 ///
 /// <para>These tests need no browser and no prebuilt WASM app, so they run in every CI job
 /// rather than only where the Playwright suite does.</para>
@@ -57,6 +63,7 @@ public sealed class StaticServerFallbackTests : IDisposable
     }
 
     [Fact]
+    [Trait("Category", "StaticServer")]
     public async Task StartStaticServerAsync_SkipsCandidatesItCannotEvenStart()
     {
         Assert.SkipWhen(Python is null, "No python available to serve the fallback candidate.");
@@ -75,6 +82,7 @@ public sealed class StaticServerFallbackTests : IDisposable
     }
 
     [Fact]
+    [Trait("Category", "StaticServer")]
     public async Task StartStaticServerAsync_FallsThroughACandidateThatOutlivesItsStartup()
     {
         Assert.SkipWhen(Python is null, "No python available to serve the fallback candidate.");
