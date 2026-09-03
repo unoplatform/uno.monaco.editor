@@ -339,13 +339,16 @@ public sealed class WasmAppFixture : IAsyncLifetime
     /// then python3 (CI images), then python/py (Windows). None of them is guaranteed to exist --
     /// nothing in this repo installs dotnet-serve, so on CI the first candidate always fails and
     /// the fall-through below is the load-bearing path, not a nicety.
+    ///
+    /// <para><c>-u</c> keeps python from buffering its startup line and any traceback behind the
+    /// redirected pipe, which is what a rejected candidate's log would otherwise be missing.</para>
     /// </summary>
     internal static IReadOnlyList<StaticServerCandidate> DefaultStaticServerCandidates { get; } =
     [
         new("dotnet", (root, port) => $"serve --port {port} --directory \"{root}\""),
-        new("python3", (root, port) => $"-m http.server {port} --directory \"{root}\""),
-        new("python", (root, port) => $"-m http.server {port} --directory \"{root}\""),
-        new("py", (root, port) => $"-3 -m http.server {port} --directory \"{root}\""),
+        new("python3", (root, port) => $"-u -m http.server {port} --directory \"{root}\""),
+        new("python", (root, port) => $"-u -m http.server {port} --directory \"{root}\""),
+        new("py", (root, port) => $"-3 -u -m http.server {port} --directory \"{root}\""),
     ];
 
     /// <summary>
@@ -363,7 +366,7 @@ public sealed class WasmAppFixture : IAsyncLifetime
         string wwwrootPath,
         string logDirectory,
         IReadOnlyList<StaticServerCandidate> candidates,
-        int perCandidateTimeoutMs = 15_000)
+        int perCandidateTimeoutMs = 30_000)
     {
         var attempted = new List<string>();
 
@@ -407,12 +410,15 @@ public sealed class WasmAppFixture : IAsyncLifetime
             // stderr is the only thing that says why it was rejected.
             _ = CaptureProcessOutputAsync(process, logPath);
 
-            if (await WaitForServerReadyAsync($"http://localhost:{port}/", process, perCandidateTimeoutMs))
+            var rejection = await ProbeUntilReadyAsync(
+                $"http://localhost:{port}/", process, perCandidateTimeoutMs);
+
+            if (rejection is null)
             {
                 return new StaticServerHandle(process, port, logPath);
             }
 
-            attempted.Add($"{candidate.FileName} ({await DescribeRejectionAsync(process, logPath)})");
+            attempted.Add($"{candidate.FileName} ({await DescribeRejectionAsync(process, logPath, rejection)})");
             await TerminateServerAsync(process);
             process.Dispose();
         }
@@ -423,20 +429,25 @@ public sealed class WasmAppFixture : IAsyncLifetime
     }
 
     /// <summary>
-    /// Polls <paramref name="url"/> until it answers, returning false as soon as the server
-    /// process dies or the budget runs out. Process death is the deterministic "this command is
-    /// unusable" signal, so it is checked every pass rather than once after a fixed sleep.
+    /// Polls <paramref name="url"/> until it answers, giving up as soon as the server process dies
+    /// or the budget runs out. Process death is the deterministic "this command is unusable"
+    /// signal, so it is checked every pass rather than once after a fixed sleep.
     /// </summary>
-    private static async Task<bool> WaitForServerReadyAsync(string url, Process serverProcess, int timeoutMs)
+    /// <returns>
+    /// <c>null</c> once the server answers; otherwise why it did not, including the last probe
+    /// failure -- "never answered" alone cannot distinguish a slow start from a broken one.
+    /// </returns>
+    private static async Task<string?> ProbeUntilReadyAsync(string url, Process serverProcess, int timeoutMs)
     {
         using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        var lastProbe = "not probed yet";
 
         while (DateTime.UtcNow < deadline)
         {
             if (serverProcess.HasExited)
             {
-                return false;
+                return $"last probe of {url}: {lastProbe}";
             }
 
             try
@@ -444,24 +455,26 @@ public sealed class WasmAppFixture : IAsyncLifetime
                 using var response = await httpClient.GetAsync(url);
                 if (response.IsSuccessStatusCode)
                 {
-                    return true;
+                    return null;
                 }
+
+                lastProbe = $"HTTP {(int)response.StatusCode}";
             }
-            catch (HttpRequestException) { }
-            catch (TaskCanceledException) { }
+            catch (HttpRequestException ex) { lastProbe = ex.Message; }
+            catch (TaskCanceledException) { lastProbe = "the request timed out"; }
 
             await Task.Delay(250);
         }
 
-        return false;
+        return $"no response from {url} within {timeoutMs}ms; last probe: {lastProbe}";
     }
 
     /// <summary>Explains why a candidate was rejected, quoting whatever it managed to print.</summary>
-    private static async Task<string> DescribeRejectionAsync(Process process, string logPath)
+    private static async Task<string> DescribeRejectionAsync(Process process, string logPath, string rejection)
     {
         var state = process.HasExited
-            ? $"exited with code {process.ExitCode}"
-            : "never answered on its port";
+            ? $"exited with code {process.ExitCode}; {rejection}"
+            : $"still running; {rejection}";
 
         // The output capture writes from its own task, so give the last lines a moment to land
         // before quoting them -- this runs only on the failure path.

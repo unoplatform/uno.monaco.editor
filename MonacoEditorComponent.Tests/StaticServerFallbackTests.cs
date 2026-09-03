@@ -15,6 +15,11 @@ namespace MonacoEditorComponent.Tests;
 /// exit 1, the doomed process was returned as the winner and every WASM integration test failed
 /// without python ever being tried.</para>
 ///
+/// <para>Budgets here are generous on purpose. A cold python takes over 5s to answer on the
+/// Windows runner and over 10s on the macOS ARM one -- the same slowness that keeps the WASM
+/// suite off those jobs -- so a candidate is only ever rejected for dying, never for being
+/// slower than a number picked on a fast dev box.</para>
+///
 /// <para>These tests need no browser and no prebuilt WASM app, so they run in every CI job
 /// rather than only where the Playwright suite does.</para>
 /// </summary>
@@ -22,6 +27,13 @@ public sealed class StaticServerFallbackTests : IDisposable
 {
     /// <summary>A dotnet verb that cannot exist, so the muxer always prints and exits 1.</summary>
     private const string MissingDotnetVerb = "serve-no-such-command";
+
+    /// <summary>
+    /// How long the deliberately useless candidate lives. Long enough to still be running when
+    /// the first probe hits it -- the old code accepted anything alive after 500ms -- and short
+    /// enough that rejecting it costs the suite seconds rather than a whole timeout budget.
+    /// </summary>
+    private const int DoomedCandidateLifetimeSeconds = 3;
 
     /// <summary>
     /// The python this machine has, resolved once. Every CI runner ships one; a dev box without
@@ -63,20 +75,21 @@ public sealed class StaticServerFallbackTests : IDisposable
     }
 
     [Fact]
-    public async Task StartStaticServerAsync_FallsThroughACandidateThatStaysAliveWithoutServing()
+    public async Task StartStaticServerAsync_FallsThroughACandidateThatOutlivesItsStartup()
     {
         Assert.SkipWhen(Python is null, "No python available to serve the fallback candidate.");
 
-        // A live process that never binds the port. Surviving startup is not evidence of a
-        // working server, which is exactly what the old 500ms liveness check assumed: it would
-        // have returned this sleeper and then failed the run on a readiness timeout, with the
-        // working candidate behind it never tried.
+        // A process that is alive for the first probes and never binds the port. Surviving
+        // startup is not evidence of a working server, which is exactly what the old 500ms
+        // liveness check assumed: it would have returned this sleeper and then failed the run on
+        // a readiness timeout, with the working candidate behind it never tried.
         var handle = await StartAsync(
             [
-                new(Python!.Value.FileName, (_, _) => PythonArguments("-c \"import time; time.sleep(120)\"")),
+                new(Python!.Value.FileName,
+                    (_, _) => PythonArguments(
+                        $"-c \"import time; time.sleep({DoomedCandidateLifetimeSeconds})\"")),
                 PythonServerCandidate(),
-            ],
-            perCandidateTimeoutMs: 5_000);
+            ]);
 
         await AssertServesProbeFileAsync(handle);
     }
@@ -112,7 +125,7 @@ public sealed class StaticServerFallbackTests : IDisposable
     /// </summary>
     private async Task<WasmAppFixture.StaticServerHandle> StartAsync(
         IReadOnlyList<WasmAppFixture.StaticServerCandidate> candidates,
-        int perCandidateTimeoutMs = 10_000)
+        int perCandidateTimeoutMs = 30_000)
     {
         await File.WriteAllTextAsync(
             Path.Combine(_rootDirectory, "index.html"), "<html>static-server-probe</html>");
