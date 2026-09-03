@@ -64,6 +64,7 @@
 	<!-- Exclude TypeScript source from compile (esbuild handles it) -->
 	<ItemGroup>
 		<None Remove="ts-helpermethods\**\*.ts" />
+		<None Remove="ts-helpermethods\**\*.css" />
 		<None Remove="tsconfig.json" />
 	</ItemGroup>
 
@@ -104,24 +105,37 @@
 		links the copy in DesktopContent. Only the ".WasmCSS." infix is load-bearing; the
 		prefix is $(RootNamespace), the same one MSBuild would derive for the sibling .js
 		resource, so a rename keeps the two consistent.
+
+		Every generated path below is declared unconditionally, and that is load-bearing. These
+		files do not exist in a clean checkout — esbuild writes them from the targets at the
+		bottom of this file, which run BeforeTargets="CoreCompile". An `Exists()` condition on the
+		item is evaluated during project *evaluation*, long before any target runs, so on the first
+		build after a clean checkout it is false and the item silently disappears; the second build
+		picks it up because the first one left the file behind. That is exactly how the WASM
+		stylesheet went missing again after the WasmCSS fix above: CI never sees it, because the
+		workflow runs `npm run build` before `dotnet build`. Reproduced by clearing obj/ and
+		rebuilding, then confirmed by disabling the sheet in the running page — the multi-file
+		header fell back to Times New Roman and the collapse chevron and +/- change markers
+		rendered as tofu. Missing files are caught by ValidateEsbuildBundles instead, which runs
+		after generation and can therefore tell the truth.
 	-->
 	<ItemGroup>
 		<EmbeddedResource Include="Properties\MonacoEditorComponent.rd.xml" />
 		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.js" />
-		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.css" LogicalName="$(RootNamespace).WasmCSS.uno-monaco-helpers.css" Condition="Exists('WasmScripts\uno-monaco-helpers.css')" />
+		<EmbeddedResource Include="WasmScripts\uno-monaco-helpers.css" LogicalName="$(RootNamespace).WasmCSS.uno-monaco-helpers.css" />
 		<EmbeddedResource Include="WasmScripts\workers\editor.worker.js" />
 	</ItemGroup>
 
 	<!-- Desktop: Content files copied to output directory -->
 	<ItemGroup>
 		<Content Include="DesktopContent\editor.html" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\editor.html" />
-		<Content Include="DesktopContent\uno-monaco-helpers.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\uno-monaco-helpers.js" Condition="Exists('DesktopContent\uno-monaco-helpers.js')" />
-		<Content Include="DesktopContent\uno-monaco-helpers.css" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\uno-monaco-helpers.css" Condition="Exists('DesktopContent\uno-monaco-helpers.css')" />
-		<Content Include="DesktopContent\workers\editor.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\editor.worker.js" Condition="Exists('DesktopContent\workers\editor.worker.js')" />
-		<Content Include="DesktopContent\workers\json.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\json.worker.js" Condition="Exists('DesktopContent\workers\json.worker.js')" />
-		<Content Include="DesktopContent\workers\css.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\css.worker.js" Condition="Exists('DesktopContent\workers\css.worker.js')" />
-		<Content Include="DesktopContent\workers\html.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\html.worker.js" Condition="Exists('DesktopContent\workers\html.worker.js')" />
-		<Content Include="DesktopContent\workers\ts.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\ts.worker.js" Condition="Exists('DesktopContent\workers\ts.worker.js')" />
+		<Content Include="DesktopContent\uno-monaco-helpers.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\uno-monaco-helpers.js" />
+		<Content Include="DesktopContent\uno-monaco-helpers.css" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\uno-monaco-helpers.css" />
+		<Content Include="DesktopContent\workers\editor.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\editor.worker.js" />
+		<Content Include="DesktopContent\workers\json.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\json.worker.js" />
+		<Content Include="DesktopContent\workers\css.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\css.worker.js" />
+		<Content Include="DesktopContent\workers\html.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\html.worker.js" />
+		<Content Include="DesktopContent\workers\ts.worker.js" CopyToOutputDirectory="PreserveNewest" Link="DesktopContent\workers\ts.worker.js" />
 	</ItemGroup>
 
 	<!--
@@ -140,15 +154,23 @@
 	<!-- Rebuild Monaco JS bundles when TypeScript sources change -->
 	<ItemGroup>
 		<MonacoBundleInput Include="ts-helpermethods\**\*.ts" />
+		<MonacoBundleInput Include="ts-helpermethods\**\*.css" />
 		<MonacoBundleInput Include="ts-helpermethods\esbuild.config.mjs" />
 		<MonacoBundleInput Include="..\package.json" />
 		<MonacoBundleInput Include="..\package-lock.json" />
 	</ItemGroup>
 
+	<!--
+		The stylesheets are in Outputs as well as the scripts. Both are products of the same
+		esbuild run, but MSBuild only re-runs the target when one of the paths it is *told* about
+		has gone missing or stale: with the .js alone listed, deleting just the .css left this
+		target up to date and RestoreMonacoBundles skipped too (it tests the .js), so nothing ever
+		regenerated the stylesheet.
+	-->
 	<Target Name="BuildMonacoBundlesWhenSourcesChange"
 		BeforeTargets="CoreCompile"
 		Inputs="@(MonacoBundleInput)"
-		Outputs="WasmScripts\uno-monaco-helpers.js;DesktopContent\uno-monaco-helpers.js">
+		Outputs="WasmScripts\uno-monaco-helpers.js;WasmScripts\uno-monaco-helpers.css;DesktopContent\uno-monaco-helpers.js;DesktopContent\uno-monaco-helpers.css">
 		<Message Importance="high" Text="Monaco TypeScript sources changed — rebuilding JS bundles..." />
 		<Exec Command="npm install" WorkingDirectory="$(MSBuildThisFileDirectory).." StandardOutputImportance="low" Condition="!Exists('$(MSBuildThisFileDirectory)..\node_modules')" />
 		<Exec Command="node MonacoEditorComponent/ts-helpermethods/esbuild.config.mjs" WorkingDirectory="$(MSBuildThisFileDirectory).." />
@@ -163,26 +185,28 @@
 		<Exec Command="node MonacoEditorComponent/ts-helpermethods/esbuild.config.mjs" WorkingDirectory="$(MSBuildThisFileDirectory).." />
 	</Target>
 
-	<!-- Safety net: fail with clear message if bundles still missing after restore -->
+	<!--
+		Safety net: fail with one clear message if any generated bundle is still missing once the
+		two targets above have had their chance. Every path listed is declared unconditionally as
+		an EmbeddedResource or Content item, so a missing one is a build break regardless — this
+		only decides whether the developer reads an actionable sentence or a csc/Copy error naming
+		a single file. The stylesheets are included deliberately: they were the one pair of
+		generated outputs nothing here guarded, which is why a build that shipped without the WASM
+		stylesheet stayed silent all the way to the browser. The DesktopContent copies are checked
+		at their own paths rather than inferred from the WasmScripts originals, because the Content
+		items above are what the desktop build actually consumes.
+	-->
 	<Target Name="ValidateEsbuildBundles" BeforeTargets="CoreCompile" DependsOnTargets="RestoreMonacoBundles">
+		<ItemGroup>
+			<_MonacoGeneratedBundle Include="WasmScripts\uno-monaco-helpers.js;WasmScripts\uno-monaco-helpers.css" />
+			<_MonacoGeneratedBundle Include="WasmScripts\workers\editor.worker.js;WasmScripts\workers\json.worker.js;WasmScripts\workers\css.worker.js;WasmScripts\workers\html.worker.js;WasmScripts\workers\ts.worker.js" />
+			<_MonacoGeneratedBundle Include="DesktopContent\uno-monaco-helpers.js;DesktopContent\uno-monaco-helpers.css" />
+			<_MonacoGeneratedBundle Include="DesktopContent\workers\editor.worker.js;DesktopContent\workers\json.worker.js;DesktopContent\workers\css.worker.js;DesktopContent\workers\html.worker.js;DesktopContent\workers\ts.worker.js" />
+			<_MonacoMissingBundle Include="@(_MonacoGeneratedBundle)" Condition="!Exists('%(Identity)')" />
+		</ItemGroup>
 		<Error
-			Condition="!Exists('WasmScripts\uno-monaco-helpers.js')"
-			Text="esbuild bundle not found at WasmScripts\uno-monaco-helpers.js. Run 'npm install &amp;&amp; npm run build' from the repository root." />
-		<Error
-			Condition="!Exists('WasmScripts\workers\editor.worker.js')"
-			Text="Worker bundle not found at WasmScripts\workers\editor.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root." />
-		<Error
-			Condition="!Exists('WasmScripts\workers\json.worker.js')"
-			Text="Worker bundle not found at WasmScripts\workers\json.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root." />
-		<Error
-			Condition="!Exists('WasmScripts\workers\css.worker.js')"
-			Text="Worker bundle not found at WasmScripts\workers\css.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root." />
-		<Error
-			Condition="!Exists('WasmScripts\workers\html.worker.js')"
-			Text="Worker bundle not found at WasmScripts\workers\html.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root." />
-		<Error
-			Condition="!Exists('WasmScripts\workers\ts.worker.js')"
-			Text="Worker bundle not found at WasmScripts\workers\ts.worker.js. Run 'npm install &amp;&amp; npm run build' from the repository root." />
+			Condition="'@(_MonacoMissingBundle)' != ''"
+			Text="esbuild output missing: @(_MonacoMissingBundle, ', '). Run 'npm install &amp;&amp; npm run build' from the repository root." />
 	</Target>
 
 </Project>

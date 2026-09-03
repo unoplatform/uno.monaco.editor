@@ -336,8 +336,100 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
             throw;
         }
     }
-}
+    /// <summary>
+    /// The WASM bootstrap path for <c>MultiDiffCodeEditor</c>: a third
+    /// <c>[JSImport("globalThis.createMonacoMultiDiffEditor")]</c> entry point, with the file
+    /// list arriving afterwards through <c>ApplyInitialPropertyValues</c> rather than in a pushed
+    /// payload the way desktop delivers it.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "WasmPlaywright")]
+    public async Task MultiDiffEditor_RendersFilesWithBadgesAndComputesHunks()
+    {
+        _currentTestName = nameof(MultiDiffEditor_RendersFilesWithBadgesAndComputesHunks);
+        try
+        {
+            await _fixture.Page.WaitForFunctionAsync(
+                MultiDiffEditorCases.IsPresentExpression,
+                null, new PageWaitForFunctionOptions { Timeout = DiffTimeoutMs });
+            await _fixture.Page.WaitForFunctionAsync(
+                MultiDiffEditorCases.AllDiffsComputedExpression,
+                null, new PageWaitForFunctionOptions { Timeout = DiffTimeoutMs });
 
+            // Revealed one at a time: the widget virtualizes, so how many files have DOM at any
+            // moment depends on the viewport.
+            for (var i = 0; i < MultiDiffEditorCases.SampleFilePaths.Length; i++)
+            {
+                var path = MultiDiffEditorCases.SampleFilePaths[i];
+
+                await _fixture.Page.EvaluateAsync(MultiDiffEditorCases.RevealPathExpression, path);
+                await _fixture.Page.WaitForFunctionAsync(
+                    MultiDiffEditorCases.IsPathRenderedExpression, path,
+                    new PageWaitForFunctionOptions { Timeout = DiffTimeoutMs });
+
+                var badge = await _fixture.Page.EvaluateAsync<string>(
+                    MultiDiffEditorCases.BadgeForPathExpression, path);
+                Assert.Equal(MultiDiffEditorCases.SampleStatusBadges[i], badge);
+
+                // The header renders the file name and its directory as two spans, and the badge
+                // drops Monaco's 600 weight. Both are pure styling on desktop, but on WASM they
+                // also depend on the stylesheet reaching the page at all.
+                var parts = await _fixture.Page.EvaluateAsync<string[]>(
+                    MultiDiffEditorCases.LabelPartsForPathExpression, path);
+                var cut = path.LastIndexOf('/');
+                Assert.Equal(path[(cut + 1)..], parts[0]);
+                Assert.Equal(path[..cut], parts[1]);
+
+                var weight = await _fixture.Page.EvaluateAsync<string>(
+                    MultiDiffEditorCases.BadgeFontWeightForPathExpression, path);
+                Assert.Equal("400", weight);
+            }
+
+            var hunks = await _fixture.Page.EvaluateAsync<int[]>(
+                MultiDiffEditorCases.PerFileHunkCountsExpression);
+            Assert.NotEmpty(hunks);
+            Assert.All(hunks, count => Assert.True(count > 0, $"Every rendered file must have computed at least one hunk; got {count}."));
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Read-only on both sides of every file, plus the theme stylesheet and a real chevron
+    /// glyph -- all three come from paths that have no equivalent in the single-file control, and
+    /// all three fail silently rather than throwing.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "WasmPlaywright")]
+    public async Task MultiDiffEditor_IsReadOnlyAndFullyStyled()
+    {
+        _currentTestName = nameof(MultiDiffEditor_IsReadOnlyAndFullyStyled);
+        try
+        {
+            await _fixture.Page.WaitForFunctionAsync(
+                MultiDiffEditorCases.AllDiffsComputedExpression,
+                null, new PageWaitForFunctionOptions { Timeout = DiffTimeoutMs });
+
+            Assert.True(
+                await _fixture.Page.EvaluateAsync<bool>(MultiDiffEditorCases.AllFilesReadOnlyExpression),
+                "Every file in a MultiDiffCodeEditor must be read-only on both sides.");
+            Assert.True(
+                await _fixture.Page.EvaluateAsync<bool>(MultiDiffEditorCases.ThemeStylesheetPresentExpression),
+                "The Monaco theme stylesheet must be injected, or the widget renders unstyled.");
+            Assert.True(
+                await _fixture.Page.EvaluateAsync<bool>(MultiDiffEditorCases.ChevronGlyphRenderedExpression),
+                "The collapse chevron must resolve to a codicon glyph.");
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+}
 /// <summary>
 /// xUnit collection definition for WASM Playwright tests, sharing a single
 /// <see cref="WasmAppFixture"/> across all tests in the collection.

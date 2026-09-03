@@ -3,6 +3,14 @@ import { ParentAccessor } from './Monaco.Helpers.ParentAccessor';
 import { isDesktopHost, getConnection, sendRequestWithTimeout, retainConnection } from './bridge/jsonRpcBridge';
 import { Disposable } from 'vscode-jsonrpc/browser';
 import { EditorContext, changeTheme } from './otherScriptsToBeOrganized';
+import {
+    attachMultiDiffObservers,
+    createMultiDiffWidget,
+    disposeMultiDiffState,
+    layoutMultiDiffEditor,
+    updateMultiDiffFiles,
+    MultiDiffFile
+} from './multiDiffEditor';
 
 type MethodWithReturnId = (parameter: string) => void;
 type NumberCallback = (parameter: any) => void;
@@ -104,10 +112,12 @@ function registerDesktopHandlers(editorContext: EditorContext): Disposable[] {
     const connection = getConnection();
     const disposables: Disposable[] = [];
 
-    // editor/getValue -- returns the current editor text
+    // editor/getValue -- returns the current editor text.
+    // Optional-chained because a multi-file diff context has no single editor: its per-file
+    // editors are pooled and recycled, so there is nothing stable to read from.
     disposables.push(
         connection.onRequest('editor/getValue', () => {
-            return editorContext.editor.getValue();
+            return editorContext.editor?.getValue() ?? '';
         })
     );
 
@@ -115,7 +125,7 @@ function registerDesktopHandlers(editorContext: EditorContext): Disposable[] {
     disposables.push(
         connection.onNotification('editor/updateOptions', (params: { options: any }) => {
             if (params && params.options && typeof params.options === 'object') {
-                editorContext.editor.updateOptions(params.options);
+                editorContext.editor?.updateOptions(params.options);
             }
         })
     );
@@ -138,6 +148,11 @@ function cleanupEditorRuntimeState(editorContext: EditorContext): void {
         (editorContext as any)._resizeObserver = undefined;
     }
 
+    // Every flavor sets this, so every flavor has to clear it. Contexts are cached per element
+    // and reused across a re-bootstrap, so a handle left behind here would let a later
+    // layoutEditor() call layout() on an already-disposed widget.
+    (editorContext as any)._layoutTarget = undefined;
+
     const disposables = (editorContext as any)._rpcHandlerDisposables as Disposable[] | undefined;
     if (disposables) {
         for (const d of disposables) {
@@ -151,6 +166,13 @@ function cleanupEditorRuntimeState(editorContext: EditorContext): void {
     // models below were created explicitly by initializeMonacoDiffEditor and are not owned
     // by the widget, so they have to go too. monaco.editor.create() does own the model it
     // builds from `value`, so the plain path must not dispose it here.
+    const multiDiff = editorContext.multiDiff;
+    if (multiDiff) {
+        disposeMultiDiffState(multiDiff);
+        editorContext.multiDiff = undefined;
+        return;
+    }
+
     const diffEditor = editorContext.diffEditor;
     if (diffEditor) {
         diffEditor.dispose();
@@ -161,6 +183,13 @@ function cleanupEditorRuntimeState(editorContext: EditorContext): void {
     } else if (editorContext.editor) {
         editorContext.editor.dispose();
     }
+
+    // Drop the handles, not just dispose them. Contexts are cached per element and reused
+    // across a re-bootstrap, and layoutEditor() falls through to .editor -- a disposed editor
+    // left sitting here would be laid out. The plain path must not dispose .model, since
+    // monaco.editor.create() owns the model it builds from `value`, but it must still let go.
+    editorContext.editor = undefined;
+    editorContext.model = undefined;
 }
 
 /**
@@ -171,15 +200,20 @@ interface InitialState {
     requestedTheme: number;
     themeName: string;
     isHighContrast: boolean;
-    text: string;
-    language: string;
-    readOnly: boolean;
+    /** Absent when the control has no primary document, i.e. the multi-file diff. */
+    text?: string;
+    /** Absent when the control has no primary document, i.e. the multi-file diff. */
+    language?: string;
+    /** Absent when the control has no primary document, i.e. the multi-file diff. */
+    readOnly?: boolean;
     /** Diff editor only: the original (left-hand) document. */
     originalText?: string;
     /** Diff editor only: language of the original document; falls back to `language`. */
     originalLanguage?: string;
     /** Diff editor only: IDiffEditorOptions to apply at construction. */
     diffOptions?: any;
+    /** Multi-file diff only: the per-file documents to render. */
+    files?: MultiDiffFile[];
 }
 
 /**
@@ -261,7 +295,7 @@ const attachEditorRuntime = async (
     element: any,
     editorContext: EditorContext,
     layoutTarget: { layout(): void },
-    textPropertyName: string,
+    textPropertyName: string | null,
     initialState?: InitialState) => {
 
     (<any>editorContext).Debug = new DebugLoggerImpl(managedOwner);
@@ -269,18 +303,27 @@ const attachEditorRuntime = async (
     (<any>editorContext).Accessor = new ParentAccessor(managedOwner);
     (<any>editorContext).Theme = new ThemeListener(managedOwner);
 
-    // Listen for Content Changes
-    editorContext.model.onDidChangeContent((event) => {
-        editorContext.Accessor.setValue(textPropertyName, stringifyForMarshalling(editorContext.model.getValue()));
-    });
+    // The content and selection listeners below are the single-document surface. A multi-file
+    // diff passes no textPropertyName and leaves editor/model unset -- its per-file editors are
+    // pooled and recycled, so there is no stable one to track, and the write-back channel is a
+    // single flat property name that cannot address N files. That control reports through
+    // callActionWithParameters instead; see attachMultiDiffObservers.
+    if (textPropertyName && editorContext.model) {
+        // Listen for Content Changes
+        editorContext.model.onDidChangeContent((event) => {
+            editorContext.Accessor.setValue(textPropertyName, stringifyForMarshalling(editorContext.model.getValue()));
+        });
+    }
 
-    // Listen for Selection Changes
-    editorContext.editor.onDidChangeCursorSelection((event) => {
-        if (!editorContext.modifingSelection) {
-            editorContext.Accessor.setValue("SelectedText", stringifyForMarshalling(editorContext.model.getValueInRange(event.selection)));
-            editorContext.Accessor.setValueWithType("SelectedRange", stringifyForMarshalling(JSON.stringify(event.selection)), "Selection");
-        }
-    });
+    if (editorContext.editor && editorContext.model) {
+        // Listen for Selection Changes
+        editorContext.editor.onDidChangeCursorSelection((event) => {
+            if (!editorContext.modifingSelection) {
+                editorContext.Accessor.setValue("SelectedText", stringifyForMarshalling(editorContext.model.getValueInRange(event.selection)));
+                editorContext.Accessor.setValueWithType("SelectedRange", stringifyForMarshalling(JSON.stringify(event.selection)), "Selection");
+            }
+        });
+    }
 
     // Apply theme:
     // - Desktop with initial state: theme already applied in the construction options.
@@ -348,6 +391,9 @@ const attachEditorRuntime = async (
     const resizeObserver = new ResizeObserver(() => { layoutTarget.layout(); });
     resizeObserver.observe(element);
     (editorContext as any)._resizeObserver = resizeObserver;
+    // layoutEditor() prefers this over diffEditor/editor, so an explicit layout request reaches
+    // the same target the ResizeObserver drives -- the only handle a multi-file diff has.
+    (editorContext as any)._layoutTarget = layoutTarget;
 
     // Disable WebView Scrollbar so Monaco Scrollbar can do heavy lifting
     document.body.style.overflow = 'hidden';
@@ -424,6 +470,42 @@ export const initializeMonacoDiffEditor = async (managedOwner: any, element: any
     });
 
     await attachEditorRuntime(managedOwner, element, editorContext, diffEditor, "ModifiedText", initialState);
+};
+
+/**
+ * Initialize a Monaco multi-file diff instance, over the same element and the same lifecycle
+ * handshake the other two flavors use.
+ *
+ * Unlike those, this leaves `editorContext.editor` and `.model` unset: the widget's per-file
+ * editors are pooled and recycled by an ObjectPool, so there is no stable single editor to
+ * alias, and every inherited single-document member is inert here by design.
+ */
+export const initializeMonacoMultiDiffEditor = async (managedOwner: any, element: any, initialState?: InitialState) => {
+    const existingContext = EditorContext.tryGetEditorForElement(element);
+    if (existingContext?.editor || existingContext?.multiDiff) {
+        cleanupEditorRuntimeState(existingContext);
+    }
+
+    const editorContext = EditorContext.getEditorForElement(element);
+    const state = createMultiDiffWidget(element, initialState?.diffOptions);
+    editorContext.multiDiff = state;
+
+    if (initialState?.files?.length) {
+        updateMultiDiffFiles(element, initialState.files);
+    }
+
+    // No textPropertyName: read-only in v1, and there is no single property to write back to.
+    await attachEditorRuntime(
+        managedOwner,
+        element,
+        editorContext,
+        { layout: () => layoutMultiDiffEditor(state) },
+        null,
+        initialState);
+
+    // After attachEditorRuntime, because the observers report through editorContext.Accessor,
+    // which that call is what creates.
+    attachMultiDiffObservers(state, editorContext);
 };
 
 /**
@@ -587,6 +669,10 @@ export const createMonacoEditor = async (managedOwner: any, elementId: string, b
 /** Bootstrap entry point for DiffCodeEditor. Invoked from C# by name. */
 export const createMonacoDiffEditor = async (managedOwner: any, elementId: string, basePath: string, initialStatePayload?: InitialState | string) =>
     await bootstrapMonaco(managedOwner, elementId, initialStatePayload, 'createMonacoDiffEditor', initializeMonacoDiffEditor);
+
+/** Bootstrap entry point for MultiDiffCodeEditor. Invoked from C# by name. */
+export const createMonacoMultiDiffEditor = async (managedOwner: any, elementId: string, basePath: string, initialStatePayload?: InitialState | string) =>
+    await bootstrapMonaco(managedOwner, elementId, initialStatePayload, 'createMonacoMultiDiffEditor', initializeMonacoMultiDiffEditor);
 
 export const InvokeJS = (elementId: string, command: string): string => {
     var r = eval(`var element = globalThis.document.getElementById("${elementId}"); ${command}`) || "";

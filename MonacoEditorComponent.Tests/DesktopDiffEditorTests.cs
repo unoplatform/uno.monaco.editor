@@ -205,6 +205,37 @@ public sealed class DesktopDiffEditorTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// The <c>+</c>/<c>-</c> markers beside changed lines are dimmed past Monaco's own 0.7.
+    /// </summary>
+    /// <remarks>
+    /// Monaco's declaration is <c>!important</c>, so the component's override needs both
+    /// <c>!important</c> and a longer selector, and nothing but the computed value tells a rule
+    /// that landed from one that lost the cascade. The wait is for a computed diff rather than
+    /// for the widget, because the markers do not exist until there is a hunk to mark.
+    /// </remarks>
+    [Fact]
+    [Trait("Category", "DesktopCDP")]
+    public async Task DiffEditor_DimsTheChangeSigns()
+    {
+        _currentTestName = nameof(DiffEditor_DimsTheChangeSigns);
+        try
+        {
+            await _fixture.DiffPage.WaitForFunctionAsync(
+                DiffEditorCases.HasComputedDiffExpression,
+                null, new PageWaitForFunctionOptions { Timeout = DiffTimeoutMs });
+
+            Assert.Equal(
+                "0.4",
+                await _fixture.DiffPage.EvaluateAsync<string>(DiffEditorCases.ChangeSignOpacityExpression));
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    /// <summary>
     /// The diff widget's own stylesheet rules are the one part of the CSS payload a plain
     /// editor never exercises, so this is also the cheapest check that the diff styles reach
     /// the page at all.

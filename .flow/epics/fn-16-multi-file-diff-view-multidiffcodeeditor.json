@@ -1,0 +1,13 @@
+{
+  "branch_name": "dev/xygu/20260828/multi-file-diff-editor",
+  "created_at": "2026-08-28T07:31:48.094903Z",
+  "depends_on_epics": [],
+  "id": "fn-16-multi-file-diff-view-multidiffcodeeditor",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/fn-16-multi-file-diff-view-multidiffcodeeditor.md",
+  "status": "open",
+  "title": "Multi-file diff view (MultiDiffCodeEditor)",
+  "updated_at": "2026-08-28T07:31:48.094903Z"
+}

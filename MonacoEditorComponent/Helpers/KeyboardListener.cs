@@ -10,9 +10,9 @@ namespace Monaco.Helpers
     /// <summary>
     /// Delegate for handling keyboard events from the Monaco editor.
     /// </summary>
-    /// <param name="sender">The <see cref="CodeEditorBase"/> that raised the event.</param>
+    /// <param name="sender">The <see cref="EditorHostBase"/> that raised the event.</param>
     /// <param name="args">The key event arguments.</param>
-    public delegate void WebKeyEventHandler(CodeEditorBase sender, WebKeyEventArgs args);
+    public delegate void WebKeyEventHandler(EditorHostBase sender, WebKeyEventArgs args);
 
     /// <summary>
     /// Provides data for keyboard events raised by the Monaco editor.
@@ -40,7 +40,7 @@ namespace Monaco.Helpers
 
     /// <summary>
     /// Listens for keyboard events from the Monaco editor and routes them to the parent
-    /// <see cref="CodeEditorBase"/>. On WASM, events arrive via JSExport; on desktop, via JSON-RPC.
+    /// <see cref="EditorHostBase"/>. On WASM, events arrive via JSExport; on desktop, via JSON-RPC.
     /// </summary>
     [AllowForWeb]
     public sealed partial class KeyboardListener : IKeyboardListener

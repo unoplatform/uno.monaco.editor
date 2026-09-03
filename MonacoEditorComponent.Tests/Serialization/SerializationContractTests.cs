@@ -28,6 +28,68 @@ public class SerializationContractTests
     #region Diff editor types
 
     /// <summary>
+    /// The whole added/deleted/renamed rendering of <c>MultiDiffCodeEditor</c> hangs on this wire
+    /// shape. A <see langword="null"/> side must be *absent* from the payload -- that absence is
+    /// what makes the JS layer omit the model and Monaco badge the file <c>A</c> or <c>D</c> --
+    /// while an empty string must survive as an empty string, meaning a real but empty file.
+    /// <c>WhenWritingNull</c> is what separates the two, and nothing else in the pipeline would
+    /// notice if it were dropped: the file would simply render as a full deletion instead.
+    /// </summary>
+    [Fact]
+    public void Serialize_DiffFileEntry_DistinguishesNullFromEmptyString()
+    {
+        var added = new DiffFileEntry
+        {
+            Path = "src/New.cs",
+            OriginalText = null,
+            ModifiedText = "class New { }",
+        };
+
+        var emptied = new DiffFileEntry
+        {
+            Path = "src/Emptied.cs",
+            OriginalText = "class Emptied { }",
+            ModifiedText = string.Empty,
+        };
+
+        var addedJson = JsonSerializer.Serialize(added, MonacoJsonContext.Default.DiffFileEntry);
+        var emptiedJson = JsonSerializer.Serialize(emptied, MonacoJsonContext.Default.DiffFileEntry);
+
+        Assert.DoesNotContain("originalText", addedJson, StringComparison.Ordinal);
+        Assert.Contains("\"modifiedText\":\"class New { }\"", addedJson, StringComparison.Ordinal);
+
+        Assert.Contains("\"modifiedText\":\"\"", emptiedJson, StringComparison.Ordinal);
+        Assert.Contains("\"originalText\":\"class Emptied { }\"", emptiedJson, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The array form is what actually crosses the boundary -- both in the desktop initial-state
+    /// payload and in every <c>updateMultiDiffFiles</c> push -- so it is registered and pinned
+    /// separately from the element type.
+    /// </summary>
+    [Fact]
+    public void Serialize_DiffFileEntryArray_PreservesOrderAndRenames()
+    {
+        DiffFileEntry[] files =
+        [
+            new() { Path = "a.cs", OriginalText = "a", ModifiedText = "a1" },
+            new() { Path = "docs/new.md", OriginalPath = "docs/old.md", OriginalText = "o", ModifiedText = "n", Language = "markdown" },
+        ];
+
+        var json = JsonSerializer.Serialize(files, MonacoJsonContext.Default.DiffFileEntryArray);
+
+        Assert.StartsWith("[{", json, StringComparison.Ordinal);
+        Assert.True(json.IndexOf("a.cs", StringComparison.Ordinal) < json.IndexOf("docs/new.md", StringComparison.Ordinal),
+            "File order is display order and must survive serialization.");
+        Assert.Contains("\"originalPath\":\"docs/old.md\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"language\":\"markdown\"", json, StringComparison.Ordinal);
+
+        // Unset optional members stay absent rather than serializing as null.
+        Assert.DoesNotContain("\"originalPath\":null", json, StringComparison.Ordinal);
+    }
+
+
+    /// <summary>
     /// <c>GetLineChangesAsync</c> deserializes Monaco's <c>getLineChanges()</c> payload into
     /// this shape, so the property names and the inherited <see cref="Change"/> members have to
     /// match the wire exactly. The members are hand-authored with <c>[JsonInclude]</c> and

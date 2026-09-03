@@ -192,7 +192,7 @@ namespace MonacoEditorTestApp
             Debug.WriteLine("Property changed - " + e.PropertyName);
         }
 
-        private void Editor_InternalException(CodeEditorBase sender, Exception args)
+        private void Editor_InternalException(EditorHostBase sender, Exception args)
         {
             // This shouldn't happen, if it does, then it's a bug.
         }
@@ -705,7 +705,7 @@ namespace MonacoEditorTestApp
                 .Replace("\r", "\\r", StringComparison.Ordinal)
                 .Replace("\n", "\\n", StringComparison.Ordinal)}\"";
 
-        private void Editor_OpenLinkRequest(CodeEditorBase sender, OpenLinkRequestedEventArgs args)
+        private void Editor_OpenLinkRequest(EditorHostBase sender, OpenLinkRequestedEventArgs args)
         {
             if (this.AllowWeb.IsChecked == false)
             {
@@ -781,7 +781,7 @@ namespace MonacoEditorTestApp
         }
 
         // Note: Can't make this method async as otherwise handled won't be read for intercepts.
-        private void Editor_KeyDown(CodeEditorBase sender, WebKeyEventArgs e)
+        private void Editor_KeyDown(EditorHostBase sender, WebKeyEventArgs e)
         {
             Debug.WriteLine("KeyDown: " + e.KeyCode + " " + e.CtrlKey);
 

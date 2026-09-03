@@ -102,6 +102,8 @@ namespace Monaco.Serialization;
 [JsonSerializable(typeof(IModelDeltaDecoration[]))]
 [JsonSerializable(typeof(ISingleEditOperation[]))]
 [JsonSerializable(typeof(IRelatedInformation[]))]
+[JsonSerializable(typeof(DiffFileEntry))]
+[JsonSerializable(typeof(DiffFileEntry[]))]
 [JsonSerializable(typeof(LineChange[]))]
 [JsonSerializable(typeof(CharChange[]))]
 [JsonSerializable(typeof(CompletionItem[]))]

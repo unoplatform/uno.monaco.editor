@@ -11,7 +11,7 @@ using Windows.Foundation;
 namespace Monaco
 {
     /// <summary>
-    /// Action delegate for <see cref="CodeEditorBase.AddCommandAsync(int, CommandHandler)"/> and <see cref="CodeEditorBase.AddCommandAsync(int, CommandHandler, string)"/>.
+    /// Action delegate for <see cref="EditorHostBase.AddCommandAsync(int, CommandHandler)"/> and <see cref="EditorHostBase.AddCommandAsync(int, CommandHandler, string)"/>.
     /// </summary>
     public delegate void CommandHandler(object?[] parameters);
 
@@ -22,7 +22,7 @@ namespace Monaco
     /// See <see href="https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor_editor_api.editor.ICodeEditor.html">ICodeEditor</see>
     /// for the upstream Monaco API surface.
     /// </remarks>
-    public abstract partial class CodeEditorBase
+    public abstract partial class EditorHostBase
     {
         #region Reveal Methods
         /// <summary>
@@ -163,16 +163,29 @@ namespace Monaco
         /// <exception cref="InvalidOperationException">
         /// Thrown when the editor is not yet initialized. Call this method after <see cref="EditorLoaded"/> fires.
         /// </exception>
-        /// <remarks>Wraps Monaco <c>editor.addAction</c>.</remarks>
+        /// <remarks>
+        /// Wraps Monaco <c>editor.addAction</c>. Inert on a control whose
+        /// <see cref="HasPrimaryDocument"/> is <see langword="false"/>: nothing is registered and
+        /// the returned action completes immediately.
+        /// </remarks>
         public IAsyncAction AddActionAsync(IActionDescriptor action)
         {
+            // There is no single editor to attach the action to, which is why the JS addAction
+            // no-ops here too. Returning before RegisterActionWithParameters is the point: the
+            // accessor holds registrations for the life of the control, so one that can never
+            // fire is a leak that grows with every call.
+            if (!HasPrimaryDocument)
+            {
+                return Task.CompletedTask.AsAsyncAction();
+            }
+
             if (_parentAccessor is null)
             {
                 throw new InvalidOperationException(
                     "The editor bridge is not initialized. Call AddActionAsync after EditorLoaded fires.");
             }
 
-            var wref = new WeakReference<CodeEditorBase>(this);
+            var wref = new WeakReference<EditorHostBase>(this);
             _parentAccessor.RegisterActionWithParameters("Action" + action.Id, (parameters) =>
             {
                 if (!wref.TryGetTarget(out var editor))
@@ -261,10 +274,19 @@ namespace Monaco
         /// <remarks>
         /// Wraps Monaco <c>editor.addCommand</c>. Command parameters arrive as
         /// <see cref="System.Text.Json.JsonElement"/> instances (breaking change from the
-        /// prior Newtonsoft <c>JObject</c> return type).
+        /// prior Newtonsoft <c>JObject</c> return type). Inert on a control whose
+        /// <see cref="HasPrimaryDocument"/> is <see langword="false"/>: nothing is registered
+        /// and the result is <see langword="null"/>.
         /// </remarks>
         public async Task<string?> AddCommandAsync(int keybinding, CommandHandler handler, string context)
         {
+            // Same leak as AddActionAsync: no single editor to bind the command to, so the
+            // handler registration would outlive every chance of being invoked.
+            if (!HasPrimaryDocument)
+            {
+                return null;
+            }
+
             if (_parentAccessor is null)
             {
                 throw new InvalidOperationException(

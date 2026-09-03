@@ -76,7 +76,7 @@ namespace Monaco
         public event EventHandler<WebViewMessageEventArgs>? MessageReceived;
 
         /// <inheritdoc />
-        public CodeEditorBase? ParentCodeEditor { get; set; }
+        public EditorHostBase? ParentCodeEditor { get; set; }
 
         /// <summary>
         /// The underlying WebView2 instance. Exposed for Task 5 to attach
@@ -272,7 +272,7 @@ namespace Monaco
                 DetachEventHandlers();
                 Debug.WriteLine($"DesktopCodeEditorPresenter.Launch error: {e}");
 
-                // Re-throw so callers (CodeEditorBase) can detect failure and abort lifecycle.
+                // Re-throw so callers (EditorHostBase) can detect failure and abort lifecycle.
                 throw;
             }
             finally
@@ -558,7 +558,7 @@ namespace Monaco
             // Block external navigation in WebView2
             args.Handled = true;
 
-            // Map WebView2 args into portable type so CodeEditorBase receives the URI
+            // Map WebView2 args into portable type so EditorHostBase receives the URI
             var presenterArgs = new PresenterNewWindowRequestedEventArgs
             {
                 Uri = global::System.Uri.TryCreate(args.Uri, UriKind.Absolute, out var parsed) ? parsed : null
@@ -780,8 +780,8 @@ namespace Monaco
         internal JsonRpc? Rpc => _jsonRpc;
 
         /// <summary>
-        /// Creates the bridge targets and returns them for registration on CodeEditorBase.
-        /// Called from <see cref="CodeEditorBase.InitialiseWebObjects"/> on the desktop path.
+        /// Creates the bridge targets and returns them for registration on EditorHostBase.
+        /// Called from <see cref="EditorHostBase.InitialiseWebObjects"/> on the desktop path.
         /// Recreates the JsonRpc instance to ensure a clean target registration --
         /// prevents stale target accumulation across unload/reload cycles.
         /// </summary>
@@ -861,7 +861,7 @@ namespace Monaco
 
         /// <summary>
         /// Emits an editor/lifecycleUpdate notification via JSON-RPC with current
-        /// EditorLoading/EditorLoaded counts. Called by <see cref="CodeEditorBase"/>
+        /// EditorLoading/EditorLoaded counts. Called by <see cref="EditorHostBase"/>
         /// when lifecycle events fire.
         /// Gated on CoreWebView2 initialization -- early lifecycle transitions
         /// (e.g., Loading before Launch()) are counted but not sent until the

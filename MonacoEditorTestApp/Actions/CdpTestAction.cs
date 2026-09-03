@@ -18,7 +18,7 @@ internal sealed class CdpTestAction(string id, Action callback) : IActionDescrip
     public string? Label => "CDP Test Action";
     public string? Precondition => null;
 
-    public void Run(CodeEditorBase editor, object[]? args)
+    public void Run(EditorHostBase editor, object[]? args)
     {
         callback();
     }

@@ -59,6 +59,15 @@ namespace MonacoEditorTestApp
                 AddDiffEditorTab();
             }
 
+            if (OperatingSystem.IsBrowser() || Environment.GetEnvironmentVariable("MONACO_MULTIDIFF_TAB") == "1")
+            {
+                ShowMultiDiffPanel();
+            }
+            else
+            {
+                AddMultiDiffEditorTab();
+            }
+
             if (Environment.GetEnvironmentVariable("MONACO_SELF_VERIFY") == "1")
             {
                 await RunSelfVerifyScenarioAsync();
@@ -86,6 +95,24 @@ namespace MonacoEditorTestApp
             DiffPanelRow.Height = new GridLength(1, GridUnitType.Star);
             DiffPanelHost.Visibility = Visibility.Visible;
             DiffPanelHost.Content = new DiffEditorControl();
+        }
+
+        private void ShowMultiDiffPanel()
+        {
+            MultiDiffPanelRow.Height = new GridLength(1, GridUnitType.Star);
+            MultiDiffPanelHost.Visibility = Visibility.Visible;
+            MultiDiffPanelHost.Content = new MultiDiffEditorControl();
+        }
+
+        private void AddMultiDiffEditorTab()
+        {
+            var tabItem = new TabViewItem
+            {
+                IconSource = new Microsoft.UI.Xaml.Controls.SymbolIconSource() { Symbol = Symbol.List },
+                Header = "multi-diff",
+                Content = new MultiDiffEditorControl()
+            };
+            editors.TabItems.Add(tabItem);
         }
 
         private void AddDiffEditorTab()

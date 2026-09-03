@@ -1,0 +1,54 @@
+<UserControl x:Class="MonacoEditorTestApp.MultiDiffEditorControl"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:local="using:MonacoEditorTestApp"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:monaco="using:Monaco"
+      mc:Ignorable="d">
+
+    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    Padding="8">
+            <Button x:Name="CollapseAllButton"
+                    Content="Collapse all"
+                    Click="CollapseAll_Click" />
+            <Button x:Name="ExpandAllButton"
+                    Content="Expand all"
+                    Click="ExpandAll_Click" />
+            <Button x:Name="RevealLastButton"
+                    Content="Reveal last file"
+                    Click="RevealLast_Click" />
+            <Button x:Name="AppendTextButton"
+                    Content="Append to first file"
+                    Click="AppendText_Click" />
+            <Button x:Name="AddFileButton"
+                    Content="Add file"
+                    Click="AddFile_Click" />
+            <Button x:Name="RemoveFileButton"
+                    Content="Remove last file"
+                    Click="RemoveFile_Click" />
+            <ToggleSwitch x:Name="SideBySideToggle"
+                          Header="Side by side"
+                          IsOn="True"
+                          Toggled="SideBySide_Toggled" />
+        </StackPanel>
+
+        <monaco:MultiDiffCodeEditor x:Name="MultiDiff"
+                                    Grid.Row="1"
+                                    DiffUpdated="MultiDiff_DiffUpdated" />
+
+        <TextBlock x:Name="SummaryText"
+                   Grid.Row="2"
+                   Padding="8"
+                   Text="Waiting for the first diff computation..." />
+    </Grid>
+</UserControl>

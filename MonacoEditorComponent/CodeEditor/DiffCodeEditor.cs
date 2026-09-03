@@ -18,18 +18,18 @@ namespace Monaco
     /// </summary>
     /// <remarks>
     /// Shares the host, lifecycle, and bridge with <see cref="CodeEditor"/> through
-    /// <see cref="CodeEditorBase"/>; only the bootstrap entry point and the text properties
+    /// <see cref="EditorHostBase"/>; only the bootstrap entry point and the text properties
     /// differ.
     /// <para>
     /// The modified (right-hand) document is the editable one, and it is what the inherited
-    /// members act on: <see cref="CodeEditorBase.SelectedText"/>,
-    /// <see cref="CodeEditorBase.Decorations"/>, <see cref="CodeEditorBase.Markers"/>,
-    /// <see cref="CodeEditorBase.Options"/>, cursor position, and actions and commands all
+    /// members act on: <see cref="EditorHostBase.SelectedText"/>,
+    /// <see cref="EditorHostBase.Decorations"/>, <see cref="EditorHostBase.Markers"/>,
+    /// <see cref="EditorHostBase.Options"/>, cursor position, and actions and commands all
     /// target it. Diff-specific configuration lives on <see cref="DiffOptions"/> instead,
     /// because Monaco keeps the two option sets in separate sinks.
     /// </para>
     /// </remarks>
-    public sealed partial class DiffCodeEditor : CodeEditorBase
+    public sealed partial class DiffCodeEditor : EditorHostBase
     {
         /// <summary>
         /// Occurs when Monaco finishes recomputing the diff, whether because either
@@ -88,7 +88,7 @@ namespace Monaco
         protected override string BootstrapFunctionName => "createMonacoDiffEditor";
 
         /// <inheritdoc />
-        protected internal override bool IsDiffEditor => true;
+        internal override EditorFlavor Flavor => EditorFlavor.Diff;
 
         /// <inheritdoc />
         protected override string? PrimaryText => ModifiedText;
@@ -181,6 +181,79 @@ namespace Monaco
             }
 
             await InvokeScriptAsync("updateDiffOptions", options);
+        }
+
+        private async void OnOriginalTextChanged(DependencyPropertyChangedEventArgs e)
+        {
+            if (IsEditorLoaded && !IsSettingValue)
+            {
+                // link:otherScriptsToBeOrganized.ts:updateOriginalContent
+                await InvokeScriptAsync("updateOriginalContent", e.NewValue?.ToString() ?? string.Empty);
+            }
+
+            NotifyPropertyChanged(nameof(OriginalText));
+        }
+
+        private async void OnModifiedTextChanged(DependencyPropertyChangedEventArgs e)
+        {
+            if (IsEditorLoaded && !IsSettingValue)
+            {
+                // link:otherScriptsToBeOrganized.ts:updateContent
+                await InvokeScriptAsync("updateContent", e.NewValue?.ToString() ?? string.Empty);
+            }
+
+            NotifyPropertyChanged(nameof(ModifiedText));
+        }
+
+        private async void OnOriginalLanguageChanged(DependencyPropertyChangedEventArgs e)
+        {
+            if (IsEditorLoaded)
+            {
+                // link:otherScriptsToBeOrganized.ts:updateOriginalLanguage
+                await InvokeScriptAsync("updateOriginalLanguage", EffectiveOriginalLanguage);
+            }
+        }
+
+        private void OnOriginalEditableChanged(DependencyPropertyChangedEventArgs e)
+        {
+            // Writing into the options object is the entire push: its PropertyChanged handler
+            // forwards to Monaco once the editor is up, and before that the same instance is
+            // what BuildInitialStateMap and ApplyInitialPropertyValues serialize. Nothing is
+            // sent from here.
+            DiffOptions?.OriginalEditable = (bool)e.NewValue;
+        }
+
+        private async void OnDiffOptionsChanged(DependencyPropertyChangedEventArgs e)
+        {
+            // Subscribing here (rather than on load, as the inherited Options property does) is
+            // enough: the options object lives as long as the control, and pre-initialization
+            // pushes are no-ops that ApplyInitialPropertyValues covers when the editor comes up.
+            if (e.OldValue is DiffEditorOptions oldValue)
+            {
+                oldValue.PropertyChanged -= DiffOptions_PropertyChanged;
+            }
+
+            if (e.NewValue is not DiffEditorOptions value)
+            {
+                return;
+            }
+
+            value.PropertyChanged -= DiffOptions_PropertyChanged;
+            value.PropertyChanged += DiffOptions_PropertyChanged;
+
+            // Same adoption rule the base applies to Options at load: an explicit value on the
+            // incoming instance seeds an untouched pass-through property, and an untouched
+            // instance does not clear one that was set.
+            if (value.OriginalEditable is { } originalEditable
+                && ReadLocalValue(OriginalEditableProperty) == DependencyProperty.UnsetValue)
+            {
+                OriginalEditable = originalEditable;
+            }
+
+            if (IsEditorLoaded)
+            {
+                await InvokeScriptAsync("updateDiffOptions", value);
+            }
         }
     }
 }

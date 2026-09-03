@@ -90,6 +90,13 @@ export class EditorContext {
     public diffEditor?: monaco.editor.IStandaloneDiffEditor;
     /** The original (left-hand) model. Set only for a diff editor. */
     public originalModel?: monaco.editor.ITextModel;
+    /**
+     * Set only for a multi-file diff. This context shape cannot express N documents -- there is
+     * one `model` and one `originalModel`, and the write-back channel is a single flat property
+     * name -- so the multi-file state hangs off here instead, and `editor`/`model` stay unset.
+     * Typed loosely to keep this module free of the multiDiffEditor import.
+     */
+    public multiDiff?: any;
     public contexts: { [index: string]: monaco.editor.IContextKey<any> };
     public decorations: string[];
     public modifingSelection: boolean;
@@ -153,11 +160,21 @@ export const addAction = function (element: any, action: monaco.editor.IActionDe
         editorContext.Accessor.callActionWithParameters2("Action" + action.id, objs);
     };
 
-    editorContext.editor.addAction(action);
+    // Optional: a multi-file diff context has no single editor to add the action to.
+    editorContext.editor?.addAction(action);
 };
 
 export const addCommand = function (element: any, keybindingStr: string, handlerName: string, context: string) {
     var editorContext = EditorContext.getEditorForElement(element);
+
+    if (!editorContext.editor) {
+        // A multi-file diff context has no single editor to bind to. Return null, not undefined:
+        // Monaco's own addCommand returns string | null, and undefined only survives the bridge
+        // by accident -- WASM coerces it through `eval(...) || ""` in InvokeJS, and WebView2
+        // stringifies it to "null". Both are read as "no command" on the C# side, but being
+        // explicit means the contract stops resting on either coercion.
+        return null;
+    }
 
     return editorContext.editor.addCommand(parseInt(keybindingStr), function () {
         const objs: string[] = [];
@@ -173,7 +190,7 @@ export const addCommand = function (element: any, keybindingStr: string, handler
 export const createContext = function (element: any, context: any) {
     var editorContext = EditorContext.getEditorForElement(element);
 
-    if (context) {
+    if (context && editorContext.editor) {
         editorContext.contexts[context.key] = editorContext.editor.createContextKey(context.key, context.defaultValue);
     }
 };
@@ -181,7 +198,9 @@ export const createContext = function (element: any, context: any) {
 export const updateContext = function (element: any, key: string, value: any) {
     var editorContext = EditorContext.getEditorForElement(element);
 
-    editorContext.contexts[key].set(value);
+    // Optional: createContext skips a context with no single editor -- a multi-file diff --
+    // so the key legitimately has nothing behind it here.
+    editorContext.contexts[key]?.set(value);
 }
 
 export const updateContent = function (element: any, content: string) {
@@ -194,6 +213,10 @@ export const updateContent = function (element: any, content: string) {
 
 export const updateDecorations = function (element: any, newHighlights: any) {
     var editorContext = EditorContext.getEditorForElement(element);
+
+    if (!editorContext.editor) {
+        return;
+    }
 
     if (newHighlights) {
         editorContext.decorations = editorContext.editor.deltaDecorations(editorContext.decorations, newHighlights);
@@ -234,7 +257,7 @@ export const updateOptions = function (element: any, opt: monaco.editor.IEditorO
     var editorContext = EditorContext.getEditorForElement(element);
 
     if (opt !== null && typeof opt === "object") {
-        editorContext.editor.updateOptions(opt);
+        editorContext.editor?.updateOptions(opt);
     }
 };
 
@@ -341,7 +364,10 @@ export const layoutEditor = function (element: any) {
         return;
     }
 
-    const target = editorContext.diffEditor ?? editorContext.editor;
+    // _layoutTarget is what attachEditorRuntime drives from its ResizeObserver, and it is the
+    // only handle a multi-file diff has: that widget does not self-size and is not laid out
+    // through an editor instance.
+    const target = (editorContext as any)._layoutTarget ?? editorContext.diffEditor ?? editorContext.editor;
     if (target) {
         target.layout();
     }

@@ -25,7 +25,21 @@ internal static class DiffEditorCases
     public const string StandaloneEditorsExpressionBody =
         "(() => { const subs = new Set(monaco.editor.getDiffEditors()" +
         ".flatMap(d => [d.getOriginalEditor(), d.getModifiedEditor()]));" +
-        " return monaco.editor.getEditors().filter(e => !subs.has(e)); })()";
+        " return monaco.editor.getEditors().filter(e => !subs.has(e)" +
+        " && !e.getDomNode()?.closest('.multiDiffEditor')); })()";
+
+    /// <summary>
+    /// The diff editors on the page that belong to a <c>DiffCodeEditor</c>, as a JS array.
+    /// </summary>
+    /// <remarks>
+    /// Every per-file editor a <c>MultiDiffCodeEditor</c> renders is itself a
+    /// <c>DiffEditorWidget</c> and registers with the same code editor service, so
+    /// <c>monaco.editor.getDiffEditors()</c> lists those too -- and because that widget
+    /// virtualizes, how many it lists changes as the user scrolls. Scoping by DOM containment
+    /// rather than by count or index is what keeps these assertions deterministic.
+    /// </remarks>
+    public const string StandaloneDiffEditorsExpressionBody =
+        "monaco.editor.getDiffEditors().filter(d => !d.getContainerDomNode().closest('.multiDiffEditor'))";
 
     /// <summary>Number of editors on the page that are not part of a diff widget.</summary>
     public const string StandaloneEditorCountExpression =
@@ -37,23 +51,23 @@ internal static class DiffEditorCases
 
     /// <summary>Whether the page hosts a Monaco diff editor at all.</summary>
     public const string IsDiffEditorPresentExpression =
-        "() => typeof monaco !== 'undefined' && monaco.editor.getDiffEditors().length > 0";
+        "() => typeof monaco !== 'undefined' && " + StandaloneDiffEditorsExpressionBody + ".length > 0";
 
     /// <summary>The original (left) document's text.</summary>
     public const string OriginalValueExpression =
-        "() => monaco.editor.getDiffEditors()[0].getOriginalEditor().getValue()";
+        "() => " + StandaloneDiffEditorsExpressionBody + "[0].getOriginalEditor().getValue()";
 
     /// <summary>The modified (right) document's text.</summary>
     public const string ModifiedValueExpression =
-        "() => monaco.editor.getDiffEditors()[0].getModifiedEditor().getValue()";
+        "() => " + StandaloneDiffEditorsExpressionBody + "[0].getModifiedEditor().getValue()";
 
     /// <summary>The original document's language id.</summary>
     public const string OriginalLanguageExpression =
-        "() => monaco.editor.getDiffEditors()[0].getOriginalEditor().getModel().getLanguageId()";
+        "() => " + StandaloneDiffEditorsExpressionBody + "[0].getOriginalEditor().getModel().getLanguageId()";
 
     /// <summary>The modified document's language id.</summary>
     public const string ModifiedLanguageExpression =
-        "() => monaco.editor.getDiffEditors()[0].getModifiedEditor().getModel().getLanguageId()";
+        "() => " + StandaloneDiffEditorsExpressionBody + "[0].getModifiedEditor().getModel().getLanguageId()";
 
     /// <summary>
     /// The two models must be distinct instances. A regression that pointed both sides at one
@@ -61,7 +75,7 @@ internal static class DiffEditorCases
     /// is checked explicitly rather than inferred from the hunk count.
     /// </summary>
     public const string ModelsAreDistinctExpression =
-        "() => { const d = monaco.editor.getDiffEditors()[0];" +
+        "() => { const d = " + StandaloneDiffEditorsExpressionBody + "[0];" +
         " return d.getOriginalEditor().getModel() !== d.getModifiedEditor().getModel(); }";
 
     /// <summary>
@@ -70,7 +84,7 @@ internal static class DiffEditorCases
     /// distinction the C# API deliberately drops.
     /// </summary>
     public const string LineChangeCountExpression =
-        "() => { const c = monaco.editor.getDiffEditors()[0].getLineChanges(); return c === null ? -1 : c.length; }";
+        "() => { const c = " + StandaloneDiffEditorsExpressionBody + "[0].getLineChanges(); return c === null ? -1 : c.length; }";
 
     /// <summary>
     /// Whether the diff widget's root element carries Monaco's <c>.monaco-diff-editor</c>
@@ -79,7 +93,23 @@ internal static class DiffEditorCases
     /// one part of the payload a plain editor never exercises.
     /// </summary>
     public const string DiffEditorRootExpression =
-        "() => document.querySelectorAll('.monaco-diff-editor').length > 0";
+        "() => [...document.querySelectorAll('.monaco-diff-editor')]" +
+        ".some(e => !e.closest('.multiDiffEditor'))";
+
+    /// <summary>
+    /// The computed opacity of the <c>+</c>/<c>-</c> marker Monaco draws in the line-decorations
+    /// margin ahead of an inserted or deleted line, or <c>null</c> when no marker is on the page.
+    /// </summary>
+    /// <remarks>
+    /// Monaco declares <c>opacity: 0.7 !important</c> on these; the component dims them further,
+    /// which means its own rule has to carry <c>!important</c> too and outrank Monaco's on
+    /// specificity. Only the computed value distinguishes a rule that landed from one that lost
+    /// the cascade -- the marker is an empty codicon element, so nothing else about it is
+    /// observable. It exists only once a hunk has been computed.
+    /// </remarks>
+    public const string ChangeSignOpacityExpression =
+        "() => { const sign = document.querySelector('.insert-sign, .delete-sign');" +
+        " return sign === null ? null : getComputedStyle(sign).opacity; }";
 
     /// <summary>
     /// Waits until Monaco has computed a diff with at least one hunk. Diff computation is
@@ -87,7 +117,7 @@ internal static class DiffEditorCases
     /// tests must wait rather than read immediately after load.
     /// </summary>
     public const string HasComputedDiffExpression =
-        "() => { const editors = monaco.editor.getDiffEditors();" +
+        "() => { const editors = " + StandaloneDiffEditorsExpressionBody + ";" +
         " if (!editors.length) return false;" +
         " const c = editors[0].getLineChanges(); return c !== null && c.length > 0; }";
 
@@ -96,14 +126,14 @@ internal static class DiffEditorCases
     /// "not computed yet", which reports null rather than an empty array.
     /// </summary>
     public const string NoRemainingHunksExpression =
-        "() => { const c = monaco.editor.getDiffEditors()[0].getLineChanges(); return c !== null && c.length === 0; }";
+        "() => { const c = " + StandaloneDiffEditorsExpressionBody + "[0].getLineChanges(); return c !== null && c.length === 0; }";
 
     /// <summary>
     /// Replaces the modified document's text, so a test can drive a recomputation the same way
     /// a user typing would. Returns nothing; pair with <see cref="HasComputedDiffExpression"/>.
     /// </summary>
     public const string SetModifiedValueExpression =
-        "(value) => monaco.editor.getDiffEditors()[0].getModifiedEditor().getModel().setValue(value)";
+        "(value) => " + StandaloneDiffEditorsExpressionBody + "[0].getModifiedEditor().getModel().setValue(value)";
 
     /// <summary>
     /// Whether the original (left) sub-editor is read-only. Monaco derives this from the diff
@@ -116,7 +146,7 @@ internal static class DiffEditorCases
     /// numeric value, which shifts between Monaco releases.
     /// </remarks>
     public const string OriginalEditorReadOnlyExpression =
-        "() => monaco.editor.getDiffEditors()[0].getOriginalEditor().getOption(monaco.editor.EditorOption.readOnly)";
+        "() => " + StandaloneDiffEditorsExpressionBody + "[0].getOriginalEditor().getOption(monaco.editor.EditorOption.readOnly)";
 
     /// <summary>
     /// Waits until the original side is present and locked. Phrased as a wait rather than a
@@ -124,7 +154,7 @@ internal static class DiffEditorCases
     /// exist for a moment before they reach it.
     /// </summary>
     public const string OriginalEditorLockedExpression =
-        "() => { const editors = monaco.editor.getDiffEditors(); if (!editors.length) return false;" +
+        "() => { const editors = " + StandaloneDiffEditorsExpressionBody + "; if (!editors.length) return false;" +
         " return editors[0].getOriginalEditor().getOption(monaco.editor.EditorOption.readOnly) === true; }";
 
     /// <summary>
@@ -133,7 +163,7 @@ internal static class DiffEditorCases
     /// the original's lock must not have leaked across to the modified one.
     /// </summary>
     public const string ModifiedEditorReadOnlyExpression =
-        "() => monaco.editor.getDiffEditors()[0].getModifiedEditor().getOption(monaco.editor.EditorOption.readOnly)";
+        "() => " + StandaloneDiffEditorsExpressionBody + "[0].getModifiedEditor().getOption(monaco.editor.EditorOption.readOnly)";
 
     /// <summary>
     /// Whether Monaco's own stylesheet reached the page, rather than only the theme rules

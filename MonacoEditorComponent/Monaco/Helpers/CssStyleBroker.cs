@@ -5,7 +5,7 @@ using System.Text;
 namespace Monaco.Helpers
 {
     /// <summary>
-    /// Broker to help manage CSS Styles and their usage within each CodeEditorBase. Lifetime managed by CodeEditorBase.
+    /// Broker to help manage CSS Styles and their usage within each EditorHostBase. Lifetime managed by EditorHostBase.
     /// </summary>
     internal sealed class CssStyleBroker : IDisposable
     {
@@ -14,15 +14,15 @@ namespace Monaco.Helpers
         // Track styles registered to this particular editor.
         private static readonly Dictionary<uint, WeakReference<ICssStyle>> _registry = [];
 
-        private static readonly Dictionary<WeakReference<CodeEditorBase>, HashSet<uint>> _knownStyles = [];
+        private static readonly Dictionary<WeakReference<EditorHostBase>, HashSet<uint>> _knownStyles = [];
 
-        private static readonly Dictionary<WeakReference<CodeEditorBase>, bool> _isDirty = [];
+        private static readonly Dictionary<WeakReference<EditorHostBase>, bool> _isDirty = [];
 
-        private readonly WeakReference<CodeEditorBase> _parent;
+        private readonly WeakReference<EditorHostBase> _parent;
 
-        public CssStyleBroker(CodeEditorBase codeEditor)
+        public CssStyleBroker(EditorHostBase codeEditor)
         {
-            _parent = new WeakReference<CodeEditorBase>(codeEditor);
+            _parent = new WeakReference<EditorHostBase>(codeEditor);
             _knownStyles.Add(_parent, []);
             _isDirty.Add(_parent, false);
         }
@@ -47,7 +47,7 @@ namespace Monaco.Helpers
 
         public bool AssociateStyles(IModelDeltaDecoration[] decorations)
         {
-            // By construction we assume that decorations will not be null from the call in CodeEditorBase.DeltaDecorationsHelperAsync.
+            // By construction we assume that decorations will not be null from the call in EditorHostBase.DeltaDecorationsHelperAsync.
             bool newStyle = _isDirty[_parent]; // Can be set in GetStyles.
 
             _isDirty[_parent] = false; // Reset

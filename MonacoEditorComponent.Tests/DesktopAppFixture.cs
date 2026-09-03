@@ -72,6 +72,11 @@ public sealed class DesktopAppFixture : IAsyncLifetime
     /// </summary>
     public IPage DiffPage { get; private set; } = null!;
 
+    /// <summary>
+    /// The page hosting the <c>MultiDiffCodeEditor</c> sample -- again its own WebView2.
+    /// </summary>
+    public IPage MultiDiffPage { get; private set; } = null!;
+
     /// <summary>The Playwright browser context for tracing support.</summary>
     public IBrowserContext Context { get; private set; } = null!;
 
@@ -126,6 +131,8 @@ public sealed class DesktopAppFixture : IAsyncLifetime
                 // and CDP drives WebView contents rather than the XAML tree, so there would be
                 // no way to reach it from a test.
                 ["MONACO_DIFF_TAB"] = "1",
+                // Same reasoning for the MultiDiffCodeEditor sample.
+                ["MONACO_MULTIDIFF_TAB"] = "1",
             },
         };
 
@@ -204,6 +211,7 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         await WaitForLogLineAfterAsync(0, @"TEST_HARNESS_READY", MonacoReadyTimeoutMs);
         await WaitForLogLineAfterAsync(0, @"APP_INIT_SETTLED", MonacoReadyTimeoutMs);
         await WaitForLogLineAfterAsync(0, @"DIFF_HARNESS_READY", MonacoReadyTimeoutMs);
+        await WaitForLogLineAfterAsync(0, @"MULTIDIFF_HARNESS_READY", MonacoReadyTimeoutMs);
 
         // 8. Find the Monaco pages. Two WebView2 hosts are live (the plain editor sample and
         // the diff sample) and they share a URL, so they are told apart by content.
@@ -213,11 +221,20 @@ public sealed class DesktopAppFixture : IAsyncLifetime
         //
         // No separate "wait for Monaco in the page" step follows: the probe that selected this
         // page already required monaco to be defined with a live editor on it.
+        // The multi-file diff page must be excluded from both probes below, not just told apart
+        // from them: each of its per-file editors is a DiffEditorWidget that registers with the
+        // same service, so it satisfies a bare getEditors() probe *and* a bare getDiffEditors()
+        // one. Only the widget's own root element distinguishes it.
         Page = await FindEditorPageAsync(
-            "monaco.editor.getEditors().length > 0 && monaco.editor.getDiffEditors().length === 0",
+            "monaco.editor.getEditors().length > 0 && monaco.editor.getDiffEditors().length === 0"
+            + " && !document.querySelector('.multiDiffEditor')",
             "plain editor");
         DiffPage = await FindEditorPageAsync(
-            "monaco.editor.getDiffEditors().length > 0", "diff editor");
+            "monaco.editor.getDiffEditors().length > 0 && !document.querySelector('.multiDiffEditor')",
+            "diff editor");
+        MultiDiffPage = await FindEditorPageAsync(
+            "document.querySelector('.monaco-component.multiDiffEditor') !== null",
+            "multi-file diff editor");
         Context = Page.Context;
 
         // 9. Start tracing for failure artifact collection.

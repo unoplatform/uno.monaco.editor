@@ -12,10 +12,14 @@ using Monaco.Editor;
 using Monaco.Extensions;
 using Monaco.Helpers;
 
+using Nito.AsyncEx;
+
+using Windows.Foundation.Collections;
+
 namespace Monaco
 {
     /// <summary>
-    /// Indicates the rendering backend used by the CodeEditorBase.
+    /// Indicates the rendering backend used by the EditorHostBase.
     /// </summary>
     public enum RenderingBackend
     {
@@ -45,7 +49,7 @@ namespace Monaco
     /// </para>
     /// </remarks>
     [TemplatePart(Name = "RootBorder", Type = typeof(Border))]
-    public abstract partial class CodeEditorBase : Control, INotifyPropertyChanged, IDisposable
+    public abstract partial class EditorHostBase : Control, INotifyPropertyChanged, IDisposable
     {
         private bool _initialized;
         private bool _desktopBootstrapInFlight;
@@ -77,33 +81,117 @@ namespace Monaco
         /// <inheritdoc />
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        /// <summary>
-        /// Gets a value indicating whether the Monaco editor has completed its initialization
-        /// lifecycle and is ready to receive commands.
-        /// </summary>
-        /// <remarks>
-        /// This property transitions to <see langword="true"/> after the editor fires
-        /// <see cref="CodeEditorBase.EditorLoaded"/>. It can be used in XAML templates to control
-        /// visibility and prevent displaying an empty WebView during loading.
-        /// </remarks>
-        public bool IsEditorLoaded
+        private readonly AsyncLock _mutexLineDecorations = new();
+        private readonly AsyncLock _mutexMarkers = new();
+
+        private void OnIsEditorLoadedChanged(DependencyPropertyChangedEventArgs e) => UpdatePresenterVisibility();
+
+        private void OnSelectedTextChanged(DependencyPropertyChangedEventArgs e)
         {
-            get => (bool)GetValue(IsEditorLoadedProperty);
-            private set => SetValue(IsEditorLoadedProperty, value);
+            if (IsEditorLoaded && !IsSettingValue)
+            {
+                // link:updateSelectedContent.ts:updateSelectedContent
+                _ = InvokeScriptAsync("updateSelectedContent", e.NewValue?.ToString() ?? string.Empty);
+            }
+
+            NotifyPropertyChanged(nameof(SelectedText));
         }
 
-        /// <summary>Identifies the <see cref="IsEditorLoaded"/> dependency property.</summary>
-        public static DependencyProperty IsEditorLoadedProperty { get; } = DependencyProperty.Register(
-            nameof(IsEditorLoaded),
-            typeof(bool),
-            typeof(CodeEditorBase),
-            new PropertyMetadata(false, OnIsEditorLoadedChanged));
+        private void OnCodeLanguageChanged(DependencyPropertyChangedEventArgs e)
+            => Options?.Language = e.NewValue?.ToString();
 
-        private static void OnIsEditorLoadedChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        private void OnReadOnlyChanged(DependencyPropertyChangedEventArgs e)
+            => Options?.ReadOnly = bool.Parse(e.NewValue?.ToString() ?? "false");
+
+        private void OnHasGlyphMarginChanged(DependencyPropertyChangedEventArgs e)
+            => Options?.GlyphMargin = e.NewValue as bool?;
+
+        private void OnOptionsChanged(DependencyPropertyChangedEventArgs e)
         {
-            if (d is CodeEditorBase editor)
+            if (e.OldValue is StandaloneEditorConstructionOptions oldValue)
             {
-                editor.UpdatePresenterVisibility();
+                oldValue.PropertyChanged -= Options_PropertyChanged;
+            }
+
+            if (e.NewValue is StandaloneEditorConstructionOptions value)
+            {
+                value.PropertyChanged -= Options_PropertyChanged;
+                value.PropertyChanged += Options_PropertyChanged;
+            }
+        }
+
+        private async void OnDecorationsChanged(DependencyPropertyChangedEventArgs e)
+        {
+            // We only want to do this one at a time per editor.
+            using (await _mutexLineDecorations.LockAsync())
+            {
+                var old = e.OldValue as IObservableVector<IModelDeltaDecoration>;
+                // Clear out the old line decorations if we're replacing them or setting back to null
+                if ((old != null && old.Count > 0) || e.NewValue == null)
+                {
+                    await DeltaDecorationsHelperAsync([]);
+                }
+
+                if (e.NewValue is IObservableVector<IModelDeltaDecoration> value)
+                {
+                    if (value.Count > 0)
+                    {
+                        await DeltaDecorationsHelperAsync([.. value]);
+                    }
+
+                    value.VectorChanged -= Decorations_VectorChanged;
+                    value.VectorChanged += Decorations_VectorChanged;
+                }
+            }
+        }
+
+        private async void Decorations_VectorChanged(IObservableVector<IModelDeltaDecoration> sender, IVectorChangedEventArgs @event)
+        {
+            if (sender != null)
+            {
+                // Need to recall mutex as this is called from outside of this initial callback setting it up.
+                using (await _mutexLineDecorations.LockAsync())
+                {
+                    await DeltaDecorationsHelperAsync([.. sender]);
+                }
+            }
+        }
+
+        private async void OnMarkersChanged(DependencyPropertyChangedEventArgs e)
+        {
+            // We only want to do this one at a time per editor.
+            using (await _mutexMarkers.LockAsync())
+            {
+                var old = e.OldValue as IObservableVector<IMarkerData>;
+                // Clear out the old markers if we're replacing them or setting back to null
+                if ((old != null && old.Count > 0) || e.NewValue == null)
+                {
+                    // TODO: Can I simplify this in this case?
+                    await SetModelMarkersAsync("CodeEditor", []);
+                }
+
+                if (e.NewValue is IObservableVector<IMarkerData> value)
+                {
+                    if (value.Count > 0)
+                    {
+                        await SetModelMarkersAsync("CodeEditor", [.. value]);
+                    }
+
+                    value.VectorChanged -= Markers_VectorChanged;
+                    value.VectorChanged += Markers_VectorChanged;
+                }
+            }
+        }
+
+        private async void Markers_VectorChanged(IObservableVector<IMarkerData> sender, IVectorChangedEventArgs @event)
+        {
+            if (sender != null)
+            {
+                // Need to recall mutex as this is called from outside of this initial callback setting it up.
+                using (await _mutexMarkers.LockAsync())
+                {
+                    await SetModelMarkersAsync("CodeEditor", [.. sender]);
+                }
             }
         }
 
@@ -228,22 +316,6 @@ namespace Monaco
         }
 
         /// <summary>
-        /// Gets the rendering backend used by the editor (Wasm or Desktop).
-        /// </summary>
-        public RenderingBackend RenderingBackend
-        {
-            get => (RenderingBackend)GetValue(RenderingBackendProperty);
-            private set => SetValue(RenderingBackendProperty, value);
-        }
-
-        /// <summary>Identifies the <see cref="RenderingBackend"/> dependency property.</summary>
-        public static DependencyProperty RenderingBackendProperty { get; } = DependencyProperty.Register(
-            nameof(RenderingBackend),
-            typeof(RenderingBackend),
-            typeof(CodeEditorBase),
-            new PropertyMetadata(OperatingSystem.IsBrowser() ? RenderingBackend.Wasm : RenderingBackend.Desktop));
-
-        /// <summary>
         /// Gets the name of the global JavaScript function that bootstraps this control's
         /// Monaco instance.
         /// </summary>
@@ -253,7 +325,27 @@ namespace Monaco
         /// Gets a value indicating whether this control hosts a Monaco diff editor.
         /// The presenters read this to select the matching bootstrap entry point.
         /// </summary>
-        protected internal virtual bool IsDiffEditor => false;
+        internal virtual EditorFlavor Flavor => EditorFlavor.Code;
+
+        /// <summary>
+        /// Gets a value indicating whether this control hosts a diff widget of any kind.
+        /// </summary>
+        protected internal bool IsDiffEditor => Flavor is EditorFlavor.Diff or EditorFlavor.MultiDiff;
+
+        /// <summary>
+        /// Gets a value indicating whether this control has a single primary document that the
+        /// inherited single-document surface acts on.
+        /// </summary>
+        /// <remarks>
+        /// <see langword="false"/> for <c>MultiDiffCodeEditor</c>, which has N documents and
+        /// no stable single editor to target -- Monaco pools and recycles the per-file editors. When
+        /// this is <see langword="false"/>, <see cref="BuildInitialStateMap"/> omits the
+        /// <c>text</c>/<c>language</c>/<c>readOnly</c> keys, <see cref="ApplyInitialPropertyValues"/>
+        /// skips every push that targets <c>EditorContext.editor</c>, because that element has none,
+        /// and <see cref="AddActionAsync"/>/<see cref="AddCommandAsync(int, CommandHandler, string)"/>
+        /// register nothing rather than leaving a callback that can never be invoked.
+        /// </remarks>
+        protected virtual bool HasPrimaryDocument => true;
 
         /// <summary>
         /// Gets the text of the primary (editable) document. This is the value pushed to
@@ -272,18 +364,18 @@ namespace Monaco
             => accessor?.RegisterAction("Loaded", CodeEditorLoaded);
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="CodeEditorBase"/> class on the current UI thread.
+        /// Initializes a new instance of the <see cref="EditorHostBase"/> class on the current UI thread.
         /// </summary>
-        protected CodeEditorBase() : this(null) { }
+        protected EditorHostBase() : this(null) { }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="CodeEditorBase"/> class with an explicit dispatcher.
+        /// Initializes a new instance of the <see cref="EditorHostBase"/> class with an explicit dispatcher.
         /// </summary>
         /// <param name="queue">
         /// The <see cref="DispatcherQueue"/> for the UI thread. When <see langword="null"/>, the
         /// current thread's dispatcher is used.
         /// </param>
-        protected CodeEditorBase(DispatcherQueue? queue)
+        protected EditorHostBase(DispatcherQueue? queue)
         {
             _queue = queue ?? DispatcherQueue.GetForCurrentThread();
 

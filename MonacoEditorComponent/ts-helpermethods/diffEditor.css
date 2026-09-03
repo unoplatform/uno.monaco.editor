@@ -1,0 +1,30 @@
+/*
+ * Styling shared by every diff editor the component renders -- the standalone one behind
+ * DiffCodeEditor and the per-file ones inside MultiDiffCodeEditor. Imported from index.ts rather
+ * than from a control's module, because both controls need it and neither owns it.
+ *
+ * Monaco's multi-diff header styling lives in multiDiffEditor.css instead; that one really is
+ * specific to the one widget.
+ */
+
+/*
+ * The + / - marker Monaco puts in the line-decorations margin ahead of an inserted or deleted
+ * line. It is a codicon whose class comes from `linesDecorationsClassName` in the diff editor's
+ * registrations.contribution, and Monaco already softens it to `opacity: 0.7 !important`. This
+ * takes it further: the marker is a redundant restatement of the row's background colour, so it
+ * should read as a hint rather than compete with the code beside it.
+ *
+ * `!important` is not optional -- Monaco's own declaration carries it, and among important
+ * declarations the cascade still runs on specificity, so this selector is one step longer than
+ * Monaco's `.monaco-editor .insert-sign`.
+ *
+ * The high-contrast themes are deliberately excluded. Monaco resets these markers to full opacity
+ * under `.hc-black` / `.hc-light` precisely so they stay legible where colour alone cannot carry
+ * the meaning; dimming them there would undo an accessibility decision, not a styling one.
+ */
+.monaco-editor:not(.hc-black):not(.hc-light) .insert-sign,
+.monaco-diff-editor:not(.hc-black):not(.hc-light) .insert-sign,
+.monaco-editor:not(.hc-black):not(.hc-light) .delete-sign,
+.monaco-diff-editor:not(.hc-black):not(.hc-light) .delete-sign {
+	opacity: 0.4 !important;
+}
