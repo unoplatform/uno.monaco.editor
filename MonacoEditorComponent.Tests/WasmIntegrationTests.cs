@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using Microsoft.Playwright;
 
 using Xunit;
@@ -21,6 +23,7 @@ namespace MonacoEditorComponent.Tests;
 public sealed class WasmIntegrationTests : IAsyncLifetime
 {
     private const int DiffTimeoutMs = 30_000;
+    private const int TokenizationTimeoutMs = 15_000;
 
     private readonly WasmAppFixture _fixture;
     private string _currentTestName = "unknown";
@@ -422,6 +425,131 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
             Assert.True(
                 await _fixture.Page.EvaluateAsync<bool>(MultiDiffEditorCases.ChevronGlyphRenderedExpression),
                 "The collapse chevron must resolve to a codicon glyph.");
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// A document re-applied to an existing editor must be tokenized by the time it is painted,
+    /// even when the host never yields an idle period.
+    ///
+    /// <para><c>updateLanguage</c> + <c>updateContent</c> only queue tokenization, on an idle
+    /// callback that a continuously-rendering WebAssembly host can starve indefinitely. The model
+    /// keeps reporting the right language and the right text, so nothing else here notices, while
+    /// the page paints every span with the theme's default class. See
+    /// <see cref="TokenizationStarvationCases"/> for why the visible range has to be held still
+    /// and why the idle callback is stubbed rather than starved for real.</para>
+    /// </summary>
+    [Fact]
+    [Trait("Category", "WasmPlaywright")]
+    public async Task ReappliedDocument_IsTokenizedWithoutIdleTime()
+    {
+        _currentTestName = nameof(ReappliedDocument_IsTokenizedWithoutIdleTime);
+        try
+        {
+            // Apply the document once, normally, and wait until it is visibly coloured. That
+            // settles the visible line range at the viewport, so the re-apply below leaves it
+            // unchanged -- which is the condition under which Monaco's non-idle attached-view
+            // refresh declines to run and the starvation becomes observable.
+            Assert.True(
+                await _fixture.Page.EvaluateAsync<bool>(
+                    TokenizationStarvationCases.PrimeExpression,
+                    TokenizationStarvationCases.Sample),
+                "The plain editor's host element was not found in EditorContext._editors.");
+
+            await _fixture.Page.WaitForFunctionAsync(
+                $"() => {{ const painted = ({TokenizationStarvationCases.PaintedTokenClassesExpression})();"
+                + " return painted !== '' && painted !== 'mtk1'; }",
+                null, new PageWaitForFunctionOptions { Timeout = TokenizationTimeoutMs });
+
+            var result = await _fixture.Page.EvaluateAsync<string[]>(
+                TokenizationStarvationCases.StarvedReapplyExpression,
+                TokenizationStarvationCases.Sample);
+
+            var painted = result[0];
+            var language = result[1];
+            var idleApiPresent = result[2];
+            var lineCount = result[3];
+
+            // The premise, not padding: with no requestIdleCallback to suspend, Monaco uses a
+            // setTimeout deadline that is never starved, and this test would pass with or
+            // without the fix.
+            // Lower-case: the flag crosses the boundary through JS String(), not ToString().
+            Assert.Equal("true", idleApiPresent);
+
+            // The document really did land -- otherwise "nothing was painted" would be the
+            // trivial explanation for the assertion below.
+            Assert.Equal("csharp", language);
+            Assert.True(
+                int.Parse(lineCount, CultureInfo.InvariantCulture) > 1,
+                $"Expected the sample document in the model, got {lineCount} line(s).");
+
+            // mtk1 is the theme's default foreground. A document that was never tokenized paints
+            // nothing else -- brackets stay coloured through decorations, not token classes, so
+            // "something is coloured" is not enough to distinguish the two states.
+            Assert.False(
+                painted is "" or "mtk1",
+                $"The re-applied document was never tokenized: painted token classes were "
+                + $"'{painted}' (expected at least one class besides mtk1). updateContent and "
+                + "updateLanguage must not leave highlighting waiting on idle time.");
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// The diff widget's original (left) document has to survive the same re-apply. Its model is
+    /// attached to its own sub-editor and starves independently of the modified side, and
+    /// <c>updateOriginalContent</c> / <c>updateOriginalLanguage</c> resolve that sub-editor
+    /// through a different expression than every other helper -- so a fix that only reached the
+    /// modified side, or that read the wrong pane's viewport, would look correct here without
+    /// this.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "WasmPlaywright")]
+    public async Task ReappliedOriginalDocument_IsTokenizedWithoutIdleTime()
+    {
+        _currentTestName = nameof(ReappliedOriginalDocument_IsTokenizedWithoutIdleTime);
+        try
+        {
+            Assert.True(
+                await _fixture.Page.EvaluateAsync<bool>(
+                    TokenizationStarvationCases.PrimeOriginalExpression,
+                    TokenizationStarvationCases.Sample),
+                "No DiffCodeEditor host element was found in EditorContext._editors.");
+
+            await _fixture.Page.WaitForFunctionAsync(
+                "() => { const painted = ("
+                + TokenizationStarvationCases.OriginalPanePaintedTokenClassesExpression
+                + ")(); return painted !== '' && painted !== 'mtk1'; }",
+                null, new PageWaitForFunctionOptions { Timeout = TokenizationTimeoutMs });
+
+            var result = await _fixture.Page.EvaluateAsync<string[]>(
+                TokenizationStarvationCases.StarvedOriginalReapplyExpression,
+                TokenizationStarvationCases.Sample);
+
+            var painted = result[0];
+            var language = result[1];
+            var idleApiPresent = result[2];
+            var lineCount = result[3];
+
+            Assert.Equal("true", idleApiPresent);
+            Assert.Equal("csharp", language);
+            Assert.True(
+                int.Parse(lineCount, CultureInfo.InvariantCulture) > 1,
+                $"Expected the sample document in the original model, got {lineCount} line(s).");
+
+            Assert.False(
+                painted is "" or "mtk1",
+                $"The re-applied original document was never tokenized: painted token classes in "
+                + $"the left pane were '{painted}' (expected at least one class besides mtk1).");
         }
         catch
         {

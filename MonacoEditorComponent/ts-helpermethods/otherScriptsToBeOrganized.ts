@@ -1,6 +1,7 @@
 import * as monaco from 'monaco-editor';
 import { ParentAccessor } from './Monaco.Helpers.ParentAccessor';
 import { callParentEventAsync } from './asyncCallbackHelpers';
+import { tokenizeVisibleRange } from './tokenization';
 
 export class EditorContext {
     static _editors: Map<any, EditorContext> = new Map<any, EditorContext>();
@@ -209,6 +210,12 @@ export const updateContent = function (element: any, content: string) {
     if (content !== editorContext.model.getValue()) {
         editorContext.model.setValue(content);
     }
+
+    // Unconditional, including when the content was already in place: a language push that
+    // arrived just before this one has flushed the token store either way, and a pass over
+    // already-tokenized lines costs a comparison. See tokenization.ts for why the queued
+    // background pass cannot be relied on to do this.
+    tokenizeVisibleRange(editorContext.model, editorContext.editor);
 };
 
 export const updateDecorations = function (element: any, newHighlights: any) {
@@ -265,6 +272,11 @@ export const updateLanguage = function (element: any, language: string) {
     var editorContext = EditorContext.getEditorForElement(element);
 
     monaco.editor.setModelLanguage(editorContext.model, language);
+
+    // setModelLanguage flushes the token store and queues the re-tokenization on an idle
+    // callback a continuously rendering host may never yield -- so the document would keep
+    // reporting the new language while painting as plain text. See tokenization.ts.
+    tokenizeVisibleRange(editorContext.model, editorContext.editor);
 };
 
 export const changeTheme = function (element: any, theme: string, highcontrast: string) {
@@ -381,6 +393,10 @@ export const updateOriginalContent = function (element: any, content: string) {
     if (model && content !== model.getValue()) {
         model.setValue(content);
     }
+
+    // The original side has its own model attached to its own sub-editor, so it starves
+    // independently of the modified side and needs its own pass over its own visible range.
+    tokenizeVisibleRange(model, editorContext?.diffEditor?.getOriginalEditor());
 };
 
 /** Set the syntax language of the original (left-hand) document. */
@@ -390,6 +406,8 @@ export const updateOriginalLanguage = function (element: any, language: string) 
     if (editorContext?.originalModel) {
         monaco.editor.setModelLanguage(editorContext.originalModel, language);
     }
+
+    tokenizeVisibleRange(editorContext?.originalModel, editorContext?.diffEditor?.getOriginalEditor());
 };
 
 /**
