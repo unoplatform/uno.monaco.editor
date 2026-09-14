@@ -6,6 +6,13 @@ namespace Monaco.Helpers;
 /// The WASM bridge uses a custom percent-encoding scheme to safely
 /// pass strings containing special characters through JS interop.
 /// </summary>
+/// <remarks>
+/// Two decoders exist because the bridge carries two kinds of payload. <see cref="DecodeTransport"/>
+/// undoes the percent-encoding and nothing else, for values that are raw text -- the editor's
+/// document and the selected text. <see cref="Desanitize"/> is the long-standing decoder for
+/// the JSON-carrying paths (events, actions with parameters, typed property writes) and keeps
+/// their historical post-processing.
+/// </remarks>
 internal static class BridgeEncoding
 {
     /// <summary>
@@ -40,20 +47,42 @@ internal static class BridgeEncoding
     }
 
     /// <summary>
-    /// Decodes special characters that were encoded by <see cref="Sanitize"/>.
-    /// '%' is decoded last to prevent premature unescaping.
+    /// Reverses <see cref="Sanitize"/> and nothing else: the result is exactly the string the
+    /// JavaScript side encoded.
     /// </summary>
-    public static string? Desanitize(string? parameter)
+    /// <param name="encoded">The percent-encoded value, or <see langword="null"/>.</param>
+    /// <returns>The decoded string, or <see langword="null"/> if the input was <see langword="null"/>.</returns>
+    /// <remarks>
+    /// This is the decoder for values that are raw text rather than JSON: the document the
+    /// content listener reports (<c>Text</c>, <c>ModifiedText</c>) and <c>SelectedText</c>.
+    /// Those carry whatever the user typed, so a quotation mark, a backslash, or the two
+    /// characters <c>\t</c> in the source are content to preserve, not notation to interpret.
+    /// '%' is decoded last to prevent premature unescaping.
+    /// </remarks>
+    public static string? DecodeTransport(string? encoded)
     {
-        if (parameter is null) return parameter;
+        if (encoded is null) return null;
 
         for (var i = 0; i < DesanitizeChars.Length; i++)
         {
-            parameter = parameter.Replace($"%{(int)DesanitizeChars[i]}", DesanitizeChars[i].ToString());
+            encoded = encoded.Replace($"%{(int)DesanitizeChars[i]}", DesanitizeChars[i].ToString());
         }
 
-        parameter = parameter.Replace(@"\\""", @"""");
+        return encoded;
+    }
 
-        return parameter;
+    /// <summary>
+    /// Decodes special characters that were encoded by <see cref="Sanitize"/>, then collapses
+    /// a <c>\\"</c> run to <c>"</c>. Used by the paths that carry JSON.
+    /// </summary>
+    /// <remarks>
+    /// Not byte-exact because of that final collapse -- for raw text use
+    /// <see cref="DecodeTransport"/>.
+    /// </remarks>
+    public static string? Desanitize(string? parameter)
+    {
+        var decoded = DecodeTransport(parameter);
+
+        return decoded?.Replace(@"\\""", @"""");
     }
 }
