@@ -189,6 +189,28 @@ internal static class DiffEditorCases
         " return [...document.fonts].some(f => f.family === 'codicon'); }";
 
     /// <summary>
+    /// The diff widget's host and root heights, as <c>[host, root]</c>. The host is the
+    /// presenter's element, the one <c>createDiffEditor</c> was given and
+    /// <c>getContainerDomNode()</c> returns; the root is Monaco's <c>.monaco-diff-editor</c>
+    /// div inside it, the element Monaco sizes.
+    /// </summary>
+    public const string DiffHostAndRootHeightExpression =
+        "() => { const host = " + StandaloneDiffEditorsExpressionBody + "[0].getContainerDomNode();" +
+        " return [host.clientHeight, host.querySelector(':scope > .monaco-diff-editor').offsetHeight]; }";
+
+    /// <summary>
+    /// Shows or hides the diff widget's host the way <c>Visibility.Collapsed</c> does on WASM:
+    /// <c>display: none</c>, so the host measures 0 and its ResizeObserver fires.
+    /// </summary>
+    public const string SetDiffHostHiddenExpression =
+        "(hidden) => { " + StandaloneDiffEditorsExpressionBody + "[0].getContainerDomNode()" +
+        ".style.display = hidden ? 'none' : ''; }";
+
+    /// <summary>Resolves after two animation frames, so pending ResizeObserver callbacks have run.</summary>
+    public const string TwoFramesExpression =
+        "() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))";
+
+    /// <summary>
     /// The sample the test app loads. Kept in sync with <c>DiffEditorControl</c> only loosely:
     /// assertions below check structural facts (the sides differ, hunks exist) rather than
     /// exact text, so tweaking the sample does not break the tests.
