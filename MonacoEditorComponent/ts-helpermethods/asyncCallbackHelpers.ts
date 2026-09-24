@@ -283,8 +283,8 @@ const resolveInitialDiffOptions = (initialState?: InitialState): any => {
  * content and selection listeners, theme initialization, the resize observer, the desktop
  * RPC handlers, and the closing "Loaded" handshake.
  *
- * @param layoutTarget the object whose layout() is called on resize -- the diff widget for
- *   a diff editor, the editor itself otherwise.
+ * @param layoutTarget the object whose layout() is called on resize -- the editor itself for
+ *   a plain editor, a wrapper that passes the host's size for the two diff flavors.
  * @param textPropertyName the C# dependency property the content listener writes back to:
  *   "Text" on CodeEditor, "ModifiedText" on DiffCodeEditor. Both bridge implementations
  *   resolve the property by name via reflection, so this parameter is the whole mechanism
@@ -469,7 +469,17 @@ export const initializeMonacoDiffEditor = async (managedOwner: any, element: any
         }
     });
 
-    await attachEditorRuntime(managedOwner, element, editorContext, diffEditor, "ModifiedText", initialState);
+    // The size is read from the host and passed in. Without automaticLayout, a bare layout()
+    // makes the widget measure its own root and then write that height back onto the root, so
+    // the root keeps its first height and never follows the host. On WASM, a collapse also
+    // measures 0, which Monaco rounds up to 5px, and the editor then stays at 5px.
+    await attachEditorRuntime(
+        managedOwner,
+        element,
+        editorContext,
+        { layout: () => diffEditor.layout({ width: element.clientWidth, height: element.clientHeight }) },
+        "ModifiedText",
+        initialState);
 };
 
 /**

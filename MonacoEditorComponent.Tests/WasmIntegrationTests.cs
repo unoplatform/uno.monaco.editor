@@ -314,6 +314,63 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// Hiding the diff editor and showing it again must bring it back at full height.
+    /// </summary>
+    /// <remarks>
+    /// Monaco's diff widget, without <c>automaticLayout</c>, measures its own root when
+    /// <c>layout()</c> is called with no size, and then writes that height back onto the root.
+    /// While hidden the root measures 0, which Monaco rounds up to 5px, so every later
+    /// <c>layout()</c> measured 5px and the editor stayed at 5px. For the same reason the root
+    /// never followed its host when the host was resized. The layout target has to pass the
+    /// host's size instead. The hide is simulated with <c>display: none</c> on the host, which
+    /// is how a collapse reaches the element on WASM. Desktop does not get stuck: hiding a
+    /// WebView does not shrink the page inside it.
+    /// </remarks>
+    [Fact]
+    [Trait("Category", "WasmPlaywright")]
+    public async Task DiffEditor_RestoresHeightAfterBeingHidden()
+    {
+        _currentTestName = nameof(DiffEditor_RestoresHeightAfterBeingHidden);
+        try
+        {
+            await _fixture.Page.WaitForFunctionAsync(
+                DiffEditorCases.HasComputedDiffExpression,
+                null, new PageWaitForFunctionOptions { Timeout = DiffTimeoutMs });
+
+            var before = await _fixture.Page.EvaluateAsync<int[]>(DiffEditorCases.DiffHostAndRootHeightExpression);
+            Assert.True(before[0] > 5, $"The diff host should have a real height to begin with, got {before[0]}px.");
+            // Already wrong before the hide when the root measures itself: it keeps the height of
+            // its first layout, so it does not follow the host as the page settles.
+            Assert.True(
+                before[1] == before[0],
+                $"The diff editor is {before[1]}px in a {before[0]}px host before it was ever hidden.");
+
+            try
+            {
+                await _fixture.Page.EvaluateAsync(DiffEditorCases.SetDiffHostHiddenExpression, true);
+                await _fixture.Page.EvaluateAsync(DiffEditorCases.TwoFramesExpression);
+            }
+            finally
+            {
+                await _fixture.Page.EvaluateAsync(DiffEditorCases.SetDiffHostHiddenExpression, false);
+            }
+
+            await _fixture.Page.EvaluateAsync(DiffEditorCases.TwoFramesExpression);
+
+            var after = await _fixture.Page.EvaluateAsync<int[]>(DiffEditorCases.DiffHostAndRootHeightExpression);
+            Assert.Equal(before[0], after[0]);
+            Assert.True(
+                after[1] == after[0],
+                $"The diff editor came back at {after[1]}px instead of its host's {after[0]}px.");
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Monaco's bundled stylesheet has to be delivered to the page, not merely embedded in the
     /// assembly. It carries the layout rules and the codicon <c>@font-face</c>; without it the
     /// editor still runs, because Monaco sets much of its geometry inline, so no other test in
