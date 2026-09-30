@@ -228,9 +228,11 @@ jobs:
           playwright-version: ${{ env.PLAYWRIGHT_VERSION }}
 
       # WASM Playwright tests are already covered by the ubuntu job.
-      # macOS ARM validates builds + unit tests; exclude DesktopCDP (headless) and WasmPlaywright (slow startup on ARM).
+      # macOS ARM validates builds + unit tests; exclude DesktopCDP (headless), WasmPlaywright and
+      # StaticServer -- a python http.server on this runner accepts the connection and then never
+      # answers, which is the same thing that keeps the WASM suite off this job.
       - name: Run tests
-        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}" --no-build --coverage --coverage-output-format cobertura --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=DesktopCDP" --filter-not-trait "Category=WasmPlaywright" --report-xunit --report-xunit-filename test-results.xml
+        run: dotnet test --project MonacoEditorComponent.Tests/MonacoEditorComponent.Tests.csproj -c Release -p:ArtifactsPath="${{ env.ARTIFACTS_PATH }}" --no-build --coverage --coverage-output-format cobertura --results-directory ${{ runner.temp }}/TestResults -- --filter-not-trait "Category=DesktopCDP" --filter-not-trait "Category=WasmPlaywright" --filter-not-trait "Category=StaticServer" --report-xunit --report-xunit-filename test-results.xml
 
       - name: Upload test artifacts
         if: always()

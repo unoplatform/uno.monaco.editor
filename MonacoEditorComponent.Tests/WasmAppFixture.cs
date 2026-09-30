@@ -30,6 +30,9 @@ public sealed class WasmAppFixture : IAsyncLifetime
     /// </summary>
     private const string AppInitSettledMarker = "APP_INIT_SETTLED";
 
+    /// <summary>How long a rejected candidate's output capture gets to finish before it is quoted.</summary>
+    private const int CaptureDrainTimeoutMs = 2_000;
+
     /// <summary>Content every test starts from -- see <see cref="ResetEditorStateAsync"/>.</summary>
     private const string ResetText = "// test-init-text";
 
@@ -70,29 +73,25 @@ public sealed class WasmAppFixture : IAsyncLifetime
         // 1. Resolve WASM build output directory (Release then Debug fallback).
         var wwwrootPath = ResolveWasmBuildOutput(repoRoot);
 
-        // 2. Pick a random available port.
-        _serverPort = GetAvailablePort();
-
-        // 3. Ensure test-artifacts directory exists.
+        // 2. Ensure the test-artifacts directory exists -- every server candidate logs into it.
         var artifactsDir = Path.Combine(repoRoot, "test-artifacts");
         Directory.CreateDirectory(artifactsDir);
-        _processLogPath = Path.Combine(artifactsDir, $"wasm-fixture-{DateTime.UtcNow:yyyyMMdd-HHmmss}.log");
 
-        // 4. Start a static file server on the wwwroot path.
-        // Use dotnet-serve if available, fallback to python3 http.server.
-        _serverProcess = StartStaticServer(wwwrootPath, _serverPort);
-        _ = CaptureProcessOutputAsync(_serverProcess, _processLogPath);
+        // 3. Start a static file server on the wwwroot path. Candidates are probed to readiness
+        // one at a time and the first that answers wins, so a command that is not installed
+        // costs an attempt rather than the whole run.
+        var server = await StartStaticServerAsync(wwwrootPath, artifactsDir, DefaultStaticServerCandidates);
+        _serverProcess = server.Process;
+        _serverPort = server.Port;
+        _processLogPath = server.LogPath;
 
-        // 5. Wait for server to be ready (fail fast if process dies).
-        await WaitForServerReady($"http://localhost:{_serverPort}/", _serverProcess, _processLogPath, timeoutMs: 15_000);
-
-        // 6. Launch Playwright Chromium browser (headless).
+        // 4. Launch Playwright Chromium browser (headless).
         _browser = await _playwright.Chromium.LaunchAsync(new()
         {
             Headless = true,
         });
 
-        // 7. Create context and page.
+        // 5. Create context and page.
         Context = await _browser.NewContextAsync();
 
         // Start tracing for failure artifact collection.
@@ -104,19 +103,19 @@ public sealed class WasmAppFixture : IAsyncLifetime
 
         Page = await Context.NewPageAsync();
 
-        // 8. Start capturing console output BEFORE navigating. C# Console.WriteLine surfaces
+        // 6. Start capturing console output BEFORE navigating. C# Console.WriteLine surfaces
         // here under WASM, and the readiness marker is emitted during boot -- subscribing after
         // GotoAsync would race it.
         Page.Console += OnPageConsole;
 
-        // 9. Navigate to the WASM app.
+        // 7. Navigate to the WASM app.
         await Page.GotoAsync($"http://localhost:{_serverPort}/", new()
         {
             WaitUntil = WaitUntilState.NetworkIdle,
             Timeout = MonacoReadyTimeoutMs,
         });
 
-        // 10. Wait for the sample's own editor to exist. Counted through the standalone-editor
+        // 8. Wait for the sample's own editor to exist. Counted through the standalone-editor
         // filter, not getEditors(): WASM runs both samples in ONE page against ONE monaco
         // instance, so getEditors() also lists the diff widget's two sub-editors and would go
         // green on a page where the plain editor had not been created at all.
@@ -124,7 +123,7 @@ public sealed class WasmAppFixture : IAsyncLifetime
             $"() => typeof monaco !== 'undefined' && {DiffEditorCases.StandaloneEditorsExpressionBody}.length > 0",
             null, new PageWaitForFunctionOptions { Timeout = MonacoReadyTimeoutMs });
 
-        // 11. Wait for the app to finish its own initialisation.
+        // 9. Wait for the app to finish its own initialisation.
         //
         // The step above is NOT sufficient on its own: it goes green the moment the editor is
         // constructed, while EditorControl.Editor_Loading is still fetching Content.txt and
@@ -133,7 +132,7 @@ public sealed class WasmAppFixture : IAsyncLifetime
         // and the following getValue at t+9.29s returned Content.txt instead.
         await WaitForAppInitCompleteAsync();
 
-        // 12. Snapshot the settled content for tests that assert on first-load state. Indexing
+        // 10. Snapshot the settled content for tests that assert on first-load state. Indexing
         // getEditors() here would read whichever editor happened to be constructed first, which
         // on this page may be a diff sub-editor holding the diff sample's document instead.
         InitialEditorText = await Page.EvaluateAsync<string>(
@@ -238,17 +237,12 @@ public sealed class WasmAppFixture : IAsyncLifetime
             try { await _browser.CloseAsync(); } catch { /* best-effort */ }
         }
 
-        if (_serverProcess is { HasExited: false })
+        if (_serverProcess is not null)
         {
-            try
-            {
-                _serverProcess.Kill(entireProcessTree: true);
-                await _serverProcess.WaitForExitAsync(new CancellationTokenSource(5000).Token);
-            }
-            catch { /* best-effort */ }
+            await TerminateServerAsync(_serverProcess);
+            _serverProcess.Dispose();
         }
 
-        _serverProcess?.Dispose();
         _playwright?.Dispose();
     }
 
@@ -332,101 +326,213 @@ public sealed class WasmAppFixture : IAsyncLifetime
             $"Searched:\n  {string.Join("\n  ", candidates)}");
     }
 
-    private static Process StartStaticServer(string wwwrootPath, int port)
-    {
-        // Try multiple static file servers in priority order for cross-platform support.
-        // dotnet-serve is preferred (.NET ecosystem), then python3 (CI images), then python/py (Windows).
-        (string fileName, string arguments)[] candidates =
-        [
-            ("dotnet", $"serve --port {port} --directory \"{wwwrootPath}\""),
-            ("python3", $"-m http.server {port} --directory \"{wwwrootPath}\""),
-            ("python", $"-m http.server {port} --directory \"{wwwrootPath}\""),
-            ("py", $"-3 -m http.server {port} --directory \"{wwwrootPath}\""),
-        ];
+    /// <summary>
+    /// One static-file-server command to try. <c>BuildArguments</c> receives the directory to
+    /// serve and the port to bind.
+    /// </summary>
+    internal readonly record struct StaticServerCandidate(
+        string FileName,
+        Func<string, int, string> BuildArguments);
 
+    /// <summary>A started static file server that has already answered on its port.</summary>
+    internal sealed record StaticServerHandle(Process Process, int Port, string LogPath);
+
+    /// <summary>
+    /// Static file servers to try, in priority order. dotnet-serve is preferred (.NET ecosystem),
+    /// then python3 (CI images), then python/py (Windows). None of them is guaranteed to exist --
+    /// nothing in this repo installs dotnet-serve, so on CI the first candidate always fails and
+    /// the fall-through below is the load-bearing path, not a nicety.
+    ///
+    /// <para><c>-u</c> keeps python from buffering its startup line and any traceback behind the
+    /// redirected pipe, which is what a rejected candidate's log would otherwise be missing.</para>
+    /// </summary>
+    internal static IReadOnlyList<StaticServerCandidate> DefaultStaticServerCandidates { get; } =
+    [
+        new("dotnet", (root, port) => $"serve --port {port} --directory \"{root}\""),
+        new("python3", (root, port) => $"-u -m http.server {port} --directory \"{root}\""),
+        new("python", (root, port) => $"-u -m http.server {port} --directory \"{root}\""),
+        new("py", (root, port) => $"-3 -u -m http.server {port} --directory \"{root}\""),
+    ];
+
+    /// <summary>
+    /// Starts the first candidate command that actually serves <paramref name="wwwrootPath"/>.
+    ///
+    /// <para>Each candidate is probed all the way to an HTTP response before it is accepted, and
+    /// rejected the moment its process exits. An earlier version instead slept 500ms and accepted
+    /// whatever was still running, which made "is this tool installed?" a race against the dotnet
+    /// muxer's startup: on CI run 33770173883 the dotnet candidate took longer than that to print
+    /// "Could not execute because the specified command or file was not found" and exit 1, so the
+    /// doomed process was returned as the winner and all 11 WASM tests failed without python ever
+    /// being tried.</para>
+    /// </summary>
+    internal static async Task<StaticServerHandle> StartStaticServerAsync(
+        string wwwrootPath,
+        string logDirectory,
+        IReadOnlyList<StaticServerCandidate> candidates,
+        int perCandidateTimeoutMs = 30_000)
+    {
         var attempted = new List<string>();
 
-        foreach (var (fileName, arguments) in candidates)
+        foreach (var candidate in candidates)
         {
+            // A fresh port per attempt: the candidate being abandoned may have bound the previous
+            // one, and racing its teardown for the same port buys nothing.
+            var port = GetAvailablePort();
+            var logPath = Path.Combine(
+                logDirectory,
+                $"wasm-fixture-{DateTime.UtcNow:yyyyMMdd-HHmmss-fff}-{Path.GetFileName(candidate.FileName)}.log");
+
+            Process process;
             try
             {
-                var startInfo = new ProcessStartInfo
+                var started = Process.Start(new ProcessStartInfo
                 {
-                    FileName = fileName,
-                    Arguments = arguments,
+                    FileName = candidate.FileName,
+                    Arguments = candidate.BuildArguments(wwwrootPath, port),
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     CreateNoWindow = true,
-                };
+                });
 
-                var process = Process.Start(startInfo);
-                if (process is null)
+                if (started is null)
                 {
-                    attempted.Add($"{fileName} (returned null)");
+                    attempted.Add($"{candidate.FileName} (Process.Start returned null)");
                     continue;
                 }
 
-                // Wait briefly to verify the process survives startup.
-                // If dotnet-serve is not installed, `dotnet serve` starts then exits
-                // immediately -- we need to detect that and try the next candidate.
-                Thread.Sleep(500);
-                if (process.HasExited)
-                {
-                    var exitCode = process.ExitCode;
-                    process.Dispose();
-                    attempted.Add($"{fileName} (exited immediately with code {exitCode})");
-                    continue;
-                }
-
-                return process;
+                process = started;
             }
             catch (Exception ex)
             {
-                attempted.Add($"{fileName} ({ex.GetType().Name}: {ex.Message})");
+                attempted.Add($"{candidate.FileName} ({ex.GetType().Name}: {ex.Message})");
+                continue;
             }
+
+            // Capture output for every candidate, not just the winner: a rejected candidate's
+            // stderr is the only thing that says why it was rejected. The winner's capture runs
+            // for as long as it serves; a rejected one is drained below.
+            var capture = CaptureProcessOutputAsync(process, logPath);
+
+            var rejection = await ProbeUntilReadyAsync(
+                $"http://localhost:{port}/", process, perCandidateTimeoutMs);
+
+            if (rejection is null)
+            {
+                return new StaticServerHandle(process, port, logPath);
+            }
+
+            // Read the liveness before killing it: "still running" versus "exited with code N" is
+            // the difference between a server that never answered and a command that is not
+            // installed, and the kill would erase it.
+            var state = process.HasExited
+                ? $"exited with code {process.ExitCode}"
+                : "still running";
+
+            await TerminateServerAsync(process);
+
+            // The capture ends when the dead process's streams hit EOF, so waiting on it both
+            // completes the log before it is quoted and keeps anything from reading the Process
+            // as it is disposed.
+            await Task.WhenAny(capture, Task.Delay(CaptureDrainTimeoutMs));
+
+            attempted.Add($"{candidate.FileName} ({DescribeRejection(state, rejection, ReadLogTail(logPath))})");
+            process.Dispose();
         }
 
         throw new InvalidOperationException(
-            "Failed to start static file server. Tried:\n" +
+            "Failed to start a static file server for the WASM app. Tried:\n" +
             string.Join("\n", attempted.Select(a => $"  - {a}")));
     }
 
-    private static async Task WaitForServerReady(string url, Process serverProcess, string logPath, int timeoutMs)
+    /// <summary>
+    /// Polls <paramref name="url"/> until it answers with a success status, giving up as soon as
+    /// the server process dies or the budget runs out. Process death is the deterministic "this command is unusable"
+    /// signal, so it is checked every pass rather than once after a fixed sleep.
+    /// </summary>
+    /// <returns>
+    /// <c>null</c> once the server answers; otherwise why it did not, including the last probe
+    /// failure -- "never answered" alone cannot distinguish a slow start from a broken one.
+    /// </returns>
+    private static async Task<string?> ProbeUntilReadyAsync(string url, Process serverProcess, int timeoutMs)
     {
         using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        var lastProbe = "not probed yet";
 
         while (DateTime.UtcNow < deadline)
         {
-            // Fail fast if the server process has died.
             if (serverProcess.HasExited)
             {
-                var exitCode = serverProcess.ExitCode;
-                var logContent = File.Exists(logPath) ? File.ReadAllText(logPath) : "(no log)";
-                throw new InvalidOperationException(
-                    $"Static file server process exited unexpectedly with code {exitCode} before becoming ready.\n" +
-                    $"Process log:\n{logContent}");
+                return $"last probe of {url}: {lastProbe}";
             }
 
             try
             {
-                var response = await httpClient.GetAsync(url);
+                using var response = await httpClient.GetAsync(url);
                 if (response.IsSuccessStatusCode)
                 {
-                    return;
+                    return null;
                 }
-            }
-            catch (HttpRequestException) { }
-            catch (TaskCanceledException) { }
 
-            await Task.Delay(500);
+                lastProbe = $"HTTP {(int)response.StatusCode}";
+            }
+            catch (HttpRequestException ex) { lastProbe = ex.Message; }
+            catch (TaskCanceledException) { lastProbe = "the request timed out"; }
+
+            await Task.Delay(250);
         }
 
-        var logOnTimeout = File.Exists(logPath) ? File.ReadAllText(logPath) : "(no log)";
-        throw new TimeoutException(
-            $"Static file server at {url} did not become ready within {timeoutMs}ms.\n" +
-            $"Process log:\n{logOnTimeout}");
+        return $"no response from {url} within {timeoutMs}ms; last probe: {lastProbe}";
+    }
+
+    /// <summary>Explains why a candidate was rejected, quoting whatever it managed to print.</summary>
+    private static string DescribeRejection(string state, string rejection, string log) =>
+        log.Length == 0 ? $"{state}; {rejection}" : $"{state}; {rejection}; output: {log}";
+
+    /// <summary>
+    /// Reads the tail of a process log that is still open for writing, hence the explicit
+    /// <see cref="FileShare.ReadWrite"/> rather than <c>File.ReadAllText</c>.
+    /// </summary>
+    private static string ReadLogTail(string logPath, int maxLines = 20)
+    {
+        try
+        {
+            using var stream = new FileStream(
+                logPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(stream);
+
+            var lines = reader.ReadToEnd()
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => line.Trim())
+                .Where(line => line.Length > 0);
+
+            return string.Join(" | ", lines.TakeLast(maxLines));
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    /// <summary>Kills a server process and its children, best-effort.</summary>
+    private static async Task TerminateServerAsync(Process process)
+    {
+        if (process.HasExited)
+        {
+            return;
+        }
+
+        try
+        {
+            // entireProcessTree: the dotnet muxer and the py launcher both run the real server as
+            // a child, which would outlive a kill aimed at the parent alone.
+            process.Kill(entireProcessTree: true);
+
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await process.WaitForExitAsync(timeout.Token);
+        }
+        catch { /* best-effort */ }
     }
 
     private static int GetAvailablePort()
@@ -458,29 +564,31 @@ public sealed class WasmAppFixture : IAsyncLifetime
         try
         {
             await using var logWriter = new StreamWriter(logPath, append: false);
-            // ReadLineAsync returns null at end-of-stream, avoiding the CA2024
-            // diagnostic from synchronous EndOfStream checks in async methods.
-            var stdoutTask = Task.Run(async () =>
-            {
-                string? line;
-                while ((line = await process.StandardOutput.ReadLineAsync()) is not null)
-                {
-                    await logWriter.WriteLineAsync($"[stdout] {line}");
-                    await logWriter.FlushAsync();
-                }
-            });
-            var stderrTask = Task.Run(async () =>
-            {
-                string? line;
-                while ((line = await process.StandardError.ReadLineAsync()) is not null)
-                {
-                    await logWriter.WriteLineAsync($"[stderr] {line}");
-                    await logWriter.FlushAsync();
-                }
-            });
 
-            await Task.WhenAny(Task.WhenAll(stdoutTask, stderrTask), Task.Delay(TimeSpan.FromMinutes(5)));
+            // Both pumps write to the one file and StreamWriter is not thread-safe, so lines from
+            // stdout and stderr could otherwise interleave mid-line and corrupt the log.
+            var writer = TextWriter.Synchronized(logWriter);
+
+            // Runs until both streams reach end-of-stream, which the process exiting guarantees.
+            // An earlier version gave up after 5 minutes and disposed the writer underneath the
+            // pumps, so a long session's log went silent partway through.
+            await Task.WhenAll(
+                PumpAsync(process.StandardOutput, writer, "stdout"),
+                PumpAsync(process.StandardError, writer, "stderr"));
         }
         catch { /* best-effort */ }
+    }
+
+    /// <summary>Copies one process stream into the shared log, tagged with its channel.</summary>
+    private static async Task PumpAsync(StreamReader reader, TextWriter writer, string channel)
+    {
+        // ReadLineAsync returns null at end-of-stream, avoiding the CA2024 diagnostic from
+        // synchronous EndOfStream checks in async methods.
+        string? line;
+        while ((line = await reader.ReadLineAsync()) is not null)
+        {
+            await writer.WriteLineAsync($"[{channel}] {line}");
+            await writer.FlushAsync();
+        }
     }
 }

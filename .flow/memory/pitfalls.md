@@ -65,7 +65,7 @@ Use Channel.CreateBounded (not Unbounded) for inbound message queues from untrus
 Playwright NuGet build/buildTransitive targets conflict with UseArtifactsOutput+OutputType=Exe on macOS/Linux; exclude those assets and install browsers from NuGet cache path instead
 
 ## 2026-02-11 manual [pitfall]
-When starting external processes with fallback candidates, verify the process survives briefly (check HasExited after short delay) before returning -- commands like 'dotnet serve' can start then exit immediately if a tool is not installed
+When starting external processes with fallback candidates, probe each one all the way to the readiness signal you actually need (an HTTP response, a CDP handshake) and reject it the moment its process exits -- a 'survives briefly' liveness check races the child's startup and accepts doomed candidates ('dotnet serve' with dotnet-serve uninstalled took >500ms to exit 1 on CI run 33770173883, blocking main)
 
 ## 2026-02-11 manual [pitfall]
 When polling for external service readiness (HTTP server, CDP endpoint), always check whether the backing process has died between polls -- otherwise timeout gives a generic error instead of a fast diagnostic with process exit code and stderr
