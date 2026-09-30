@@ -56,6 +56,31 @@ namespace Monaco.Helpers
         partial void PartialCtor(ICodeEditorPresenter parent);
 
         /// <summary>
+        /// Resolves the object that a named property is declared on.
+        /// </summary>
+        /// <param name="presenter">The presenter this accessor was created for.</param>
+        /// <param name="name">The property name used by the JavaScript bridge.</param>
+        /// <returns>The object to read or write, and the property, if one was found.</returns>
+        /// <remarks>
+        /// The bridge addresses properties declared on the editor control -- <c>Text</c>,
+        /// <c>SelectedText</c>, <c>SelectedRange</c> -- while this accessor holds the presenter,
+        /// which declares none of them. Looking them up on the presenter alone returned no
+        /// <see cref="PropertyInfo"/>, and the null-conditional at each call site then turned
+        /// "property not found" into "do nothing" -- so editor-originated writes were dropped in
+        /// silence. The presenter remains the fallback, so presenter-owned properties still work.
+        /// </remarks>
+        private (object Target, PropertyInfo? Property) ResolveProperty(ICodeEditorPresenter presenter, string name)
+        {
+            if (presenter.ParentCodeEditor is { } editor
+                && editor.GetType().GetProperty(name) is { } editorProperty)
+            {
+                return (editor, editorProperty);
+            }
+
+            return (presenter, typeinfo.GetProperty(name));
+        }
+
+        /// <summary>
         /// Registers an action from the .NET side which can be called from within the JavaScript code.
         /// </summary>
         /// <param name="name">String Key.</param>
@@ -201,8 +226,8 @@ namespace Monaco.Helpers
             {
                 if (parent.TryGetTarget(out var tobj))
                 {
-                    var propinfo = typeinfo.GetProperty(name);
-                    return propinfo?.GetValue(tobj);
+                    var (target, propinfo) = ResolveProperty(tobj, name);
+                    return propinfo?.GetValue(target);
                 }
                 return null;
             }
@@ -212,8 +237,8 @@ namespace Monaco.Helpers
             {
                 if (parent.TryGetTarget(out var tobj))
                 {
-                    var propinfo = typeinfo.GetProperty(name);
-                    result = propinfo?.GetValue(tobj);
+                    var (target, propinfo) = ResolveProperty(tobj, name);
+                    result = propinfo?.GetValue(target);
                 }
             }).ConfigureAwait(false);
 
@@ -233,8 +258,8 @@ namespace Monaco.Helpers
         {
             if (parent.TryGetTarget(out var tobj))
             {
-                var propinfo = typeinfo.GetProperty(name);
-                var obj = propinfo?.GetValue(tobj);
+                var (target, propinfo) = ResolveProperty(tobj, name);
+                var obj = propinfo?.GetValue(target);
 
                 if (obj is null)
                 {
@@ -270,8 +295,8 @@ namespace Monaco.Helpers
             {
                 if (parent.TryGetTarget(out var tobj))
                 {
-                    var propinfo = typeinfo.GetProperty(name);
-                    var prop = propinfo?.GetValue(tobj);
+                    var (target, propinfo) = ResolveProperty(tobj, name);
+                    var prop = propinfo?.GetValue(target);
                     if (prop != null)
                     {
                         var childinfo = prop.GetType().GetProperty(child);
@@ -286,8 +311,8 @@ namespace Monaco.Helpers
             {
                 if (parent.TryGetTarget(out var tobj))
                 {
-                    var propinfo = typeinfo.GetProperty(name);
-                    var prop = propinfo?.GetValue(tobj);
+                    var (target, propinfo) = ResolveProperty(tobj, name);
+                    var prop = propinfo?.GetValue(target);
                     if (prop != null)
                     {
                         var childinfo = prop.GetType().GetProperty(child);
@@ -337,14 +362,14 @@ namespace Monaco.Helpers
         {
             if (parent.TryGetTarget(out var tobj))
             {
-                var propinfo = typeinfo.GetProperty(name);
+                var (target, propinfo) = ResolveProperty(tobj, name);
                 tobj.IsSettingValue = true;
                 try
                 {
                     // Desanitization is handled at the JSExport boundary
                     // (ManagedSetValue in ParentAccessor.wasm.cs). Do not
                     // desanitize here -- callers pass already-decoded values.
-                    propinfo?.SetValue(tobj, newValue);
+                    propinfo?.SetValue(target, newValue);
                 }
                 finally
                 {
@@ -357,7 +382,7 @@ namespace Monaco.Helpers
         {
             if (parent.TryGetTarget(out var tobj))
             {
-                var propinfo = typeinfo.GetProperty(name);
+                var (target, propinfo) = ResolveProperty(tobj, name);
 
                 if (!_typeInfoMap.TryGetValue(type, out var jsonTypeInfo))
                 {
@@ -371,7 +396,7 @@ namespace Monaco.Helpers
                 tobj.IsSettingValue = true;
                 try
                 {
-                    propinfo?.SetValue(tobj, obj);
+                    propinfo?.SetValue(target, obj);
                 }
                 finally
                 {

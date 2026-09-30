@@ -170,4 +170,70 @@ public sealed class BridgeEncodingTests
         Assert.DoesNotContain(":", encoded);
         Assert.DoesNotContain(",", encoded);
     }
+
+    // ---- DecodeTransport: the byte-exact decoder for the raw-text property writes ----
+
+    [Fact]
+    public void DecodeTransport_NullInput_ReturnsNull()
+    {
+        Assert.Null(BridgeEncoding.DecodeTransport(null));
+    }
+
+    [Fact]
+    public void DecodeTransport_EmptyString_ReturnsEmpty()
+    {
+        Assert.Equal(string.Empty, BridgeEncoding.DecodeTransport(string.Empty));
+    }
+
+    /// <summary>
+    /// The raw-text property writes (<c>Text</c>, <c>ModifiedText</c>, <c>SelectedText</c>) carry
+    /// the editor's document, not a JSON literal, so decoding must give back exactly what was
+    /// encoded. Each case is source the JSExport boundary used to alter: quoted strings lost their
+    /// quotes, doubled backslashes were halved, and a literal backslash-t or
+    /// backslash-r-backslash-n became a control character.
+    /// </summary>
+    [Theory]
+    [InlineData("\"hello\"")]
+    [InlineData("\"\"")]
+    [InlineData("var s = \"say \\\"hi\\\"\";")]
+    [InlineData("a\\tb")]
+    [InlineData("line1\\r\\nline2")]
+    [InlineData("C:\\\\Users\\\\me")]
+    [InlineData("var p = @\"C:\\\\\";")]
+    [InlineData("  padded  ")]
+    [InlineData("\tindented\r\nreal line break\n")]
+    [InlineData("100% of {items}: 'a', \"b\" & c")]
+    public void DecodeTransport_RoundTripsRawTextExactly(string document)
+    {
+        var encoded = BridgeEncoding.Sanitize(document);
+
+        Assert.Equal(document, BridgeEncoding.DecodeTransport(encoded));
+    }
+
+    /// <summary>
+    /// Nothing that merely looks like an escape sequence may be interpreted: the decoder's only
+    /// job is the percent-encoding, so text with none of it passes through untouched.
+    /// </summary>
+    [Fact]
+    public void DecodeTransport_LeavesUnencodedTextUntouched()
+    {
+        const string input = "\\t \\r\\n \\\\ \\\" \"quoted\"";
+
+        Assert.Equal(input, BridgeEncoding.DecodeTransport(input));
+    }
+
+    /// <summary>
+    /// A percent sign followed by digits that happen to spell an encoded character is content,
+    /// not encoding, once the real encoding has been applied around it.
+    /// </summary>
+    [Theory]
+    [InlineData("%34")]
+    [InlineData("%92")]
+    [InlineData("50%37 off")]
+    public void DecodeTransport_DoesNotDoubleDecode(string document)
+    {
+        var encoded = BridgeEncoding.Sanitize(document);
+
+        Assert.Equal(document, BridgeEncoding.DecodeTransport(encoded));
+    }
 }

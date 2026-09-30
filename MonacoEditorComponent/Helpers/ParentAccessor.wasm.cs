@@ -24,19 +24,33 @@ partial class ParentAccessor
         _instances.Remove(presenter);
     }
 
+    /// <summary>
+    /// JSExport entry point for the raw-text property writes: the document (<c>Text</c>,
+    /// <c>ModifiedText</c>) reported by the content listener and the <c>SelectedText</c>
+    /// reported by the selection listener in <c>asyncCallbackHelpers.ts</c>.
+    /// </summary>
+    /// <param name="managedOwner">The managed presenter object passed from JavaScript.</param>
+    /// <param name="name">The property name on the editor control.</param>
+    /// <param name="value">The editor's text, percent-encoded by <c>stringifyForMarshalling</c>.</param>
+    /// <remarks>
+    /// <paramref name="value"/> is the model's text with only the bridge's transport encoding
+    /// applied -- it is not a JSON string literal -- so the only thing to undo here is that
+    /// encoding. This method used to also trim quotation marks, halve doubled backslashes and
+    /// turn a literal <c>\t</c> or <c>\r\n</c> into the control characters. That went unnoticed
+    /// while the write was dropped on the presenter; once it reaches the editor's properties,
+    /// each of those alters the host's copy of the document, so a consumer saving <c>Text</c>
+    /// would save different source from what Monaco displays. The desktop bridge
+    /// (<c>ParentAccessorDesktop.OnSetValue</c>) has always passed the string through untouched;
+    /// decoding only the transport keeps both bridges reporting the same text. JSON-carrying
+    /// values take <see cref="ManagedSetValueWithType"/> instead.
+    /// </remarks>
     [JSExport]
     internal static void ManagedSetValue([JSMarshalAs<JSType.Any>] object managedOwner, string name, string value)
     {
         if (_instances.TryGetValue(managedOwner, out var parentAccessor))
         {
-            var json = Desanitize(value) ?? "";
-            json = json.Replace(@"\\", @"\");
-            json = json.Trim('"');
-            json = json.Replace(@"\r\n", Environment.NewLine);
-            json = json.Replace(@"\t", "\t");
-            System.Diagnostics.Debug.WriteLine($"Trimmed: {json}");
-            // Pass the desanitized/processed json, not the raw value
-            _ = parentAccessor.SetValue(name, json);
+            var text = BridgeEncoding.DecodeTransport(value) ?? "";
+            _ = parentAccessor.SetValue(name, text);
         }
         else
         {
@@ -44,6 +58,16 @@ partial class ParentAccessor
         }
     }
 
+    /// <summary>
+    /// JSExport entry point for the typed property writes, where <paramref name="value"/> is a
+    /// percent-encoded JSON document deserialized as <paramref name="type"/> (for example the
+    /// <c>Selection</c> behind <c>SelectedRange</c>). Distinct from <see cref="ManagedSetValue"/>,
+    /// which carries raw text and must not be normalized.
+    /// </summary>
+    /// <param name="managedOwner">The managed presenter object passed from JavaScript.</param>
+    /// <param name="name">The property name on the editor control.</param>
+    /// <param name="value">The JSON payload, percent-encoded by <c>stringifyForMarshalling</c>.</param>
+    /// <param name="type">The registered type name to deserialize the JSON as.</param>
     [JSExport]
     internal static void ManagedSetValueWithType([JSMarshalAs<JSType.Any>] object managedOwner, string name, string value, string type)
     {
