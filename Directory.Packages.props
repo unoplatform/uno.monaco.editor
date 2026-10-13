@@ -14,7 +14,7 @@
     <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.10" />
     <PackageVersion Include="StreamJsonRpc" Version="2.25.28" />
     <PackageVersion Include="Uno.CommunityToolkit.WinUI" Version="7.1.204" />
-    <PackageVersion Include="Uno.WinUI" Version="6.5.153" />
+    <PackageVersion Include="Uno.WinUI" Version="7.0.0-dev.2282" />
     <PackageVersion Include="Uno.Core.Extensions.Logging" Version="4.1.1" />
     <PackageVersion Include="Uno.Core.Extensions.Logging.Singleton" Version="4.1.1" />
     <PackageVersion Include="Microsoft.TypeScript.MSBuild" Version="5.9.3" />

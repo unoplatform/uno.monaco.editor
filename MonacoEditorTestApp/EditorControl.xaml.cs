@@ -224,7 +224,7 @@ namespace MonacoEditorTestApp
                     try
                     {
                         var md = new MessageDialog("You hit the CodeLens command " + args[0]?.ToString());
-                        WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
+                        WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow!));
                         await md.ShowAsync();
                     }
                     catch (Exception ex)
@@ -247,7 +247,7 @@ namespace MonacoEditorTestApp
                 await Editor.AddCommandAsync(KeyCode.F5, async (args) =>
                 {
                     var md = new MessageDialog("You Hit F5!");
-                    WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
+                    WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow!));
                     await md.ShowAsync();
 
                     // Turn off Command again.
@@ -264,7 +264,7 @@ namespace MonacoEditorTestApp
                         var range = await model.GetFullModelRangeAsync();
 
                         var md = new MessageDialog("Document Range: " + range?.ToString());
-                        WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
+                        WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow!));
                         await md.ShowAsync();
                     }
 
@@ -280,13 +280,13 @@ namespace MonacoEditorTestApp
                         if (word == null)
                         {
                             var md = new MessageDialog("No Word Found.");
-                            WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
+                            WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow!));
                             await md.ShowAsync();
                         }
                         else
                         {
                             var md = new MessageDialog("Word: " + word.Word + "[" + word.StartColumn + ", " + word.EndColumn + "]");
-                            WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
+                            WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow!));
                             await md.ShowAsync();
                         }
                     }
@@ -304,7 +304,7 @@ namespace MonacoEditorTestApp
                         var count = await model.GetLineCountAsync();
 
                         var md = new MessageDialog("Current Line: " + line + "\nAll Lines [" + count + "]:\n" + string.Join("\n", lines));
-                        WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
+                        WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow!));
                         await md.ShowAsync();
                     }
 
@@ -319,7 +319,7 @@ namespace MonacoEditorTestApp
                         var seg = await model.GetValueInRangeAsync(range);
 
                         var md = new MessageDialog("Segment " + range.ToString() + ": " + seg);
-                        WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
+                        WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow!));
                         await md.ShowAsync();
                     }
 
@@ -798,7 +798,7 @@ namespace MonacoEditorTestApp
                 _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Low, async () =>
                 {
                     var md = new MessageDialog("You Hit Ctrl+Enter!");
-                    WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
+                    WinRT.Interop.InitializeWithWindow.Initialize(md, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow!));
                     await md.ShowAsync();
 
                     // Refocus on CodeEditor
