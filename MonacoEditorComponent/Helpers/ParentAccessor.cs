@@ -3,8 +3,6 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 
-using CommunityToolkit.WinUI;
-
 using Microsoft.UI.Dispatching;
 
 using Monaco.Serialization;
