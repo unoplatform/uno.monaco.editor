@@ -45,7 +45,8 @@ A cross-platform [Uno Platform](https://platform.uno/) wrapper around the [Monac
 ### Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) with the `wasm-tools` workload (for WASM targets)
-- [Uno Platform project](https://platform.uno/docs/articles/getting-started.html) targeting `net10.0-browserwasm` and/or `net10.0-desktop`
+- [Uno Platform 7.0](https://platform.uno/docs/articles/getting-started.html) project targeting `net10.0-browserwasm` and/or `net10.0-desktop`.
+  Uno Platform 6 apps must stay on `Uno.Monaco.Editor` 6.5.x (the last is `6.5.0-dev.395`); Uno 7 cannot load libraries built against Uno 6
 
 ### Install
 

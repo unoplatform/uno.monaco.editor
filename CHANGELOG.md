@@ -55,7 +55,7 @@ Monaco Editor version: **0.52.2** (declared `^0.52.2` in `package.json`; resolve
 - **Custom converters**: all domain-specific JSON converters rewritten for `System.Text.Json` (string enums use `JsonStringEnumMemberName`)
 - **`ParentAccessor`**: redesigned for AOT-compatible serialization with `System.Text.Json`
 - **TFM consolidation**: unified to `net10.0` with runtime platform detection replacing compile-time `#if` directives
-- **Uno Platform upgrade**: updated to Uno 5+ / WinUI, targeting .NET 10
+- **Uno Platform upgrade**: requires Uno Platform 7.0, targeting .NET 10. Uno 7 cannot load libraries built against Uno 6, so Uno 6 apps must stay on `Uno.Monaco.Editor` 6.5.x (the last is `6.5.0-dev.395`); the package version line moves to 7.0 to match
 - **Monaco Editor upgrade**: updated from v0.21.3 to v0.52.2
 - **CI pipeline**: migrated from Azure Pipelines to GitHub Actions with NuGet signing
 - **Versioning**: switched to Nerdbank.GitVersioning
@@ -70,6 +70,7 @@ Monaco Editor version: **0.52.2** (declared `^0.52.2` in `package.json`; resolve
 ### Removed
 
 - **`Newtonsoft.Json` dependency**: the transitive NuGet dependency has been removed from the library
+- **`Uno.CommunityToolkit.WinUI` dependency**: built against Uno 5 and unable to bind on Uno 7; the one API used from it, `DispatcherQueue.EnqueueAsync`, is now internal to the library. Projects that used the toolkit through this transitive reference must reference it themselves
 - **Legacy `GenerateMonacoTypings` MSBuild target**: replaced by the new `ts-morph` + .NET CLI emitter pipeline
 - **AMD script loading**: replaced by ESM module bundling with esbuild
 - **`build/` directory**: stale build artifacts directory removed
@@ -104,7 +105,7 @@ Monaco Editor version: **0.52.2** (declared `^0.52.2` in `package.json`; resolve
 
 This release contains several breaking changes. Follow these steps to migrate from `Monaco.Editor` 2.0.0-dev.60 or earlier:
 
-1. **Target framework**: Upgrade consuming projects to .NET 10 and Uno Platform 5+. The library now targets `net10.0` exclusively.
+1. **Target framework**: Upgrade consuming projects to .NET 10 and Uno Platform 7.0. The library now targets `net10.0` exclusively.
 
 2. **Package reference**: Replace `Monaco.Editor` with `Uno.Monaco.Editor` in your project file.
 
