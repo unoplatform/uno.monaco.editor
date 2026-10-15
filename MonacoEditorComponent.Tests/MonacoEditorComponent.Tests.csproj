@@ -3,6 +3,18 @@
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
 		<OutputType>Exe</OutputType>
+		<!--
+			Uno 7's UNOB0029 rejects any Exe that references Uno.WinUI without the Uno.Sdk, and only
+			exempts projects with IsTestProject=true. xunit.v3.mtp-v2 marks this project as a testing
+			platform application but leaves IsTestProject unset, so say it explicitly.
+		-->
+		<IsTestProject>true</IsTestProject>
+		<!--
+			UNOB0025: the library reference brings Uno.Foundation/Uno.WinRT without a runtime host.
+			Intentional: these tests exercise the bridge and serialization layers in-process and drive
+			the real UI through the separately built TestApp, so no Uno runtime is needed here.
+		-->
+		<MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);UNOB0025</MSBuildWarningsAsMessages>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<NoWarn>$(NoWarn);CA1416;xUnit1051</NoWarn>

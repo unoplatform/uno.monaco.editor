@@ -42,7 +42,6 @@
 	<ItemGroup>
 		<PackageReference Include="Nito.AsyncEx" />
 		<PackageReference Include="StreamJsonRpc" />
-		<PackageReference Include="Uno.CommunityToolkit.WinUI" />
 		<PackageReference Include="Uno.WinUI" />
 		<PackageReference Include="Uno.Core.Extensions.Logging" />
 		<PackageReference Include="Uno.Core.Extensions.Logging.Singleton" />

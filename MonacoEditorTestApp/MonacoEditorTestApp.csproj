@@ -22,7 +22,7 @@
       https://aka.platform.uno/singleproject-features
     -->
 		<UnoFeatures>
-			SkiaRenderer;
+			Skia;
 			WebView;
 		</UnoFeatures>
 
@@ -45,18 +45,6 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\MonacoEditorComponent\MonacoEditorComponent.csproj" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<!--
-			Direct reference to force the patched System.Security.Cryptography.Xml (version from
-			Directory.Packages.props) into the app graph. Version 10.0.9 flows in transitively and has
-			known high-severity vulnerabilities that fail the NU1903 audit (GHSA-23rf-6693-g89p and
-			related). With CentralPackageTransitivePinningEnabled unset (as it is in this repo), CPM
-			does not pin transitive dependency versions on its own, so this direct reference is what
-			applies the fix. Enabling that option would be the alternative to referencing it directly.
-		-->
-		<PackageReference Include="System.Security.Cryptography.Xml" />
 	</ItemGroup>
 
 	<ItemGroup>

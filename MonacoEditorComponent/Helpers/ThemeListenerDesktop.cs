@@ -1,7 +1,5 @@
 using System.Diagnostics;
 
-using CommunityToolkit.WinUI;
-
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 
