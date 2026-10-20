@@ -7,7 +7,7 @@
   -->
   <ItemGroup>
     <PackageVersion Include="Nito.AsyncEx" Version="5.1.2" />
-    <PackageVersion Include="StreamJsonRpc" Version="2.25.28" />
+    <PackageVersion Include="StreamJsonRpc" Version="2.26.150" />
     <PackageVersion Include="Uno.WinUI" Version="7.0.0-dev.2282" />
     <PackageVersion Include="Uno.Core.Extensions.Logging" Version="4.1.1" />
     <PackageVersion Include="Uno.Core.Extensions.Logging.Singleton" Version="4.1.1" />
