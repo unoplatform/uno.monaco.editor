@@ -100,7 +100,8 @@ Additional jobs (Sign, Publish Dev, Publish Production) run only on pushes to `m
 ### Known CI limitations
 
 - **Desktop CDP tests** run on the Windows CI runner (`windows-latest`), which has WebView2 Runtime and Edge pre-installed. They are excluded from Ubuntu (no WebView2) and macOS ARM (no WebView2 on macOS). The fixture uses `-c Release --no-build` to avoid rebuild overhead and a 60s Monaco readiness timeout to accommodate CI cold-start latency.
-- **WASM Playwright tests** are excluded from the Windows Desktop Tests job and the macOS ARM job (`--filter-not-trait "Category=WasmPlaywright"`). Ubuntu covers WASM Playwright tests; macOS ARM validates builds and unit tests only (the static file server startup is too slow on ARM runners).
+- **WASM Playwright tests** are excluded from the Windows Desktop Tests job and the macOS ARM job (`--filter-not-trait "Category=WasmPlaywright"`). Ubuntu covers WASM Playwright tests; macOS ARM validates builds and unit tests only (the static file server does not work on that runner -- see below).
+- **Static file server tests** (`Category=StaticServer`, the `WasmAppFixture` candidate fall-through) run on Ubuntu and Windows but are excluded from macOS ARM. A `python -m http.server` started there accepts the connection and then never answers: it prints nothing even with `-u`, and probes time out rather than being refused, so it hangs somewhere before it serves. Cold startup on the Windows runner is also slow -- over 5s to first answer -- which is why every candidate gets a 30s readiness budget.
 
 ### How to verify
 
