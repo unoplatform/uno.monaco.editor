@@ -8,9 +8,9 @@
   <ItemGroup>
     <PackageVersion Include="Nito.AsyncEx" Version="5.1.2" />
     <PackageVersion Include="StreamJsonRpc" Version="2.26.150" />
-    <PackageVersion Include="Uno.WinUI" Version="7.0.0-dev.2282" />
-    <PackageVersion Include="Uno.Core.Extensions.Logging" Version="4.1.1" />
-    <PackageVersion Include="Uno.Core.Extensions.Logging.Singleton" Version="4.1.1" />
+    <PackageVersion Include="Uno.WinUI" Version="7.0.29" />
+    <PackageVersion Include="Uno.Core.Extensions.Logging" Version="5.0.0" />
+    <PackageVersion Include="Uno.Core.Extensions.Logging.Singleton" Version="5.0.0" />
     <PackageVersion Include="Microsoft.TypeScript.MSBuild" Version="5.9.3" />
     <PackageVersion Include="xunit.v3.mtp-v2" Version="3.2.2" />    
     <PackageVersion Include="Microsoft.Playwright" Version="1.58.0" />
