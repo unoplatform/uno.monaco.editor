@@ -53,9 +53,63 @@ namespace Monaco.Extensions
                 throw new JavaScriptInnerException(returnstring, "");
             }
 
-            if (!string.IsNullOrEmpty(returnstring) && returnstring != "\"\"" && returnstring != "null")
+            return DeserializeResult<T>(returnstring);
+        }
+
+        /// <summary>
+        /// Evaluates a JavaScript expression whose result may hold arbitrary text, such as the
+        /// document, a line, or a marker message, and deserializes it as <typeparamref name="T"/>.
+        /// </summary>
+        /// <remarks>
+        /// The macOS WebView returns a string result with its line breaks and backslashes left raw
+        /// (unoplatform/uno#26294), which is not valid JSON. So the page serializes the result
+        /// itself and percent-encodes the only characters of that JSON a bridge could mangle
+        /// (<c>%</c>, <c>"</c> and <c>\</c>). What crosses the bridge is then a string every
+        /// platform returns intact, and it is decoded here before being deserialized.
+        /// </remarks>
+        /// <param name="_view">The presenter to run the script in.</param>
+        /// <param name="expression">A single JavaScript expression, without a trailing semicolon. It may reference <c>element</c>.</param>
+        /// <param name="member">The calling member, for diagnostics.</param>
+        /// <param name="file">The calling file, for diagnostics.</param>
+        /// <param name="line">The calling line, for diagnostics.</param>
+        /// <returns>The result, or <see langword="default"/> when it is <c>null</c>, <c>undefined</c> or an empty string.</returns>
+        public static async Task<T?> RunEncodedExpressionAsync<T>(
+            this ICodeEditorPresenter _view,
+            string expression,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
+            [CallerLineNumber] int line = 0)
+        {
+            var script = EncodeExpressionResult(expression);
+
+            try
             {
-                return JsonSerializer.Deserialize<T>(returnstring, MonacoJsonContext.Default.Options);
+                var encodedJson = await RunScriptHelperAsync<string>(_view, script);
+
+                return encodedJson is null
+                    ? default
+                    : DeserializeResult<T>(global::System.Uri.UnescapeDataString(encodedJson));
+            }
+            catch (Exception e)
+            {
+                throw new JavaScriptExecutionException(member, file, line, script, e);
+            }
+        }
+
+        /// <summary>
+        /// Wraps <paramref name="expression"/> so the page returns its JSON with <c>%</c>, <c>"</c>
+        /// and <c>\</c> percent-encoded, or <c>null</c> when the result has no JSON form.
+        /// </summary>
+        /// <param name="expression">A single JavaScript expression.</param>
+        /// <returns>The script to evaluate.</returns>
+        internal static string EncodeExpressionResult(string expression)
+            => "(function (v) { var j = JSON.stringify(v); return j === undefined ? null : j.replace(/[%\"\\\\]/g, function (c) { return c === '%' ? '%25' : c === '\"' ? '%22' : '%5C'; }); })(" + expression + ")";
+
+        private static T? DeserializeResult<T>(string? json)
+        {
+            if (!string.IsNullOrEmpty(json) && json != "\"\"" && json != "null")
+            {
+                return JsonSerializer.Deserialize<T>(json, MonacoJsonContext.Default.Options);
             }
 
             return default;

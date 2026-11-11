@@ -348,7 +348,7 @@ namespace Monaco
         /// <remarks>Wraps Monaco <c>editor.getModelMarkers</c>.</remarks>
         public async Task<IEnumerable<Marker?>> GetModelMarkersAsync() // TODO: Filter (string? owner, Uri? resource, int? take)
         {
-            return await SendScriptAsync<IEnumerable<Marker>>("monaco.editor.getModelMarkers();").AsAsyncOperation();
+            return await SendEncodedExpressionAsync<IEnumerable<Marker>>("monaco.editor.getModelMarkers()").AsAsyncOperation();
         }
 
         /// <summary>

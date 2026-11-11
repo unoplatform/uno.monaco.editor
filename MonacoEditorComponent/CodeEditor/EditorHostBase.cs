@@ -848,16 +848,37 @@ namespace Monaco
             await SendScriptAsync<object>(script, member, file, line);
         }
 
-        internal async Task<T?> SendScriptAsync<T>(string script,
+        internal Task<T?> SendScriptAsync<T>(string script,
             [CallerMemberName] string? member = null,
             [CallerFilePath] string? file = null,
             [CallerLineNumber] int line = 0)
+            => SendGuardedAsync(view => view.RunScriptAsync<T>(script, member, file, line), script);
+
+        /// <summary>
+        /// Evaluates a JavaScript expression whose result may hold arbitrary text and returns it
+        /// intact on every platform. Use it, rather than <see cref="SendScriptAsync{T}"/>, for any
+        /// result that carries document text: line breaks and backslashes in it would otherwise
+        /// break deserialization on macOS.
+        /// </summary>
+        /// <typeparam name="T">The type of the result.</typeparam>
+        /// <param name="expression">A single JavaScript expression, without a trailing semicolon. It may reference <c>element</c>.</param>
+        /// <param name="member">The calling member, for diagnostics.</param>
+        /// <param name="file">The calling file, for diagnostics.</param>
+        /// <param name="line">The calling line, for diagnostics.</param>
+        /// <returns>The result, or <see langword="default"/> when it is empty or the script failed.</returns>
+        internal Task<T?> SendEncodedExpressionAsync<T>(string expression,
+            [CallerMemberName] string? member = null,
+            [CallerFilePath] string? file = null,
+            [CallerLineNumber] int line = 0)
+            => SendGuardedAsync(view => view.RunEncodedExpressionAsync<T>(expression, member, file, line), expression);
+
+        private async Task<T?> SendGuardedAsync<T>(Func<ICodeEditorPresenter, Task<T?>> run, string script)
         {
             if (_initialized && _view is not null)
             {
                 try
                 {
-                    return await _view.RunScriptAsync<T>(script, member, file, line);
+                    return await run(_view);
                 }
                 catch (Exception e)
                 {
