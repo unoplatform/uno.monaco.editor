@@ -6,6 +6,9 @@ runs:
   steps:
   - name: Checkout
     uses: actions/checkout@v4
+    with:
+      # nbgv computes the version height from the git history: a shallow clone fails.
+      fetch-depth: 0
 
   - name: Setup .NET SDK
     uses: actions/setup-dotnet@v4
