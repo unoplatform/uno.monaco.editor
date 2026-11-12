@@ -26,4 +26,6 @@ runs:
       $dllPath = Join-Path $pwPkgPath "lib/netstandard2.0/Microsoft.Playwright.dll"
       if (-not (Test-Path $dllPath)) { throw "Microsoft.Playwright.dll not found at $dllPath" }
       [Reflection.Assembly]::Load([System.IO.File]::ReadAllBytes($dllPath)) | Out-Null
-      [Microsoft.Playwright.Program]::Main(@("install", "--with-deps", "chromium"))
+      # Main returns the CLI's exit code instead of throwing: fail here, not later in the tests.
+      $exitCode = [Microsoft.Playwright.Program]::Main(@("install", "--with-deps", "chromium"))
+      if ($exitCode -ne 0) { throw "Playwright browser install failed (exit code $exitCode)" }
