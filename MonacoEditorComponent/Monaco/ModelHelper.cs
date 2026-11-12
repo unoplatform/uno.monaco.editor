@@ -91,7 +91,7 @@ public sealed class ModelHelper(EditorHostBase editor) : IModel
     {
         if (_editor.TryGetTarget(out var editor))
         {
-            return await editor.SendScriptAsync<string>("EditorContext.getEditorForElement(element).model.getEOL();").AsAsyncOperation();
+            return await editor.SendEncodedExpressionAsync<string>("EditorContext.getEditorForElement(element).model.getEOL()").AsAsyncOperation();
         }
 
         return null;
@@ -111,7 +111,7 @@ public sealed class ModelHelper(EditorHostBase editor) : IModel
     {
         if (_editor.TryGetTarget(out var editor))
         {
-            return await editor.SendScriptAsync<string>("EditorContext.getEditorForElement(element).model.getLineContent(" + lineNumber + ");").AsAsyncOperation();
+            return await editor.SendEncodedExpressionAsync<string>("EditorContext.getEditorForElement(element).model.getLineContent(" + lineNumber + ")").AsAsyncOperation();
         }
 
         return null;
@@ -181,7 +181,7 @@ public sealed class ModelHelper(EditorHostBase editor) : IModel
     {
         if (_editor.TryGetTarget(out var editor))
         {
-            return await editor.SendScriptAsync<IEnumerable<string>>("EditorContext.getEditorForElement(element).model.getLinesContent();").AsAsyncOperation();
+            return await editor.SendEncodedExpressionAsync<IEnumerable<string>>("EditorContext.getEditorForElement(element).model.getLinesContent()").AsAsyncOperation();
         }
 
         return [];
@@ -191,7 +191,7 @@ public sealed class ModelHelper(EditorHostBase editor) : IModel
     {
         if (_editor.TryGetTarget(out var editor))
         {
-            return await editor.SendScriptAsync<string>("EditorContext.getEditorForElement(element).model.getModelId();").AsAsyncOperation();
+            return await editor.SendEncodedExpressionAsync<string>("EditorContext.getEditorForElement(element).model.getModelId()").AsAsyncOperation();
         }
 
         return null;
@@ -211,7 +211,7 @@ public sealed class ModelHelper(EditorHostBase editor) : IModel
     {
         if (_editor.TryGetTarget(out var editor))
         {
-            return await editor.SendScriptAsync<string>("EditorContext.getEditorForElement(element).model.getOneIndent();").AsAsyncOperation();
+            return await editor.SendEncodedExpressionAsync<string>("EditorContext.getEditorForElement(element).model.getOneIndent()").AsAsyncOperation();
         }
 
         return null;
@@ -231,7 +231,7 @@ public sealed class ModelHelper(EditorHostBase editor) : IModel
     {
         if (_editor.TryGetTarget(out var editor))
         {
-            return await editor.SendScriptAsync<string>("EditorContext.getEditorForElement(element).model.getValue();").AsAsyncOperation();
+            return await editor.SendEncodedExpressionAsync<string>("EditorContext.getEditorForElement(element).model.getValue()").AsAsyncOperation();
         }
 
         return null;
@@ -251,7 +251,7 @@ public sealed class ModelHelper(EditorHostBase editor) : IModel
     {
         if (_editor.TryGetTarget(out var editor))
         {
-            return await editor.SendScriptAsync<string>("EditorContext.getEditorForElement(element).model.getValueInRange(" + JsonSerializer.Serialize(Range.Lift(range), MonacoJsonContext.Relaxed.Range) + ");").AsAsyncOperation();
+            return await editor.SendEncodedExpressionAsync<string>("EditorContext.getEditorForElement(element).model.getValueInRange(" + JsonSerializer.Serialize(Range.Lift(range), MonacoJsonContext.Relaxed.Range) + ")").AsAsyncOperation();
         }
 
         return null;
@@ -307,7 +307,7 @@ public sealed class ModelHelper(EditorHostBase editor) : IModel
     {
         if (_editor.TryGetTarget(out var editor))
         {
-            return await editor.SendScriptAsync<WordAtPosition>("EditorContext.getEditorForElement(element).model.getWordAtPosition(" + JsonSerializer.Serialize(Position.Lift(position), MonacoJsonContext.Relaxed.Position) + ");").AsAsyncOperation();
+            return await editor.SendEncodedExpressionAsync<WordAtPosition>("EditorContext.getEditorForElement(element).model.getWordAtPosition(" + JsonSerializer.Serialize(Position.Lift(position), MonacoJsonContext.Relaxed.Position) + ")").AsAsyncOperation();
         }
 
         return null;
@@ -317,7 +317,7 @@ public sealed class ModelHelper(EditorHostBase editor) : IModel
     {
         if (_editor.TryGetTarget(out var editor))
         {
-            return await editor.SendScriptAsync<WordAtPosition>("EditorContext.getEditorForElement(element).model.getWordUntilPosition(" + JsonSerializer.Serialize(Position.Lift(position), MonacoJsonContext.Relaxed.Position) + ");").AsAsyncOperation();
+            return await editor.SendEncodedExpressionAsync<WordAtPosition>("EditorContext.getEditorForElement(element).model.getWordUntilPosition(" + JsonSerializer.Serialize(Position.Lift(position), MonacoJsonContext.Relaxed.Position) + ")").AsAsyncOperation();
         }
 
         return null;
@@ -337,7 +337,7 @@ public sealed class ModelHelper(EditorHostBase editor) : IModel
     {
         if (_editor.TryGetTarget(out var editor))
         {
-            return await editor.SendScriptAsync<string>("EditorContext.getEditorForElement(element).model.normalizeIndentations(JSON.parse(" + JsonSerializer.Serialize(str, MonacoJsonContext.Relaxed.Options) + "));").AsAsyncOperation();
+            return await editor.SendEncodedExpressionAsync<string>("EditorContext.getEditorForElement(element).model.normalizeIndentations(JSON.parse(" + JsonSerializer.Serialize(str, MonacoJsonContext.Relaxed.Options) + "))").AsAsyncOperation();
         }
 
         return null;

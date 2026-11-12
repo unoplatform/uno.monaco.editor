@@ -2,6 +2,8 @@ using System.Globalization;
 
 using Microsoft.Playwright;
 
+using Monaco.Extensions;
+
 using Xunit;
 
 namespace MonacoEditorComponent.Tests;
@@ -115,6 +117,34 @@ public sealed class WasmIntegrationTests : IAsyncLifetime
                 $"() => {DiffEditorCases.StandaloneEditorsExpressionBody}[0].getValue()");
 
             Assert.Equal(testText, readBack);
+        }
+        catch
+        {
+            _testFailed = true;
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Text read through <c>RunEncodedExpressionAsync</c> survives the real WASM bridge
+    /// (<c>InvokeJS</c>), so the encoding added for macOS does not break the browser.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "WasmPlaywright")]
+    public async Task EncodedExpression_MultiLineText_ReadsBackIntact()
+    {
+        _currentTestName = nameof(EncodedExpression_MultiLineText_ReadsBackIntact);
+        try
+        {
+            const string text = "line 1\nvar path = \"C:\\temp\\new\";\n\tdone 100%";
+            var editor = DiffEditorCases.StandaloneEditorsExpressionBody + "[0]";
+            await _fixture.Page.EvaluateAsync($"text => {editor}.setValue(text)", text);
+
+            var script = ICodeEditorPresenterExtensions.EncodeExpressionResult(editor + ".getValue()");
+            var raw = await _fixture.Page.EvaluateAsync<string>("script => globalThis.InvokeJS('unused', script)", script);
+
+            var presenter = new MockCodeEditorPresenter { ScriptWithElementResult = raw };
+            Assert.Equal(text, await presenter.RunEncodedExpressionAsync<string>("unused"));
         }
         catch
         {

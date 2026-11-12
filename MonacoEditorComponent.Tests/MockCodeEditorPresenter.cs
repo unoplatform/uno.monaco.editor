@@ -55,10 +55,13 @@ internal sealed class MockCodeEditorPresenter : ICodeEditorPresenter
         return Task.FromResult("null");
     }
 
+    /// <summary>The raw result <see cref="InvokeScriptWithElementAsync"/> returns, as the bridge would hand it over.</summary>
+    public string ScriptWithElementResult { get; set; } = "null";
+
     public Task<string> InvokeScriptWithElementAsync(string script)
     {
         InvokeScriptWithElementCalls.Add(script);
-        return Task.FromResult("null");
+        return Task.FromResult(ScriptWithElementResult);
     }
 
     public Task PostWebMessageAsync(string json)
